@@ -1,0 +1,42 @@
+# SpiritCore — Git Ignore
+
+# Environment — NEVER commit credentials
+.env
+.env.local
+.env.production
+.env.staging
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Phase planning documents (local build artifacts)
+PhaseA_*
+PhaseB_*
+PhaseC_*
+PhaseD_*
+PhaseE_*
+PhaseF_*
+PhaseG_*
+PhaseH_*
+phase_b_notes.md
+RepoMap.md
+
+# SQL migration scripts (keep locally, not in repo)
+*.sql
+
+# Test output
+tests/output/

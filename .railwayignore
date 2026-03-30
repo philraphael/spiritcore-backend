@@ -1,0 +1,33 @@
+# SpiritCore — Railway Ignore File
+# Excludes files that must not be deployed to production.
+
+# Local environment — credentials must be set in Railway dashboard only
+.env
+.env.*
+!.env.example
+
+# Development and test artifacts
+tests/
+*.test.mjs
+*.spec.mjs
+
+# Build phase reports and planning documents
+PhaseA_*
+PhaseB_*
+PhaseC_*
+PhaseD_*
+PhaseE_*
+PhaseF_*
+PhaseG_*
+PhaseH_*
+RepoMap.md
+phase_b_notes.md
+*.sql
+
+# Archived legacy files (not needed at runtime)
+archive/
+
+# Editor and OS artifacts
+.DS_Store
+.vscode/
+*.swp
