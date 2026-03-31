@@ -69,12 +69,17 @@ function TopBar({ onContinue, entryAccepted, userName, onEditName }) {
 function EntryCard({ onBegin, userNameDraft, onUserNameDraft }) {
   return html`<section className="entry-card">
     <p className="kicker">Welcome</p>
-    <h2>Begin with beta access</h2>
-    <p>Continue as a beta user now, with sign in and account creation ready to unlock as this beta expands.</p>
+    <h2>Begin your Spiritkins beta session</h2>
+    <p>Spiritkins is for reflective, emotionally attuned check-ins. Start with beta access now, then continue with account features as invites expand.</p>
+    <ol className="entry-steps">
+      <li>Set your display name (optional).</li>
+      <li>Continue as Beta User.</li>
+      <li>Choose a Spiritkin and begin your first grounded conversation.</li>
+    </ol>
     <div className="entry-auth-rail">
       <button disabled title="Coming soon">Sign In (Soon)</button>
       <button disabled title="Coming soon">Create Account (Soon)</button>
-      <span>Beta access is active today</span>
+      <span>Invite-based beta access is active today</span>
     </div>
     <label className="field"><span>Your name (optional)</span><input value=${userNameDraft} placeholder="How should we address you?" onInput=${(e) => onUserNameDraft(e.target.value)} /></label>
     <button className="primary" onClick=${onBegin}>Continue as Beta User</button>
@@ -111,6 +116,7 @@ function SectionHeader({ title, subtitle }) {
 
 function FutureReady() {
   return html`<section className="future-grid">
+    <div><h4>Invite Flow</h4><p>Prepared for invitation, acceptance, and beta cohort onboarding.</p></div>
     <div><h4>Sign In</h4><p>Prepared for secure account login when beta accounts open.</p></div>
     <div><h4>Create Account</h4><p>Reserved for onboarding, profile creation, and consent steps.</p></div>
     <div><h4>Saved Conversations</h4><p>Reserved layout for persistent conversation history.</p></div>
@@ -162,6 +168,7 @@ function App() {
   const continuitySummary = lastMessageAt
     ? `Last active ${fmtTime(lastMessageAt)}`
     : "No local conversation activity yet";
+  const starterFeedbackPrompt = "First session felt calm and clear.";
 
   useEffect(() => { fetchSpiritkins(); hydrateSession(); }, []);
   useEffect(() => {
@@ -311,6 +318,7 @@ function App() {
         <span className="identity-pill subtle">${continuitySummary}</span>
       </div>
       <p className="trust-note">Local-first beta: your preferences, feedback notes, and session continuity stay on this device for now.</p>
+      <p className="launch-note">Built for invited beta testers who want a calm place to reflect, reset, and return over time.</p>
     </section>
 
     <nav className="section-nav">
@@ -409,6 +417,7 @@ function App() {
             </div>
 
             ${failedMessage ? html`<div className="retry-banner"><span>Last message didn’t send.</span><button onClick=${() => sendMessage(failedMessage.content)} disabled=${loadingReply}>Retry</button></div>` : null}
+            ${failedMessage ? html`<p className="retry-note">Your unsent message is preserved locally so you can retry safely.</p>` : null}
 
             <div className="composer">
               <textarea
@@ -454,6 +463,11 @@ function App() {
     ${activeSection === "feedback" ? html`<section className="product-panel feedback-panel">
       <${SectionHeader} title=${SECTION_COPY.feedback.title} subtitle=${SECTION_COPY.feedback.subtitle} />
       <p className="settings-note">Use this as a lightweight product journal while beta access is local-first.</p>
+      <div className="feedback-suggestions">
+        <button onClick=${() => setFeedbackDraft(starterFeedbackPrompt)}>Helpful first-session note</button>
+        <button onClick=${() => setFeedbackDraft("I wanted clearer guidance before selecting a Spiritkin.")}>Onboarding clarity note</button>
+        <button onClick=${() => setFeedbackDraft("Retry and recovery felt dependable.")}>Reliability note</button>
+      </div>
       <textarea value=${feedbackDraft} placeholder="Share what felt helpful, unclear, or missing..." onChange=${(e) => setFeedbackDraft(e.target.value)}></textarea>
       <div className="feedback-actions">
         <button className="primary" onClick=${submitFeedback} disabled=${!feedbackDraft.trim()}>Save Feedback</button>
