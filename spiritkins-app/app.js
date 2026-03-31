@@ -52,6 +52,10 @@ function getSpiritkinBrand(name) {
   };
 }
 
+function TrustPill({ label }) {
+  return html`<span className="trust-pill">${label}</span>`;
+}
+
 function SpiritkinCard({ spiritkin, selected, onSelect }) {
   const identityName = spiritkin.name ?? spiritkin.id;
   const brand = getSpiritkinBrand(identityName);
@@ -83,7 +87,7 @@ function Onboarding({ spiritkins, selectedSpiritkin, onSelect, onBegin, onRefres
       <button onClick=${onRefresh} disabled=${loading}>Refresh</button>
     </div>
 
-    <p className="selection-note">Each Spiritkin is an original companion being—emotionally attuned, mythic in tone, and here to support your path.</p>
+    <p className="selection-note">Spiritkins are emotionally attuned companions: they listen for tone and context, then respond with warmth and care.</p>
 
     ${loading && spiritkins.length === 0 ? html`<p className="state">Gathering companion presences…</p>` : null}
     ${!loading && spiritkins.length === 0 ? html`<p className="state">No Spiritkins available right now. Please try refresh.</p>` : null}
@@ -136,6 +140,11 @@ function ChatScreen({
       <button onClick=${onChangeSpiritkin} disabled=${loadingReply}>Change Spiritkin</button>
     </header>
 
+    <div className="thread-status">
+      <span>${loadingReply ? "Attunement in progress…" : "Companion ready"}</span>
+      <span>${messages.length} message${messages.length === 1 ? "" : "s"}</span>
+    </div>
+
     <div className="thread">
       ${messages.length === 0 ? html`<p className="state">Say hello. Your companion is ready to listen.</p>` : null}
       ${messages.map((item, idx) => html`<${MessageBubble} key=${idx} item=${item} />`)}
@@ -171,6 +180,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [loadingReply, setLoadingReply] = useState(false);
   const [softError, setSoftError] = useState("");
+  const [statusText, setStatusText] = useState("Ready");
 
   const filteredSpiritkins = useMemo(
     () => spiritkins.filter((s) => ALLOWED_SPIRITKINS.includes(s.name ?? s.id)),
@@ -195,18 +205,22 @@ function App() {
     setSelectedSpiritkin(session.selectedSpiritkin ?? null);
     setConversationId(session.conversationId ?? null);
     setMessages(Array.isArray(session.messages) ? session.messages : []);
+    setStatusText("Last session restored");
   }
 
   async function fetchSpiritkins() {
     try {
       setLoading(true);
       setSoftError("");
+      setStatusText("Loading companions...");
       const res = await fetch("/v1/spiritkins");
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Unable to load Spiritkins.");
       setSpiritkins(data.spiritkins ?? []);
+      setStatusText("Companions loaded");
     } catch (err) {
       setSoftError(err?.message ?? "We couldn’t load companions right now. Please try again.");
+      setStatusText("Connection needs retry");
     } finally {
       setLoading(false);
     }
@@ -217,6 +231,7 @@ function App() {
     try {
       setLoading(true);
       setSoftError("");
+      setStatusText("Opening your conversation...");
       const res = await fetch("/v1/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -228,8 +243,10 @@ function App() {
       const newConversationId = data?.conversation?.id ?? null;
       setConversationId(newConversationId);
       setMessages([]);
+      setStatusText("Conversation ready");
     } catch (err) {
       setSoftError(err?.message ?? "We couldn’t open your conversation. Please try again.");
+      setStatusText("Conversation unavailable");
     } finally {
       setLoading(false);
     }
@@ -243,6 +260,7 @@ function App() {
     localStorage.removeItem(SESSION_KEY);
     setConversationId(null);
     setMessages([]);
+    setStatusText("Session cleared");
   }
 
   async function sendMessage() {
@@ -255,6 +273,7 @@ function App() {
     try {
       setLoadingReply(true);
       setSoftError("");
+      setStatusText("Awaiting companion reply...");
       const res = await fetch("/v1/interact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -276,8 +295,10 @@ function App() {
           spiritkinName: selectedSpiritkin?.name,
         },
       ]);
+      setStatusText("Reply received");
     } catch (err) {
       setSoftError(err?.message ?? "Something interrupted the reply. Please try again.");
+      setStatusText("Reply interrupted");
     } finally {
       setLoadingReply(false);
     }
@@ -289,11 +310,17 @@ function App() {
     <section className="hero">
       <p className="kicker">Spiritkins • Closed Beta</p>
       <h1>Step into your companion world</h1>
-      <p className="subtitle">Spiritkins are original mythic-emotional companion beings—here to support clarity, courage, and inner wonder.</p>
+      <p className="subtitle">Spiritkins are original mythic-emotional companion beings—designed for emotional attunement, supportive reflection, and grounded connection.</p>
       <div className="hero-actions">
         ${sessionAvailable && !hasSession ? html`<button onClick=${resumeSession}>Resume Last Session</button>` : null}
         ${hasSession ? html`<button onClick=${clearSession}>Start Fresh</button>` : null}
       </div>
+      <div className="trust-row">
+        <${TrustPill} label="Emotionally attuned responses" />
+        <${TrustPill} label="Session continuity" />
+        <${TrustPill} label="Mythic companion identity" />
+      </div>
+      <p className="status-line">Status: ${statusText}</p>
     </section>
 
     ${softError ? html`<div className="error-banner">${softError}</div>` : null}

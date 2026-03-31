@@ -53,6 +53,27 @@ body { margin: 0; min-height: 100vh; background: transparent; }
   flex-wrap: wrap;
 }
 
+.trust-row {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.trust-pill {
+  font-size: .76rem;
+  color: #5a4474;
+  border: 1px solid #dfd2f2;
+  background: rgba(255,255,255,.82);
+  border-radius: 999px;
+  padding: 5px 10px;
+}
+.status-line {
+  margin: 10px 0 0;
+  color: #7b6594;
+  font-size: .86rem;
+}
+
 .error-banner {
   background: #fff1f3;
   border: 1px solid #f5c2ca;
@@ -159,8 +180,18 @@ body { margin: 0; min-height: 100vh; background: transparent; }
 .chat-header.kairo,
 .selected-preview.kairo { background: linear-gradient(90deg, rgba(242,248,255,.9), rgba(255,255,255,.9)); }
 
+
+.thread-status {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #7e6998;
+  font-size: .82rem;
+}
+
 .thread {
-  margin: 12px 0;
+  margin: 10px 0 12px;
   border: 1px solid #ebdefd;
   border-radius: 14px;
   min-height: 300px;
@@ -231,4 +262,6 @@ button:disabled { opacity: .55; cursor: not-allowed; }
   .thread { min-height: 240px; max-height: 48vh; }
   .hero { text-align: left; }
   .hero-actions { justify-content: flex-start; }
+  .trust-row { justify-content: flex-start; }
+  .thread-status { flex-direction: column; gap: 2px; }
 }
