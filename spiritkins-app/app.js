@@ -6,6 +6,24 @@ const html = htm.bind(React.createElement);
 const ALLOWED_SPIRITKINS = ["Lyra", "Raien", "Kairo"];
 const SESSION_KEY = "spiritkins.session.v1";
 
+const BRAND_BY_SPIRITKIN = {
+  Lyra: {
+    aura: "lyra",
+    tag: "Warmth • Grounding • Compassion",
+    welcome: "A gentle presence for steadiness, care, and calm clarity.",
+  },
+  Raien: {
+    aura: "raien",
+    tag: "Courage • Protection • Strength",
+    welcome: "A steadfast companion for brave steps and resilient focus.",
+  },
+  Kairo: {
+    aura: "kairo",
+    tag: "Wonder • Imagination • Reflection",
+    welcome: "A curious guide for creative insight and deeper perspective.",
+  },
+};
+
 function getOrCreateUserId() {
   const existing = localStorage.getItem("spiritkins.userId");
   if (existing) return existing;
@@ -26,11 +44,23 @@ function saveSession(session) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
+function getSpiritkinBrand(name) {
+  return BRAND_BY_SPIRITKIN[name] ?? {
+    aura: "default",
+    tag: "Mythic Companion",
+    welcome: "An original companion presence for meaningful conversation.",
+  };
+}
+
 function SpiritkinCard({ spiritkin, selected, onSelect }) {
-  return html`<button className=${`spiritkin-card ${selected ? "selected" : ""}`} onClick=${onSelect}>
-    <h3>${spiritkin.name ?? spiritkin.id}</h3>
+  const identityName = spiritkin.name ?? spiritkin.id;
+  const brand = getSpiritkinBrand(identityName);
+
+  return html`<button className=${`spiritkin-card ${brand.aura} ${selected ? "selected" : ""}`} onClick=${onSelect}>
+    <p className="spiritkin-tag">${brand.tag}</p>
+    <h3>${identityName}</h3>
     <p className="spiritkin-role">${spiritkin.role ?? spiritkin.archetype ?? "Companion"}</p>
-    <p className="spiritkin-essence">${spiritkin.essence ?? spiritkin.description ?? spiritkin.summary ?? ""}</p>
+    <p className="spiritkin-essence">${spiritkin.essence ?? spiritkin.description ?? spiritkin.summary ?? brand.welcome}</p>
   </button>`;
 }
 
@@ -42,17 +72,21 @@ function MessageBubble({ item }) {
 }
 
 function Onboarding({ spiritkins, selectedSpiritkin, onSelect, onBegin, onRefresh, loading }) {
+  const brand = getSpiritkinBrand(selectedSpiritkin?.name);
+
   return html`<section className="selection-panel">
     <div className="selection-header">
       <div>
-        <p className="kicker">Choose your companion</p>
-        <h2>Who should walk with you today?</h2>
+        <p className="kicker">Choose your mythic companion</p>
+        <h2>Enter with the presence that meets your moment.</h2>
       </div>
       <button onClick=${onRefresh} disabled=${loading}>Refresh</button>
     </div>
 
-    ${loading && spiritkins.length === 0 ? html`<p className="state">Loading Spiritkins…</p>` : null}
-    ${!loading && spiritkins.length === 0 ? html`<p className="state">Spiritkins are currently unavailable. Try refresh.</p>` : null}
+    <p className="selection-note">Each Spiritkin is an original companion being—emotionally attuned, mythic in tone, and here to support your path.</p>
+
+    ${loading && spiritkins.length === 0 ? html`<p className="state">Gathering companion presences…</p>` : null}
+    ${!loading && spiritkins.length === 0 ? html`<p className="state">No Spiritkins available right now. Please try refresh.</p>` : null}
 
     <div className="spiritkin-grid">
       ${spiritkins.map(
@@ -66,7 +100,16 @@ function Onboarding({ spiritkins, selectedSpiritkin, onSelect, onBegin, onRefres
       )}
     </div>
 
-    <button className="primary" onClick=${onBegin} disabled=${loading || !selectedSpiritkin}>Begin Conversation</button>
+    ${selectedSpiritkin
+      ? html`<div className=${`selected-preview ${brand.aura}`}>
+          <strong>${selectedSpiritkin.name}</strong>
+          <p>${brand.welcome}</p>
+        </div>`
+      : null}
+
+    <button className="primary" onClick=${onBegin} disabled=${loading || !selectedSpiritkin}>
+      Begin Conversation
+    </button>
   </section>`;
 }
 
@@ -80,29 +123,31 @@ function ChatScreen({
   onSend,
   onChangeSpiritkin,
 }) {
+  const brand = getSpiritkinBrand(selectedSpiritkin?.name);
+
   return html`<section className="chat-panel">
-    <header className="chat-header">
+    <header className=${`chat-header ${brand.aura}`}>
       <div>
         <p className="kicker">Active session</p>
         <h2>${selectedSpiritkin?.name}</h2>
-        <p>${selectedSpiritkin?.role ?? selectedSpiritkin?.archetype ?? "Spiritkin"}</p>
+        <p>${brand.tag}</p>
         <p className="session-id">Conversation: ${conversationId}</p>
       </div>
       <button onClick=${onChangeSpiritkin} disabled=${loadingReply}>Change Spiritkin</button>
     </header>
 
     <div className="thread">
-      ${messages.length === 0 ? html`<p className="state">Say hello to begin your conversation.</p>` : null}
+      ${messages.length === 0 ? html`<p className="state">Say hello. Your companion is ready to listen.</p>` : null}
       ${messages.map((item, idx) => html`<${MessageBubble} key=${idx} item=${item} />`)}
       ${loadingReply
-        ? html`<article className="bubble assistant loading-bubble"><span className="bubble-role">Spiritkin</span><p>Thinking with care…</p></article>`
+        ? html`<article className="bubble assistant loading-bubble"><span className="bubble-role">${selectedSpiritkin?.name ?? "Spiritkin"}</span><p>Listening… shaping a thoughtful reply.</p></article>`
         : null}
     </div>
 
     <div className="composer">
       <textarea
         value=${input}
-        placeholder="Share what is on your mind..."
+        placeholder="Share what you’re feeling, wondering, or working through..."
         onChange=${(e) => onInput(e.target.value)}
         onKeyDown=${(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
@@ -158,10 +203,10 @@ function App() {
       setSoftError("");
       const res = await fetch("/v1/spiritkins");
       const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Failed to load Spiritkins");
+      if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Unable to load Spiritkins.");
       setSpiritkins(data.spiritkins ?? []);
     } catch (err) {
-      setSoftError(err?.message ?? "Could not load Spiritkins right now.");
+      setSoftError(err?.message ?? "We couldn’t load companions right now. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -178,13 +223,13 @@ function App() {
         body: JSON.stringify({ userId, spiritkinName: selectedSpiritkin.name ?? selectedSpiritkin.id }),
       });
       const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Could not start a conversation.");
+      if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Could not begin a conversation yet.");
 
       const newConversationId = data?.conversation?.id ?? null;
       setConversationId(newConversationId);
       setMessages([]);
     } catch (err) {
-      setSoftError(err?.message ?? "Unable to begin conversation right now.");
+      setSoftError(err?.message ?? "We couldn’t open your conversation. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -221,7 +266,7 @@ function App() {
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Your message could not be sent.");
+      if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Message delivery was interrupted.");
 
       setMessages((prev) => [
         ...prev,
@@ -243,8 +288,8 @@ function App() {
   return html`<main className="app-shell">
     <section className="hero">
       <p className="kicker">Spiritkins • Closed Beta</p>
-      <h1>Your calm companion space</h1>
-      <p className="subtitle">A warm place to think, reflect, and reconnect with yourself—one conversation at a time.</p>
+      <h1>Step into your companion world</h1>
+      <p className="subtitle">Spiritkins are original mythic-emotional companion beings—here to support clarity, courage, and inner wonder.</p>
       <div className="hero-actions">
         ${sessionAvailable && !hasSession ? html`<button onClick=${resumeSession}>Resume Last Session</button>` : null}
         ${hasSession ? html`<button onClick=${clearSession}>Start Fresh</button>` : null}
