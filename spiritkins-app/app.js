@@ -159,6 +159,9 @@ function App() {
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
   const greetingName = userName?.trim() ? `, ${userName.trim()}` : "";
   const identityLabel = userName?.trim() || "Beta User";
+  const continuitySummary = lastMessageAt
+    ? `Last active ${fmtTime(lastMessageAt)}`
+    : "No local conversation activity yet";
 
   useEffect(() => { fetchSpiritkins(); hydrateSession(); }, []);
   useEffect(() => {
@@ -305,12 +308,14 @@ function App() {
       <div className="identity-pill-row">
         <span className="identity-pill">${identityLabel}</span>
         <span className="identity-pill subtle">${entryAccepted ? "Beta access active" : "Access not started"}</span>
+        <span className="identity-pill subtle">${continuitySummary}</span>
       </div>
+      <p className="trust-note">Local-first beta: your preferences, feedback notes, and session continuity stay on this device for now.</p>
     </section>
 
     <nav className="section-nav">
       ${Object.keys(SECTION_COPY).map((key) => html`
-        <button className=${activeSection === key ? "active" : ""} onClick=${() => setActiveSection(key)}>
+        <button className=${activeSection === key ? "active" : ""} aria-current=${activeSection === key ? "page" : "false"} onClick=${() => setActiveSection(key)}>
           <span>${key.charAt(0).toUpperCase() + key.slice(1)}</span>
           <small>${SECTION_COPY[key].title}</small>
         </button>
@@ -422,6 +427,10 @@ function App() {
 
     ${activeSection === "preferences" ? html`<section className="product-panel settings-panel">
       <${SectionHeader} title=${SECTION_COPY.preferences.title} subtitle=${SECTION_COPY.preferences.subtitle} />
+      <article className="account-readiness">
+        <h4>Account readiness</h4>
+        <p>Sign in and account creation are prepared in the UI. Your current beta identity remains local until account rollout begins.</p>
+      </article>
       <div className="settings-grid">
         <article>
           <h4>Identity</h4>
@@ -444,6 +453,7 @@ function App() {
 
     ${activeSection === "feedback" ? html`<section className="product-panel feedback-panel">
       <${SectionHeader} title=${SECTION_COPY.feedback.title} subtitle=${SECTION_COPY.feedback.subtitle} />
+      <p className="settings-note">Use this as a lightweight product journal while beta access is local-first.</p>
       <textarea value=${feedbackDraft} placeholder="Share what felt helpful, unclear, or missing..." onChange=${(e) => setFeedbackDraft(e.target.value)}></textarea>
       <div className="feedback-actions">
         <button className="primary" onClick=${submitFeedback} disabled=${!feedbackDraft.trim()}>Save Feedback</button>
