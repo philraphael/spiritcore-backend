@@ -2,6 +2,9 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import "dotenv/config";
+import { readFile } from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
@@ -26,6 +29,10 @@ import { healthRoutes }           from "./src/routes/health.mjs";
 
 // Fail fast on missing required env vars
 try { validateConfig(); } catch (err) { console.error("[SpiritCore] Config error:", err.message); process.exit(1); }
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const OPERATOR_CONSOLE_DIR = path.join(__dirname, "operator-console");
 
 const PORT    = config.port;
 const USE_LLM = String(process.env.USE_LLM || "false").toLowerCase() === "true";
@@ -120,6 +127,23 @@ app.get("/", async (req, reply) => {
     time: nowIso(),
     request_id: req.request_id
   };
+});
+
+app.get("/operator", async (_req, reply) => {
+  const html = await readFile(path.join(OPERATOR_CONSOLE_DIR, "index.html"), "utf8");
+  return reply.type("text/html; charset=utf-8").send(html);
+});
+
+app.get("/operator/:asset", async (req, reply) => {
+  const { asset } = req.params;
+  if (!["app.js", "styles.css"].includes(asset)) {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
+
+  const filePath = path.join(OPERATOR_CONSOLE_DIR, asset);
+  const content = await readFile(filePath, "utf8");
+  const mime = asset.endsWith(".js") ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8";
+  return reply.type(mime).send(content);
 });
 
 /* ------------------------ Runtime endpoints ------------------------ */
