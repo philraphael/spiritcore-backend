@@ -60,7 +60,7 @@ function TopBar({ onContinue, entryAccepted, userName, onEditName }) {
     </div>
     <div className="top-actions">
       ${!entryAccepted ? html`<button onClick=${onContinue}>Continue</button>` : html`<span className="active-pill">${userName ? `Hi, ${userName}` : "Beta User Active"}</span>`}
-      <button onClick=${onEditName}>Name</button>
+      <button onClick=${onEditName}>Identity</button>
       <button disabled title="Coming soon">Sign in (Soon)</button>
     </div>
   </header>`;
@@ -69,8 +69,13 @@ function TopBar({ onContinue, entryAccepted, userName, onEditName }) {
 function EntryCard({ onBegin, userNameDraft, onUserNameDraft }) {
   return html`<section className="entry-card">
     <p className="kicker">Welcome</p>
-    <h2>Begin in one step</h2>
-    <p>Continue as a beta user, choose your Spiritkin, and start a calm conversation in minutes.</p>
+    <h2>Begin with beta access</h2>
+    <p>Continue as a beta user now, with sign in and account creation ready to unlock as this beta expands.</p>
+    <div className="entry-auth-rail">
+      <button disabled title="Coming soon">Sign In (Soon)</button>
+      <button disabled title="Coming soon">Create Account (Soon)</button>
+      <span>Beta access is active today</span>
+    </div>
     <label className="field"><span>Your name (optional)</span><input value=${userNameDraft} placeholder="How should we address you?" onInput=${(e) => onUserNameDraft(e.target.value)} /></label>
     <button className="primary" onClick=${onBegin}>Continue as Beta User</button>
   </section>`;
@@ -106,7 +111,8 @@ function SectionHeader({ title, subtitle }) {
 
 function FutureReady() {
   return html`<section className="future-grid">
-    <div><h4>Account Area</h4><p>Ready for sign-in, profile, and identity controls.</p></div>
+    <div><h4>Sign In</h4><p>Prepared for secure account login when beta accounts open.</p></div>
+    <div><h4>Create Account</h4><p>Reserved for onboarding, profile creation, and consent steps.</p></div>
     <div><h4>Saved Conversations</h4><p>Reserved layout for persistent conversation history.</p></div>
     <div><h4>Memory View</h4><p>UI foundation for memory-aware context panels.</p></div>
     <div><h4>Settings</h4><p>Space for tone, notifications, and preference controls.</p></div>
@@ -152,6 +158,10 @@ function App() {
   const lastMessageAt = messages.length ? messages[messages.length - 1].time : null;
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
   const greetingName = userName?.trim() ? `, ${userName.trim()}` : "";
+  const identityLabel = userName?.trim() || "Beta User";
+  const continuitySummary = lastMessageAt
+    ? `Last active ${fmtTime(lastMessageAt)}`
+    : "No local conversation activity yet";
 
   useEffect(() => { fetchSpiritkins(); hydrateSession(); }, []);
   useEffect(() => {
@@ -175,6 +185,7 @@ function App() {
     localStorage.setItem(NAME_KEY, normalizedName);
     setUserName(normalizedName);
     setEntryAccepted(true);
+    setStatusText("Beta access confirmed. You can choose a companion whenever you’re ready.");
     setTimeout(() => selectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
 
@@ -210,7 +221,7 @@ function App() {
         const initial = preferred ?? list.find((s) => ALLOWED_SPIRITKINS.includes(s.name ?? s.id)) ?? list[0];
         setSelectedSpiritkin(initial);
       }
-      setStatusText("Companions are available.");
+      setStatusText("Companions are available. Select the one that fits this moment.");
     } catch (err) {
       setSoftError(err?.message ?? "We couldn’t load companions right now. Please try again.");
       setStatusText("Connection needs retry.");
@@ -230,7 +241,7 @@ function App() {
       setConversationId(data?.conversation?.id ?? null);
       setMessages([]);
       setStartedAt(nowIso());
-      setStatusText("Conversation is ready.");
+      setStatusText("Conversation is ready. You can begin whenever it feels right.");
       setSessionState({ kind: "new", label: "Started a new session" });
       setPrefs((prev) => ({ ...prev, preferredSpiritkin: selectedSpiritkin.name ?? selectedSpiritkin.id }));
     } catch (err) {
@@ -242,7 +253,7 @@ function App() {
   function clearSession() {
     localStorage.removeItem(SESSION_KEY);
     setConversationId(null); setMessages([]); setStartedAt(null);
-    setStatusText("Session cleared.");
+    setStatusText("Session cleared. Your local preferences and identity are still here.");
     setSessionState({ kind: "cleared", label: "Cleared current session" });
   }
 
@@ -255,7 +266,7 @@ function App() {
     if (!contentOverride) setInput("");
 
     try {
-      setLoadingReply(true); setSoftError(""); setStatusText("Your companion is preparing a response...");
+      setLoadingReply(true); setSoftError(""); setStatusText("Your companion is preparing a response with care...");
       const res = await fetch("/v1/interact", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, input: text, conversationId, spiritkin: { name: selectedSpiritkin.name ?? selectedSpiritkin.id } }),
@@ -267,7 +278,7 @@ function App() {
     } catch (err) {
       setMessages((prev) => prev.map((m) => (m.id === outgoing.id ? { ...m, status: "failed" } : m)));
       setSoftError(err?.message ?? "Something interrupted the reply. You can retry safely.");
-      setStatusText("Reply interrupted.");
+      setStatusText("Reply interrupted. Your message is safe, and retry is available.");
     } finally { setLoadingReply(false); }
   }
 
@@ -294,16 +305,23 @@ function App() {
       <h1>${`Welcome${greetingName}`}</h1>
       <p className="subtitle">Emotionally attuned, mythic-emotional companions designed to help you reconnect with clarity and care.</p>
       <p className="status-line">Status: ${statusText}</p>
+      <div className="identity-pill-row">
+        <span className="identity-pill">${identityLabel}</span>
+        <span className="identity-pill subtle">${entryAccepted ? "Beta access active" : "Access not started"}</span>
+        <span className="identity-pill subtle">${continuitySummary}</span>
+      </div>
+      <p className="trust-note">Local-first beta: your preferences, feedback notes, and session continuity stay on this device for now.</p>
     </section>
 
     <nav className="section-nav">
       ${Object.keys(SECTION_COPY).map((key) => html`
-        <button className=${activeSection === key ? "active" : ""} onClick=${() => setActiveSection(key)}>
+        <button className=${activeSection === key ? "active" : ""} aria-current=${activeSection === key ? "page" : "false"} onClick=${() => setActiveSection(key)}>
           <span>${key.charAt(0).toUpperCase() + key.slice(1)}</span>
           <small>${SECTION_COPY[key].title}</small>
         </button>
       `)}
     </nav>
+    <p className="nav-support">Companion for active conversation, Preferences for your defaults, and Feedback for product notes.</p>
 
     ${isEditingName
       ? html`<section className="identity-edit"><label className="field"><span>Display name</span><input value=${userNameDraft} onInput=${(e) => setUserNameDraft(e.target.value)} placeholder="Name" /></label><div className="identity-actions"><button onClick=${saveName}>Save</button><button onClick=${() => { setIsEditingName(false); setUserNameDraft(userName); }}>Cancel</button></div></section>`
@@ -328,7 +346,7 @@ function App() {
         </div>
         <div className="meta-card">
           <h4>Continuity</h4>
-          <p>${lastMessageAt ? `Picking up where we left off (${fmtTime(lastMessageAt)}).` : "Conversation continuity will appear here as you chat."}</p>
+          <p>${lastMessageAt ? `Picking up where we left off (${fmtTime(lastMessageAt)}).` : "Continuity appears here as soon as your first exchange is saved in this device session."}</p>
           <p>${lastUserMessage ? `Last shared: “${lastUserMessage.slice(0, 78)}${lastUserMessage.length > 78 ? "…" : ""}”` : "No prior user message in this local session yet."}</p>
         </div>
       </section>
@@ -409,6 +427,10 @@ function App() {
 
     ${activeSection === "preferences" ? html`<section className="product-panel settings-panel">
       <${SectionHeader} title=${SECTION_COPY.preferences.title} subtitle=${SECTION_COPY.preferences.subtitle} />
+      <article className="account-readiness">
+        <h4>Account readiness</h4>
+        <p>Sign in and account creation are prepared in the UI. Your current beta identity remains local until account rollout begins.</p>
+      </article>
       <div className="settings-grid">
         <article>
           <h4>Identity</h4>
@@ -431,6 +453,7 @@ function App() {
 
     ${activeSection === "feedback" ? html`<section className="product-panel feedback-panel">
       <${SectionHeader} title=${SECTION_COPY.feedback.title} subtitle=${SECTION_COPY.feedback.subtitle} />
+      <p className="settings-note">Use this as a lightweight product journal while beta access is local-first.</p>
       <textarea value=${feedbackDraft} placeholder="Share what felt helpful, unclear, or missing..." onChange=${(e) => setFeedbackDraft(e.target.value)}></textarea>
       <div className="feedback-actions">
         <button className="primary" onClick=${submitFeedback} disabled=${!feedbackDraft.trim()}>Save Feedback</button>
