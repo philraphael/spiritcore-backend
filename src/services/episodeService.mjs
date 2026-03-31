@@ -10,6 +10,7 @@
 
 import { AppError } from "../errors.mjs";
 import { nowIso } from "../utils/time.mjs";
+import { toUuid } from "../utils/id.mjs";
 
 export function createEpisodeService({ supabase }) {
 
@@ -20,9 +21,9 @@ export function createEpisodeService({ supabase }) {
   async function write({ userId, spiritkinId = null, conversationId = null, text, emotion = {} }) {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
     if (!text) throw new AppError("VALIDATION", "text is required", 400);
-
+    const dbUserId = toUuid(userId);
     const payload = {
-      user_id: userId,
+      user_id: dbUserId,
       spiritkin_id: spiritkinId,
       conversation_id: conversationId,
       content: String(text),
@@ -49,11 +50,11 @@ export function createEpisodeService({ supabase }) {
    */
   async function fetchRecent({ userId, spiritkinId = null, conversationId = null, limit = 5 }) {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
-
+    const dbUserId = toUuid(userId);
     let query = supabase
       .from("episodes")
       .select("id, content, emotion_snapshot, created_at")
-      .eq("user_id", userId)
+      .eq("user_id", dbUserId)
       .order("created_at", { ascending: false })
       .limit(Math.min(limit, 20));
 
@@ -71,11 +72,11 @@ export function createEpisodeService({ supabase }) {
    */
   async function fetchLatestSummary({ userId, spiritkinId = null, conversationId = null }) {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
-
+    const dbUserId = toUuid(userId);
     let query = supabase
       .from("episodes")
       .select("id, content, emotion_snapshot, created_at")
-      .eq("user_id", userId)
+      .eq("user_id", dbUserId)
       .order("created_at", { ascending: false })
       .limit(1);
 

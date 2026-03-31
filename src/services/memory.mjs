@@ -2,16 +2,17 @@ import { AppError } from "../errors.mjs";
 import { config } from "../config.mjs";
 import { nowIso, daysBetween } from "../utils/time.mjs";
 import { sanitizeText } from "../utils/sanitize.mjs";
+import { toUuid } from "../utils/id.mjs";
 
 export const createMemoryService = ({ supabase, bus }) => {
   const write = async ({ userId, spiritkinId, kind = "message", content, meta = {} }) => {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
     if (!content || typeof content !== "string") throw new AppError("VALIDATION", "content is required", 400);
-
+    const dbUserId = toUuid(userId);
     const clean = sanitizeText(content).slice(0, 4000);
 
     const payload = {
-      user_id: userId,
+      user_id: dbUserId,
       spiritkin_id: spiritkinId || null,
       kind,
       content: clean,
@@ -28,8 +29,8 @@ export const createMemoryService = ({ supabase, bus }) => {
 
   const query = async ({ userId, spiritkinId, limit = 20 }) => {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
-
-    let q = supabase.from("memories").select("id, kind, content, meta, created_at").eq("user_id", userId);
+    const dbUserId = toUuid(userId);
+    let q = supabase.from("memories").select("id, kind, content, meta, created_at").eq("user_id", dbUserId);
 
     if (spiritkinId) q = q.eq("spiritkin_id", spiritkinId);
 
@@ -38,7 +39,7 @@ export const createMemoryService = ({ supabase, bus }) => {
 
     supabase
       .from("memory_access")
-      .upsert({ user_id: userId, last_accessed_at: nowIso() }, { onConflict: "user_id" })
+      .upsert({ user_id: dbUserId, last_accessed_at: nowIso() }, { onConflict: "user_id" })
       .then(() => {})
       .catch(() => {});
 
@@ -47,11 +48,11 @@ export const createMemoryService = ({ supabase, bus }) => {
 
   const computePolicyState = async ({ userId }) => {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
-
+    const dbUserId = toUuid(userId);
     const { data, error } = await supabase
       .from("memory_access")
       .select("last_accessed_at")
-      .eq("user_id", userId)
+      .eq("user_id", dbUserId)
       .maybeSingle();
 
     if (error) {

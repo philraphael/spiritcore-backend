@@ -13,6 +13,7 @@
 
 import { AppError } from "../errors.mjs";
 import { nowIso } from "../utils/time.mjs";
+import { toUuid } from "../utils/id.mjs";
 
 export function createConversationService({ supabase, registry }) {
 
@@ -74,10 +75,11 @@ export function createConversationService({ supabase, registry }) {
       );
     }
 
+    const dbUserId = toUuid(userId);
     const { data, error } = await supabase
       .from("conversations")
       .insert([{
-        user_id: userId,
+        user_id: dbUserId,
         spiritkin_id: identity.id,
         title,
         created_at: nowIso(),
@@ -106,10 +108,11 @@ export function createConversationService({ supabase, registry }) {
   async function listForUser({ userId, limit = 20 }) {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
 
+    const dbUserId = toUuid(userId);
     const { data, error } = await supabase
       .from("conversations")
       .select("id, spiritkin_id, title, created_at")
-      .eq("user_id", userId)
+      .eq("user_id", dbUserId)
       .order("created_at", { ascending: false })
       .limit(Math.min(limit, 100));
 

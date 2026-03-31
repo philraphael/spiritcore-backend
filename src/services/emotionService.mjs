@@ -10,6 +10,7 @@
 
 import { AppError } from "../errors.mjs";
 import { nowIso } from "../utils/time.mjs";
+import { toUuid } from "../utils/id.mjs";
 
 /** Lightweight keyword-based sentiment signal (no external model dependency). */
 function deriveEmotionFromText(text) {
@@ -34,11 +35,11 @@ export function createEmotionService({ supabase }) {
    */
   async function getState({ userId, spiritkinId = null, conversationId = null }) {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
-
+    const dbUserId = toUuid(userId);
     let query = supabase
       .from("emotion_state")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", dbUserId)
       .order("updated_at", { ascending: false })
       .limit(1);
 
@@ -58,10 +59,10 @@ export function createEmotionService({ supabase }) {
    */
   async function updateFromText({ userId, spiritkinId = null, conversationId = null, text }) {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
-
+    const dbUserId = toUuid(userId);
     const derived = deriveEmotionFromText(text);
     const payload = {
-      user_id: userId,
+      user_id: dbUserId,
       spiritkin_id: spiritkinId,
       conversation_id: conversationId,
       label: derived.label,
