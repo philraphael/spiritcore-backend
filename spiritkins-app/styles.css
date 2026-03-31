@@ -23,7 +23,15 @@ body { margin: 0; min-height: 100vh; }
 .topbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; }
 .brand strong { display: block; }
 .brand span { font-size: .8rem; color: #866ca3; }
-.top-actions { display: flex; gap: 8px; }
+.top-actions { display: flex; gap: 8px; align-items: center; }
+.active-pill {
+  font-size: .78rem;
+  color: #4f3b67;
+  background: #f4ebff;
+  border: 1px solid #dcc7f6;
+  border-radius: 999px;
+  padding: 6px 10px;
+}
 
 .entry-card { padding: 14px; }
 .entry-card h2 { margin: 4px 0 0; }
@@ -39,6 +47,31 @@ body { margin: 0; min-height: 100vh; }
 .session-resumed { background: #eef6ff; border: 1px solid #bfdbfe; color: #1e3a8a; }
 .session-new { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
 .session-cleared { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; }
+
+
+.lifecycle-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.step {
+  font-size: .8rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #ddd6e8;
+  color: #8b7a9d;
+  background: #fbf9ff;
+}
+.step.active {
+  color: #5b21b6;
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+}
+.step.done {
+  color: #065f46;
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
 
 .meta-row { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .meta-card { padding: 10px 12px; }
@@ -118,6 +151,8 @@ button:disabled { opacity: .55; cursor: not-allowed; }
   .topbar,.session-bar,.selection-header,.chat-header,.retry-banner,.thread-status { flex-direction: column; align-items: flex-start; }
   .top-actions { width: 100%; }
   .top-actions button { flex: 1; }
+  .active-pill { width: 100%; text-align: center; }
+  .lifecycle-rail { width: 100%; }
   .starter-prompts { width: 100%; }
   .starter-prompts button { width: 100%; text-align: left; }
   .thread { min-height: 240px; max-height: 50vh; }

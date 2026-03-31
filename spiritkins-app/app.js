@@ -35,14 +35,14 @@ function getBrand(name) {
   return BRAND_BY_SPIRITKIN[name] ?? { aura: "default", tag: "Mythic Companion", presence: "Attuned and thoughtful." };
 }
 
-function TopBar({ onContinue }) {
+function TopBar({ onContinue, entryAccepted }) {
   return html`<header className="topbar">
     <div className="brand">
       <strong>Spiritkins</strong>
       <span>Companion Beta</span>
     </div>
     <div className="top-actions">
-      <button onClick=${onContinue}>Continue</button>
+      ${!entryAccepted ? html`<button onClick=${onContinue}>Continue</button>` : html`<span className="active-pill">Beta User Active</span>`}
       <button disabled title="Coming soon">Sign in (Soon)</button>
     </div>
   </header>`;
@@ -60,6 +60,18 @@ function EntryCard({ onBegin }) {
 function SessionStateBanner({ sessionState }) {
   if (!sessionState) return null;
   return html`<div className=${`session-state session-${sessionState.kind}`}>${sessionState.label}</div>`;
+}
+
+
+function LifecycleRail({ entryAccepted, hasSession, selectedSpiritkin }) {
+  const stepOne = entryAccepted ? "done" : "active";
+  const stepTwo = selectedSpiritkin ? "done" : entryAccepted ? "active" : "idle";
+  const stepThree = hasSession ? "done" : selectedSpiritkin ? "active" : "idle";
+  return html`<div className="lifecycle-rail">
+    <span className=${`step ${stepOne}`}>1. Access</span>
+    <span className=${`step ${stepTwo}`}>2. Choose Companion</span>
+    <span className=${`step ${stepThree}`}>3. Begin Conversation</span>
+  </div>`;
 }
 
 function MessageRow({ msg }) {
@@ -215,7 +227,7 @@ function App() {
   }
 
   return html`<main className="app-shell ${brand.aura}">
-    <${TopBar} onContinue=${acceptEntry} />
+    <${TopBar} onContinue=${acceptEntry} entryAccepted=${entryAccepted} />
 
     ${!entryAccepted ? html`<${EntryCard} onBegin=${acceptEntry} />` : null}
 
@@ -227,6 +239,7 @@ function App() {
     </section>
 
     <${SessionStateBanner} sessionState=${sessionState} />
+    <${LifecycleRail} entryAccepted=${entryAccepted} hasSession=${hasSession} selectedSpiritkin=${selectedSpiritkin} />
 
     <section className="meta-row">
       <div className="meta-card">
@@ -316,7 +329,7 @@ function App() {
 
     <${FutureReady} />
 
-    <footer className="footer-note">Spiritkins closed beta • Built for calm, consistent, emotionally attuned conversations.</footer>
+    <footer className="footer-note">Spiritkins beta • A calm, trustworthy companion experience designed to support reflection over time.</footer>
   </main>`;
 }
 
