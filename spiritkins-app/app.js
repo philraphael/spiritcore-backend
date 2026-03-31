@@ -4,8 +4,9 @@ import htm from "https://esm.sh/htm@3.1.1";
 
 const html = htm.bind(React.createElement);
 const ALLOWED_SPIRITKINS = ["Lyra", "Raien", "Kairo"];
-const SESSION_KEY = "spiritkins.session.v5";
+const SESSION_KEY = "spiritkins.session.v6";
 const ENTRY_KEY = "spiritkins.entry.accepted";
+const NAME_KEY = "spiritkins.profile.name";
 
 const STARTER_PROMPTS = [
   "I need help settling my mind today.",
@@ -35,11 +36,11 @@ function getBrand(name) {
   return BRAND_BY_SPIRITKIN[name] ?? { aura: "default", tag: "Mythic Companion", presence: "Attuned and thoughtful." };
 }
 
-function TopBar({ onContinue, entryAccepted }) {
+function TopBar({ onContinue, entryAccepted, userName }) {
   return html`<header className="topbar">
     <div className="brand">
       <strong>Spiritkins</strong>
-      <span>Companion Beta</span>
+      <span>${userName ? `Companion Beta • ${userName}` : "Companion Beta"}</span>
     </div>
     <div className="top-actions">
       ${!entryAccepted ? html`<button onClick=${onContinue}>Continue</button>` : html`<span className="active-pill">Beta User Active</span>`}
@@ -48,11 +49,15 @@ function TopBar({ onContinue, entryAccepted }) {
   </header>`;
 }
 
-function EntryCard({ onBegin }) {
+function EntryCard({ onBegin, userNameDraft, onUserNameDraft }) {
   return html`<section className="entry-card">
     <p className="kicker">Welcome</p>
     <h2>Begin in one step</h2>
     <p>Continue as a beta user, choose your Spiritkin, and start a calm conversation in minutes.</p>
+    <label className="field">
+      <span>Your name (optional)</span>
+      <input value=${userNameDraft} placeholder="How should we address you?" onInput=${(e) => onUserNameDraft(e.target.value)} />
+    </label>
     <button className="primary" onClick=${onBegin}>Continue as Beta User</button>
   </section>`;
 }
@@ -61,7 +66,6 @@ function SessionStateBanner({ sessionState }) {
   if (!sessionState) return null;
   return html`<div className=${`session-state session-${sessionState.kind}`}>${sessionState.label}</div>`;
 }
-
 
 function LifecycleRail({ entryAccepted, hasSession, selectedSpiritkin }) {
   const stepOne = entryAccepted ? "done" : "active";
@@ -104,6 +108,8 @@ function FutureReady() {
 
 function App() {
   const [userId] = useState(() => getOrCreateUserId());
+  const [userName, setUserName] = useState(localStorage.getItem(NAME_KEY) || "");
+  const [userNameDraft, setUserNameDraft] = useState(localStorage.getItem(NAME_KEY) || "");
   const [spiritkins, setSpiritkins] = useState([]);
   const [selectedSpiritkin, setSelectedSpiritkin] = useState(null);
   const [conversationId, setConversationId] = useState(null);
@@ -126,6 +132,7 @@ function App() {
   const resumeAvailable = Boolean(readJson(SESSION_KEY)?.conversationId);
   const lastMessageAt = messages.length ? messages[messages.length - 1].time : null;
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+  const greetingName = userName?.trim() ? `, ${userName.trim()}` : "";
 
   useEffect(() => { fetchSpiritkins(); hydrateSession(); }, []);
   useEffect(() => {
@@ -139,6 +146,9 @@ function App() {
 
   function acceptEntry() {
     localStorage.setItem(ENTRY_KEY, "1");
+    const normalizedName = userNameDraft.trim();
+    localStorage.setItem(NAME_KEY, normalizedName);
+    setUserName(normalizedName);
     setEntryAccepted(true);
     setTimeout(() => selectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
@@ -150,7 +160,7 @@ function App() {
     setConversationId(session.conversationId ?? null);
     setMessages(Array.isArray(session.messages) ? session.messages : []);
     setStartedAt(session.startedAt ?? null);
-    setStatusText("Welcome back — your session is ready.");
+    setStatusText(`Welcome back${greetingName} — your session is ready.`);
     setSessionState({ kind: "resumed", label: "Resumed previous session" });
   }
 
@@ -227,13 +237,13 @@ function App() {
   }
 
   return html`<main className="app-shell ${brand.aura}">
-    <${TopBar} onContinue=${acceptEntry} entryAccepted=${entryAccepted} />
+    <${TopBar} onContinue=${acceptEntry} entryAccepted=${entryAccepted} userName=${userName} />
 
-    ${!entryAccepted ? html`<${EntryCard} onBegin=${acceptEntry} />` : null}
+    ${!entryAccepted ? html`<${EntryCard} onBegin=${acceptEntry} userNameDraft=${userNameDraft} onUserNameDraft=${setUserNameDraft} />` : null}
 
     <section className="hero">
       <p className="kicker">Spiritkins • Beta</p>
-      <h1>A real companion experience, ready for daily use</h1>
+      <h1>${`Welcome${greetingName}`}</h1>
       <p className="subtitle">Emotionally attuned, mythic-emotional companions designed to help you reconnect with clarity and care.</p>
       <p className="status-line">Status: ${statusText}</p>
     </section>
@@ -244,9 +254,9 @@ function App() {
     <section className="meta-row">
       <div className="meta-card">
         <h4>Identity</h4>
+        <p><strong>Name:</strong> ${userName || "Not set"}</p>
         <p><strong>Beta user:</strong> ${userId}</p>
         <p><strong>Session started:</strong> ${fmtTime(startedAt)}</p>
-        <p><strong>Status:</strong> ${statusText}</p>
       </div>
       <div className="meta-card">
         <h4>Continuity</h4>
