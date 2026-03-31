@@ -1,10 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "https://esm.sh/react@18.3.1";
-import { createRoot } from "https://esm.sh/react-dom@18.3.1/client";
-import htm from "https://esm.sh/htm@3.1.1";
-
-const html = htm.bind(React.createElement);
 const ALLOWED_SPIRITKINS = ["Lyra", "Raien", "Kairo"];
-const SESSION_KEY = "spiritkins.session.v7";
+const SESSION_KEY = "spiritkins.session.v10";
 const ENTRY_KEY = "spiritkins.entry.accepted";
 const NAME_KEY = "spiritkins.profile.name";
 const PREFS_KEY = "spiritkins.prefs.v1";
@@ -15,19 +10,11 @@ const STARTER_PROMPTS = [
   "Can we reflect on what I am carrying right now?",
   "Help me find one grounded next step.",
 ];
+
 const SECTION_COPY = {
-  companion: {
-    title: "Companion Space",
-    subtitle: "Stay grounded with continuity, gentle identity cues, and your active Spiritkin relationship.",
-  },
-  preferences: {
-    title: "Preferences",
-    subtitle: "Shape how the beta feels for you today. These settings are local and reversible.",
-  },
-  feedback: {
-    title: "Feedback Journal",
-    subtitle: "Capture quick product notes and keep a clean local log of your beta impressions.",
-  },
+  companion: { title: "Companion Space", subtitle: "Stay grounded with continuity and your active Spiritkin relationship." },
+  preferences: { title: "Preferences", subtitle: "Shape how the beta feels for you today. Settings are local and reversible." },
+  feedback: { title: "Feedback Journal", subtitle: "Capture product notes as you use Spiritkins in beta." },
 };
 
 const BRAND_BY_SPIRITKIN = {
@@ -39,450 +26,284 @@ const BRAND_BY_SPIRITKIN = {
 const nowIso = () => new Date().toISOString();
 const fmtTime = (iso) => (iso ? new Date(iso).toLocaleString() : "—");
 const readJson = (k, fallback = null) => { try { return JSON.parse(localStorage.getItem(k) || "null") ?? fallback; } catch { return fallback; } };
-
-function getOrCreateUserId() {
-  const existing = localStorage.getItem("spiritkins.userId");
-  if (existing) return existing;
-  const newId = `user-${crypto.randomUUID().slice(0, 8)}`;
-  localStorage.setItem("spiritkins.userId", newId);
-  return newId;
-}
+const escapeHtml = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 function getBrand(name) {
   return BRAND_BY_SPIRITKIN[name] ?? { aura: "default", tag: "Mythic Companion", presence: "Attuned and thoughtful." };
 }
 
-function TopBar({ onContinue, entryAccepted, userName, onEditName }) {
-  return html`<header className="topbar">
-    <div className="brand">
-      <strong>Spiritkins</strong>
-      <span>${userName ? `Companion Beta • ${userName}` : "Companion Beta"}</span>
-    </div>
-    <div className="top-actions">
-      ${!entryAccepted ? html`<button onClick=${onContinue}>Continue</button>` : html`<span className="active-pill">${userName ? `Hi, ${userName}` : "Beta User Active"}</span>`}
-      <button onClick=${onEditName}>Identity</button>
-      <button disabled title="Coming soon">Sign in (Soon)</button>
-    </div>
-  </header>`;
+function getOrCreateUserId() {
+  const existing = localStorage.getItem("spiritkins.userId");
+  if (existing) return existing;
+  const id = `user-${crypto.randomUUID().slice(0, 8)}`;
+  localStorage.setItem("spiritkins.userId", id);
+  return id;
 }
 
-function EntryCard({ onBegin, userNameDraft, onUserNameDraft }) {
-  return html`<section className="entry-card">
-    <p className="kicker">Welcome</p>
-    <h2>Begin your Spiritkins beta session</h2>
-    <p>Spiritkins is for reflective, emotionally attuned check-ins. Start with beta access now, then continue with account features as invites expand.</p>
-    <ol className="entry-steps">
-      <li>Set your display name (optional).</li>
-      <li>Continue as Beta User.</li>
-      <li>Choose a Spiritkin and begin your first grounded conversation.</li>
-    </ol>
-    <div className="entry-auth-rail">
-      <button disabled title="Coming soon">Sign In (Soon)</button>
-      <button disabled title="Coming soon">Create Account (Soon)</button>
-      <span>Invite-based beta access is active today</span>
-    </div>
-    <label className="field"><span>Your name (optional)</span><input value=${userNameDraft} placeholder="How should we address you?" onInput=${(e) => onUserNameDraft(e.target.value)} /></label>
-    <button className="primary" onClick=${onBegin}>Continue as Beta User</button>
-  </section>`;
+const state = {
+  userId: getOrCreateUserId(),
+  entryAccepted: Boolean(localStorage.getItem(ENTRY_KEY)),
+  userName: localStorage.getItem(NAME_KEY) || "",
+  userNameDraft: localStorage.getItem(NAME_KEY) || "",
+  isEditingName: false,
+  activeSection: "companion",
+  spiritkins: [],
+  selectedSpiritkin: null,
+  conversationId: null,
+  messages: [],
+  input: "",
+  loading: false,
+  loadingReply: false,
+  softError: "",
+  statusText: "Ready",
+  startedAt: null,
+  sessionState: null,
+  prefs: readJson(PREFS_KEY, { preferredSpiritkin: "", appTone: "balanced", reminderMode: "off" }),
+  feedbackDraft: "",
+  feedbackItems: readJson(FEEDBACK_KEY, []),
+};
+
+function persistState() {
+  localStorage.setItem(NAME_KEY, state.userName);
+  localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs));
+  localStorage.setItem(FEEDBACK_KEY, JSON.stringify(state.feedbackItems));
+  if (state.selectedSpiritkin && state.conversationId) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      selectedSpiritkin: state.selectedSpiritkin,
+      conversationId: state.conversationId,
+      messages: state.messages,
+      startedAt: state.startedAt,
+    }));
+  }
 }
 
-function MessageRow({ msg }) {
-  return html`<article className=${`bubble ${msg.role === "user" ? "user" : "assistant"}`}>
-    <span className="bubble-role">${msg.role === "user" ? "You" : msg.spiritkinName ?? "Spiritkin"}</span>
-    <p>${msg.content}</p>
-    ${msg.status === "failed" ? html`<span className="bubble-failed">Not delivered</span>` : html`<span className="bubble-time">${new Date(msg.time).toLocaleTimeString()}</span>`}
-  </article>`;
+function hydrateSession() {
+  const session = readJson(SESSION_KEY);
+  if (!session) return;
+  state.selectedSpiritkin = session.selectedSpiritkin ?? null;
+  state.conversationId = session.conversationId ?? null;
+  state.messages = Array.isArray(session.messages) ? session.messages : [];
+  state.startedAt = session.startedAt ?? null;
+  state.sessionState = { kind: "resumed", label: "Resumed previous session" };
+  state.statusText = `Welcome back${state.userName ? `, ${state.userName}` : ""} — your session is ready.`;
 }
 
-function SessionStateBanner({ sessionState }) {
-  if (!sessionState) return null;
-  return html`<div className=${`session-state session-${sessionState.kind}`}>${sessionState.label}</div>`;
+async function fetchSpiritkins() {
+  try {
+    state.loading = true;
+    state.softError = "";
+    state.statusText = "Loading companions...";
+    render();
+    const res = await fetch("/v1/spiritkins");
+    const data = await res.json();
+    if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Unable to load Spiritkins.");
+    state.spiritkins = (data.spiritkins ?? []).filter((s) => ALLOWED_SPIRITKINS.includes(s.name ?? s.id));
+    if (!state.selectedSpiritkin && state.spiritkins.length > 0) {
+      state.selectedSpiritkin = state.spiritkins.find((s) => (s.name ?? s.id) === state.prefs.preferredSpiritkin) ?? state.spiritkins[0];
+    }
+    state.statusText = "Companions are available. Select the one that fits this moment.";
+  } catch (err) {
+    state.softError = err?.message ?? "We couldn’t load companions right now.";
+    state.statusText = "Connection needs retry.";
+  } finally {
+    state.loading = false;
+    render();
+  }
 }
 
-function SpiritkinCard({ spiritkin, selected, onSelect }) {
-  const name = spiritkin.name ?? spiritkin.id;
-  const brand = getBrand(name);
-  return html`<button className=${`spiritkin-card ${brand.aura} ${selected ? "selected" : ""}`} onClick=${onSelect}>
-    <p className="spiritkin-tag">${brand.tag}</p>
-    <h3>${name}</h3>
-    <p className="spiritkin-role">${spiritkin.role ?? spiritkin.archetype ?? "Companion"}</p>
-    <p className="spiritkin-essence">${spiritkin.essence ?? spiritkin.description ?? spiritkin.summary ?? brand.presence}</p>
-  </button>`;
+async function beginConversation() {
+  if (!state.selectedSpiritkin) return;
+  try {
+    state.loading = true;
+    state.softError = "";
+    state.statusText = "Opening your conversation...";
+    render();
+    const res = await fetch("/v1/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: state.userId, spiritkinName: state.selectedSpiritkin.name ?? state.selectedSpiritkin.id }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Could not begin a conversation yet.");
+    state.conversationId = data?.conversation?.id ?? null;
+    state.messages = [];
+    state.startedAt = nowIso();
+    state.sessionState = { kind: "new", label: "Started a new session" };
+    state.prefs.preferredSpiritkin = state.selectedSpiritkin.name ?? state.selectedSpiritkin.id;
+    state.statusText = "Conversation is ready. You can begin whenever it feels right.";
+    persistState();
+  } catch (err) {
+    state.softError = err?.message ?? "We couldn’t open your conversation.";
+    state.statusText = "Conversation unavailable.";
+  } finally {
+    state.loading = false;
+    render();
+  }
 }
 
-function SectionHeader({ title, subtitle }) {
-  return html`<header className="section-header"><h3>${title}</h3><p>${subtitle}</p></header>`;
+async function sendMessage(contentOverride) {
+  const text = (contentOverride ?? state.input).trim();
+  if (!text || !state.conversationId || !state.selectedSpiritkin) return;
+  const outgoing = { id: crypto.randomUUID(), role: "user", content: text, spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() };
+  state.messages.push(outgoing);
+  state.input = "";
+  state.loadingReply = true;
+  state.softError = "";
+  state.statusText = "Your companion is preparing a response with care...";
+  persistState();
+  render();
+  try {
+    const res = await fetch("/v1/interact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: state.userId,
+        input: text,
+        conversationId: state.conversationId,
+        spiritkin: { name: state.selectedSpiritkin.name ?? state.selectedSpiritkin.id },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Message delivery was interrupted.");
+    state.messages.push({ id: crypto.randomUUID(), role: "assistant", content: data?.output ?? data?.response?.text ?? data?.response ?? "…", spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() });
+    state.statusText = "Reply received.";
+  } catch (err) {
+    state.messages = state.messages.map((m) => (m.id === outgoing.id ? { ...m, status: "failed" } : m));
+    state.softError = err?.message ?? "Something interrupted the reply. You can retry safely.";
+    state.statusText = "Reply interrupted. Your message is safe, and retry is available.";
+  } finally {
+    state.loadingReply = false;
+    persistState();
+    render();
+  }
 }
 
-function FutureReady() {
-  return html`<section className="future-grid">
-    <div><h4>Invite Flow</h4><p>Prepared for invitation, acceptance, and beta cohort onboarding.</p></div>
-    <div><h4>Sign In</h4><p>Prepared for secure account login when beta accounts open.</p></div>
-    <div><h4>Create Account</h4><p>Reserved for onboarding, profile creation, and consent steps.</p></div>
-    <div><h4>Saved Conversations</h4><p>Reserved layout for persistent conversation history.</p></div>
-    <div><h4>Memory View</h4><p>UI foundation for memory-aware context panels.</p></div>
-    <div><h4>Settings</h4><p>Space for tone, notifications, and preference controls.</p></div>
-  </section>`;
-}
+function render() {
+  const root = document.getElementById("root");
+  const brand = getBrand(state.selectedSpiritkin?.name);
+  const hasSession = Boolean(state.selectedSpiritkin && state.conversationId);
+  const lastMessageAt = state.messages.length ? state.messages[state.messages.length - 1].time : null;
+  const failedMessage = [...state.messages].reverse().find((m) => m.role === "user" && m.status === "failed");
+  const filteredSpiritkins = state.spiritkins;
 
-function App() {
-  const [userId] = useState(() => getOrCreateUserId());
-  const [userName, setUserName] = useState(localStorage.getItem(NAME_KEY) || "");
-  const [userNameDraft, setUserNameDraft] = useState(localStorage.getItem(NAME_KEY) || "");
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [activeSection, setActiveSection] = useState("companion");
+  root.innerHTML = `
+    <main class="app-shell ${brand.aura}">
+      <header class="topbar">
+        <div class="brand"><strong>Spiritkins</strong><span>${state.userName ? `Companion Beta • ${escapeHtml(state.userName)}` : "Companion Beta"}</span></div>
+        <div class="top-actions">
+          ${!state.entryAccepted ? '<button data-action="continue">Continue</button>' : `<span class="active-pill">${state.userName ? `Hi, ${escapeHtml(state.userName)}` : "Beta User Active"}</span>`}
+          <button data-action="toggle-name">Identity</button>
+          <button disabled title="Coming soon">Sign in (Soon)</button>
+        </div>
+      </header>
 
-  const [spiritkins, setSpiritkins] = useState([]);
-  const [selectedSpiritkin, setSelectedSpiritkin] = useState(null);
-  const [conversationId, setConversationId] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [loadingReply, setLoadingReply] = useState(false);
-  const [softError, setSoftError] = useState("");
-  const [statusText, setStatusText] = useState("Ready");
-  const [startedAt, setStartedAt] = useState(null);
-  const [entryAccepted, setEntryAccepted] = useState(Boolean(localStorage.getItem(ENTRY_KEY)));
-  const [sessionState, setSessionState] = useState(null);
+      ${!state.entryAccepted ? `
+        <section class="entry-card">
+          <p class="kicker">Welcome</p>
+          <h2>Begin your Spiritkins beta session</h2>
+          <p>Spiritkins is for reflective, emotionally attuned check-ins. Start with beta access now, then continue with account features as invites expand.</p>
+          <ol class="entry-steps"><li>Set your display name (optional).</li><li>Continue as Beta User.</li><li>Choose a Spiritkin and begin your first grounded conversation.</li></ol>
+          <div class="entry-auth-rail"><button disabled>Sign In (Soon)</button><button disabled>Create Account (Soon)</button><span>Invite-based beta access is active today</span></div>
+          <label class="field"><span>Your name (optional)</span><input data-field="entry-name" value="${escapeHtml(state.userNameDraft)}" placeholder="How should we address you?" /></label>
+          <button class="primary" data-action="continue">Continue as Beta User</button>
+        </section>` : ""}
 
-  const [prefs, setPrefs] = useState(readJson(PREFS_KEY, {
-    preferredSpiritkin: "",
-    appTone: "balanced",
-    reminderMode: "off",
-  }));
-  const [feedbackDraft, setFeedbackDraft] = useState("");
-  const [feedbackItems, setFeedbackItems] = useState(readJson(FEEDBACK_KEY, []));
-
-  const threadRef = useRef(null);
-  const selectionRef = useRef(null);
-
-  const filteredSpiritkins = useMemo(() => spiritkins.filter((s) => ALLOWED_SPIRITKINS.includes(s.name ?? s.id)), [spiritkins]);
-  const hasSession = Boolean(selectedSpiritkin && conversationId);
-  const brand = getBrand(selectedSpiritkin?.name);
-  const failedMessage = [...messages].reverse().find((m) => m.role === "user" && m.status === "failed");
-  const resumeAvailable = Boolean(readJson(SESSION_KEY)?.conversationId);
-  const lastMessageAt = messages.length ? messages[messages.length - 1].time : null;
-  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
-  const greetingName = userName?.trim() ? `, ${userName.trim()}` : "";
-  const identityLabel = userName?.trim() || "Beta User";
-  const continuitySummary = lastMessageAt
-    ? `Last active ${fmtTime(lastMessageAt)}`
-    : "No local conversation activity yet";
-  const starterFeedbackPrompt = "First session felt calm and clear.";
-
-  useEffect(() => { fetchSpiritkins(); hydrateSession(); }, []);
-  useEffect(() => {
-    if (!selectedSpiritkin || !conversationId) return;
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ selectedSpiritkin, conversationId, messages, startedAt }));
-  }, [selectedSpiritkin, conversationId, messages, startedAt]);
-  useEffect(() => {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-  }, [prefs]);
-  useEffect(() => {
-    localStorage.setItem(FEEDBACK_KEY, JSON.stringify(feedbackItems));
-  }, [feedbackItems]);
-  useEffect(() => {
-    const el = threadRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, loadingReply]);
-
-  function acceptEntry() {
-    localStorage.setItem(ENTRY_KEY, "1");
-    const normalizedName = userNameDraft.trim();
-    localStorage.setItem(NAME_KEY, normalizedName);
-    setUserName(normalizedName);
-    setEntryAccepted(true);
-    setStatusText("Beta access confirmed. You can choose a companion whenever you’re ready.");
-    setTimeout(() => selectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-  }
-
-  function saveName() {
-    const normalizedName = userNameDraft.trim();
-    localStorage.setItem(NAME_KEY, normalizedName);
-    setUserName(normalizedName);
-    setIsEditingName(false);
-    setStatusText(normalizedName ? `Identity updated for ${normalizedName}.` : "Identity updated.");
-  }
-
-  function hydrateSession() {
-    const session = readJson(SESSION_KEY);
-    if (!session) return;
-    setSelectedSpiritkin(session.selectedSpiritkin ?? null);
-    setConversationId(session.conversationId ?? null);
-    setMessages(Array.isArray(session.messages) ? session.messages : []);
-    setStartedAt(session.startedAt ?? null);
-    setStatusText(`Welcome back${greetingName} — your session is ready.`);
-    setSessionState({ kind: "resumed", label: "Resumed previous session" });
-  }
-
-  async function fetchSpiritkins() {
-    try {
-      setLoading(true); setSoftError(""); setStatusText("Loading companions...");
-      const res = await fetch("/v1/spiritkins");
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Unable to load Spiritkins.");
-      const list = data.spiritkins ?? [];
-      setSpiritkins(list);
-      if (!selectedSpiritkin && list.length > 0) {
-        const preferred = list.find((s) => (s.name ?? s.id) === prefs.preferredSpiritkin);
-        const initial = preferred ?? list.find((s) => ALLOWED_SPIRITKINS.includes(s.name ?? s.id)) ?? list[0];
-        setSelectedSpiritkin(initial);
-      }
-      setStatusText("Companions are available. Select the one that fits this moment.");
-    } catch (err) {
-      setSoftError(err?.message ?? "We couldn’t load companions right now. Please try again.");
-      setStatusText("Connection needs retry.");
-    } finally { setLoading(false); }
-  }
-
-  async function beginConversation() {
-    if (!selectedSpiritkin) return;
-    try {
-      setLoading(true); setSoftError(""); setStatusText("Opening your conversation...");
-      const res = await fetch("/v1/conversations", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, spiritkinName: selectedSpiritkin.name ?? selectedSpiritkin.id }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Could not begin a conversation yet.");
-      setConversationId(data?.conversation?.id ?? null);
-      setMessages([]);
-      setStartedAt(nowIso());
-      setStatusText("Conversation is ready. You can begin whenever it feels right.");
-      setSessionState({ kind: "new", label: "Started a new session" });
-      setPrefs((prev) => ({ ...prev, preferredSpiritkin: selectedSpiritkin.name ?? selectedSpiritkin.id }));
-    } catch (err) {
-      setSoftError(err?.message ?? "We couldn’t open your conversation. Please try again.");
-      setStatusText("Conversation unavailable.");
-    } finally { setLoading(false); }
-  }
-
-  function clearSession() {
-    localStorage.removeItem(SESSION_KEY);
-    setConversationId(null); setMessages([]); setStartedAt(null);
-    setStatusText("Session cleared. Your local preferences and identity are still here.");
-    setSessionState({ kind: "cleared", label: "Cleared current session" });
-  }
-
-  async function sendMessage(contentOverride) {
-    const text = (contentOverride ?? input).trim();
-    if (!text || !hasSession) return;
-
-    const outgoing = { id: crypto.randomUUID(), role: "user", content: text, spiritkinName: selectedSpiritkin?.name, status: "sent", time: nowIso() };
-    setMessages((prev) => [...prev, outgoing]);
-    if (!contentOverride) setInput("");
-
-    try {
-      setLoadingReply(true); setSoftError(""); setStatusText("Your companion is preparing a response with care...");
-      const res = await fetch("/v1/interact", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, input: text, conversationId, spiritkin: { name: selectedSpiritkin.name ?? selectedSpiritkin.id } }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Message delivery was interrupted.");
-      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: data?.output ?? data?.response?.text ?? data?.response ?? "…", spiritkinName: selectedSpiritkin?.name, status: "sent", time: nowIso() }]);
-      setStatusText("Reply received.");
-    } catch (err) {
-      setMessages((prev) => prev.map((m) => (m.id === outgoing.id ? { ...m, status: "failed" } : m)));
-      setSoftError(err?.message ?? "Something interrupted the reply. You can retry safely.");
-      setStatusText("Reply interrupted. Your message is safe, and retry is available.");
-    } finally { setLoadingReply(false); }
-  }
-
-  function submitFeedback() {
-    const text = feedbackDraft.trim();
-    if (!text) return;
-    setFeedbackItems((prev) => [{ id: crypto.randomUUID(), text, time: nowIso() }, ...prev].slice(0, 20));
-    setFeedbackDraft("");
-    setStatusText("Feedback saved locally. Thank you.");
-  }
-
-  function clearFeedbackHistory() {
-    setFeedbackItems([]);
-    setStatusText("Local feedback history cleared.");
-  }
-
-  return html`<main className="app-shell ${brand.aura}">
-    <${TopBar} onContinue=${acceptEntry} entryAccepted=${entryAccepted} userName=${userName} onEditName=${() => setIsEditingName(true)} />
-
-    ${!entryAccepted ? html`<${EntryCard} onBegin=${acceptEntry} userNameDraft=${userNameDraft} onUserNameDraft=${setUserNameDraft} />` : null}
-
-    <section className="hero">
-      <p className="kicker">Spiritkins • Beta</p>
-      <h1>${`Welcome${greetingName}`}</h1>
-      <p className="subtitle">Emotionally attuned, mythic-emotional companions designed to help you reconnect with clarity and care.</p>
-      <p className="status-line">Status: ${statusText}</p>
-      <div className="identity-pill-row">
-        <span className="identity-pill">${identityLabel}</span>
-        <span className="identity-pill subtle">${entryAccepted ? "Beta access active" : "Access not started"}</span>
-        <span className="identity-pill subtle">${continuitySummary}</span>
-      </div>
-      <p className="trust-note">Local-first beta: your preferences, feedback notes, and session continuity stay on this device for now.</p>
-      <p className="launch-note">Built for invited beta testers who want a calm place to reflect, reset, and return over time.</p>
-    </section>
-
-    <nav className="section-nav">
-      ${Object.keys(SECTION_COPY).map((key) => html`
-        <button className=${activeSection === key ? "active" : ""} aria-current=${activeSection === key ? "page" : "false"} onClick=${() => setActiveSection(key)}>
-          <span>${key.charAt(0).toUpperCase() + key.slice(1)}</span>
-          <small>${SECTION_COPY[key].title}</small>
-        </button>
-      `)}
-    </nav>
-    <p className="nav-support">Companion for active conversation, Preferences for your defaults, and Feedback for product notes.</p>
-
-    ${isEditingName
-      ? html`<section className="identity-edit"><label className="field"><span>Display name</span><input value=${userNameDraft} onInput=${(e) => setUserNameDraft(e.target.value)} placeholder="Name" /></label><div className="identity-actions"><button onClick=${saveName}>Save</button><button onClick=${() => { setIsEditingName(false); setUserNameDraft(userName); }}>Cancel</button></div></section>`
-      : null}
-
-    ${activeSection === "companion" ? html`
-      <section className="product-panel">
-      <${SectionHeader} title=${SECTION_COPY.companion.title} subtitle=${SECTION_COPY.companion.subtitle} />
-      <${SessionStateBanner} sessionState=${sessionState} />
-      <section className="lifecycle-rail">
-        <span className=${`step ${entryAccepted ? "done" : "active"}`}>1. Access</span>
-        <span className=${`step ${selectedSpiritkin ? "done" : entryAccepted ? "active" : "idle"}`}>2. Choose Companion</span>
-        <span className=${`step ${hasSession ? "done" : selectedSpiritkin ? "active" : "idle"}`}>3. Begin Conversation</span>
+      <section class="hero">
+        <p class="kicker">Spiritkins • Beta</p><h1>Welcome${state.userName ? `, ${escapeHtml(state.userName)}` : ""}</h1>
+        <p class="subtitle">Emotionally attuned, mythic-emotional companions designed to help you reconnect with clarity and care.</p>
+        <p class="status-line">Status: ${escapeHtml(state.statusText)}</p>
       </section>
 
-      <section className="meta-row">
-        <div className="meta-card">
-          <h4>Identity</h4>
-          <p><strong>Name:</strong> ${userName || "Not set"}</p>
-          <p><strong>Beta user:</strong> ${userId}</p>
-          <p><strong>Session started:</strong> ${fmtTime(startedAt)}</p>
-        </div>
-        <div className="meta-card">
-          <h4>Continuity</h4>
-          <p>${lastMessageAt ? `Picking up where we left off (${fmtTime(lastMessageAt)}).` : "Continuity appears here as soon as your first exchange is saved in this device session."}</p>
-          <p>${lastUserMessage ? `Last shared: “${lastUserMessage.slice(0, 78)}${lastUserMessage.length > 78 ? "…" : ""}”` : "No prior user message in this local session yet."}</p>
-        </div>
-      </section>
+      <nav class="section-nav">
+        ${Object.keys(SECTION_COPY).map((k) => `<button data-action="switch-section" data-section="${k}" class="${state.activeSection === k ? "active" : ""}"><span>${k[0].toUpperCase() + k.slice(1)}</span><small>${SECTION_COPY[k].title}</small></button>`).join("")}
+      </nav>
 
-      <section className="session-bar">
-        <div>
-          <p className="kicker">Session</p>
-          <p className="session-title">${hasSession ? `${selectedSpiritkin?.name} • Active` : "No active conversation"}</p>
-          <p className="session-sub">${hasSession ? `Conversation: ${conversationId}` : "Choose a companion to begin."}</p>
-        </div>
-        <div className="session-actions">
-          ${resumeAvailable && !hasSession ? html`<button onClick=${hydrateSession}>Resume</button>` : null}
-          ${hasSession ? html`<button onClick=${clearSession}>Start Fresh</button>` : null}
-        </div>
-      </section>
+      ${state.isEditingName ? `<section class="identity-edit"><label class="field"><span>Display name</span><input data-field="name" value="${escapeHtml(state.userNameDraft)}" /></label><div class="identity-actions"><button data-action="save-name">Save</button><button data-action="cancel-name">Cancel</button></div></section>` : ""}
 
-      ${softError ? html`<div className="error-banner">${softError}</div>` : null}
+      ${state.activeSection === "companion" ? `
+      <section class="product-panel">
+        ${state.sessionState ? `<div class="session-state session-${state.sessionState.kind}">${state.sessionState.label}</div>` : ""}
+        <section class="lifecycle-rail"><span class="step ${state.entryAccepted ? "done" : "active"}">1. Access</span><span class="step ${state.selectedSpiritkin ? "done" : "active"}">2. Choose Companion</span><span class="step ${hasSession ? "done" : "active"}">3. Begin Conversation</span></section>
+        <section class="meta-row"><div class="meta-card"><h4>Identity</h4><p><strong>Name:</strong> ${escapeHtml(state.userName || "Not set")}</p><p><strong>Beta user:</strong> ${escapeHtml(state.userId)}</p><p><strong>Session started:</strong> ${fmtTime(state.startedAt)}</p></div><div class="meta-card"><h4>Continuity</h4><p>${lastMessageAt ? `Picking up where we left off (${fmtTime(lastMessageAt)}).` : "Continuity appears once your first exchange is saved."}</p></div></section>
+        <section class="session-bar"><div><p class="kicker">Session</p><p class="session-title">${hasSession ? `${escapeHtml(state.selectedSpiritkin?.name)} • Active` : "No active conversation"}</p><p class="session-sub">${hasSession ? `Conversation: ${escapeHtml(state.conversationId)}` : "Choose a companion to begin."}</p></div><div class="session-actions">${readJson(SESSION_KEY)?.conversationId && !hasSession ? '<button data-action="resume">Resume</button>' : ""}${hasSession ? '<button data-action="clear-session">Start Fresh</button>' : ""}</div></section>
+        ${state.softError ? `<div class="error-banner">${escapeHtml(state.softError)}</div>` : ""}
 
-      ${!hasSession
-        ? html`<section className="selection-panel" ref=${selectionRef}>
-            <div className="selection-header">
-              <div>
-                <p className="kicker">Choose your companion</p>
-                <h2>Select the presence that fits today.</h2>
-              </div>
-              <button onClick=${fetchSpiritkins} disabled=${loading}>Refresh</button>
-            </div>
-            <p className="selection-note">Each Spiritkin keeps continuity through your ongoing session and responds with an attuned tone.</p>
-            ${loading && filteredSpiritkins.length === 0 ? html`<p className="state">Gathering companion presences…</p>` : null}
-            ${!loading && filteredSpiritkins.length === 0 ? html`<p className="state">No Spiritkins available right now. Please try refresh.</p>` : null}
-            <div className="spiritkin-grid">
-              ${filteredSpiritkins.map((sp) => html`<${SpiritkinCard} key=${sp.name ?? sp.id} spiritkin=${sp} selected=${selectedSpiritkin?.name === sp.name} onSelect=${() => setSelectedSpiritkin(sp)} />`)}
-            </div>
-            <button className="primary" onClick=${beginConversation} disabled=${loading || !selectedSpiritkin}>Begin Conversation</button>
-          </section>`
-        : html`<section className="chat-panel">
-            <header className=${`chat-header ${brand.aura}`}>
-              <div>
-                <p className="kicker">Active Spiritkin</p>
-                <h2>${selectedSpiritkin?.name}</h2>
-                <p>${brand.tag}</p>
-                <p className="session-id">${brand.presence}</p>
-              </div>
-              <button onClick=${() => setConversationId(null)} disabled=${loadingReply}>Change Spiritkin</button>
-            </header>
-
-            <div className="starter-prompts">
-              ${messages.length === 0 ? STARTER_PROMPTS.map((prompt) => html`<button onClick=${() => setInput(userName ? `${userName}: ${prompt}` : prompt)}>${prompt}</button>`) : null}
-            </div>
-
-            <div className="thread-status">
-              <span>${loadingReply ? "Attunement in progress…" : "Companion ready"}</span>
-              <span>${messages.length} message${messages.length === 1 ? "" : "s"}</span>
-            </div>
-
-            <div className="thread" ref=${threadRef}>
-              ${messages.length === 0 ? html`<p className="state">Try one of the starter prompts, or write your own first message.</p>` : null}
-              ${messages.map((msg) => html`<${MessageRow} key=${msg.id} msg=${msg} />`)}
-              ${loadingReply ? html`<article className="bubble assistant loading-bubble"><span className="bubble-role">${selectedSpiritkin?.name ?? "Spiritkin"}</span><p>Listening… shaping a thoughtful reply.</p></article>` : null}
-            </div>
-
-            ${failedMessage ? html`<div className="retry-banner"><span>Last message didn’t send.</span><button onClick=${() => sendMessage(failedMessage.content)} disabled=${loadingReply}>Retry</button></div>` : null}
-            ${failedMessage ? html`<p className="retry-note">Your unsent message is preserved locally so you can retry safely.</p>` : null}
-
-            <div className="composer">
-              <textarea
-                value=${input}
-                placeholder="Share what you’re feeling, wondering, or working through..."
-                onChange=${(e) => setInput(e.target.value)}
-                onKeyDown=${(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-                }}
-              ></textarea>
-              <button className="primary" onClick=${() => sendMessage()} disabled=${loadingReply || !input.trim()}>Send</button>
-            </div>
+        ${!hasSession ? `
+          <section class="selection-panel"><div class="selection-header"><div><p class="kicker">Choose your companion</p><h2>Select the presence that fits today.</h2></div><button data-action="refresh-spiritkins" ${state.loading ? "disabled" : ""}>Refresh</button></div>
+          <div class="spiritkin-grid">${filteredSpiritkins.map((sp, i) => { const name = sp.name ?? sp.id; const b = getBrand(name); return `<button class="spiritkin-card ${b.aura} ${(state.selectedSpiritkin?.name ?? state.selectedSpiritkin?.id) === name ? "selected" : ""}" data-action="select-spiritkin" data-index="${i}"><p class="spiritkin-tag">${b.tag}</p><h3>${escapeHtml(name)}</h3><p class="spiritkin-role">${escapeHtml(sp.role ?? sp.archetype ?? "Companion")}</p><p class="spiritkin-essence">${escapeHtml(sp.essence ?? sp.description ?? sp.summary ?? b.presence)}</p></button>`; }).join("")}</div>
+          <button class="primary" data-action="begin" ${state.loading || !state.selectedSpiritkin ? "disabled" : ""}>Begin Conversation</button></section>` : `
+          <section class="chat-panel">
+            <header class="chat-header ${brand.aura}"><div><p class="kicker">Active Spiritkin</p><h2>${escapeHtml(state.selectedSpiritkin?.name)}</h2><p>${brand.tag}</p><p class="session-id">${brand.presence}</p></div><button data-action="change-spiritkin" ${state.loadingReply ? "disabled" : ""}>Change Spiritkin</button></header>
+            <div class="starter-prompts">${state.messages.length === 0 ? STARTER_PROMPTS.map((p) => `<button data-action="prompt" data-prompt="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join("") : ""}</div>
+            <div class="thread">${state.messages.length === 0 ? '<p class="state">Try a starter prompt, or write your own message.</p>' : state.messages.map((m) => `<article class="bubble ${m.role === "user" ? "user" : "assistant"}"><span class="bubble-role">${m.role === "user" ? "You" : escapeHtml(m.spiritkinName ?? "Spiritkin")}</span><p>${escapeHtml(m.content)}</p>${m.status === "failed" ? '<span class="bubble-failed">Not delivered</span>' : `<span class="bubble-time">${new Date(m.time).toLocaleTimeString()}</span>`}</article>`).join("")}</div>
+            ${failedMessage ? '<div class="retry-banner"><span>Last message didn’t send.</span><button data-action="retry">Retry</button></div>' : ""}
+            <div class="composer"><textarea data-field="chat-input" placeholder="Share what you’re feeling, wondering, or working through...">${escapeHtml(state.input)}</textarea><button class="primary" data-action="send" ${state.loadingReply || !state.input.trim() ? "disabled" : ""}>Send</button></div>
           </section>`}
-      </section>
-    ` : null}
+      </section>` : ""}
 
-    ${activeSection === "preferences" ? html`<section className="product-panel settings-panel">
-      <${SectionHeader} title=${SECTION_COPY.preferences.title} subtitle=${SECTION_COPY.preferences.subtitle} />
-      <article className="account-readiness">
-        <h4>Account readiness</h4>
-        <p>Sign in and account creation are prepared in the UI. Your current beta identity remains local until account rollout begins.</p>
-      </article>
-      <div className="settings-grid">
-        <article>
-          <h4>Identity</h4>
-          <label className="field"><span>Display name</span><input value=${userNameDraft} onInput=${(e) => setUserNameDraft(e.target.value)} /></label>
-          <p className="settings-note">Used in your greeting and prompt suggestions.</p>
-        </article>
-        <article>
-          <h4>Companion defaults</h4>
-          <label className="field"><span>Preferred Spiritkin</span><select value=${prefs.preferredSpiritkin} onChange=${(e) => setPrefs((prev) => ({ ...prev, preferredSpiritkin: e.target.value }))}><option value="">Auto</option>${ALLOWED_SPIRITKINS.map((name) => html`<option value=${name}>${name}</option>`)}</select></label>
-          <label className="field"><span>App tone readiness</span><select value=${prefs.appTone} onChange=${(e) => setPrefs((prev) => ({ ...prev, appTone: e.target.value }))}><option value="balanced">Balanced</option><option value="gentle">Gentle</option><option value="direct">Direct</option></select></label>
-        </article>
-        <article>
-          <h4>Ritual pacing</h4>
-          <label className="field"><span>Reminder placeholder</span><select value=${prefs.reminderMode} onChange=${(e) => setPrefs((prev) => ({ ...prev, reminderMode: e.target.value }))}><option value="off">Off</option><option value="daily">Daily (placeholder)</option><option value="weekly">Weekly (placeholder)</option></select></label>
-          <p className="settings-note">Account-linked delivery will ship with sign-in support.</p>
-        </article>
-      </div>
-      <button onClick=${saveName}>Save Local Preferences</button>
-    </section>` : null}
+      ${state.activeSection === "preferences" ? `<section class="product-panel settings-panel"><h3>${SECTION_COPY.preferences.title}</h3><p class="settings-note">${SECTION_COPY.preferences.subtitle}</p><label class="field"><span>Display name</span><input data-field="name" value="${escapeHtml(state.userNameDraft)}" /></label><label class="field"><span>Preferred Spiritkin</span><select data-field="pref-spiritkin"><option value="">Auto</option>${ALLOWED_SPIRITKINS.map((n) => `<option ${state.prefs.preferredSpiritkin === n ? "selected" : ""} value="${n}">${n}</option>`).join("")}</select></label><label class="field"><span>App tone readiness</span><select data-field="pref-tone"><option value="balanced" ${state.prefs.appTone === "balanced" ? "selected" : ""}>Balanced</option><option value="gentle" ${state.prefs.appTone === "gentle" ? "selected" : ""}>Gentle</option><option value="direct" ${state.prefs.appTone === "direct" ? "selected" : ""}>Direct</option></select></label><button data-action="save-name">Save Local Preferences</button></section>` : ""}
 
-    ${activeSection === "feedback" ? html`<section className="product-panel feedback-panel">
-      <${SectionHeader} title=${SECTION_COPY.feedback.title} subtitle=${SECTION_COPY.feedback.subtitle} />
-      <p className="settings-note">Use this as a lightweight product journal while beta access is local-first.</p>
-      <div className="feedback-suggestions">
-        <button onClick=${() => setFeedbackDraft(starterFeedbackPrompt)}>Helpful first-session note</button>
-        <button onClick=${() => setFeedbackDraft("I wanted clearer guidance before selecting a Spiritkin.")}>Onboarding clarity note</button>
-        <button onClick=${() => setFeedbackDraft("Retry and recovery felt dependable.")}>Reliability note</button>
-      </div>
-      <textarea value=${feedbackDraft} placeholder="Share what felt helpful, unclear, or missing..." onChange=${(e) => setFeedbackDraft(e.target.value)}></textarea>
-      <div className="feedback-actions">
-        <button className="primary" onClick=${submitFeedback} disabled=${!feedbackDraft.trim()}>Save Feedback</button>
-        <button onClick=${clearFeedbackHistory} disabled=${feedbackItems.length === 0}>Clear History</button>
-      </div>
-      <div className="feedback-list">
-        ${feedbackItems.length === 0
-          ? html`<p className="state">No saved feedback yet. Add your first note to begin a local beta journal.</p>`
-          : feedbackItems.map((f) => html`<article><strong>${fmtTime(f.time)}</strong><p>${f.text}</p></article>`)}
-      </div>
-    </section>` : null}
+      ${state.activeSection === "feedback" ? `<section class="product-panel feedback-panel"><h3>${SECTION_COPY.feedback.title}</h3><p class="settings-note">${SECTION_COPY.feedback.subtitle}</p><textarea data-field="feedback" placeholder="Share what felt helpful, unclear, or missing...">${escapeHtml(state.feedbackDraft)}</textarea><div class="feedback-actions"><button class="primary" data-action="save-feedback" ${!state.feedbackDraft.trim() ? "disabled" : ""}>Save Feedback</button><button data-action="clear-feedback" ${state.feedbackItems.length === 0 ? "disabled" : ""}>Clear History</button></div><div class="feedback-list">${state.feedbackItems.length === 0 ? '<p class="state">No saved feedback yet.</p>' : state.feedbackItems.map((f) => `<article><strong>${fmtTime(f.time)}</strong><p>${escapeHtml(f.text)}</p></article>`).join("")}</div></section>` : ""}
 
-    <${FutureReady} />
-    <footer className="footer-note">Spiritkins beta • A calm, trustworthy companion experience designed to support reflection over time.</footer>
-  </main>`;
+      <section class="future-grid"><div><h4>Invite Flow</h4><p>Prepared for invitation and beta cohort onboarding.</p></div><div><h4>Sign In</h4><p>Prepared for secure account login when beta accounts open.</p></div><div><h4>Create Account</h4><p>Reserved for onboarding and consent steps.</p></div><div><h4>Saved Conversations</h4><p>Reserved layout for persistent history.</p></div><div><h4>Memory View</h4><p>UI foundation for memory-aware context.</p></div><div><h4>Settings</h4><p>Space for tone, notifications, and controls.</p></div></section>
+      <footer class="footer-note">Spiritkins beta • A calm, trustworthy companion experience designed to support reflection over time.</footer>
+    </main>`;
 }
 
-createRoot(document.getElementById("root")).render(html`<${App} />`);
+function onRootInput(e) {
+  const field = e.target.dataset.field;
+  if (!field) return;
+  if (field === "entry-name" || field === "name") state.userNameDraft = e.target.value;
+  if (field === "chat-input") state.input = e.target.value;
+  if (field === "feedback") state.feedbackDraft = e.target.value;
+  if (field === "pref-spiritkin") state.prefs.preferredSpiritkin = e.target.value;
+  if (field === "pref-tone") state.prefs.appTone = e.target.value;
+  persistState();
+  render();
+}
+
+async function onRootClick(e) {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  const action = btn.dataset.action;
+  if (action === "continue") {
+    localStorage.setItem(ENTRY_KEY, "1");
+    state.entryAccepted = true;
+    state.userName = state.userNameDraft.trim();
+    localStorage.setItem(NAME_KEY, state.userName);
+    state.statusText = "Beta access confirmed. You can choose a companion whenever you’re ready.";
+    render();
+    return;
+  }
+  if (action === "toggle-name") state.isEditingName = !state.isEditingName;
+  if (action === "cancel-name") { state.isEditingName = false; state.userNameDraft = state.userName; }
+  if (action === "save-name") { state.userName = state.userNameDraft.trim(); state.isEditingName = false; state.statusText = state.userName ? `Identity updated for ${state.userName}.` : "Identity updated."; persistState(); }
+  if (action === "switch-section") state.activeSection = btn.dataset.section;
+  if (action === "refresh-spiritkins") fetchSpiritkins();
+  if (action === "select-spiritkin") state.selectedSpiritkin = state.spiritkins[Number(btn.dataset.index)] ?? state.selectedSpiritkin;
+  if (action === "begin") beginConversation();
+  if (action === "change-spiritkin") { state.conversationId = null; state.messages = []; }
+  if (action === "send") sendMessage();
+  if (action === "prompt") { state.input = btn.dataset.prompt || ""; }
+  if (action === "retry") { const failed = [...state.messages].reverse().find((m) => m.role === "user" && m.status === "failed"); if (failed) sendMessage(failed.content); }
+  if (action === "clear-session") { localStorage.removeItem(SESSION_KEY); state.conversationId = null; state.messages = []; state.startedAt = null; state.statusText = "Session cleared."; }
+  if (action === "resume") hydrateSession();
+  if (action === "save-feedback") { const text = state.feedbackDraft.trim(); if (text) { state.feedbackItems = [{ id: crypto.randomUUID(), text, time: nowIso() }, ...state.feedbackItems].slice(0, 20); state.feedbackDraft = ""; state.statusText = "Feedback saved locally. Thank you."; persistState(); } }
+  if (action === "clear-feedback") { state.feedbackItems = []; persistState(); }
+  render();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  hydrateSession();
+  fetchSpiritkins();
+  render();
+  document.getElementById("root").addEventListener("input", onRootInput);
+  document.getElementById("root").addEventListener("change", onRootInput);
+  document.getElementById("root").addEventListener("click", (e) => { onRootClick(e); });
+  document.getElementById("root").addEventListener("keydown", (e) => {
+    if (e.target.dataset.field === "chat-input" && e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+});
