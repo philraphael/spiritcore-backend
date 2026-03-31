@@ -36,14 +36,15 @@ function getBrand(name) {
   return BRAND_BY_SPIRITKIN[name] ?? { aura: "default", tag: "Mythic Companion", presence: "Attuned and thoughtful." };
 }
 
-function TopBar({ onContinue, entryAccepted, userName }) {
+function TopBar({ onContinue, entryAccepted, userName, onEditName }) {
   return html`<header className="topbar">
     <div className="brand">
       <strong>Spiritkins</strong>
       <span>${userName ? `Companion Beta • ${userName}` : "Companion Beta"}</span>
     </div>
     <div className="top-actions">
-      ${!entryAccepted ? html`<button onClick=${onContinue}>Continue</button>` : html`<span className="active-pill">Beta User Active</span>`}
+      ${!entryAccepted ? html`<button onClick=${onContinue}>Continue</button>` : html`<span className="active-pill">${userName ? `Hi, ${userName}` : "Beta User Active"}</span>`}
+      <button onClick=${onEditName}>Name</button>
       <button disabled title="Coming soon">Sign in (Soon)</button>
     </div>
   </header>`;
@@ -82,7 +83,7 @@ function MessageRow({ msg }) {
   return html`<article className=${`bubble ${msg.role === "user" ? "user" : "assistant"}`}>
     <span className="bubble-role">${msg.role === "user" ? "You" : msg.spiritkinName ?? "Spiritkin"}</span>
     <p>${msg.content}</p>
-    ${msg.status === "failed" ? html`<span className="bubble-failed">Not delivered</span>` : null}
+    ${msg.status === "failed" ? html`<span className="bubble-failed">Not delivered</span>` : html`<span className="bubble-time">${new Date(msg.time).toLocaleTimeString()}</span>`}
   </article>`;
 }
 
@@ -110,6 +111,7 @@ function App() {
   const [userId] = useState(() => getOrCreateUserId());
   const [userName, setUserName] = useState(localStorage.getItem(NAME_KEY) || "");
   const [userNameDraft, setUserNameDraft] = useState(localStorage.getItem(NAME_KEY) || "");
+  const [isEditingName, setIsEditingName] = useState(false);
   const [spiritkins, setSpiritkins] = useState([]);
   const [selectedSpiritkin, setSelectedSpiritkin] = useState(null);
   const [conversationId, setConversationId] = useState(null);
@@ -151,6 +153,15 @@ function App() {
     setUserName(normalizedName);
     setEntryAccepted(true);
     setTimeout(() => selectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+
+
+  function saveName() {
+    const normalizedName = userNameDraft.trim();
+    localStorage.setItem(NAME_KEY, normalizedName);
+    setUserName(normalizedName);
+    setIsEditingName(false);
+    setStatusText(normalizedName ? `Identity updated for ${normalizedName}.` : "Identity updated.");
   }
 
   function hydrateSession() {
@@ -237,7 +248,7 @@ function App() {
   }
 
   return html`<main className="app-shell ${brand.aura}">
-    <${TopBar} onContinue=${acceptEntry} entryAccepted=${entryAccepted} userName=${userName} />
+    <${TopBar} onContinue=${acceptEntry} entryAccepted=${entryAccepted} userName=${userName} onEditName=${() => setIsEditingName(true)} />
 
     ${!entryAccepted ? html`<${EntryCard} onBegin=${acceptEntry} userNameDraft=${userNameDraft} onUserNameDraft=${setUserNameDraft} />` : null}
 
@@ -250,6 +261,11 @@ function App() {
 
     <${SessionStateBanner} sessionState=${sessionState} />
     <${LifecycleRail} entryAccepted=${entryAccepted} hasSession=${hasSession} selectedSpiritkin=${selectedSpiritkin} />
+
+
+    ${isEditingName
+      ? html`<section className="identity-edit"><label className="field"><span>Display name</span><input value=${userNameDraft} onInput=${(e) => setUserNameDraft(e.target.value)} placeholder="Name" /></label><div className="identity-actions"><button onClick=${saveName}>Save</button><button onClick=${() => { setIsEditingName(false); setUserNameDraft(userName); }}>Cancel</button></div></section>`
+      : null}
 
     <section className="meta-row">
       <div className="meta-card">
@@ -308,7 +324,7 @@ function App() {
           </header>
 
           <div className="starter-prompts">
-            ${messages.length === 0 ? STARTER_PROMPTS.map((prompt) => html`<button onClick=${() => setInput(prompt)}>${prompt}</button>`) : null}
+            ${messages.length === 0 ? STARTER_PROMPTS.map((prompt) => html`<button onClick=${() => setInput(userName ? `${userName}: ${prompt}` : prompt)}>${prompt}</button>`) : null}
           </div>
 
           <div className="thread-status">
