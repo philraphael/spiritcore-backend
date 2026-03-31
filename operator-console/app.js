@@ -10,12 +10,32 @@ const DEFAULT_ENVS = {
   production: "https://api.spiritcore.internal",
 };
 
-function Panel({ title, children }) {
-  return html`<section className="panel"><header className="panel-header">${title}</header><div className="panel-body">${children}</div></section>`;
+const STATUS_KIND = {
+  idle: "info",
+  success: "success",
+  error: "error",
+  loading: "loading",
+};
+
+function Panel({ title, actions, children, compact = false }) {
+  return html`
+    <section className=${`panel ${compact ? "panel-compact" : ""}`}>
+      <header className="panel-header">
+        <h2>${title}</h2>
+        <div className="panel-actions">${actions}</div>
+      </header>
+      <div className="panel-body">${children}</div>
+    </section>
+  `;
 }
 
 function Field({ label, children }) {
   return html`<label className="field"><span className="field-label">${label}</span>${children}</label>`;
+}
+
+function StatusBanner({ kind, message }) {
+  if (!message) return null;
+  return html`<div className=${`status-banner status-${kind}`}>${message}</div>`;
 }
 
 function MessageItem({ msg }) {
@@ -28,8 +48,51 @@ function MessageItem({ msg }) {
   </article>`;
 }
 
-function MetadataBlock({ title, value }) {
-  return html`<div className="metadata-block"><h4>${title}</h4><pre>${typeof value === "string" ? value : JSON.stringify(value ?? null, null, 2)}</pre></div>`;
+function MetadataCard({ title, value }) {
+  const rendered = typeof value === "string" ? value : JSON.stringify(value ?? null, null, 2);
+  return html`<div className="metadata-card"><h4>${title}</h4><pre>${rendered}</pre></div>`;
+}
+
+function TraceCard({ traceId }) {
+  const [copied, setCopied] = useState(false);
+
+  async function onCopy() {
+    if (!traceId || !navigator?.clipboard) return;
+    await navigator.clipboard.writeText(traceId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  }
+
+  return html`<div className="trace-card">
+    <h4>Trace ID</h4>
+    <code>${traceId || "(none)"}</code>
+    <button onClick=${onCopy} disabled=${!traceId}>${copied ? "Copied" : "Copy"}</button>
+  </div>`;
+}
+
+function SpiritkinCard({ spiritkin, selected, onSelect }) {
+  const title = spiritkin?.name ?? spiritkin?.id ?? "Unknown";
+  const role = spiritkin?.role ?? spiritkin?.archetype ?? "n/a";
+  const essence = spiritkin?.essence ?? spiritkin?.description ?? spiritkin?.summary ?? "No essence provided.";
+
+  return html`<button className=${`spiritkin-card ${selected ? "selected" : ""}`} onClick=${onSelect}>
+    <strong>${title}</strong>
+    <span className="muted">Role: ${role}</span>
+    <p>${String(essence)}</p>
+  </button>`;
+}
+
+function ConversationRow({ conversation, active, onLoad }) {
+  const title = conversation?.title ?? conversation?.id ?? "Untitled";
+  const subtitle = conversation?.id ?? "No ID";
+  const timestamp = conversation?.created_at ?? conversation?.updated_at ?? null;
+  return html`<button className=${`conversation-row ${active ? "active" : ""}`} onClick=${onLoad}>
+    <div>
+      <strong>${title}</strong>
+      <span className="muted mono">${subtitle}</span>
+    </div>
+    <span className="muted">${timestamp ? new Date(timestamp).toLocaleString() : ""}</span>
+  </button>`;
 }
 
 function App() {
@@ -39,10 +102,11 @@ function App() {
   const [spiritkinName, setSpiritkinName] = useState("");
   const [userId, setUserId] = useState("operator-user-1");
   const [conversationId, setConversationId] = useState("");
+  const [conversationList, setConversationList] = useState([]);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
   const [meta, setMeta] = useState({});
-  const [status, setStatus] = useState("idle");
+  const [status, setStatus] = useState({ kind: STATUS_KIND.idle, message: "Idle" });
 
   const canSend = useMemo(
     () => Boolean(input.trim() && userId.trim() && spiritkinName.trim() && conversationId.trim()),
@@ -53,124 +117,231 @@ function App() {
     setBaseUrl(DEFAULT_ENVS[environment]);
   }, [environment]);
 
+  function setSuccess(message) {
+    setStatus({ kind: STATUS_KIND.success, message });
+  }
+
+  function setError(message) {
+    setStatus({ kind: STATUS_KIND.error, message });
+  }
+
+  function setLoading(message) {
+    setStatus({ kind: STATUS_KIND.loading, message });
+  }
+
   async function checkReady() {
-    setStatus("Checking /ready ...");
-    const res = await fetch(`${baseUrl}/ready`);
-    const data = await res.json();
-    setStatus(data?.ok ? "Backend ready" : "Backend not ready");
+    try {
+      setLoading("Checking backend readiness...");
+      const res = await fetch(`${baseUrl}/ready`);
+      const data = await res.json();
+      if (!res.ok || !data?.ok) return setError("Backend ready check failed");
+      setSuccess("Backend is ready");
+    } catch (err) {
+      setError(`Ready check error: ${err?.message ?? err}`);
+    }
   }
 
   async function loadSpiritkins() {
-    setStatus("Loading spiritkins ...");
-    const res = await fetch(`${baseUrl}/v1/spiritkins`);
-    const data = await res.json();
-    const list = data?.spiritkins ?? [];
-    setSpiritkins(list);
-    if (!spiritkinName && list.length > 0) setSpiritkinName(list[0].name ?? list[0].id ?? "");
-    setStatus(`Loaded ${list.length} spiritkin(s)`);
+    try {
+      setLoading("Loading spiritkin registry...");
+      const res = await fetch(`${baseUrl}/v1/spiritkins`);
+      const data = await res.json();
+      if (!res.ok || !data?.ok) return setError(data?.message ?? "Failed to load spiritkins");
+      const list = data?.spiritkins ?? [];
+      setSpiritkins(list);
+      if (!spiritkinName && list.length > 0) setSpiritkinName(list[0].name ?? list[0].id ?? "");
+      setMeta(data);
+      setSuccess(`Loaded ${list.length} spiritkin(s)`);
+    } catch (err) {
+      setError(`Spiritkin load error: ${err?.message ?? err}`);
+    }
   }
 
   async function createConversation() {
-    setStatus("Creating conversation ...");
-    const res = await fetch(`${baseUrl}/v1/conversations`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: userId.trim(), spiritkinName: spiritkinName.trim() }),
-    });
-    const data = await res.json();
-    const newId = data?.conversation?.id ?? data?.conversation_id ?? "";
-    setConversationId(newId);
-    setStatus(newId ? `Conversation created: ${newId}` : "Conversation create returned no id");
+    try {
+      setLoading("Creating conversation...");
+      const res = await fetch(`${baseUrl}/v1/conversations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: userId.trim(), spiritkinName: spiritkinName.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) return setError(data?.message ?? "Conversation create failed");
+      const newId = data?.conversation?.id ?? "";
+      setConversationId(newId);
+      setMeta(data);
+      setSuccess(`Conversation created: ${newId}`);
+      await loadConversations();
+    } catch (err) {
+      setError(`Create conversation error: ${err?.message ?? err}`);
+    }
+  }
+
+  async function loadConversations() {
+    if (!userId.trim()) return setError("Set userId before loading conversations");
+    try {
+      setLoading("Loading conversation list...");
+      const res = await fetch(`${baseUrl}/v1/conversations/${encodeURIComponent(userId.trim())}`);
+      const data = await res.json();
+      if (!res.ok || !data?.ok) return setError(data?.message ?? "Failed to load conversations");
+      const list = data?.conversations ?? [];
+      setConversationList(list);
+      setMeta(data);
+      setSuccess(`Loaded ${list.length} conversation(s)`);
+    } catch (err) {
+      setError(`Conversation list error: ${err?.message ?? err}`);
+    }
+  }
+
+  function loadConversationToSession(conversation) {
+    const loadedId = conversation?.id ?? "";
+    setConversationId(loadedId);
+    setSuccess(`Active conversation set: ${loadedId}`);
   }
 
   async function sendMessage() {
     if (!canSend) return;
-    const outbound = { role: "operator", content: input.trim(), time: new Date().toISOString() };
-    setMessages((prev) => [...prev, outbound]);
-    setInput("");
-    setStatus("Sending /v1/interact ...");
+    try {
+      const outbound = { role: "operator", content: input.trim(), time: new Date().toISOString() };
+      setMessages((prev) => [...prev, outbound]);
+      setInput("");
+      setLoading("Sending interaction...");
 
-    const payload = {
-      userId: userId.trim(),
-      spiritkin: { name: spiritkinName.trim() },
-      input: outbound.content,
-      conversationId: conversationId.trim(),
-    };
+      const payload = {
+        userId: userId.trim(),
+        spiritkin: { name: spiritkinName.trim() },
+        input: outbound.content,
+        conversationId: conversationId.trim(),
+      };
 
-    const res = await fetch(`${baseUrl}/v1/interact`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+      const res = await fetch(`${baseUrl}/v1/interact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    const data = await res.json();
-    const assistantMsg = {
-      role: "assistant",
-      content: data?.output ?? data?.response?.text ?? data?.response ?? "(no response)",
-      time: new Date().toISOString(),
-    };
+      const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        setMeta(data);
+        return setError(data?.message ?? "Interaction failed");
+      }
 
-    setMessages((prev) => [...prev, assistantMsg]);
-    setMeta(data);
-    setStatus(res.ok ? "Interaction complete" : "Interaction failed");
+      const assistantMsg = {
+        role: "assistant",
+        content: data?.output ?? data?.response?.text ?? data?.response ?? "(no response)",
+        time: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, assistantMsg]);
+      setMeta(data);
+      setSuccess("Interaction complete");
+    } catch (err) {
+      setError(`Interaction error: ${err?.message ?? err}`);
+    }
   }
 
+  const traceId = meta?.trace_id ?? meta?.traceId ?? meta?.request_id ?? null;
+
   return html`<main className="layout">
-    <${Panel} title="Operator Controls">
-      <${Field} label="Environment">
-        <select value=${environment} onChange=${(e) => setEnvironment(e.target.value)}>
-          ${Object.keys(DEFAULT_ENVS).map((env) => html`<option key=${env} value=${env}>${env}</option>`) }
-        </select>
+    <section className="left-stack">
+      <${Panel}
+        title="Operator Controls"
+        actions=${html`<button onClick=${checkReady}>Check /ready</button>`}
+      >
+        <${StatusBanner} kind=${status.kind} message=${status.message} />
+
+        <${Field} label="Environment">
+          <select value=${environment} onChange=${(e) => setEnvironment(e.target.value)}>
+            ${Object.keys(DEFAULT_ENVS).map((env) => html`<option key=${env} value=${env}>${env}</option>`) }
+          </select>
+        <//>
+
+        <${Field} label="API Base URL"><input value=${baseUrl} onChange=${(e) => setBaseUrl(e.target.value)} /><//>
+        <${Field} label="userId"><input value=${userId} onChange=${(e) => setUserId(e.target.value)} /><//>
+        <${Field} label="conversationId"><input value=${conversationId} onChange=${(e) => setConversationId(e.target.value)} /><//>
+
+        <div className="button-row">
+          <button onClick=${loadSpiritkins}>Load Spiritkins</button>
+          <button onClick=${createConversation}>Create Conversation</button>
+        </div>
       <//>
 
-      <${Field} label="API Base URL">
-        <input value=${baseUrl} onChange=${(e) => setBaseUrl(e.target.value)} />
+      <${Panel}
+        title="Conversation List"
+        compact=${true}
+        actions=${html`<button onClick=${loadConversations}>Refresh</button>`}
+      >
+        <div className="conversation-list">
+          ${conversationList.length === 0
+            ? html`<p className="muted">No conversations loaded.</p>`
+            : conversationList.map((conv) =>
+                html`<${ConversationRow}
+                  key=${conv.id}
+                  conversation=${conv}
+                  active=${conversationId === conv.id}
+                  onLoad=${() => loadConversationToSession(conv)}
+                />`
+              )}
+        </div>
       <//>
+    </section>
 
-      <div className="button-row">
-        <button onClick=${checkReady}>Check /ready</button>
-        <button onClick=${loadSpiritkins}>Load Spiritkins</button>
-      </div>
-
-      <${Field} label="Spiritkin Selector">
-        <select value=${spiritkinName} onChange=${(e) => setSpiritkinName(e.target.value)}>
-          <option value="">-- choose spiritkin --</option>
-          ${spiritkins.map((s) => html`<option key=${s.name ?? s.id} value=${s.name ?? s.id}>${s.name ?? s.id}</option>`) }
-        </select>
-      <//>
-
-      <${Field} label="userId"><input value=${userId} onChange=${(e) => setUserId(e.target.value)} /><//>
-      <${Field} label="conversationId"><input value=${conversationId} onChange=${(e) => setConversationId(e.target.value)} /><//>
-
-      <button onClick=${createConversation}>Create Conversation</button>
-      <p className="status">${status}</p>
-    <//>
-
-    <${Panel} title="Interaction">
+    <${Panel} title="Interaction Console">
       <div className="chat-window">
         ${messages.length === 0 ? html`<p className="placeholder">No messages yet.</p>` : null}
         ${messages.map((msg, i) => html`<${MessageItem} key=${`${msg.time}-${i}`} msg=${msg} />`)}
       </div>
+
       <div className="chat-controls">
-        <input
-          placeholder="Type an operator message..."
-          value=${input}
-          onChange=${(e) => setInput(e.target.value)}
-          onKeyDown=${(e) => e.key === "Enter" && sendMessage()}
-        />
-        <button onClick=${sendMessage} disabled=${!canSend}>Send</button>
+        <${Field} label="Spiritkin">
+          <input value=${spiritkinName} onChange=${(e) => setSpiritkinName(e.target.value)} placeholder="Spiritkin name" />
+        <//>
+        <${Field} label="Input">
+          <textarea
+            rows="3"
+            value=${input}
+            onChange=${(e) => setInput(e.target.value)}
+            onKeyDown=${(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") sendMessage();
+            }}
+            placeholder="Type operator command/message..."
+          />
+        <//>
+        <button className="send-btn" onClick=${sendMessage} disabled=${!canSend}>Send (Ctrl/Cmd + Enter)</button>
       </div>
     <//>
 
-    <${Panel} title="Response Metadata">
-      <${MetadataBlock} title="Raw JSON" value=${meta} />
-      <${MetadataBlock} title="Safety" value=${meta?.safety} />
-      <${MetadataBlock} title="Governance" value=${meta?.governance} />
-      <${MetadataBlock} title="Policy" value=${meta?.policy} />
-      <${MetadataBlock} title="World State" value=${meta?.world_state ?? meta?.worldState} />
-      <${MetadataBlock} title="Emotion" value=${meta?.emotion} />
-      <${MetadataBlock} title="Trace ID" value=${meta?.trace_id ?? meta?.request_id} />
-    <//>
+    <section className="right-stack">
+      <${Panel} title="Diagnostics" compact=${true}>
+        <${TraceCard} traceId=${traceId} />
+        <div className="cards-grid">
+          <${MetadataCard} title="Safety" value=${meta?.safety} />
+          <${MetadataCard} title="Governance" value=${meta?.governance} />
+          <${MetadataCard} title="Policy" value=${meta?.policy} />
+          <${MetadataCard} title="World State" value=${meta?.world_state ?? meta?.worldState} />
+          <${MetadataCard} title="Emotion" value=${meta?.emotion} />
+        </div>
+      <//>
+
+      <${Panel} title="Spiritkin Registry" compact=${true}>
+        <div className="registry-grid">
+          ${spiritkins.length === 0
+            ? html`<p className="muted">Load spiritkins to inspect registry cards.</p>`
+            : spiritkins.map((sp) =>
+                html`<${SpiritkinCard}
+                  key=${sp.name ?? sp.id}
+                  spiritkin=${sp}
+                  selected=${spiritkinName === (sp.name ?? sp.id)}
+                  onSelect=${() => setSpiritkinName(sp.name ?? sp.id ?? "")}
+                />`
+              )}
+        </div>
+      <//>
+
+      <${Panel} title="Raw JSON" compact=${true}>
+        <pre className="raw-json">${JSON.stringify(meta ?? null, null, 2)}</pre>
+      <//>
+    </section>
   </main>`;
 }
 
