@@ -1,6 +1,5 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import sensible from "@fastify/sensible";
 import rateLimit from "@fastify/rate-limit";
 import "dotenv/config";
 
@@ -39,7 +38,6 @@ const app = Fastify({
   genReqId:   () => randomUUID(),
 });
 
-await app.register(sensible);
 await app.register(cors, { origin: true });
 // Rate limiter registered via Phase F module (replaces inline registration)
 await registerRateLimiter(app);
