@@ -15,6 +15,20 @@ const STARTER_PROMPTS = [
   "Can we reflect on what I am carrying right now?",
   "Help me find one grounded next step.",
 ];
+const SECTION_COPY = {
+  companion: {
+    title: "Companion Space",
+    subtitle: "Stay grounded with continuity, gentle identity cues, and your active Spiritkin relationship.",
+  },
+  preferences: {
+    title: "Preferences",
+    subtitle: "Shape how the beta feels for you today. These settings are local and reversible.",
+  },
+  feedback: {
+    title: "Feedback Journal",
+    subtitle: "Capture quick product notes and keep a clean local log of your beta impressions.",
+  },
+};
 
 const BRAND_BY_SPIRITKIN = {
   Lyra: { aura: "lyra", tag: "Warmth • Grounding • Compassion", presence: "Grounded, gentle, and steady." },
@@ -84,6 +98,10 @@ function SpiritkinCard({ spiritkin, selected, onSelect }) {
     <p className="spiritkin-role">${spiritkin.role ?? spiritkin.archetype ?? "Companion"}</p>
     <p className="spiritkin-essence">${spiritkin.essence ?? spiritkin.description ?? spiritkin.summary ?? brand.presence}</p>
   </button>`;
+}
+
+function SectionHeader({ title, subtitle }) {
+  return html`<header className="section-header"><h3>${title}</h3><p>${subtitle}</p></header>`;
 }
 
 function FutureReady() {
@@ -261,6 +279,11 @@ function App() {
     setStatusText("Feedback saved locally. Thank you.");
   }
 
+  function clearFeedbackHistory() {
+    setFeedbackItems([]);
+    setStatusText("Local feedback history cleared.");
+  }
+
   return html`<main className="app-shell ${brand.aura}">
     <${TopBar} onContinue=${acceptEntry} entryAccepted=${entryAccepted} userName=${userName} onEditName=${() => setIsEditingName(true)} />
 
@@ -274,9 +297,12 @@ function App() {
     </section>
 
     <nav className="section-nav">
-      <button className=${activeSection === "companion" ? "active" : ""} onClick=${() => setActiveSection("companion")}>Companion</button>
-      <button className=${activeSection === "preferences" ? "active" : ""} onClick=${() => setActiveSection("preferences")}>Preferences</button>
-      <button className=${activeSection === "feedback" ? "active" : ""} onClick=${() => setActiveSection("feedback")}>Feedback</button>
+      ${Object.keys(SECTION_COPY).map((key) => html`
+        <button className=${activeSection === key ? "active" : ""} onClick=${() => setActiveSection(key)}>
+          <span>${key.charAt(0).toUpperCase() + key.slice(1)}</span>
+          <small>${SECTION_COPY[key].title}</small>
+        </button>
+      `)}
     </nav>
 
     ${isEditingName
@@ -284,6 +310,8 @@ function App() {
       : null}
 
     ${activeSection === "companion" ? html`
+      <section className="product-panel">
+      <${SectionHeader} title=${SECTION_COPY.companion.title} subtitle=${SECTION_COPY.companion.subtitle} />
       <${SessionStateBanner} sessionState=${sessionState} />
       <section className="lifecycle-rail">
         <span className=${`step ${entryAccepted ? "done" : "active"}`}>1. Access</span>
@@ -376,24 +404,43 @@ function App() {
               <button className="primary" onClick=${() => sendMessage()} disabled=${loadingReply || !input.trim()}>Send</button>
             </div>
           </section>`}
+      </section>
     ` : null}
 
-    ${activeSection === "preferences" ? html`<section className="settings-panel">
-      <h3>Preferences</h3>
-      <p className="settings-note">These are local beta preferences. Account-linked settings will arrive with sign-in support.</p>
-      <label className="field"><span>Display name</span><input value=${userNameDraft} onInput=${(e) => setUserNameDraft(e.target.value)} /></label>
-      <label className="field"><span>Preferred Spiritkin</span><select value=${prefs.preferredSpiritkin} onChange=${(e) => setPrefs((prev) => ({ ...prev, preferredSpiritkin: e.target.value }))}><option value="">Auto</option>${ALLOWED_SPIRITKINS.map((name) => html`<option value=${name}>${name}</option>`)}</select></label>
-      <label className="field"><span>App tone readiness</span><select value=${prefs.appTone} onChange=${(e) => setPrefs((prev) => ({ ...prev, appTone: e.target.value }))}><option value="balanced">Balanced</option><option value="gentle">Gentle</option><option value="direct">Direct</option></select></label>
-      <label className="field"><span>Reminder placeholder</span><select value=${prefs.reminderMode} onChange=${(e) => setPrefs((prev) => ({ ...prev, reminderMode: e.target.value }))}><option value="off">Off</option><option value="daily">Daily (placeholder)</option><option value="weekly">Weekly (placeholder)</option></select></label>
+    ${activeSection === "preferences" ? html`<section className="product-panel settings-panel">
+      <${SectionHeader} title=${SECTION_COPY.preferences.title} subtitle=${SECTION_COPY.preferences.subtitle} />
+      <div className="settings-grid">
+        <article>
+          <h4>Identity</h4>
+          <label className="field"><span>Display name</span><input value=${userNameDraft} onInput=${(e) => setUserNameDraft(e.target.value)} /></label>
+          <p className="settings-note">Used in your greeting and prompt suggestions.</p>
+        </article>
+        <article>
+          <h4>Companion defaults</h4>
+          <label className="field"><span>Preferred Spiritkin</span><select value=${prefs.preferredSpiritkin} onChange=${(e) => setPrefs((prev) => ({ ...prev, preferredSpiritkin: e.target.value }))}><option value="">Auto</option>${ALLOWED_SPIRITKINS.map((name) => html`<option value=${name}>${name}</option>`)}</select></label>
+          <label className="field"><span>App tone readiness</span><select value=${prefs.appTone} onChange=${(e) => setPrefs((prev) => ({ ...prev, appTone: e.target.value }))}><option value="balanced">Balanced</option><option value="gentle">Gentle</option><option value="direct">Direct</option></select></label>
+        </article>
+        <article>
+          <h4>Ritual pacing</h4>
+          <label className="field"><span>Reminder placeholder</span><select value=${prefs.reminderMode} onChange=${(e) => setPrefs((prev) => ({ ...prev, reminderMode: e.target.value }))}><option value="off">Off</option><option value="daily">Daily (placeholder)</option><option value="weekly">Weekly (placeholder)</option></select></label>
+          <p className="settings-note">Account-linked delivery will ship with sign-in support.</p>
+        </article>
+      </div>
       <button onClick=${saveName}>Save Local Preferences</button>
     </section>` : null}
 
-    ${activeSection === "feedback" ? html`<section className="feedback-panel">
-      <h3>Beta Feedback</h3>
-      <p className="settings-note">Your feedback is stored locally for now. This panel is ready to connect to a future backend feedback endpoint.</p>
+    ${activeSection === "feedback" ? html`<section className="product-panel feedback-panel">
+      <${SectionHeader} title=${SECTION_COPY.feedback.title} subtitle=${SECTION_COPY.feedback.subtitle} />
       <textarea value=${feedbackDraft} placeholder="Share what felt helpful, unclear, or missing..." onChange=${(e) => setFeedbackDraft(e.target.value)}></textarea>
-      <button onClick=${submitFeedback} disabled=${!feedbackDraft.trim()}>Save Feedback</button>
-      <div className="feedback-list">${feedbackItems.length === 0 ? html`<p className="state">No saved feedback yet.</p>` : feedbackItems.map((f) => html`<article><strong>${fmtTime(f.time)}</strong><p>${f.text}</p></article>`)}</div>
+      <div className="feedback-actions">
+        <button className="primary" onClick=${submitFeedback} disabled=${!feedbackDraft.trim()}>Save Feedback</button>
+        <button onClick=${clearFeedbackHistory} disabled=${feedbackItems.length === 0}>Clear History</button>
+      </div>
+      <div className="feedback-list">
+        ${feedbackItems.length === 0
+          ? html`<p className="state">No saved feedback yet. Add your first note to begin a local beta journal.</p>`
+          : feedbackItems.map((f) => html`<article><strong>${fmtTime(f.time)}</strong><p>${f.text}</p></article>`)}
+      </div>
     </section>` : null}
 
     <${FutureReady} />
