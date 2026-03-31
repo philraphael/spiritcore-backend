@@ -33,6 +33,7 @@ try { validateConfig(); } catch (err) { console.error("[SpiritCore] Config error
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const OPERATOR_CONSOLE_DIR = path.join(__dirname, "operator-console");
+const USER_APP_DIR = path.join(__dirname, "spiritkins-app");
 
 const PORT    = config.port;
 const USE_LLM = String(process.env.USE_LLM || "false").toLowerCase() === "true";
@@ -141,6 +142,23 @@ app.get("/operator/:asset", async (req, reply) => {
   }
 
   const filePath = path.join(OPERATOR_CONSOLE_DIR, asset);
+  const content = await readFile(filePath, "utf8");
+  const mime = asset.endsWith(".js") ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8";
+  return reply.type(mime).send(content);
+});
+
+app.get("/app", async (_req, reply) => {
+  const html = await readFile(path.join(USER_APP_DIR, "index.html"), "utf8");
+  return reply.type("text/html; charset=utf-8").send(html);
+});
+
+app.get("/app/:asset", async (req, reply) => {
+  const { asset } = req.params;
+  if (!["app.js", "styles.css"].includes(asset)) {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
+
+  const filePath = path.join(USER_APP_DIR, asset);
   const content = await readFile(filePath, "utf8");
   const mime = asset.endsWith(".js") ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8";
   return reply.type(mime).send(content);
