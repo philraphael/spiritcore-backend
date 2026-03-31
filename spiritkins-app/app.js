@@ -2,6 +2,7 @@ const ALLOWED_SPIRITKINS = ["Lyra", "Raien", "Kairo"];
 const SESSION_KEY = "spiritkins.session.v10";
 const ENTRY_KEY = "spiritkins.entry.accepted";
 const NAME_KEY = "spiritkins.profile.name";
+const USER_ID_KEY = "spiritkins.user.id";
 const PREFS_KEY = "spiritkins.prefs.v1";
 const FEEDBACK_KEY = "spiritkins.feedback.v1";
 
@@ -33,10 +34,10 @@ function getBrand(name) {
 }
 
 function getOrCreateUserId() {
-  const existing = localStorage.getItem("spiritkins.userId");
+  const existing = localStorage.getItem(USER_ID_KEY);
   if (existing) return existing;
-  const id = `user-${crypto.randomUUID().slice(0, 8)}`;
-  localStorage.setItem("spiritkins.userId", id);
+  const id = crypto.randomUUID();
+  localStorage.setItem(USER_ID_KEY, id);
   return id;
 }
 
@@ -160,7 +161,6 @@ async function sendMessage(contentOverride) {
         userId: state.userId,
         input: text,
         conversationId: state.conversationId,
-        spiritkin: { name: state.selectedSpiritkin.name ?? state.selectedSpiritkin.id },
       }),
     });
     const data = await res.json();
@@ -286,7 +286,7 @@ async function onRootClick(e) {
   if (action === "send") sendMessage();
   if (action === "prompt") { state.input = btn.dataset.prompt || ""; }
   if (action === "retry") { const failed = [...state.messages].reverse().find((m) => m.role === "user" && m.status === "failed"); if (failed) sendMessage(failed.content); }
-  if (action === "clear-session") { localStorage.removeItem(SESSION_KEY); state.conversationId = null; state.messages = []; state.startedAt = null; state.statusText = "Session cleared."; }
+  if (action === "clear-session") { localStorage.removeItem(SESSION_KEY); state.conversationId = null; state.messages = []; state.startedAt = null; state.statusText = "Session cleared. You can create a new conversation at any time."; }
   if (action === "resume") hydrateSession();
   if (action === "save-feedback") { const text = state.feedbackDraft.trim(); if (text) { state.feedbackItems = [{ id: crypto.randomUUID(), text, time: nowIso() }, ...state.feedbackItems].slice(0, 20); state.feedbackDraft = ""; state.statusText = "Feedback saved locally. Thank you."; persistState(); } }
   if (action === "clear-feedback") { state.feedbackItems = []; persistState(); }

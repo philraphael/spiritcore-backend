@@ -4,7 +4,7 @@ const state = {
   spiritkins: [],
   conversations: [],
   selectedConversation: "",
-  userId: `operator-${crypto.randomUUID().slice(0, 8)}`,
+  userId: crypto.randomUUID(),
   input: "",
   selectedSpiritkin: "Lyra",
   messages: [],
@@ -102,7 +102,6 @@ async function sendMessage() {
         userId: state.userId,
         conversationId: state.selectedConversation,
         input: text,
-        spiritkin: { name: state.selectedSpiritkin },
       }),
     });
     state.messages.push({ role: "assistant", content: data.output ?? data.response?.text ?? "…", time: new Date().toLocaleTimeString() });
