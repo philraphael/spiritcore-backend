@@ -11,6 +11,7 @@ const state = {
   status: { kind: "info", message: "Operator console ready." },
   raw: null,
   loading: false,
+  debug: { lastAction: "init", lastPayload: null, lastResponse: null, lastError: null },
 };
 
 const escapeHtml = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -21,26 +22,32 @@ function setStatus(kind, message) {
 }
 
 async function request(path, options = {}) {
+  state.debug.lastPayload = { path, options };
   const res = await fetch(api(path), options);
   const data = await res.json().catch(() => ({}));
+  state.debug.lastResponse = data;
   if (!res.ok || data?.ok === false) throw new Error(data?.message || `Request failed: ${path}`);
   state.raw = data;
+  state.debug.lastError = null;
   return data;
 }
 
 async function checkReady() {
   try {
+    state.debug.lastAction = "checkReady:start";
     const res = await fetch(api("/ready"));
     state.ready = await res.json();
     setStatus("ok", "Ready check succeeded.");
   } catch (err) {
     setStatus("error", err.message);
+    state.debug.lastError = err.message;
   }
   render();
 }
 
 async function loadSpiritkins() {
   try {
+    state.debug.lastAction = "loadSpiritkins:start";
     state.loading = true; render();
     const data = await request("/v1/spiritkins");
     state.spiritkins = data.spiritkins || [];
@@ -50,6 +57,7 @@ async function loadSpiritkins() {
     setStatus("ok", "Loaded spiritkin registry.");
   } catch (err) {
     setStatus("error", err.message);
+    state.debug.lastError = err.message;
   } finally {
     state.loading = false;
     render();
@@ -58,17 +66,20 @@ async function loadSpiritkins() {
 
 async function loadConversations() {
   try {
+    state.debug.lastAction = "loadConversations:start";
     const data = await request(`/v1/conversations?userId=${encodeURIComponent(state.userId)}`);
     state.conversations = data.conversations || [];
     setStatus("ok", "Loaded conversations.");
   } catch (err) {
     setStatus("error", err.message);
+    state.debug.lastError = err.message;
   }
   render();
 }
 
 async function createConversation() {
   try {
+    state.debug.lastAction = "createConversation:start";
     const data = await request("/v1/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -79,6 +90,7 @@ async function createConversation() {
     setStatus("ok", "Created new conversation.");
   } catch (err) {
     setStatus("error", err.message);
+    state.debug.lastError = err.message;
     render();
   }
 }
@@ -95,6 +107,7 @@ async function sendMessage() {
   state.input = "";
   render();
   try {
+    state.debug.lastAction = "sendMessage:start";
     const data = await request("/v1/interact", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -109,6 +122,7 @@ async function sendMessage() {
   } catch (err) {
     state.messages.push({ role: "assistant", content: `Error: ${err.message}`, time: new Date().toLocaleTimeString() });
     setStatus("error", err.message);
+    state.debug.lastError = err.message;
   }
   render();
 }
@@ -145,6 +159,7 @@ function render() {
       </section>
 
       <section class="panel"><h2>Raw JSON</h2><pre>${escapeHtml(JSON.stringify(state.raw ?? {}, null, 2))}</pre></section>
+      <section class="panel"><h2>Debug</h2><p><strong>Last action:</strong> ${escapeHtml(state.debug.lastAction)}</p><p><strong>Last error:</strong> ${escapeHtml(state.debug.lastError || "none")}</p><pre>${escapeHtml(JSON.stringify({ payload: state.debug.lastPayload, response: state.debug.lastResponse }, null, 2))}</pre></section>
     </main>
   `;
 }
@@ -163,6 +178,7 @@ async function onClick(e) {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;
   const action = btn.dataset.action;
+  state.debug.lastAction = `click:${action}`;
   if (action === "check-ready") return checkReady();
   if (action === "load-spiritkins") return loadSpiritkins();
   if (action === "load-conversations") return loadConversations();
