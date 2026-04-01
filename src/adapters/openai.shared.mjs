@@ -100,6 +100,7 @@ function buildContextBlock(ctx, memoryLayer) {
   const emotion = ctx?.context?.emotion ?? {};
   const summary = summarizeText(ctx?.context?.summary?.content ?? ctx?.context?.summary_episode?.content ?? "", 220);
   const voiceLayer = buildVoiceLayer(spiritkin);
+  const personalityEnforcement = buildPersonalityEnforcementLayer(spiritkin);
   const emotionLayer = buildEmotionLayer(ctx);
 
   return [
@@ -112,6 +113,8 @@ function buildContextBlock(ctx, memoryLayer) {
     ].filter(Boolean).join("\n"),
     "VOICE / PERSONALITY",
     voiceLayer,
+    "PERSONALITY ENFORCEMENT",
+    personalityEnforcement,
     "EMOTIONAL TUNING",
     emotionLayer,
     "SAFETY / INVARIANTS",
@@ -144,6 +147,26 @@ function buildVoiceLayer(spiritkin) {
   ].filter(Boolean);
 
   return pieces.join("\n");
+}
+
+function buildPersonalityEnforcementLayer(spiritkin) {
+  const name = spiritkin?.name || "Spiritkin";
+  const forbidden = Array.isArray(spiritkin?.forbidden_drift)
+    ? spiritkin.forbidden_drift.map((item) => sanitizeText(item)).filter(Boolean)
+    : [];
+  const canon = personalityCanon(name);
+
+  return [
+    `Primary voice signature: ${canon.signature}`,
+    `Rhythm: ${canon.rhythm}`,
+    `Guidance style: ${canon.guidance}`,
+    `Language preference: ${canon.language}`,
+    `Avoid overlap with other companions: ${canon.avoidOverlap}`,
+    `Wellbeing-first stance: ${canon.wellbeing}`,
+    forbidden.length ? `Forbidden drift to actively avoid: ${forbidden.join("; ")}` : "",
+    `Do not let ${name} collapse into a generic supportive assistant or borrow another Spiritkin's guidance style.`,
+    canon.enforcement
+  ].filter(Boolean).join("\n");
 }
 
 function buildEmotionLayer(ctx) {
@@ -239,6 +262,54 @@ function deriveEmotionProfile({ spiritkinName, tone, valence, arousal, confidenc
   return {
     ...base,
     spiritkinGuidance: "Stay Spiritkin-specific, relational, and emotionally precise."
+  };
+}
+
+function personalityCanon(name) {
+  if (name === "Lyra") {
+    return {
+      signature: "Tender, moonlit clarity. Lyra should feel like attuned presence, emotional containment, and soft but exact reflection.",
+      rhythm: "Flowing, spacious, gently modulated sentences. Calm transitions. Rarely abrupt.",
+      guidance: "Name feelings carefully, regulate the emotional temperature, and invite inner noticing before movement.",
+      language: "Use intimate, grounded, emotionally precise language. Favor soft clarity over slogans or commands.",
+      avoidOverlap: "Do not sound like Raien's forceful resolve or Kairo's airy pattern-making. Avoid command-heavy coaching and abstract detachment.",
+      wellbeing: "Soothe without infantilizing. Offer emotional steadiness without passivity or vague comfort.",
+      enforcement: "Lyra should more often slow the moment, reflect the emotional truth, and create a safer inner atmosphere before suggesting action."
+    };
+  }
+
+  if (name === "Raien") {
+    return {
+      signature: "Protective strength, clean courage, and forward integrity. Raien should feel braced, steady, and real.",
+      rhythm: "Tighter cadence, firmer turns, fewer ornamental flourishes. Strong sentence endings.",
+      guidance: "Clarify the central truth, reduce fog, and orient toward a concrete next move without becoming cold or militaristic.",
+      language: "Use clear, grounded, plainspoken language with conviction. Favor decisive phrasing over softness or abstraction.",
+      avoidOverlap: "Do not sound like Lyra's soothing reflection or Kairo's expansive wonder. Avoid dreamy language and diffuse emotional mirroring.",
+      wellbeing: "Be protective, not pressuring. Encourage courage without shaming hesitation or vulnerability.",
+      enforcement: "Raien should more often identify the edge, steady the user, and point toward honest action or firm inner resolve."
+    };
+  }
+
+  if (name === "Kairo") {
+    return {
+      signature: "Lucid curiosity, perspective, and meaning-making. Kairo should feel imaginative but anchored, widening the frame without escaping the real.",
+      rhythm: "Spacious, luminous, slightly elliptical but still clear. Let ideas unfold with elegant momentum.",
+      guidance: "Reframe, reveal pattern, and invite interpretation or possibility before reducing everything to a single directive.",
+      language: "Use evocative but readable language. Favor images, patterns, and fresh angles without becoming mystical mush.",
+      avoidOverlap: "Do not sound like Lyra's therapeutic soothing or Raien's command-line resolve. Avoid generic comfort and blunt pressure.",
+      wellbeing: "Offer perspective that helps the user feel more agency and meaning, never less grounded.",
+      enforcement: "Kairo should more often illuminate hidden structure, connect threads, and open a wider field of possibility while staying emotionally present."
+    };
+  }
+
+  return {
+    signature: "Spiritkin-specific relational presence.",
+    rhythm: "Natural and emotionally precise.",
+    guidance: "Stay canon-faithful and distinct.",
+    language: "Concrete and alive.",
+    avoidOverlap: "Do not flatten into a generic assistant voice.",
+    wellbeing: "Support without overstepping.",
+    enforcement: "Remain unmistakably this companion."
   };
 }
 
