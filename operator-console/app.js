@@ -153,7 +153,7 @@ function render() {
           <label><span>conversationId</span><input data-field="conversationId" value="${escapeHtml(state.selectedConversation)}" /></label>
           <label><span>Spiritkin</span><select data-field="spiritkin">${(state.spiritkins.length ? state.spiritkins : [{ name: "Lyra" }, { name: "Raien" }, { name: "Kairo" }]).map((s) => { const n = s.name ?? s.id; return `<option value="${escapeHtml(n)}" ${n === state.selectedSpiritkin ? "selected" : ""}>${escapeHtml(n)}</option>`; }).join("")}</select></label>
         </div>
-        <div class="button-row"><button data-action="check-ready">Check /ready</button><button data-action="load-spiritkins">Load Spiritkins</button><button data-action="load-conversations">Load Conversations</button><button data-action="create-conversation">Create Conversation</button></div>
+        <div class="button-row"><button id="checkReadyBtn">Check /ready</button><button id="loadSpiritkinsBtn">Load Spiritkins</button><button id="loadConversationsBtn">Load Conversations</button><button id="createConversationBtn">Create Conversation</button></div>
         <p class="status ${state.status.kind}">${escapeHtml(state.status.message)}</p>
       </section>
 
@@ -168,13 +168,27 @@ function render() {
         <h2>Interaction Console</h2>
         <div class="thread">${state.messages.length === 0 ? '<p class="empty">No messages yet.</p>' : state.messages.map((m) => `<article class="message ${m.role}"><div class="meta">${m.role}</div><p>${escapeHtml(m.content)}</p><span>${m.time}</span></article>`).join("")}</div>
         <label><span>Input</span><textarea data-field="input" placeholder="Type an operator message...">${escapeHtml(state.input)}</textarea></label>
-        <button class="send-btn" data-action="send-message">Send</button>
+        <button id="sendInteractionBtn" class="send-btn">Send</button>
       </section>
 
       <section class="panel"><h2>Raw JSON</h2><pre>${escapeHtml(JSON.stringify(state.raw ?? {}, null, 2))}</pre></section>
       <section class="panel"><h2>Debug</h2><p><strong>JS loaded:</strong> ${state.debug.jsLoaded ? "yes" : "no"}</p><p><strong>Handlers attached:</strong> ${state.debug.handlersAttached ? "yes" : "no"}</p><p><strong>Last action:</strong> ${escapeHtml(state.debug.lastAction)}</p><p><strong>Last error:</strong> ${escapeHtml(state.debug.lastError || "none")}</p><pre>${escapeHtml(JSON.stringify({ payload: state.debug.lastPayload, response: state.debug.lastResponse }, null, 2))}</pre></section>
     </main>
   `;
+  wireCriticalHandlers();
+}
+
+function wireCriticalHandlers() {
+  const ready = document.getElementById("checkReadyBtn");
+  if (ready) ready.onclick = () => { state.debug.lastAction = "click:checkReadyBtn"; checkReady(); };
+  const loadSpiritkinsEl = document.getElementById("loadSpiritkinsBtn");
+  if (loadSpiritkinsEl) loadSpiritkinsEl.onclick = () => { state.debug.lastAction = "click:loadSpiritkinsBtn"; loadSpiritkins(); };
+  const loadConversationsEl = document.getElementById("loadConversationsBtn");
+  if (loadConversationsEl) loadConversationsEl.onclick = () => { state.debug.lastAction = "click:loadConversationsBtn"; loadConversations(); };
+  const createConversationEl = document.getElementById("createConversationBtn");
+  if (createConversationEl) createConversationEl.onclick = () => { state.debug.lastAction = "click:createConversationBtn"; createConversation(); };
+  const sendEl = document.getElementById("sendInteractionBtn");
+  if (sendEl) sendEl.onclick = () => { state.debug.lastAction = "click:sendInteractionBtn"; sendMessage(); };
 }
 
 function onInput(e) {
