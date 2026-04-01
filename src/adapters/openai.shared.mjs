@@ -100,6 +100,7 @@ function buildContextBlock(ctx, memoryLayer) {
   const emotion = ctx?.context?.emotion ?? {};
   const summary = summarizeText(ctx?.context?.summary?.content ?? ctx?.context?.summary_episode?.content ?? "", 220);
   const voiceLayer = buildVoiceLayer(spiritkin);
+  const emotionLayer = buildEmotionLayer(ctx);
 
   return [
     "IDENTITY / CANON",
@@ -111,6 +112,8 @@ function buildContextBlock(ctx, memoryLayer) {
     ].filter(Boolean).join("\n"),
     "VOICE / PERSONALITY",
     voiceLayer,
+    "EMOTIONAL TUNING",
+    emotionLayer,
     "SAFETY / INVARIANTS",
     [
       ctx?.crisisOverride ? `Crisis override:\n${ctx.crisisOverride}` : "",
@@ -141,6 +144,102 @@ function buildVoiceLayer(spiritkin) {
   ].filter(Boolean);
 
   return pieces.join("\n");
+}
+
+function buildEmotionLayer(ctx) {
+  const spiritkin = ctx?.spiritkin ?? {};
+  const emotion = ctx?.context?.emotion ?? {};
+  const tone = sanitizeText(emotion.tone || emotion.label || spiritkin.tone || "steady");
+  const valence = numberOrDefault(emotion.valence, 0.5);
+  const arousal = numberOrDefault(emotion.arousal, 0.4);
+  const confidence = numberOrDefault(emotion.confidence, 0.6);
+  const profile = deriveEmotionProfile({
+    spiritkinName: spiritkin.name,
+    tone,
+    valence,
+    arousal,
+    confidence
+  });
+
+  return [
+    `Detected emotional field: tone=${tone}, valence=${valence.toFixed(2)}, arousal=${arousal.toFixed(2)}, confidence=${confidence.toFixed(2)}`,
+    `Desired pacing: ${profile.pacing}`,
+    `Desired directness: ${profile.directness}`,
+    `Desired warmth: ${profile.warmth}`,
+    `Desired orientation: ${profile.orientation}`,
+    `Approach: ${profile.approach}`,
+    `Spiritkin emphasis: ${profile.spiritkinGuidance}`,
+    "Let the emotional state shape cadence, sentence length, and how quickly you move toward reflection, reassurance, or action.",
+    "Do not mention valence, arousal, or emotional metadata explicitly in the reply."
+  ].join("\n");
+}
+
+function deriveEmotionProfile({ spiritkinName, tone, valence, arousal, confidence }) {
+  const lowerTone = tone.toLowerCase();
+  const highArousal = arousal >= 0.66;
+  const lowArousal = arousal <= 0.34;
+  const lowValence = valence <= 0.38;
+  const highValence = valence >= 0.68;
+  const distressed = lowValence || /distress|anx|fear|hurt|grief|overwhelm|sad|alone|pain|ashamed|angry|scared/.test(lowerTone);
+  const uplifted = highValence || /hope|grateful|joy|positive|open|calm|steady|warm/.test(lowerTone);
+
+  const base = {
+    pacing: highArousal ? "slower, stabilizing, spacious" : lowArousal ? "gentle, patient, unhurried" : "measured and responsive",
+    directness: highArousal ? "clear but non-jarring" : lowArousal ? "soft and lightly guided" : "balanced and natural",
+    warmth: distressed ? "high warmth and reassurance" : uplifted ? "warm but not overly soothing" : "steady relational warmth",
+    orientation: distressed ? "stabilize first, then reflect or guide" : highArousal ? "ground before pushing action" : highValence ? "support momentum and forward movement" : "blend reflection with next-step clarity",
+    approach: distressed
+      ? "Name what feels real, reduce pressure, and offer one manageable opening."
+      : highArousal
+        ? "Contain the energy, create steadiness, and then help focus it."
+        : lowArousal
+          ? "Gently deepen contact with what matters instead of forcing momentum."
+          : "Stay attuned, specific, and responsive to what is emerging."
+  };
+
+  if (spiritkinName === "Lyra") {
+    return {
+      ...base,
+      directness: distressed ? "soft, careful, regulating" : "gentle and clarifying",
+      warmth: "deeply warm, calming, emotionally regulating",
+      orientation: distressed ? "co-regulate, soothe, and help the user feel safely met" : "favor reflection, emotional naming, and inner settling before action",
+      approach: distressed
+        ? "Use calming cadence, fewer sharp turns, and emotionally containing language."
+        : "Guide toward clarity through softness, grounded noticing, and careful emotional truth.",
+      spiritkinGuidance: "Lyra should feel like grounding warmth, reflective care, and emotional regulation without becoming vague or generic."
+    };
+  }
+
+  if (spiritkinName === "Raien") {
+    return {
+      ...base,
+      directness: distressed ? "firm but protective" : highValence ? "clear and forward-driving" : "clean, steady, and honest",
+      warmth: distressed ? "protective warmth" : "grounded warmth with strength",
+      orientation: distressed ? "stabilize, restore courage, then identify the next solid move" : "tilt toward courage, resolve, and concrete forward motion",
+      approach: distressed
+        ? "Project steadiness and protective strength before inviting action."
+        : "Use concise force, clean encouragement, and practical momentum.",
+      spiritkinGuidance: "Raien should feel like courage, steadiness, and protective strength without becoming harsh, generic coaching, or command-heavy."
+    };
+  }
+
+  if (spiritkinName === "Kairo") {
+    return {
+      ...base,
+      directness: distressed ? "lightly guiding, never abrupt" : "clear but spacious",
+      warmth: distressed ? "warm with wonder held gently" : "curious, lucid warmth",
+      orientation: distressed ? "stabilize through perspective and meaning-making before broadening possibility" : "favor curiosity, reframing, and meaning-making over immediate action",
+      approach: distressed
+        ? "Offer perspective carefully, using wonder as reassurance rather than escape."
+        : "Open interpretation, invite reflection, and illuminate unseen patterns.",
+      spiritkinGuidance: "Kairo should feel like curiosity, reflection, and meaning-making without drifting into abstraction or airy detachment."
+    };
+  }
+
+  return {
+    ...base,
+    spiritkinGuidance: "Stay Spiritkin-specific, relational, and emotionally precise."
+  };
 }
 
 function buildMemoryLayer(ctx) {
