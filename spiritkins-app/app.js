@@ -1,396 +1,491 @@
-const ALLOWED_SPIRITKINS = ["Lyra", "Raien", "Kairo"];
-const SESSION_KEY = "spiritkins.session.v10";
-const ENTRY_KEY = "spiritkins.entry.accepted";
-const NAME_KEY = "spiritkins.profile.name";
-const USER_ID_KEY = "spiritkins.user.id";
-const PREFS_KEY = "spiritkins.prefs.v1";
+/* ── Spiritkins App — Premium Rebuild ── */
+"use strict";
 
-const STARTER_PROMPTS = [
-  "I need help settling my mind today.",
-  "Can we reflect on what I am carrying right now?",
-  "Help me find one grounded next step.",
-];
+// ── Constants ──────────────────────────────────────────────────────────────
+const API = "";
+const SESSION_KEY = "sv.session.v3";
+const ENTRY_KEY   = "sv.entry.v3";
+const NAME_KEY    = "sv.name.v3";
+const UID_KEY     = "sv.uid.v3";
+const RATINGS_KEY = "sv.ratings.v3";
 
-const BRAND_BY_SPIRITKIN = {
-  Lyra: { aura: "lyra", tag: "Warmth • Grounding • Compassion", presence: "Gentle, warm, and steady." },
-  Raien: { aura: "raien", tag: "Courage • Protection • Strength", presence: "Direct, protective, and brave." },
-  Kairo: { aura: "kairo", tag: "Wonder • Imagination • Reflection", presence: "Curious, expansive, and reflective." },
+const SK_META = {
+  Lyra:  { emoji: "🌙", cls: "lyra",  prompts: ["I've been feeling overwhelmed lately.", "Help me find some calm.", "What do you sense in me right now?"] },
+  Raien: { emoji: "⚡", cls: "raien", prompts: ["I need to face something difficult.", "Give me the courage to begin.", "What strength do I already have?"] },
+  Kairo: { emoji: "✨", cls: "kairo", prompts: ["I want to explore a new idea.", "Help me see this differently.", "What is my imagination telling me?"] },
 };
+const DEFAULT_PROMPTS = ["Tell me about yourself.", "How can you help me?", "What is the Spiritverse?"];
 
-const readJson = (k, fallback = null) => {
-  try {
-    return JSON.parse(localStorage.getItem(k) || "null") ?? fallback;
-  } catch {
-    return fallback;
-  }
-};
-const nowIso = () => new Date().toISOString();
-const fmtTime = (iso) => (iso ? new Date(iso).toLocaleString() : "—");
-const escapeHtml = (s) => String(s ?? "").replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-
-const uuid = () => {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-  if (globalThis.crypto?.getRandomValues) {
-    const b = new Uint8Array(16);
-    globalThis.crypto.getRandomValues(b);
-    b[6] = (b[6] & 0x0f) | 0x40;
-    b[8] = (b[8] & 0x3f) | 0x80;
-    const h = [...b].map((x) => x.toString(16).padStart(2, "0"));
-    return `${h[0]}${h[1]}${h[2]}${h[3]}-${h[4]}${h[5]}-${h[6]}${h[7]}-${h[8]}${h[9]}-${h[10]}${h[11]}${h[12]}${h[13]}${h[14]}${h[15]}`;
-  }
-  return `fallback-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-};
-
-function getOrCreateUserId() {
-  const existing = localStorage.getItem(USER_ID_KEY);
-  if (existing) return existing;
-  const id = uuid();
-  localStorage.setItem(USER_ID_KEY, id);
+// ── Utilities ──────────────────────────────────────────────────────────────
+function uuid() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+function nowIso() { return new Date().toISOString(); }
+function esc(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function readJson(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+}
+function writeJson(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+function fmtTime(iso) {
+  try { return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); } catch { return ""; }
+}
+function getOrCreateUid() {
+  let id = localStorage.getItem(UID_KEY);
+  if (!id) { id = uuid(); localStorage.setItem(UID_KEY, id); }
   return id;
 }
 
+// ── State ──────────────────────────────────────────────────────────────────
 const state = {
-  userId: getOrCreateUserId(),
-  entryAccepted: Boolean(localStorage.getItem(ENTRY_KEY)),
+  userId: getOrCreateUid(),
+  entryAccepted: !!localStorage.getItem(ENTRY_KEY),
   userName: localStorage.getItem(NAME_KEY) || "",
   userNameDraft: localStorage.getItem(NAME_KEY) || "",
   spiritkins: [],
+  loadingSpirits: false,
+  spiritError: null,
   selectedSpiritkin: null,
   conversationId: null,
   messages: [],
-  input: "",
-  loading: false,
   loadingReply: false,
-  softError: "",
-  statusText: "Ready",
-  startedAt: null,
-  sessionState: null,
-  prefs: readJson(PREFS_KEY, { preferredSpiritkin: "" }),
+  loadingConv: false,
+  convError: null,
+  input: "",
+  ratings: readJson(RATINGS_KEY, {}),
+  statusText: "",
+  statusError: false,
 };
 
-function getBrand(name) {
-  return BRAND_BY_SPIRITKIN[name] ?? { aura: "", tag: "Mythic companion", presence: "Attuned and thoughtful." };
-}
+// Hydrate session
+(function () {
+  const s = readJson(SESSION_KEY, null);
+  if (s && s.conversationId && s.selectedSpiritkin) {
+    state.conversationId = s.conversationId;
+    state.selectedSpiritkin = s.selectedSpiritkin;
+    state.messages = Array.isArray(s.messages) ? s.messages : [];
+    if (s.userId) state.userId = s.userId;
+  }
+})();
 
-function persistState() {
-  localStorage.setItem(NAME_KEY, state.userName);
-  localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs));
-  if (state.selectedSpiritkin && state.conversationId) {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({
-      selectedSpiritkin: state.selectedSpiritkin,
+function persistSession() {
+  if (state.conversationId) {
+    writeJson(SESSION_KEY, {
       conversationId: state.conversationId,
-      messages: state.messages,
-      startedAt: state.startedAt,
-    }));
+      selectedSpiritkin: state.selectedSpiritkin,
+      messages: state.messages.slice(-80),
+      userId: state.userId,
+    });
   }
+  writeJson(RATINGS_KEY, state.ratings);
 }
 
-function hydrateSession() {
-  const session = readJson(SESSION_KEY);
-  if (!session) return;
-  state.selectedSpiritkin = session.selectedSpiritkin ?? null;
-  state.conversationId = session.conversationId ?? null;
-  state.messages = Array.isArray(session.messages) ? session.messages : [];
-  state.startedAt = session.startedAt ?? null;
-  state.sessionState = "resumed";
-}
-
+// ── API ────────────────────────────────────────────────────────────────────
 async function fetchSpiritkins() {
+  state.loadingSpirits = true;
+  state.spiritError = null;
+  render();
   try {
-    state.loading = true;
-    state.softError = "";
-    state.statusText = "Loading companions...";
-    render();
-
-    const res = await fetch("/v1/spiritkins");
+    const res = await fetch(`${API}/v1/spiritkins`);
     const data = await res.json();
-    if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Unable to load Spiritkins.");
-
-    state.spiritkins = (data.spiritkins ?? []).filter((s) => ALLOWED_SPIRITKINS.includes(s.name ?? s.id));
-    if (!state.selectedSpiritkin && state.spiritkins.length) {
-      state.selectedSpiritkin = state.spiritkins.find((s) => (s.name ?? s.id) === state.prefs.preferredSpiritkin) ?? state.spiritkins[0];
+    if (!data.ok) throw new Error(data.message || "Could not load companions.");
+    state.spiritkins = (data.spiritkins || []).filter(s => s.is_canon !== false);
+    if (state.selectedSpiritkin) {
+      const live = state.spiritkins.find(s => s.name === state.selectedSpiritkin.name);
+      if (live) state.selectedSpiritkin = live;
     }
-    state.statusText = "Companions ready.";
-  } catch (err) {
-    state.softError = err?.message ?? "Could not load companions.";
-    state.statusText = "Retry needed.";
-  } finally {
-    state.loading = false;
-    render();
+  } catch (e) {
+    state.spiritError = e.message;
   }
+  state.loadingSpirits = false;
+  render();
 }
 
 async function beginConversation() {
   if (!state.selectedSpiritkin) return;
-  try {
-    state.loading = true;
-    state.softError = "";
-    state.statusText = "Opening conversation...";
-    render();
-
-    const payload = { userId: state.userId, spiritkinName: state.selectedSpiritkin.name ?? state.selectedSpiritkin.id };
-    const res = await fetch("/v1/conversations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Could not begin conversation.");
-
-    state.conversationId = data?.conversation?.id ?? null;
-    state.messages = [];
-    state.startedAt = nowIso();
-    state.sessionState = "new";
-    state.prefs.preferredSpiritkin = state.selectedSpiritkin.name ?? state.selectedSpiritkin.id;
-    state.statusText = "Conversation started.";
-    persistState();
-  } catch (err) {
-    state.softError = err?.message ?? "Could not begin conversation.";
-    state.statusText = "Conversation unavailable.";
-  } finally {
-    state.loading = false;
-    render();
-  }
-}
-
-async function sendMessage(contentOverride) {
-  const text = (contentOverride ?? state.input).trim();
-  if (!text || !state.conversationId || !state.selectedSpiritkin) return;
-
-  const outgoing = { id: uuid(), role: "user", content: text, spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() };
-  state.messages.push(outgoing);
-  state.input = "";
-  state.loadingReply = true;
-  state.softError = "";
-  state.statusText = "Listening...";
-  persistState();
+  state.loadingConv = true;
+  state.convError = null;
   render();
-
   try {
-    const payload = { userId: state.userId, input: text, conversationId: state.conversationId };
-    const res = await fetch("/v1/interact", {
+    const res = await fetch(`${API}/v1/conversations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ userId: state.userId, spiritkinName: state.selectedSpiritkin.name }),
     });
     const data = await res.json();
-    if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Message interrupted.");
+    if (!data.ok) throw new Error(data.message || "Could not begin conversation.");
+    state.conversationId = data.conversation?.conversation_id ?? data.conversation?.id ?? data.conversationId;
+    if (!state.conversationId) throw new Error("No conversation ID returned.");
+    state.messages = [];
+    state.statusText = "";
+    state.statusError = false;
+    persistSession();
+  } catch (e) {
+    state.convError = e.message;
+    state.statusText = e.message;
+    state.statusError = true;
+  }
+  state.loadingConv = false;
+  render();
+}
 
-    state.messages.push({
-      id: uuid(),
-      role: "assistant",
-      content: data?.output ?? data?.response?.text ?? data?.response ?? "…",
-      spiritkinName: state.selectedSpiritkin.name,
-      status: "sent",
-      time: nowIso(),
+async function sendMessage(overrideText) {
+  const text = (overrideText ?? state.input).trim();
+  if (!text || !state.conversationId || state.loadingReply) return;
+  state.input = "";
+
+  const outId = uuid();
+  state.messages.push({ id: outId, role: "user", content: text, time: nowIso(), status: "sent" });
+  state.loadingReply = true;
+  state.convError = null;
+  render();
+  scrollThread();
+
+  try {
+    const res = await fetch(`${API}/v1/interact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: state.userId, conversationId: state.conversationId, input: text }),
     });
-    state.statusText = "Reply received.";
-  } catch (err) {
-    state.messages = state.messages.map((m) => (m.id === outgoing.id ? { ...m, status: "failed" } : m));
-    state.softError = err?.message ?? "Reply interrupted.";
-    state.statusText = "Retry available.";
-  } finally {
-    state.loadingReply = false;
-    persistState();
-    render();
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.message || "Reply interrupted.");
+    const reply = data.message ?? data.output ?? data.response?.text ?? data.response ?? "…";
+    state.messages.push({
+      id: uuid(), role: "assistant", content: reply,
+      spiritkinName: state.selectedSpiritkin?.name,
+      time: nowIso(), status: "sent",
+    });
+    state.statusText = "";
+    state.statusError = false;
+    persistSession();
+  } catch (e) {
+    state.messages = state.messages.map(m => m.id === outId ? { ...m, status: "failed" } : m);
+    state.convError = e.message;
+    state.statusText = e.message;
+    state.statusError = true;
+  }
+  state.loadingReply = false;
+  render();
+  scrollThread();
+}
+
+function scrollThread() {
+  requestAnimationFrame(() => {
+    const el = document.querySelector(".thread-wrap");
+    if (el) el.scrollTop = el.scrollHeight;
+  });
+}
+
+function submitFeedback(msgId, helpful) {
+  if (state.ratings[msgId]) return;
+  state.ratings[msgId] = helpful ? "up" : "down";
+  persistSession();
+  const msg = state.messages.find(m => m.id === msgId);
+  fetch(`${API}/v1/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId: state.userId,
+      conversationId: state.conversationId,
+      spiritkinName: msg?.spiritkinName ?? state.selectedSpiritkin?.name ?? "unknown",
+      rating: helpful ? 5 : 1,
+      helpful,
+      messageId: msgId,
+    }),
+  }).catch(() => {});
+  render();
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render() {
+  const root = document.getElementById("root");
+  if (!root) return;
+  root.innerHTML = buildApp();
+  const ta = root.querySelector("textarea[data-field='chat-input']");
+  if (ta) {
+    ta.value = state.input;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 140) + "px";
   }
 }
 
-function renderEntry() {
-  if (state.entryAccepted) return "";
+function buildApp() {
   return `
-    <section class="card entry">
-      <p class="section-title">Welcome</p>
-      <h3>Start your Spiritkins beta session</h3>
-      <p>Choose a display name (optional), then continue into the conversation space.</p>
-      <ol>
-        <li>Set your display name.</li>
-        <li>Pick a Spiritkin.</li>
-        <li>Begin conversation.</li>
-      </ol>
-      <label class="field">
-        <span>Your name (optional)</span>
-        <input data-field="entry-name" value="${escapeHtml(state.userNameDraft)}" placeholder="How should we address you?" />
-      </label>
-      <button class="primary" data-action="continue">Continue as Beta User</button>
+    <div class="sv-bg"></div>
+    <div class="app-shell">
+      ${buildTopbar()}
+      ${state.entryAccepted ? buildMain() : buildEntry()}
+    </div>
+  `;
+}
+
+function buildTopbar() {
+  return `
+    <header class="topbar">
+      <div class="topbar-brand">
+        <div class="topbar-logo">S</div>
+        <div>
+          <div class="topbar-name">Spiritkins</div>
+          <div class="topbar-tag">Spiritverse Beta</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        ${state.entryAccepted && state.conversationId
+          ? `<button class="btn btn-ghost btn-sm" data-action="new-session">New Session</button>`
+          : ""}
+        ${state.entryAccepted && state.userName
+          ? `<span style="font-size:.8rem;color:var(--text-faint)">${esc(state.userName)}</span>`
+          : ""}
+      </div>
+    </header>
+  `;
+}
+
+function buildEntry() {
+  return `
+    <section class="entry-screen">
+      <div class="entry-glyph">✦</div>
+      <h1 class="entry-title">Enter the Spiritverse</h1>
+      <p class="entry-sub">Spiritkins are identity-invariant companions — presences that grow with you, remember what matters, and hold space without judgment.</p>
+      <div class="entry-pillars">
+        <span class="entry-pillar">Emotionally intelligent</span>
+        <span class="entry-pillar">Memory-persistent</span>
+        <span class="entry-pillar">Identity-safe</span>
+        <span class="entry-pillar">Always present</span>
+      </div>
+      <div class="entry-cta">
+        <div class="entry-name-row">
+          <input type="text" placeholder="Your name (optional)" data-field="entry-name" value="${esc(state.userNameDraft)}" maxlength="40" />
+        </div>
+        <button class="btn btn-primary" data-action="continue" style="width:100%;justify-content:center">Begin your journey →</button>
+        <p class="entry-disclaimer">Beta access · No account required · Your conversations are private</p>
+      </div>
     </section>
   `;
 }
 
-function renderSidebar() {
+function buildMain() {
+  if (state.loadingSpirits && state.spiritkins.length === 0) {
+    return `<div class="loading-state"><div class="spinner"></div><p>Summoning companions…</p></div>`;
+  }
+  if (state.spiritError && state.spiritkins.length === 0) {
+    return `<div class="soft-error" style="margin-top:32px">Could not reach the Spiritverse: ${esc(state.spiritError)}  
+<button class="btn btn-ghost btn-sm" style="margin-top:10px" data-action="retry-load">Try again</button></div>`;
+  }
+  if (state.conversationId && state.selectedSpiritkin) {
+    return buildChatView();
+  }
+  return buildSelectionView();
+}
+
+function buildSelectionView() {
   return `
-    <aside class="card sidebar">
-      <p class="section-title">Companions</p>
+    <div class="selection-view">
+      <div class="selection-heading">
+        <p class="kicker">Spiritverse</p>
+        <h2>Choose your companion</h2>
+        <p>Each Spiritkin carries a distinct presence. Select the one that calls to you today.</p>
+      </div>
       <div class="spiritkin-grid">
-        ${state.spiritkins.map((sp, i) => {
-          const name = sp.name ?? sp.id;
-          const b = getBrand(name);
-          const selected = (state.selectedSpiritkin?.name ?? state.selectedSpiritkin?.id) === name;
-          return `
-            <button class="spiritkin ${b.aura} ${selected ? "selected" : ""}" data-action="select-spiritkin" data-index="${i}">
-              <p class="tag">${b.tag}</p>
-              <p class="name">${escapeHtml(name)}</p>
-              <p class="essence">${escapeHtml(sp.essence ?? sp.description ?? sp.summary ?? b.presence)}</p>
-            </button>
-          `;
-        }).join("")}
+        ${state.spiritkins.map((sk, i) => buildSkCard(sk, i)).join("")}
       </div>
-
-      <div class="status ${state.softError ? "error" : state.conversationId ? "good" : ""}">${escapeHtml(state.softError || state.statusText)}</div>
-
-      <div style="display:grid;gap:8px;margin-top:10px;">
-        <button data-action="refresh-spiritkins" ${state.loading ? "disabled" : ""}>Refresh companions</button>
-        <button class="primary" data-action="begin" ${state.loading || !state.selectedSpiritkin ? "disabled" : ""}>Begin conversation</button>
-        ${state.conversationId ? '<button data-action="clear-session">Start fresh</button>' : ""}
-        ${readJson(SESSION_KEY)?.conversationId && !state.conversationId ? '<button data-action="resume">Resume previous session</button>' : ""}
-      </div>
-    </aside>
+      ${state.selectedSpiritkin ? `
+        <div class="selection-action">
+          <button class="btn btn-primary" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
+            ${state.loadingConv ? "Opening…" : `Begin with ${esc(state.selectedSpiritkin.name)} →`}
+          </button>
+        </div>
+      ` : ""}
+      ${state.convError ? `<div class="soft-error" style="margin-top:12px">${esc(state.convError)}</div>` : ""}
+      ${buildSvStrip()}
+    </div>
   `;
 }
 
-function renderMain() {
-  const hasSession = Boolean(state.selectedSpiritkin && state.conversationId);
-  const brand = getBrand(state.selectedSpiritkin?.name);
-  const failedMessage = [...state.messages].reverse().find((m) => m.role === "user" && m.status === "failed");
+function buildSkCard(sk, i) {
+  const meta = SK_META[sk.name] || { emoji: "◈", cls: "", prompts: [] };
+  const selected = state.selectedSpiritkin?.name === sk.name;
+  const essence = Array.isArray(sk.essence) ? sk.essence : [];
+  return `
+    <div class="sk-card ${meta.cls} ${selected ? "selected" : ""}" data-action="select-spiritkin" data-index="${i}">
+      ${selected ? `<div class="sk-selected-badge">✓</div>` : ""}
+      <div class="sk-aura">${meta.emoji}</div>
+      <div class="sk-name">${esc(sk.name)}</div>
+      <div class="sk-title">${esc(sk.title || "")}</div>
+      <div class="sk-role">${esc(sk.role || "")}</div>
+      <div class="sk-essence">${essence.slice(0,3).map(e => `<span>${esc(e)}</span>`).join("")}</div>
+      <div class="sk-tone">${esc(sk.tone || sk.growth_axis || "")}</div>
+    </div>
+  `;
+}
+
+function buildChatView() {
+  const sk = state.selectedSpiritkin;
+  const meta = SK_META[sk.name] || { emoji: "◈", cls: "", prompts: DEFAULT_PROMPTS };
+  const failedMsg = [...state.messages].reverse().find(m => m.role === "user" && m.status === "failed");
+  const showPrompts = state.messages.length === 0 && !state.loadingReply;
 
   return `
-    <section class="card main">
-      <div class="main-header">
-        <div>
-          <h3>${hasSession ? escapeHtml(state.selectedSpiritkin?.name) : "No active session"}</h3>
-          <p>${hasSession ? `${brand.tag} • ${brand.presence}` : "Select a companion and start conversation."}</p>
-          <p style="margin:4px 0 0;color:#8a78a7;font-size:.82rem;">Conversation: ${escapeHtml(state.conversationId || "—")}</p>
+    <div class="chat-view">
+      <div class="chat-header-bar">
+        <div class="chat-header-info">
+          <div class="chat-sk-aura ${meta.cls}">${meta.emoji}</div>
+          <div>
+            <div class="chat-sk-name">${esc(sk.name)}</div>
+            <div class="chat-sk-sub">${esc(sk.title || sk.role || "")}${sk.tone ? " · " + esc(sk.tone) : ""}</div>
+          </div>
         </div>
-        <div class="pill">Started: ${fmtTime(state.startedAt)}</div>
+        <div class="chat-header-actions">
+          <button class="btn btn-ghost btn-sm" data-action="change-spiritkin">Change</button>
+        </div>
       </div>
 
-      ${hasSession && state.messages.length === 0 ? `
+      ${showPrompts ? `
         <div class="starter-prompts">
-          ${STARTER_PROMPTS.map((p) => `<button data-action="prompt" data-prompt="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join("")}
+          ${(meta.prompts || DEFAULT_PROMPTS).map(p =>
+            `<button data-action="prompt" data-prompt="${esc(p)}">${esc(p)}</button>`
+          ).join("")}
         </div>
       ` : ""}
 
-      <div class="thread">
-        ${state.messages.length === 0
-          ? '<p style="color:#6d5b88;margin:0;">Try a starter prompt, or write your own message.</p>'
-          : state.messages.map((m) => `
-            <article class="bubble ${m.role === "user" ? "user" : "assistant"}">
-              <span class="role">${m.role === "user" ? "You" : escapeHtml(m.spiritkinName ?? "Spiritkin")}</span>
-              <p>${escapeHtml(m.content)}</p>
-              <small>${m.status === "failed" ? "Not delivered" : new Date(m.time).toLocaleTimeString()}</small>
-            </article>
-          `).join("")}
-      </div>
-
-      ${failedMessage ? '<div class="status warn" style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>Last message did not send.</span><button data-action="retry">Retry</button></div>' : ""}
-
-      <div class="composer">
-        <textarea data-field="chat-input" placeholder="Share what you’re feeling, wondering, or working through..." ${!hasSession ? "disabled" : ""}>${escapeHtml(state.input)}</textarea>
-        <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;">
-          <label class="field" style="margin:0;min-width:220px;">
-            <span>Display name</span>
-            <input data-field="name" value="${escapeHtml(state.userNameDraft)}" placeholder="Optional" />
-          </label>
-          <button class="primary" data-action="send" ${state.loadingReply || !state.input.trim() || !hasSession ? "disabled" : ""}>Send</button>
+      <div class="thread-wrap">
+        <div class="thread">
+          ${state.messages.length === 0 && !state.loadingReply
+            ? `<div class="thread-empty"><div style="font-size:1.5rem;margin-bottom:8px">${meta.emoji}</div><p>${esc(sk.name)} is present. Begin when you're ready.</p></div>`
+            : state.messages.map(m => buildBubble(m, sk)).join("")
+          }
+          ${state.loadingReply ? `
+            <div class="bubble assistant loading">
+              <div class="bubble-role">${esc(sk.name)}</div>
+              <div class="typing-dots"><span></span><span></span><span></span></div>
+            </div>
+          ` : ""}
         </div>
       </div>
-    </section>
+
+      ${failedMsg ? `
+        <div class="retry-banner">
+          <span>Message not delivered. You can retry safely.</span>
+          <button class="btn btn-ghost btn-sm" data-action="retry">Retry</button>
+        </div>
+      ` : ""}
+
+      <div class="composer-bar">
+        <textarea
+          data-field="chat-input"
+          placeholder="Write to ${esc(sk.name)}…"
+          rows="1"
+          ${state.loadingReply ? "disabled" : ""}
+        ></textarea>
+        <button class="composer-send" data-action="send" ${state.loadingReply || !state.conversationId ? "disabled" : ""} title="Send">↑</button>
+      </div>
+
+      ${state.statusText ? `<div class="status-bar ${state.statusError ? "error" : ""}">${esc(state.statusText)}</div>` : ""}
+    </div>
   `;
 }
 
-function render() {
-  const root = document.getElementById("root");
-  root.innerHTML = `
-    <main class="app">
-      <header class="card topbar">
-        <div class="brand">
-          <h1>Spiritkins</h1>
-          <p>${state.userName ? `Companion beta • ${escapeHtml(state.userName)}` : "Companion beta"}</p>
-        </div>
-        <div class="actions">
-          <span class="pill">User: ${escapeHtml(state.userId.slice(0, 8))}</span>
-          <button data-action="save-name">Save name</button>
-        </div>
-      </header>
-
-      <section class="card hero">
-        <p class="kicker">Spiritkins • /app</p>
-        <h2>Find the right companion for this moment</h2>
-        <p>Each Spiritkin has a distinct emotional style. Choose intentionally, then keep a steady conversation with continuity.</p>
-      </section>
-
-      ${renderEntry()}
-
-      <section class="layout">
-        ${renderSidebar()}
-        ${renderMain()}
-      </section>
-
-      <footer class="footer">Spiritkins beta • Calm, consistent companion experience.</footer>
-    </main>
+function buildBubble(m, sk) {
+  const rated = state.ratings[m.id];
+  const thumbs = m.role === "assistant" ? `
+    <div class="bubble-thumbs">
+      <button class="thumb ${rated === "up" ? "active" : ""}" data-action="thumb-up" data-msg-id="${m.id}" ${rated ? "disabled" : ""}>👍</button>
+      <button class="thumb ${rated === "down" ? "active" : ""}" data-action="thumb-down" data-msg-id="${m.id}" ${rated ? "disabled" : ""}>👎</button>
+    </div>
+  ` : "";
+  return `
+    <div class="bubble ${m.role}${m.status === "failed" ? " failed" : ""}">
+      <div class="bubble-role">${m.role === "user" ? esc(state.userName || "You") : esc(m.spiritkinName || sk?.name || "Spiritkin")}</div>
+      <p>${esc(m.content)}</p>
+      <div class="bubble-meta">
+        <span class="${m.status === "failed" ? "bubble-failed" : "bubble-time"}">${m.status === "failed" ? "Not delivered" : fmtTime(m.time)}</span>
+        ${thumbs}
+      </div>
+    </div>
   `;
 }
 
-function onRootInput(e) {
+function buildSvStrip() {
+  return `
+    <div class="sv-strip">
+      <div class="sv-strip-icon">◈</div>
+      <div class="sv-strip-text">
+        <strong>The Spiritverse</strong> — a living world of identity-safe companions. Each Spiritkin holds a governed presence: they remember, they grow, and they never drift from who they are.
+      </div>
+    </div>
+  `;
+}
+
+// ── Events ─────────────────────────────────────────────────────────────────
+function onInput(e) {
   const field = e.target.dataset.field;
   if (!field) return;
-  if (field === "entry-name" || field === "name") state.userNameDraft = e.target.value;
-  if (field === "chat-input") state.input = e.target.value;
-  persistState();
-  render();
+  if (field === "entry-name") state.userNameDraft = e.target.value;
+  if (field === "chat-input") {
+    state.input = e.target.value;
+    e.target.style.height = "auto";
+    e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px";
+  }
 }
 
-async function onRootClick(e) {
+async function onClick(e) {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;
   const action = btn.dataset.action;
 
   if (action === "continue") {
-    localStorage.setItem(ENTRY_KEY, "1");
+    state.userName = state.userNameDraft.trim();
     state.entryAccepted = true;
-    state.userName = state.userNameDraft.trim();
-    localStorage.setItem(NAME_KEY, state.userName);
-    state.statusText = "Beta access confirmed.";
+    localStorage.setItem(ENTRY_KEY, "1");
+    if (state.userName) localStorage.setItem(NAME_KEY, state.userName);
+    render();
+    return;
   }
-  if (action === "save-name") {
-    state.userName = state.userNameDraft.trim();
-    persistState();
-    state.statusText = "Name saved locally.";
+  if (action === "select-spiritkin") {
+    state.selectedSpiritkin = state.spiritkins[Number(btn.dataset.index)] ?? null;
+    render();
+    return;
   }
-  if (action === "refresh-spiritkins") fetchSpiritkins();
-  if (action === "select-spiritkin") state.selectedSpiritkin = state.spiritkins[Number(btn.dataset.index)] ?? state.selectedSpiritkin;
-  if (action === "begin") beginConversation();
-  if (action === "send") sendMessage();
-  if (action === "prompt") state.input = btn.dataset.prompt || "";
+  if (action === "begin") { await beginConversation(); return; }
+  if (action === "send") { await sendMessage(); return; }
+  if (action === "prompt") { await sendMessage(btn.dataset.prompt || ""); return; }
   if (action === "retry") {
-    const failed = [...state.messages].reverse().find((m) => m.role === "user" && m.status === "failed");
-    if (failed) sendMessage(failed.content);
+    const failed = [...state.messages].reverse().find(m => m.role === "user" && m.status === "failed");
+    if (failed) {
+      state.messages = state.messages.filter(m => m.id !== failed.id);
+      await sendMessage(failed.content);
+    }
+    return;
   }
-  if (action === "clear-session") {
-    localStorage.removeItem(SESSION_KEY);
+  if (action === "change-spiritkin" || action === "new-session") {
     state.conversationId = null;
     state.messages = [];
-    state.startedAt = null;
-    state.statusText = "Session cleared.";
+    state.selectedSpiritkin = null;
+    state.convError = null;
+    state.statusText = "";
+    state.statusError = false;
+    localStorage.removeItem(SESSION_KEY);
+    render();
+    return;
   }
-  if (action === "resume") {
-    hydrateSession();
-    state.statusText = "Resumed previous session.";
-  }
-
-  render();
+  if (action === "retry-load") { await fetchSpiritkins(); return; }
+  if (action === "thumb-up")   { submitFeedback(btn.dataset.msgId, true);  return; }
+  if (action === "thumb-down") { submitFeedback(btn.dataset.msgId, false); return; }
 }
 
+// ── Boot ───────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-  hydrateSession();
-  fetchSpiritkins();
   render();
-
+  fetchSpiritkins();
   const root = document.getElementById("root");
-  root.addEventListener("input", onRootInput);
-  root.addEventListener("change", onRootInput);
-  root.addEventListener("click", (e) => { onRootClick(e); });
-  root.addEventListener("keydown", (e) => {
+  root.addEventListener("input", onInput);
+  root.addEventListener("click", onClick);
+  root.addEventListener("keydown", e => {
     if (e.target.dataset.field === "chat-input" && e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
