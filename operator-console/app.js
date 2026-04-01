@@ -80,7 +80,7 @@ async function loadSpiritkins() {
 async function loadConversations() {
   try {
     state.debug.lastAction = "loadConversations:start";
-    const data = await request(`/v1/conversations?userId=${encodeURIComponent(state.userId)}`);
+    const data = await request(`/v1/conversations/${encodeURIComponent(state.userId)}`);
     state.conversations = data.conversations || [];
     setStatus("ok", "Loaded conversations.");
   } catch (err) {
@@ -98,7 +98,7 @@ async function createConversation() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: state.userId, spiritkinName: state.selectedSpiritkin }),
     });
-    state.selectedConversation = data?.conversation?.id || "";
+    state.selectedConversation = data?.conversation?.conversation_id ?? data?.conversation?.id ?? "";
     await loadConversations();
     setStatus("ok", "Created new conversation.");
   } catch (err) {
@@ -130,7 +130,7 @@ async function sendMessage() {
         input: text,
       }),
     });
-    state.messages.push({ role: "assistant", content: data.output ?? data.response?.text ?? "…", time: new Date().toLocaleTimeString() });
+    state.messages.push({ role: "assistant", content: data.message ?? data.output ?? data.response?.text ?? "…", time: new Date().toLocaleTimeString() });
     setStatus("ok", "Interaction complete.");
   } catch (err) {
     state.messages.push({ role: "assistant", content: `Error: ${err.message}`, time: new Date().toLocaleTimeString() });

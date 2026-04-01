@@ -149,7 +149,7 @@ async function beginConversation() {
     state.debug.lastResponse = data;
     state.debug.lastError = null;
     if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Could not begin a conversation yet.");
-    state.conversationId = data?.conversation?.id ?? null;
+    state.conversationId = data?.conversation?.conversation_id ?? data?.conversation?.id ?? null;
     state.messages = [];
     state.startedAt = nowIso();
     state.sessionState = { kind: "new", label: "Started a new session" };
@@ -194,7 +194,7 @@ async function sendMessage(contentOverride) {
     state.debug.lastResponse = data;
     state.debug.lastError = null;
     if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Message delivery was interrupted.");
-    state.messages.push({ id: uuid(), role: "assistant", content: data?.output ?? data?.response?.text ?? data?.response ?? "…", spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() });
+    state.messages.push({ id: uuid(), role: "assistant", content: data?.message ?? data?.output ?? data?.response?.text ?? data?.response ?? "…", spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() });
     state.statusText = "Reply received.";
   } catch (err) {
     state.messages = state.messages.map((m) => (m.id === outgoing.id ? { ...m, status: "failed" } : m));
