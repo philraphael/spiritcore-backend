@@ -2,11 +2,12 @@ import { config } from "../config.mjs";
 import { AppError } from "../errors.mjs";
 import { assertAdapterContract } from "./adapter.contract.mjs";
 import { localAdapter } from "./localAdapter.mjs";
+import { openaiAdapter } from "./openaiAdapter.mjs";
 import { templateAdapter } from "./templateAdapter.mjs";
 
 export const buildAdapterRegistry = ({ bus }) => {
   const registry = new Map();
-  [localAdapter, templateAdapter].forEach((a) => {
+  [localAdapter, openaiAdapter, templateAdapter].forEach((a) => {
     assertAdapterContract(a);
     registry.set(a.name, a);
   });
