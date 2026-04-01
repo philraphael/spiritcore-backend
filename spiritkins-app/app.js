@@ -260,8 +260,8 @@ function render() {
 
         ${!hasSession ? `
           <section class="selection-panel"><div class="selection-header"><div><p class="kicker">Choose your companion</p><h2>Select the presence that fits today.</h2></div><button data-action="refresh-spiritkins" ${state.loading ? "disabled" : ""}>Refresh</button></div>
-          <div class="spiritkin-grid">${filteredSpiritkins.map((sp, i) => { const name = sp.name ?? sp.id; const b = getBrand(name); return `<button class="spiritkin-card ${b.aura} ${(state.selectedSpiritkin?.name ?? state.selectedSpiritkin?.id) === name ? "selected" : ""}" data-action="select-spiritkin" data-index="${i}"><p class="spiritkin-tag">${b.tag}</p><h3>${escapeHtml(name)}</h3><p class="spiritkin-role">${escapeHtml(sp.role ?? sp.archetype ?? "Companion")}</p><p class="spiritkin-essence">${escapeHtml(sp.essence ?? sp.description ?? sp.summary ?? b.presence)}</p></button>`; }).join("")}</div>
-          <button class="primary" data-action="begin" ${state.loading || !state.selectedSpiritkin ? "disabled" : ""}>Begin Conversation</button></section>` : `
+          <div class="spiritkin-grid">${filteredSpiritkins.map((sp, i) => { const name = sp.name ?? sp.id; const b = getBrand(name); return `<button id="spiritkin-${i}" class="spiritkin-card ${b.aura} ${(state.selectedSpiritkin?.name ?? state.selectedSpiritkin?.id) === name ? "selected" : ""}" data-index="${i}"><p class="spiritkin-tag">${b.tag}</p><h3>${escapeHtml(name)}</h3><p class="spiritkin-role">${escapeHtml(sp.role ?? sp.archetype ?? "Companion")}</p><p class="spiritkin-essence">${escapeHtml(sp.essence ?? sp.description ?? sp.summary ?? b.presence)}</p></button>`; }).join("")}</div>
+          <button id="beginConversationBtn" class="primary" ${state.loading || !state.selectedSpiritkin ? "disabled" : ""}>Begin Conversation</button></section>` : `
           <section class="chat-panel">
             <header class="chat-header ${brand.aura}"><div><p class="kicker">Active Spiritkin</p><h2>${escapeHtml(state.selectedSpiritkin?.name)}</h2><p>${brand.tag}</p><p class="session-id">${brand.presence}</p></div><button data-action="change-spiritkin" ${state.loadingReply ? "disabled" : ""}>Change Spiritkin</button></header>
             <div class="starter-prompts">${state.messages.length === 0 ? STARTER_PROMPTS.map((p) => `<button data-action="prompt" data-prompt="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join("") : ""}</div>
@@ -287,6 +287,27 @@ function render() {
       <section class="future-grid"><div><h4>Invite Flow</h4><p>Prepared for invitation and beta cohort onboarding.</p></div><div><h4>Sign In</h4><p>Prepared for secure account login when beta accounts open.</p></div><div><h4>Create Account</h4><p>Reserved for onboarding and consent steps.</p></div><div><h4>Saved Conversations</h4><p>Reserved layout for persistent history.</p></div><div><h4>Memory View</h4><p>UI foundation for memory-aware context.</p></div><div><h4>Settings</h4><p>Space for tone, notifications, and controls.</p></div></section>
       <footer class="footer-note">Spiritkins beta • A calm, trustworthy companion experience designed to support reflection over time.</footer>
     </main>`;
+  wireCriticalHandlers();
+}
+
+function wireCriticalHandlers() {
+  const beginBtn = document.getElementById("beginConversationBtn");
+  if (beginBtn) {
+    beginBtn.onclick = () => {
+      state.debug.lastAction = "click:beginConversationBtn";
+      beginConversation();
+    };
+  }
+  state.spiritkins.forEach((_, i) => {
+    const btn = document.getElementById(`spiritkin-${i}`);
+    if (btn) {
+      btn.onclick = () => {
+        state.debug.lastAction = `click:spiritkin-${i}`;
+        state.selectedSpiritkin = state.spiritkins[i] ?? state.selectedSpiritkin;
+        render();
+      };
+    }
+  });
 }
 
 function onRootInput(e) {
