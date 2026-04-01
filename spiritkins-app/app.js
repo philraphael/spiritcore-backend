@@ -28,6 +28,18 @@ const nowIso = () => new Date().toISOString();
 const fmtTime = (iso) => (iso ? new Date(iso).toLocaleString() : "—");
 const readJson = (k, fallback = null) => { try { return JSON.parse(localStorage.getItem(k) || "null") ?? fallback; } catch { return fallback; } };
 const escapeHtml = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const uuid = () => {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  if (globalThis.crypto?.getRandomValues) {
+    const b = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(b);
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    const h = [...b].map((x) => x.toString(16).padStart(2, "0"));
+    return `${h[0]}${h[1]}${h[2]}${h[3]}-${h[4]}${h[5]}-${h[6]}${h[7]}-${h[8]}${h[9]}-${h[10]}${h[11]}${h[12]}${h[13]}${h[14]}${h[15]}`;
+  }
+  return `fallback-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
 
 function getBrand(name) {
   return BRAND_BY_SPIRITKIN[name] ?? { aura: "default", tag: "Mythic Companion", presence: "Attuned and thoughtful." };
@@ -36,7 +48,7 @@ function getBrand(name) {
 function getOrCreateUserId() {
   const existing = localStorage.getItem(USER_ID_KEY);
   if (existing) return existing;
-  const id = crypto.randomUUID();
+  const id = uuid();
   localStorage.setItem(USER_ID_KEY, id);
   return id;
 }
@@ -62,6 +74,7 @@ const state = {
   prefs: readJson(PREFS_KEY, { preferredSpiritkin: "", appTone: "balanced", reminderMode: "off" }),
   feedbackDraft: "",
   feedbackItems: readJson(FEEDBACK_KEY, []),
+  debug: { jsLoaded: true, handlersAttached: false, lastAction: "init", lastPayload: null, lastResponse: null, lastError: null },
 };
 
 function persistState() {
@@ -91,12 +104,16 @@ function hydrateSession() {
 
 async function fetchSpiritkins() {
   try {
+    state.debug.lastAction = "fetchSpiritkins:start";
     state.loading = true;
     state.softError = "";
     state.statusText = "Loading companions...";
     render();
     const res = await fetch("/v1/spiritkins");
     const data = await res.json();
+    state.debug.lastPayload = { method: "GET", path: "/v1/spiritkins" };
+    state.debug.lastResponse = data;
+    state.debug.lastError = null;
     if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Unable to load Spiritkins.");
     state.spiritkins = (data.spiritkins ?? []).filter((s) => ALLOWED_SPIRITKINS.includes(s.name ?? s.id));
     if (!state.selectedSpiritkin && state.spiritkins.length > 0) {
@@ -106,6 +123,7 @@ async function fetchSpiritkins() {
   } catch (err) {
     state.softError = err?.message ?? "We couldn’t load companions right now.";
     state.statusText = "Connection needs retry.";
+    state.debug.lastError = state.softError;
   } finally {
     state.loading = false;
     render();
@@ -115,16 +133,21 @@ async function fetchSpiritkins() {
 async function beginConversation() {
   if (!state.selectedSpiritkin) return;
   try {
+    state.debug.lastAction = "beginConversation:start";
     state.loading = true;
     state.softError = "";
     state.statusText = "Opening your conversation...";
     render();
+    const payload = { userId: state.userId, spiritkinName: state.selectedSpiritkin.name ?? state.selectedSpiritkin.id };
     const res = await fetch("/v1/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: state.userId, spiritkinName: state.selectedSpiritkin.name ?? state.selectedSpiritkin.id }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
+    state.debug.lastPayload = { method: "POST", path: "/v1/conversations", body: payload };
+    state.debug.lastResponse = data;
+    state.debug.lastError = null;
     if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Could not begin a conversation yet.");
     state.conversationId = data?.conversation?.id ?? null;
     state.messages = [];
@@ -136,6 +159,7 @@ async function beginConversation() {
   } catch (err) {
     state.softError = err?.message ?? "We couldn’t open your conversation.";
     state.statusText = "Conversation unavailable.";
+    state.debug.lastError = state.softError;
   } finally {
     state.loading = false;
     render();
@@ -145,7 +169,7 @@ async function beginConversation() {
 async function sendMessage(contentOverride) {
   const text = (contentOverride ?? state.input).trim();
   if (!text || !state.conversationId || !state.selectedSpiritkin) return;
-  const outgoing = { id: crypto.randomUUID(), role: "user", content: text, spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() };
+  const outgoing = { id: uuid(), role: "user", content: text, spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() };
   state.messages.push(outgoing);
   state.input = "";
   state.loadingReply = true;
@@ -154,23 +178,29 @@ async function sendMessage(contentOverride) {
   persistState();
   render();
   try {
+    state.debug.lastAction = "sendMessage:start";
+    const payload = {
+      userId: state.userId,
+      input: text,
+      conversationId: state.conversationId,
+    };
     const res = await fetch("/v1/interact", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: state.userId,
-        input: text,
-        conversationId: state.conversationId,
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
+    state.debug.lastPayload = { method: "POST", path: "/v1/interact", body: payload };
+    state.debug.lastResponse = data;
+    state.debug.lastError = null;
     if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Message delivery was interrupted.");
-    state.messages.push({ id: crypto.randomUUID(), role: "assistant", content: data?.output ?? data?.response?.text ?? data?.response ?? "…", spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() });
+    state.messages.push({ id: uuid(), role: "assistant", content: data?.output ?? data?.response?.text ?? data?.response ?? "…", spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() });
     state.statusText = "Reply received.";
   } catch (err) {
     state.messages = state.messages.map((m) => (m.id === outgoing.id ? { ...m, status: "failed" } : m));
     state.softError = err?.message ?? "Something interrupted the reply. You can retry safely.";
     state.statusText = "Reply interrupted. Your message is safe, and retry is available.";
+    state.debug.lastError = state.softError;
   } finally {
     state.loadingReply = false;
     persistState();
@@ -245,6 +275,15 @@ function render() {
 
       ${state.activeSection === "feedback" ? `<section class="product-panel feedback-panel"><h3>${SECTION_COPY.feedback.title}</h3><p class="settings-note">${SECTION_COPY.feedback.subtitle}</p><textarea data-field="feedback" placeholder="Share what felt helpful, unclear, or missing...">${escapeHtml(state.feedbackDraft)}</textarea><div class="feedback-actions"><button class="primary" data-action="save-feedback" ${!state.feedbackDraft.trim() ? "disabled" : ""}>Save Feedback</button><button data-action="clear-feedback" ${state.feedbackItems.length === 0 ? "disabled" : ""}>Clear History</button></div><div class="feedback-list">${state.feedbackItems.length === 0 ? '<p class="state">No saved feedback yet.</p>' : state.feedbackItems.map((f) => `<article><strong>${fmtTime(f.time)}</strong><p>${escapeHtml(f.text)}</p></article>`).join("")}</div></section>` : ""}
 
+      <section class="product-panel">
+        <h4>Debug</h4>
+        <p><strong>JS loaded:</strong> ${state.debug.jsLoaded ? "yes" : "no"}</p>
+        <p><strong>Handlers attached:</strong> ${state.debug.handlersAttached ? "yes" : "no"}</p>
+        <p><strong>Last action:</strong> ${escapeHtml(state.debug.lastAction)}</p>
+        <p><strong>Last error:</strong> ${escapeHtml(state.debug.lastError || "none")}</p>
+        <pre>${escapeHtml(JSON.stringify({ payload: state.debug.lastPayload, response: state.debug.lastResponse }, null, 2))}</pre>
+      </section>
+
       <section class="future-grid"><div><h4>Invite Flow</h4><p>Prepared for invitation and beta cohort onboarding.</p></div><div><h4>Sign In</h4><p>Prepared for secure account login when beta accounts open.</p></div><div><h4>Create Account</h4><p>Reserved for onboarding and consent steps.</p></div><div><h4>Saved Conversations</h4><p>Reserved layout for persistent history.</p></div><div><h4>Memory View</h4><p>UI foundation for memory-aware context.</p></div><div><h4>Settings</h4><p>Space for tone, notifications, and controls.</p></div></section>
       <footer class="footer-note">Spiritkins beta • A calm, trustworthy companion experience designed to support reflection over time.</footer>
     </main>`;
@@ -266,6 +305,7 @@ async function onRootClick(e) {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;
   const action = btn.dataset.action;
+  state.debug.lastAction = `click:${action}`;
   if (action === "continue") {
     localStorage.setItem(ENTRY_KEY, "1");
     state.entryAccepted = true;
@@ -288,7 +328,7 @@ async function onRootClick(e) {
   if (action === "retry") { const failed = [...state.messages].reverse().find((m) => m.role === "user" && m.status === "failed"); if (failed) sendMessage(failed.content); }
   if (action === "clear-session") { localStorage.removeItem(SESSION_KEY); state.conversationId = null; state.messages = []; state.startedAt = null; state.statusText = "Session cleared. You can create a new conversation at any time."; }
   if (action === "resume") hydrateSession();
-  if (action === "save-feedback") { const text = state.feedbackDraft.trim(); if (text) { state.feedbackItems = [{ id: crypto.randomUUID(), text, time: nowIso() }, ...state.feedbackItems].slice(0, 20); state.feedbackDraft = ""; state.statusText = "Feedback saved locally. Thank you."; persistState(); } }
+  if (action === "save-feedback") { const text = state.feedbackDraft.trim(); if (text) { state.feedbackItems = [{ id: uuid(), text, time: nowIso() }, ...state.feedbackItems].slice(0, 20); state.feedbackDraft = ""; state.statusText = "Feedback saved locally. Thank you."; persistState(); } }
   if (action === "clear-feedback") { state.feedbackItems = []; persistState(); }
   render();
 }
@@ -297,13 +337,16 @@ document.addEventListener("DOMContentLoaded", () => {
   hydrateSession();
   fetchSpiritkins();
   render();
-  document.getElementById("root").addEventListener("input", onRootInput);
-  document.getElementById("root").addEventListener("change", onRootInput);
-  document.getElementById("root").addEventListener("click", (e) => { onRootClick(e); });
-  document.getElementById("root").addEventListener("keydown", (e) => {
+  const root = document.getElementById("root");
+  root.addEventListener("input", onRootInput);
+  root.addEventListener("change", onRootInput);
+  root.addEventListener("click", (e) => { onRootClick(e); });
+  root.addEventListener("keydown", (e) => {
     if (e.target.dataset.field === "chat-input" && e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   });
+  state.debug.handlersAttached = true;
+  render();
 });
