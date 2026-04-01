@@ -221,6 +221,14 @@ function buildPortrait(name, size, cls) {
   `;
 }
 
+function buildSigil(meta, variant, label) {
+  return `
+    <div class="spirit-sigil ${esc(meta.cls)} ${esc(variant)}" aria-hidden="true">
+      <span>${esc(label || meta.symbol)}</span>
+    </div>
+  `;
+}
+
 function hydrateSpiritkin(raw) {
   return { ...raw, ui: getMeta(raw.name) };
 }
@@ -556,6 +564,10 @@ function buildEntry() {
   return `
     <section class="entry-screen">
       <div class="entry-copy">
+        <div class="entry-glyph-wrap">
+          <div class="entry-glyph">SV</div>
+          <div class="entry-glyph-line">Spiritkins visual canon</div>
+        </div>
         <p class="eyebrow">Spiritverse beta</p>
         <h1 class="entry-title">Choose the companion you want to bond with.</h1>
         <p class="entry-sub">
@@ -582,10 +594,15 @@ function buildEntry() {
         </div>
       </div>
       <div class="entry-gallery">
+        <div class="entry-gallery-head">
+          <div class="panel-label">Canonical companions</div>
+          <div class="entry-gallery-note">Earlier Spiritkins visual language, carried forward into the bonded flow.</div>
+        </div>
         ${["Lyra", "Raien", "Kairo"].map((name) => {
           const meta = getMeta(name);
           return `
             <article class="entry-spirit ${esc(meta.cls)}">
+              ${buildSigil(meta, "mini", meta.symbol)}
               ${buildPortrait(name, "portrait-mini", meta.cls)}
               <div class="entry-spirit-copy">
                 <span>${esc(meta.symbol)}</span>
@@ -642,6 +659,13 @@ function buildBondSelectionView() {
         `}
       </div>
 
+      <div class="selection-heading">
+        <div>
+          <div class="panel-label">Companion stage</div>
+          <p class="selection-note">The visual canon stays intact: each Spiritkin keeps a distinct sigil, aura, and realm identity.</p>
+        </div>
+      </div>
+
       <div class="spiritkin-grid">
         ${state.spiritkins.map((spiritkin, index) => buildBondCard(spiritkin, index, false)).join("")}
       </div>
@@ -677,9 +701,6 @@ function buildBondedHomeView() {
           </p>
           <p class="bond-home-atmosphere">${esc(spiritkin.ui.realmText)}</p>
           <div class="bond-home-atlas">${esc(spiritkin.ui.atmosphereLine)}</div>
-          <p>
-            Sessions and conversations now belong to ${esc(spiritkin.name)}. To switch, use Manage bond and confirm a rebonding decision.
-          </p>
           <div class="bonded-actions">
             <button class="btn btn-primary" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
               ${state.loadingConv ? "Opening bonded channel..." : `Begin with ${esc(spiritkin.name)}`}
@@ -701,15 +722,14 @@ function buildBondPreview(spiritkin, pending) {
   const essence = Array.isArray(spiritkin.essence) ? spiritkin.essence.slice(0, 3) : [];
   return `
     <div class="selection-focus ${esc(spiritkin.ui.cls)} ${pending ? "pending" : "bonded"}">
-      ${buildPortrait(spiritkin.name, "portrait-focus", spiritkin.ui.cls)}
+      <div class="selection-focus-stage">
+        ${buildSigil(spiritkin.ui, "focus", spiritkin.ui.symbol)}
+        ${buildPortrait(spiritkin.name, "portrait-focus", spiritkin.ui.cls)}
+      </div>
       <div class="selection-focus-copy">
         <div class="focus-kicker">${pending ? "Pending bond" : "Bonded companion"}</div>
         <h3>${esc(spiritkin.name)}</h3>
         <div class="focus-realm">${esc(spiritkin.ui.realm)}</div>
-        <p>${esc(spiritkin.title || spiritkin.ui.bondLine)}</p>
-        <div class="focus-tags">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
-        <div class="focus-tone">${esc(describePresence(spiritkin) || spiritkin.ui.bondLine)}</div>
-        <div class="focus-atmosphere">${esc(spiritkin.ui.realmText)}</div>
         <p>${esc(spiritkin.title || spiritkin.ui.bondLine)}</p>
         <div class="focus-tags">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
         <div class="focus-tone">${esc(describePresence(spiritkin) || spiritkin.ui.bondLine)}</div>
@@ -734,6 +754,7 @@ function buildBondCard(spiritkin, index, subdued) {
         </div>
         ${activeBond ? `<div class="sk-selected-badge">Bonded</div>` : pending ? `<div class="sk-pending-badge">Pending</div>` : ""}
       </div>
+      ${buildSigil(spiritkin.ui, "card", spiritkin.ui.symbol)}
       ${buildPortrait(spiritkin.name, "portrait-card", spiritkin.ui.cls)}
       <div class="sk-role">${esc(spiritkin.role || spiritkin.ui.bondLine)}</div>
       <div class="sk-essence">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
@@ -756,14 +777,16 @@ function buildChatView() {
           <div class="mode-pill strong">Bonded conversation mode</div>
           <button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>
         </div>
-        ${buildPortrait(spiritkin.name, "portrait-hero", meta.cls)}
+        <div class="presence-stage">
+          ${buildSigil(meta, "hero", meta.symbol)}
+          ${buildPortrait(spiritkin.name, "portrait-hero", meta.cls)}
+        </div>
         <div class="presence-summary">
           <div class="focus-kicker">${esc(meta.ambient)}</div>
           <h2>${esc(spiritkin.name)}</h2>
           <div class="presence-realm">${esc(meta.realm)}</div>
           <p class="presence-title">${esc(spiritkin.title || spiritkin.role || meta.strap)}</p>
           <p class="presence-text">${esc(describePresence(spiritkin) || meta.bondLine)}</p>
-          <p class="presence-atmosphere">${esc(meta.realmText)}</p>
           <p class="presence-atmosphere">${esc(meta.realmText)}</p>
         </div>
         <div class="presence-bond-banner">This session is bonded to ${esc(spiritkin.name)}.</div>
@@ -781,7 +804,9 @@ function buildChatView() {
 
       <div class="chat-stage">
         <div class="chat-header-bar">
-          <div>
+          <div class="chat-header-info">
+            ${buildSigil(meta, "header", meta.symbol)}
+            <div>
             <div class="chat-mode-label">Bonded companion</div>
             <div class="chat-sk-name">${esc(spiritkin.name)}</div>
             <div class="chat-sk-sub">${esc(spiritkin.title || spiritkin.role || "")}</div>
@@ -801,6 +826,7 @@ function buildChatView() {
                 ` : ""}
               </div>
             ` : ""}
+            </div>
           </div>
           <div class="chat-header-right">
             <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>
