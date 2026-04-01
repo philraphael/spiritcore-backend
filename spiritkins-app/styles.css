@@ -403,6 +403,34 @@ button:disabled {
   line-height: 0.92;
 }
 
+.entry-glyph-wrap {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.entry-glyph {
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.14);
+  background:
+    radial-gradient(circle at center, color-mix(in srgb, var(--realm-accent-soft) 80%, rgba(255,255,255,0.06)), transparent 72%),
+    rgba(255,255,255,0.02);
+  color: var(--realm-accent);
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1.35rem;
+  letter-spacing: 0.18em;
+}
+
+.entry-glyph-line,
+.entry-gallery-note {
+  color: var(--faint);
+  font-size: 0.8rem;
+}
+
 .entry-sub {
   max-width: 640px;
   font-size: 1.05rem;
@@ -462,9 +490,15 @@ button:disabled {
   padding: 28px;
 }
 
+.entry-gallery-head {
+  display: grid;
+  gap: 4px;
+  padding: 0 4px 4px;
+}
+
 .entry-spirit {
   display: grid;
-  grid-template-columns: 104px 1fr;
+  grid-template-columns: 58px 104px 1fr;
   gap: 16px;
   align-items: center;
   padding: 16px;
@@ -562,9 +596,88 @@ button:disabled {
   margin: 0 auto;
 }
 
+.spirit-sigil {
+  --sigil-color: var(--realm-accent);
+  --sigil-soft: var(--realm-accent-soft);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.14);
+  color: var(--sigil-color);
+  font-family: "Cormorant Garamond", serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background:
+    radial-gradient(circle at center, color-mix(in srgb, var(--sigil-soft) 78%, rgba(255,255,255,0.04)), transparent 72%),
+    rgba(255,255,255,0.02);
+  box-shadow: inset 0 0 24px rgba(255,255,255,0.04);
+}
+
+.spirit-sigil.lyra {
+  --sigil-color: rgba(243, 159, 209, 0.95);
+  --sigil-soft: rgba(243, 159, 209, 0.18);
+}
+
+.spirit-sigil.raien {
+  --sigil-color: rgba(246, 164, 92, 0.96);
+  --sigil-soft: rgba(246, 164, 92, 0.18);
+}
+
+.spirit-sigil.kairo {
+  --sigil-color: rgba(132, 200, 255, 0.96);
+  --sigil-soft: rgba(132, 200, 255, 0.18);
+}
+
+.spirit-sigil.mini {
+  width: 58px;
+  height: 58px;
+  font-size: 0.62rem;
+}
+
+.spirit-sigil.card {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 10px;
+  font-size: 0.58rem;
+}
+
+.spirit-sigil.focus {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 62px;
+  height: 62px;
+  font-size: 0.65rem;
+  z-index: 2;
+}
+
+.spirit-sigil.hero {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 74px;
+  height: 74px;
+  font-size: 0.7rem;
+  z-index: 2;
+}
+
+.spirit-sigil.header {
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  font-size: 0.62rem;
+}
+
 .selection-view {
   display: grid;
   gap: 22px;
+}
+
+.selection-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .selection-hero {
@@ -595,6 +708,11 @@ button:disabled {
   grid-template-columns: minmax(180px, 240px) 1fr;
   gap: 20px;
   align-items: center;
+}
+
+.selection-focus-stage,
+.presence-stage {
+  position: relative;
 }
 
 .selection-placeholder {
@@ -894,6 +1012,12 @@ button:disabled {
   justify-content: space-between;
   gap: 16px;
   padding: 6px 2px 18px;
+}
+
+.chat-header-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
 }
 
 .chat-sk-name {
@@ -1290,6 +1414,15 @@ button:disabled {
 
   .selection-focus {
     grid-template-columns: 1fr;
+  }
+
+  .entry-spirit {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .chat-header-info {
+    flex-direction: column;
   }
 
   .presence-stats,
