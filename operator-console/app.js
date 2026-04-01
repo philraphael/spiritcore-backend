@@ -80,7 +80,7 @@ async function loadSpiritkins() {
 async function loadConversations() {
   try {
     state.debug.lastAction = "loadConversations:start";
-    const data = await request(`/v1/conversations?userId=${encodeURIComponent(state.userId)}`);
+    const data = await request(`/v1/conversations/${encodeURIComponent(state.userId)}`);
     state.conversations = data.conversations || [];
     setStatus("ok", "Loaded conversations.");
   } catch (err) {
