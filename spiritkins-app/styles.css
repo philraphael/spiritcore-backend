@@ -901,6 +901,36 @@ button:disabled {
   line-height: 0.95;
 }
 
+.chat-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.chat-signal {
+  display: grid;
+  gap: 2px;
+  padding: 9px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: color-mix(in srgb, var(--realm-panel) 58%, rgba(255,255,255,0.03));
+}
+
+.chat-signal strong {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.chat-signal-label,
+.bubble-resonance-mark {
+  color: var(--realm-accent);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+}
+
 .stage-atmosphere {
   display: flex;
   align-items: center;
@@ -984,6 +1014,10 @@ button:disabled {
 .bubble p {
   margin: 0;
   white-space: pre-wrap;
+}
+
+.bubble-resonance {
+  margin: 8px 0 10px;
 }
 
 .bubble-meta {

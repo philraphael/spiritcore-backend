@@ -233,6 +233,39 @@ function getAtmosphereSpiritkin() {
   return state.primarySpiritkin || state.pendingBondSpiritkin || state.selectedSpiritkin || null;
 }
 
+function sanitizeTone(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function sanitizeScene(value) {
+  const scene = typeof value === "string" ? value.trim() : "";
+  return scene && scene.toLowerCase() !== "default" ? scene : "";
+}
+
+function normalizeMessage(raw) {
+  const tags = Array.isArray(raw?.tags) ? raw.tags.filter((tag) => typeof tag === "string") : [];
+  return {
+    ...raw,
+    tags,
+    memoryActive: tags.includes("memory:active"),
+    emotionTone: sanitizeTone(raw?.emotionTone),
+    sceneName: sanitizeScene(raw?.sceneName)
+  };
+}
+
+function getStageSignals() {
+  for (let index = state.messages.length - 1; index >= 0; index -= 1) {
+    const message = state.messages[index];
+    if (message.role !== "assistant") continue;
+    const emotionTone = sanitizeTone(message.emotionTone);
+    const sceneName = sanitizeScene(message.sceneName);
+    if (emotionTone || sceneName) {
+      return { emotionTone, sceneName };
+    }
+  }
+  return { emotionTone: "", sceneName: "" };
+}
+
 const state = {
   userId: getOrCreateUid(),
   entryAccepted: !!localStorage.getItem(ENTRY_KEY),
@@ -261,7 +294,7 @@ const state = {
   if (session && session.conversationId && session.selectedSpiritkin) {
     state.conversationId = session.conversationId;
     state.selectedSpiritkin = normalizeStoredSpiritkin(session.selectedSpiritkin);
-    state.messages = Array.isArray(session.messages) ? session.messages : [];
+    state.messages = Array.isArray(session.messages) ? session.messages.map(normalizeMessage) : [];
     if (session.userId) state.userId = session.userId;
   }
   if (!state.selectedSpiritkin && state.primarySpiritkin) {
@@ -405,13 +438,20 @@ async function sendMessage(overrideText) {
     const data = await res.json();
     if (!data.ok) throw new Error(data.message || "Reply interrupted.");
     const reply = data.message ?? data.output ?? data.response?.text ?? data.response ?? "...";
+    const tags = Array.isArray(data.metadata?.tags) ? data.metadata.tags.filter((tag) => typeof tag === "string") : [];
+    const emotionTone = sanitizeTone(data.metadata?.emotion?.tone);
+    const sceneName = sanitizeScene(data.metadata?.world?.scene?.name);
     state.messages.push({
       id: uuid(),
       role: "assistant",
       content: reply,
       spiritkinName: state.selectedSpiritkin?.name,
       time: nowIso(),
-      status: "sent"
+      status: "sent",
+      tags,
+      memoryActive: tags.includes("memory:active"),
+      emotionTone,
+      sceneName
     });
     state.statusText = `${state.selectedSpiritkin?.name || "Spiritkin"} is with you.`;
     state.statusError = false;
@@ -629,6 +669,9 @@ function buildBondedHomeView() {
           </p>
           <p class="bond-home-atmosphere">${esc(spiritkin.ui.realmText)}</p>
           <div class="bond-home-atlas">${esc(spiritkin.ui.atmosphereLine)}</div>
+          <p>
+            Sessions and conversations now belong to ${esc(spiritkin.name)}. To switch, use Manage bond and confirm a rebonding decision.
+          </p>
           <div class="bonded-actions">
             <button class="btn btn-primary" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
               ${state.loadingConv ? "Opening bonded channel..." : `Begin with ${esc(spiritkin.name)}`}
@@ -655,6 +698,10 @@ function buildBondPreview(spiritkin, pending) {
         <div class="focus-kicker">${pending ? "Pending bond" : "Bonded companion"}</div>
         <h3>${esc(spiritkin.name)}</h3>
         <div class="focus-realm">${esc(spiritkin.ui.realm)}</div>
+        <p>${esc(spiritkin.title || spiritkin.ui.bondLine)}</p>
+        <div class="focus-tags">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
+        <div class="focus-tone">${esc(describePresence(spiritkin) || spiritkin.ui.bondLine)}</div>
+        <div class="focus-atmosphere">${esc(spiritkin.ui.realmText)}</div>
         <p>${esc(spiritkin.title || spiritkin.ui.bondLine)}</p>
         <div class="focus-tags">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
         <div class="focus-tone">${esc(describePresence(spiritkin) || spiritkin.ui.bondLine)}</div>
@@ -691,6 +738,7 @@ function buildBondCard(spiritkin, index, subdued) {
 function buildChatView() {
   const spiritkin = state.selectedSpiritkin;
   const meta = spiritkin.ui;
+  const signals = getStageSignals();
   const failed = [...state.messages].reverse().find((message) => message.role === "user" && message.status === "failed");
   const showPrompts = state.messages.length === 0 && !state.loadingReply;
   return `
@@ -707,6 +755,7 @@ function buildChatView() {
           <div class="presence-realm">${esc(meta.realm)}</div>
           <p class="presence-title">${esc(spiritkin.title || spiritkin.role || meta.strap)}</p>
           <p class="presence-text">${esc(describePresence(spiritkin) || meta.bondLine)}</p>
+          <p class="presence-atmosphere">${esc(meta.realmText)}</p>
           <p class="presence-atmosphere">${esc(meta.realmText)}</p>
         </div>
         <div class="presence-bond-banner">This session is bonded to ${esc(spiritkin.name)}.</div>
@@ -728,6 +777,22 @@ function buildChatView() {
             <div class="chat-mode-label">Bonded companion</div>
             <div class="chat-sk-name">${esc(spiritkin.name)}</div>
             <div class="chat-sk-sub">${esc(spiritkin.title || spiritkin.role || "")}</div>
+            ${(signals.emotionTone || signals.sceneName) ? `
+              <div class="chat-signals">
+                ${signals.emotionTone ? `
+                  <div class="chat-signal">
+                    <span class="chat-signal-label">Resonance</span>
+                    <strong>${esc(signals.emotionTone)}</strong>
+                  </div>
+                ` : ""}
+                ${signals.sceneName ? `
+                  <div class="chat-signal">
+                    <span class="chat-signal-label">Scene</span>
+                    <strong>${esc(signals.sceneName)}</strong>
+                  </div>
+                ` : ""}
+              </div>
+            ` : ""}
           </div>
           <div class="chat-header-right">
             <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>
@@ -793,6 +858,11 @@ function buildChatView() {
 }
 
 function buildBubble(message, spiritkin) {
+  const memoryResonance = message.role === "assistant" && message.memoryActive ? `
+    <div class="bubble-resonance">
+      <span class="bubble-resonance-mark">Memory resonance</span>
+    </div>
+  ` : "";
   const rated = state.ratings[message.id];
   const feedback = message.role === "assistant" ? `
     <div class="bubble-thumbs">
@@ -803,6 +873,7 @@ function buildBubble(message, spiritkin) {
   return `
     <article class="bubble ${esc(message.role)} ${message.status === "failed" ? "failed" : ""} ${message.role === "assistant" ? esc(spiritkin.ui.cls) : ""}">
       <div class="bubble-role">${message.role === "user" ? esc(state.userName || "You") : esc(message.spiritkinName || spiritkin.name)}</div>
+      ${memoryResonance}
       <p>${esc(message.content)}</p>
       <div class="bubble-meta">
         <span class="${message.status === "failed" ? "bubble-failed" : "bubble-time"}">${message.status === "failed" ? "Not delivered" : fmtTime(message.time)}</span>
