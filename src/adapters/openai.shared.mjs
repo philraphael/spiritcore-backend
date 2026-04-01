@@ -57,6 +57,7 @@ export async function generateSpiritCoreResponse(ctx, { allowFallback = true, ca
 
 function buildMessages(ctx) {
   const spiritkin = ctx?.spiritkin ?? {};
+  const memoryLayer = buildMemoryLayer(ctx);
   const prompt = [
     "Return JSON only.",
     "You are generating the Spiritkin's next reply inside SpiritCore.",
@@ -71,7 +72,10 @@ function buildMessages(ctx) {
     "Be emotionally intelligent, concrete, and non-generic.",
     "Avoid placeholder lines like 'I hear you' unless the rest of the response is clearly specific and grounded.",
     "Do not fabricate features, tools, or world facts not present in context.",
-    "Honor safety and crisis guidance if present."
+    "Honor safety and crisis guidance if present.",
+    "Use memory selectively and intentionally, never as a raw dump.",
+    "If memory is relevant, weave one or two strong continuity cues naturally into the reply.",
+    "Set memory_used to true only when the final reply actually depends on supplied memory or recent episode context."
   ].join("\n");
 
   return [
@@ -81,7 +85,7 @@ function buildMessages(ctx) {
     },
     {
       role: "system",
-      content: buildContextBlock(ctx)
+      content: buildContextBlock(ctx, memoryLayer)
     },
     {
       role: "user",
@@ -90,28 +94,68 @@ function buildMessages(ctx) {
   ];
 }
 
-function buildContextBlock(ctx) {
+function buildContextBlock(ctx, memoryLayer) {
   const spiritkin = ctx?.spiritkin ?? {};
   const sceneName = sanitizeScene(ctx?.scene?.name);
   const emotion = ctx?.context?.emotion ?? {};
   const summary = summarizeText(ctx?.context?.summary?.content ?? ctx?.context?.summary_episode?.content ?? "", 220);
-  const episodes = collectEpisodeSnippets(ctx);
-  const memories = collectMemorySnippets(ctx);
+  const voiceLayer = buildVoiceLayer(spiritkin);
 
   return [
-    `Spiritkin: ${spiritkin.name || "Spiritkin"}`,
-    spiritkin.title ? `Title: ${spiritkin.title}` : "",
-    spiritkin.role ? `Role: ${spiritkin.role}` : "",
-    ctx?.identityFragment ? `Identity fragment:\n${ctx.identityFragment}` : "",
-    ctx?.crisisOverride ? `Crisis override:\n${ctx.crisisOverride}` : "",
-    ctx?.safetyInstruction ? `Safety instruction:\n${ctx.safetyInstruction}` : "",
-    sceneName ? `Current scene: ${sceneName}` : "Current scene: default",
-    `Emotion state: tone=${sanitizeText(emotion.tone || emotion.label || "steady")}, valence=${numberOrDefault(emotion.valence, 0.5)}, arousal=${numberOrDefault(emotion.arousal, 0.4)}`,
-    summary ? `Latest summary:\n${summary}` : "",
-    episodes.length ? `Recent episodes:\n- ${episodes.join("\n- ")}` : "",
-    memories.length ? `Relevant memories:\n- ${memories.join("\n- ")}` : "",
-    "Write 1-3 short paragraphs. The reply should feel like a real Spiritkin response, not a generic assistant."
+    "IDENTITY / CANON",
+    [
+      `Spiritkin: ${spiritkin.name || "Spiritkin"}`,
+      spiritkin.title ? `Title: ${spiritkin.title}` : "",
+      spiritkin.role ? `Role: ${spiritkin.role}` : "",
+      ctx?.identityFragment ? `Canonical fragment:\n${ctx.identityFragment}` : ""
+    ].filter(Boolean).join("\n"),
+    "VOICE / PERSONALITY",
+    voiceLayer,
+    "SAFETY / INVARIANTS",
+    [
+      ctx?.crisisOverride ? `Crisis override:\n${ctx.crisisOverride}` : "",
+      ctx?.safetyInstruction ? `Safety instruction:\n${ctx.safetyInstruction}` : "",
+      "Do not break canon, drift into generic assistant voice, or flatten this Spiritkin into neutral support language."
+    ].filter(Boolean).join("\n\n"),
+    "MEMORY / CONTEXT",
+    [
+      sceneName ? `Current scene: ${sceneName}` : "Current scene: default",
+      `Emotion state: tone=${sanitizeText(emotion.tone || emotion.label || "steady")}, valence=${numberOrDefault(emotion.valence, 0.5)}, arousal=${numberOrDefault(emotion.arousal, 0.4)}`,
+      summary ? `Latest summary:\n${summary}` : "",
+      memoryLayer,
+      "Use only the most relevant continuity cues. Prefer emotional and relational continuity over generic recap."
+    ].filter(Boolean).join("\n\n"),
+    "RESPONSE SHAPE",
+    "Write 1-3 short paragraphs. The reply should feel like a bonded companion with continuity, not a generic reply engine."
   ].filter(Boolean).join("\n\n");
+}
+
+function buildVoiceLayer(spiritkin) {
+  const pieces = [
+    spiritkin?.tone ? `Tone: ${sanitizeText(spiritkin.tone)}` : "",
+    spiritkin?.invariant ? `Invariant: ${sanitizeText(spiritkin.invariant)}` : "",
+    Array.isArray(spiritkin?.essence) && spiritkin.essence.length
+      ? `Essence cues: ${spiritkin.essence.slice(0, 5).map((item) => sanitizeText(item)).filter(Boolean).join(", ")}`
+      : "",
+    spiritkin?.growth_axis ? `Growth axis: ${sanitizeText(spiritkin.growth_axis)}` : ""
+  ].filter(Boolean);
+
+  return pieces.join("\n");
+}
+
+function buildMemoryLayer(ctx) {
+  const selected = selectMemoryCandidates(ctx);
+  if (!selected.length) {
+    return "No continuity cue strongly matches the current message. Rely on present-moment attunement unless a memory clearly belongs.";
+  }
+
+  return [
+    "Selected continuity cues:",
+    ...selected.map((candidate, index) => (
+      `${index + 1}. ${candidate.label} [score=${candidate.score}]${candidate.why ? ` [why=${candidate.why}]` : ""}\n${candidate.text}`
+    )),
+    "If you use one of these cues directly in the reply, set memory_used=true. If you do not rely on them, set memory_used=false."
+  ].join("\n\n");
 }
 
 function collectEpisodeSnippets(ctx) {
@@ -131,6 +175,123 @@ function collectMemorySnippets(ctx) {
     ))
     .filter(Boolean)
     .slice(0, 3);
+}
+
+function selectMemoryCandidates(ctx) {
+  const input = sanitizeText(ctx?.input);
+  const emotionTone = sanitizeText(ctx?.context?.emotion?.tone || ctx?.context?.emotion?.label || "");
+  const candidates = [
+    ...buildEpisodeCandidates(ctx),
+    ...buildMemoryCandidates(ctx),
+    ...buildSummaryCandidates(ctx)
+  ].map((candidate) => scoreCandidate(candidate, input, emotionTone))
+   .filter((candidate) => candidate.score > 1);
+
+  return candidates
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+}
+
+function buildEpisodeCandidates(ctx) {
+  const episodes = Array.isArray(ctx?.context?.episodes) ? ctx.context.episodes : [];
+  return episodes
+    .map((episode, index) => {
+      const text = summarizeText(episode?.content, 220);
+      if (!text) return null;
+      const emotionSnapshot = episode?.emotion_snapshot ?? {};
+      return {
+        kind: "recent episode",
+        order: index,
+        text,
+        emotionLabel: sanitizeText(emotionSnapshot?.tone || emotionSnapshot?.label || ""),
+        createdAt: episode?.created_at ?? ""
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildMemoryCandidates(ctx) {
+  const memories = Array.isArray(ctx?.context?.memories) ? ctx.context.memories : [];
+  return memories
+    .map((memory, index) => {
+      const text = summarizeText(memory?.content ?? memory?.memory ?? memory?.summary ?? memory?.text, 220);
+      if (!text) return null;
+      return {
+        kind: "memory",
+        order: index,
+        text,
+        emotionLabel: sanitizeText(memory?.tone || memory?.emotion || memory?.label || ""),
+        createdAt: memory?.created_at ?? memory?.updated_at ?? ""
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildSummaryCandidates(ctx) {
+  const summary = summarizeText(ctx?.context?.summary?.content ?? ctx?.context?.summary_episode?.content ?? "", 220);
+  if (!summary) return [];
+  return [{
+    kind: "summary",
+    order: 0,
+    text: summary,
+    emotionLabel: "",
+    createdAt: ctx?.context?.summary?.created_at ?? ctx?.context?.summary_episode?.created_at ?? ""
+  }];
+}
+
+function scoreCandidate(candidate, input, emotionTone) {
+  const text = sanitizeText(candidate.text);
+  const loweredInput = input.toLowerCase();
+  const loweredText = text.toLowerCase();
+  let score = 0;
+  const reasons = [];
+
+  const overlap = sharedTokenCount(loweredInput, loweredText);
+  if (overlap > 0) {
+    score += overlap * 2;
+    reasons.push(`topic:${overlap}`);
+  }
+
+  const emotionalWeight = emotionalSignalCount(loweredText);
+  if (emotionalWeight > 0) {
+    score += Math.min(3, emotionalWeight);
+    reasons.push(`emotion:${Math.min(3, emotionalWeight)}`);
+  }
+
+  if (emotionTone && loweredText.includes(emotionTone.toLowerCase())) {
+    score += 2;
+    reasons.push("tone-match");
+  }
+
+  if (candidate.kind === "recent episode") {
+    score += Math.max(0, 3 - candidate.order);
+    reasons.push("recent");
+  }
+
+  if (candidate.kind === "summary") {
+    score += 1;
+    reasons.push("summary");
+  }
+
+  if (candidate.createdAt) {
+    const recencyBonus = recencyScore(candidate.createdAt);
+    if (recencyBonus > 0) {
+      score += recencyBonus;
+      reasons.push(`fresh:${recencyBonus}`);
+    }
+  }
+
+  return {
+    ...candidate,
+    text,
+    score,
+    why: reasons.join(", "),
+    label: candidate.kind === "recent episode"
+      ? "Recent episode"
+      : candidate.kind === "summary"
+        ? "Continuity summary"
+        : "Stored memory"
+  };
 }
 
 function buildFallbackResult(ctx, { caller, reason }) {
@@ -177,20 +338,8 @@ function fallbackBySpiritkin(name, { input, sceneName, memorySnippet, emotionTon
 }
 
 function pickMemorySnippet(ctx) {
-  const input = String(ctx?.input ?? "").toLowerCase();
-  const candidates = [
-    ...collectEpisodeSnippets(ctx),
-    ...collectMemorySnippets(ctx)
-  ];
-  if (!candidates.length) return "";
-
-  const scored = candidates
-    .map((snippet) => ({ snippet, score: relevanceScore(input, snippet.toLowerCase()) }))
-    .sort((a, b) => b.score - a.score);
-
-  const best = scored[0];
-  if (!best || best.score <= 0) return "";
-  return best.snippet;
+  const best = selectMemoryCandidates(ctx)[0];
+  return best?.text ?? "";
 }
 
 function relevanceScore(input, candidate) {
@@ -202,6 +351,32 @@ function relevanceScore(input, candidate) {
     if (candidateTokens.includes(token)) score += 1;
   }
   return score;
+}
+
+function sharedTokenCount(input, candidate) {
+  return relevanceScore(input, candidate);
+}
+
+function emotionalSignalCount(text) {
+  const cues = [
+    "hurt", "afraid", "anxious", "grief", "lonely", "alone", "tender", "ashamed",
+    "hope", "love", "loss", "trust", "scared", "angry", "overwhelmed", "peace",
+    "close", "bond", "remember", "promised", "miss", "care"
+  ];
+  let score = 0;
+  for (const cue of cues) {
+    if (text.includes(cue)) score += 1;
+  }
+  return score;
+}
+
+function recencyScore(value) {
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return 0;
+  const ageMs = Date.now() - time;
+  if (ageMs <= 1000 * 60 * 60 * 24 * 3) return 2;
+  if (ageMs <= 1000 * 60 * 60 * 24 * 14) return 1;
+  return 0;
 }
 
 function tokenize(value) {
