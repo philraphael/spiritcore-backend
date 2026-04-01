@@ -28,6 +28,18 @@ const nowIso = () => new Date().toISOString();
 const fmtTime = (iso) => (iso ? new Date(iso).toLocaleString() : "—");
 const readJson = (k, fallback = null) => { try { return JSON.parse(localStorage.getItem(k) || "null") ?? fallback; } catch { return fallback; } };
 const escapeHtml = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const uuid = () => {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  if (globalThis.crypto?.getRandomValues) {
+    const b = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(b);
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    const h = [...b].map((x) => x.toString(16).padStart(2, "0"));
+    return `${h[0]}${h[1]}${h[2]}${h[3]}-${h[4]}${h[5]}-${h[6]}${h[7]}-${h[8]}${h[9]}-${h[10]}${h[11]}${h[12]}${h[13]}${h[14]}${h[15]}`;
+  }
+  return `fallback-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
 
 function getBrand(name) {
   return BRAND_BY_SPIRITKIN[name] ?? { aura: "default", tag: "Mythic Companion", presence: "Attuned and thoughtful." };
@@ -36,7 +48,7 @@ function getBrand(name) {
 function getOrCreateUserId() {
   const existing = localStorage.getItem(USER_ID_KEY);
   if (existing) return existing;
-  const id = crypto.randomUUID();
+  const id = uuid();
   localStorage.setItem(USER_ID_KEY, id);
   return id;
 }
@@ -62,7 +74,7 @@ const state = {
   prefs: readJson(PREFS_KEY, { preferredSpiritkin: "", appTone: "balanced", reminderMode: "off" }),
   feedbackDraft: "",
   feedbackItems: readJson(FEEDBACK_KEY, []),
-  debug: { lastAction: "init", lastPayload: null, lastResponse: null, lastError: null },
+  debug: { jsLoaded: true, handlersAttached: false, lastAction: "init", lastPayload: null, lastResponse: null, lastError: null },
 };
 
 function persistState() {
@@ -157,7 +169,7 @@ async function beginConversation() {
 async function sendMessage(contentOverride) {
   const text = (contentOverride ?? state.input).trim();
   if (!text || !state.conversationId || !state.selectedSpiritkin) return;
-  const outgoing = { id: crypto.randomUUID(), role: "user", content: text, spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() };
+  const outgoing = { id: uuid(), role: "user", content: text, spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() };
   state.messages.push(outgoing);
   state.input = "";
   state.loadingReply = true;
@@ -182,7 +194,7 @@ async function sendMessage(contentOverride) {
     state.debug.lastResponse = data;
     state.debug.lastError = null;
     if (!res.ok || !data?.ok) throw new Error(data?.message ?? "Message delivery was interrupted.");
-    state.messages.push({ id: crypto.randomUUID(), role: "assistant", content: data?.output ?? data?.response?.text ?? data?.response ?? "…", spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() });
+    state.messages.push({ id: uuid(), role: "assistant", content: data?.output ?? data?.response?.text ?? data?.response ?? "…", spiritkinName: state.selectedSpiritkin.name, status: "sent", time: nowIso() });
     state.statusText = "Reply received.";
   } catch (err) {
     state.messages = state.messages.map((m) => (m.id === outgoing.id ? { ...m, status: "failed" } : m));
@@ -265,6 +277,8 @@ function render() {
 
       <section class="product-panel">
         <h4>Debug</h4>
+        <p><strong>JS loaded:</strong> ${state.debug.jsLoaded ? "yes" : "no"}</p>
+        <p><strong>Handlers attached:</strong> ${state.debug.handlersAttached ? "yes" : "no"}</p>
         <p><strong>Last action:</strong> ${escapeHtml(state.debug.lastAction)}</p>
         <p><strong>Last error:</strong> ${escapeHtml(state.debug.lastError || "none")}</p>
         <pre>${escapeHtml(JSON.stringify({ payload: state.debug.lastPayload, response: state.debug.lastResponse }, null, 2))}</pre>
@@ -314,7 +328,7 @@ async function onRootClick(e) {
   if (action === "retry") { const failed = [...state.messages].reverse().find((m) => m.role === "user" && m.status === "failed"); if (failed) sendMessage(failed.content); }
   if (action === "clear-session") { localStorage.removeItem(SESSION_KEY); state.conversationId = null; state.messages = []; state.startedAt = null; state.statusText = "Session cleared. You can create a new conversation at any time."; }
   if (action === "resume") hydrateSession();
-  if (action === "save-feedback") { const text = state.feedbackDraft.trim(); if (text) { state.feedbackItems = [{ id: crypto.randomUUID(), text, time: nowIso() }, ...state.feedbackItems].slice(0, 20); state.feedbackDraft = ""; state.statusText = "Feedback saved locally. Thank you."; persistState(); } }
+  if (action === "save-feedback") { const text = state.feedbackDraft.trim(); if (text) { state.feedbackItems = [{ id: uuid(), text, time: nowIso() }, ...state.feedbackItems].slice(0, 20); state.feedbackDraft = ""; state.statusText = "Feedback saved locally. Thank you."; persistState(); } }
   if (action === "clear-feedback") { state.feedbackItems = []; persistState(); }
   render();
 }
@@ -323,13 +337,16 @@ document.addEventListener("DOMContentLoaded", () => {
   hydrateSession();
   fetchSpiritkins();
   render();
-  document.getElementById("root").addEventListener("input", onRootInput);
-  document.getElementById("root").addEventListener("change", onRootInput);
-  document.getElementById("root").addEventListener("click", (e) => { onRootClick(e); });
-  document.getElementById("root").addEventListener("keydown", (e) => {
+  const root = document.getElementById("root");
+  root.addEventListener("input", onRootInput);
+  root.addEventListener("change", onRootInput);
+  root.addEventListener("click", (e) => { onRootClick(e); });
+  root.addEventListener("keydown", (e) => {
     if (e.target.dataset.field === "chat-input" && e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   });
+  state.debug.handlersAttached = true;
+  render();
 });

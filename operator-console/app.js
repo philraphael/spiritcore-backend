@@ -1,17 +1,30 @@
+const uuid = () => {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  if (globalThis.crypto?.getRandomValues) {
+    const b = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(b);
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    const h = [...b].map((x) => x.toString(16).padStart(2, "0"));
+    return `${h[0]}${h[1]}${h[2]}${h[3]}-${h[4]}${h[5]}-${h[6]}${h[7]}-${h[8]}${h[9]}-${h[10]}${h[11]}${h[12]}${h[13]}${h[14]}${h[15]}`;
+  }
+  return `fallback-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
 const state = {
   baseUrl: "",
   ready: null,
   spiritkins: [],
   conversations: [],
   selectedConversation: "",
-  userId: crypto.randomUUID(),
+  userId: uuid(),
   input: "",
   selectedSpiritkin: "Lyra",
   messages: [],
   status: { kind: "info", message: "Operator console ready." },
   raw: null,
   loading: false,
-  debug: { lastAction: "init", lastPayload: null, lastResponse: null, lastError: null },
+  debug: { jsLoaded: true, handlersAttached: false, lastAction: "init", lastPayload: null, lastResponse: null, lastError: null },
 };
 
 const escapeHtml = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -159,7 +172,7 @@ function render() {
       </section>
 
       <section class="panel"><h2>Raw JSON</h2><pre>${escapeHtml(JSON.stringify(state.raw ?? {}, null, 2))}</pre></section>
-      <section class="panel"><h2>Debug</h2><p><strong>Last action:</strong> ${escapeHtml(state.debug.lastAction)}</p><p><strong>Last error:</strong> ${escapeHtml(state.debug.lastError || "none")}</p><pre>${escapeHtml(JSON.stringify({ payload: state.debug.lastPayload, response: state.debug.lastResponse }, null, 2))}</pre></section>
+      <section class="panel"><h2>Debug</h2><p><strong>JS loaded:</strong> ${state.debug.jsLoaded ? "yes" : "no"}</p><p><strong>Handlers attached:</strong> ${state.debug.handlersAttached ? "yes" : "no"}</p><p><strong>Last action:</strong> ${escapeHtml(state.debug.lastAction)}</p><p><strong>Last error:</strong> ${escapeHtml(state.debug.lastError || "none")}</p><pre>${escapeHtml(JSON.stringify({ payload: state.debug.lastPayload, response: state.debug.lastResponse }, null, 2))}</pre></section>
     </main>
   `;
 }
@@ -199,6 +212,8 @@ document.addEventListener("DOMContentLoaded", () => {
       sendMessage();
     }
   });
+  state.debug.handlersAttached = true;
+  render();
 
   checkReady();
   loadSpiritkins();
