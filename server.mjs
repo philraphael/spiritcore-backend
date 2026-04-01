@@ -34,6 +34,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const OPERATOR_CONSOLE_DIR = path.join(__dirname, "operator-console");
 const USER_APP_DIR = path.join(__dirname, "spiritkins-app");
+const USER_APP_ASSETS_DIR = path.join(USER_APP_DIR, "assets");
 
 const PORT    = config.port;
 const USE_LLM = String(process.env.USE_LLM || "false").toLowerCase() === "true";
@@ -84,6 +85,28 @@ function sendError(reply, httpStatus, code, message, details, request_id) {
       time: nowIso()
     }
   });
+}
+
+function contentTypeForAsset(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const map = {
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml; charset=utf-8",
+    ".avif": "image/avif",
+    ".ico": "image/x-icon",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm"
+  };
+  return map[ext] || null;
 }
 
 // Request id + basic ops logging
@@ -162,6 +185,31 @@ app.get("/app/:asset", async (req, reply) => {
   const content = await readFile(filePath, "utf8");
   const mime = asset.endsWith(".js") ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8";
   return reply.type(mime).send(content);
+});
+
+app.get("/app/assets/*", async (req, reply) => {
+  const raw = String(req.params["*"] || "");
+  if (!raw) return reply.code(404).send({ ok: false, error: "Not found" });
+
+  const normalized = path.normalize(raw).replace(/^(\.\.(\/|\\|$))+/, "");
+  if (!normalized || normalized.includes("..")) {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
+
+  const filePath = path.resolve(USER_APP_ASSETS_DIR, normalized);
+  if (!filePath.startsWith(USER_APP_ASSETS_DIR + path.sep) && filePath !== USER_APP_ASSETS_DIR) {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
+
+  const mime = contentTypeForAsset(filePath);
+  if (!mime) return reply.code(404).send({ ok: false, error: "Not found" });
+
+  try {
+    const content = await readFile(filePath);
+    return reply.type(mime).send(content);
+  } catch {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
 });
 
 /* ------------------------ Runtime endpoints ------------------------ */
