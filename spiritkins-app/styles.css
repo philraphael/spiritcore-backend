@@ -33,3 +33,8 @@
 .future-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}.future-grid>div{padding:10px 12px}.future-grid h4{margin:0;font-size:.9rem}.future-grid p{margin:6px 0 0;font-size:.83rem;color:#6b5683}
 .footer-note{padding:10px 12px;font-size:.83rem;color:#735d8d;text-align:center}
 @media (max-width:700px){.app-shell{padding:12px 10px 20px}.hero{text-align:left}.topbar,.session-bar,.selection-header,.chat-header,.retry-banner,.thread-status{flex-direction:column;align-items:flex-start}.top-actions{width:100%}.top-actions button{flex:1}.active-pill{width:100%;text-align:center}.lifecycle-rail{width:100%}.starter-prompts{width:100%}.starter-prompts button{width:100%;text-align:left}.identity-actions{width:100%}.identity-actions button{flex:1}.section-nav{grid-template-columns:1fr}.identity-pill-row{justify-content:flex-start}.thread{min-height:240px;max-height:50vh}}
+/* Analytics feedback thumbs */
+.bubble-thumbs{display:flex;gap:4px;margin-top:4px}
+.thumb{background:none;border:1px solid rgba(163,142,206,.3);border-radius:8px;padding:2px 6px;cursor:pointer;font-size:.85rem;opacity:.6;transition:opacity .15s,background .15s}
+.thumb:hover{opacity:1;background:rgba(163,142,206,.15)}
+.thumb-active{opacity:1;background:rgba(163,142,206,.25);cursor:default}

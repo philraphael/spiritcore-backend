@@ -25,6 +25,7 @@ export const interactRoutes = async (app) => {
     },
     async (req, reply) => {
       const { userId, input, spiritkin, conversationId, context } = req.body;
+      const t0 = Date.now();
       try {
         const result = await app.orchestrator.interact({
           userId,
@@ -33,8 +34,33 @@ export const interactRoutes = async (app) => {
           conversationId: conversationId ?? null,
           context,
         });
+        // ── Non-blocking analytics hook (fire-and-forget) ──
+        if (app.analyticsService) {
+          app.analyticsService.logInteraction({
+            userId,
+            spiritkinName:  result.spiritkin ?? spiritkin?.name ?? "unknown",
+            conversationId: result.metadata?.conversationId ?? conversationId ?? null,
+            inputLength:    input.length,
+            responseLength: (result.message ?? "").length,
+            latencyMs:      Date.now() - t0,
+            success:        result.ok !== false,
+            safetyTier:     result.safety?.tier ?? null,
+            traceId:        result.traceId ?? null,
+          });
+        }
         return result;
       } catch (err) {
+        if (app.analyticsService) {
+          app.analyticsService.logInteraction({
+            userId,
+            spiritkinName:  spiritkin?.name ?? "unknown",
+            conversationId: conversationId ?? null,
+            inputLength:    input.length,
+            responseLength: 0,
+            latencyMs:      Date.now() - t0,
+            success:        false,
+          });
+        }
         const code = err.httpCode ?? 500;
         return reply.code(code).send({
           ok: false,

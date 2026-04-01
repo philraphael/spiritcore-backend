@@ -6,7 +6,7 @@
  */
 
 export async function conversationRoutes(fastify, opts) {
-  const { conversationService } = opts;
+  const { conversationService, analyticsService } = opts;
 
   /**
    * POST /v1/conversations
@@ -28,6 +28,15 @@ export async function conversationRoutes(fastify, opts) {
     const { userId, spiritkinName, title } = req.body;
     try {
       const result = await conversationService.bootstrap({ userId, spiritkinName, title });
+      // ── Non-blocking session start event ──
+      if (analyticsService) {
+        analyticsService.logSessionEvent({
+          userId,
+          conversationId: result?.conversation_id ?? null,
+          spiritkinName,
+          eventType: "start",
+        });
+      }
       return { ok: true, conversation: result };
     } catch (err) {
       const code = err.httpCode ?? 500;

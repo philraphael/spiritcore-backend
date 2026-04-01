@@ -73,7 +73,9 @@ const state = {
   sessionState: null,
   prefs: readJson(PREFS_KEY, { preferredSpiritkin: "", appTone: "balanced", reminderMode: "off" }),
   feedbackDraft: "",
+  feedbackRatings: {},  // messageId -> 'up' | 'down'
   feedbackItems: readJson(FEEDBACK_KEY, []),
+  feedbackRatings: readJson("spiritkins.ratings.v1", {}),
   debug: { jsLoaded: true, handlersAttached: false, lastAction: "init", lastPayload: null, lastResponse: null, lastError: null },
 };
 
@@ -81,6 +83,7 @@ function persistState() {
   localStorage.setItem(NAME_KEY, state.userName);
   localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs));
   localStorage.setItem(FEEDBACK_KEY, JSON.stringify(state.feedbackItems));
+  localStorage.setItem("spiritkins.ratings.v1", JSON.stringify(state.feedbackRatings));
   if (state.selectedSpiritkin && state.conversationId) {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
       selectedSpiritkin: state.selectedSpiritkin,
@@ -265,7 +268,12 @@ function render() {
           <section class="chat-panel">
             <header class="chat-header ${brand.aura}"><div><p class="kicker">Active Spiritkin</p><h2>${escapeHtml(state.selectedSpiritkin?.name)}</h2><p>${brand.tag}</p><p class="session-id">${brand.presence}</p></div><button data-action="change-spiritkin" ${state.loadingReply ? "disabled" : ""}>Change Spiritkin</button></header>
             <div class="starter-prompts">${state.messages.length === 0 ? STARTER_PROMPTS.map((p) => `<button data-action="prompt" data-prompt="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join("") : ""}</div>
-            <div class="thread">${state.messages.length === 0 ? '<p class="state">Try a starter prompt, or write your own message.</p>' : state.messages.map((m) => `<article class="bubble ${m.role === "user" ? "user" : "assistant"}"><span class="bubble-role">${m.role === "user" ? "You" : escapeHtml(m.spiritkinName ?? "Spiritkin")}</span><p>${escapeHtml(m.content)}</p>${m.status === "failed" ? '<span class="bubble-failed">Not delivered</span>' : `<span class="bubble-time">${new Date(m.time).toLocaleTimeString()}</span>`}</article>`).join("")}</div>
+            <div class="thread">${state.messages.length === 0 ? '<p class="state">Try a starter prompt, or write your own message.</p>' : state.messages.map((m) => {
+              const isAssistant = m.role === "assistant";
+              const rated = state.feedbackRatings[m.id];
+              const thumbs = isAssistant ? `<span class="bubble-thumbs">${rated === "up" ? '<button class="thumb thumb-active" data-action="thumb-up" data-msg-id="${m.id}" disabled>&#128077;</button>' : `<button class="thumb" data-action="thumb-up" data-msg-id="${m.id}">&#128077;</button>`}${rated === "down" ? '<button class="thumb thumb-active" data-action="thumb-down" data-msg-id="${m.id}" disabled>&#128078;</button>' : `<button class="thumb" data-action="thumb-down" data-msg-id="${m.id}">&#128078;</button>`}</span>` : "";
+              return `<article class="bubble ${m.role === "user" ? "user" : "assistant"}"><span class="bubble-role">${m.role === "user" ? "You" : escapeHtml(m.spiritkinName ?? "Spiritkin")}</span><p>${escapeHtml(m.content)}</p>${m.status === "failed" ? '<span class="bubble-failed">Not delivered</span>' : `<span class="bubble-time">${new Date(m.time).toLocaleTimeString()}</span>`}${thumbs}</article>`;
+            }).join("")}</div>
             ${failedMessage ? '<div class="retry-banner"><span>Last message didn’t send.</span><button data-action="retry">Retry</button></div>' : ""}
             <div class="composer"><textarea data-field="chat-input" placeholder="Share what you’re feeling, wondering, or working through...">${escapeHtml(state.input)}</textarea><button class="primary" data-action="send" ${state.loadingReply || !state.input.trim() ? "disabled" : ""}>Send</button></div>
           </section>`}
@@ -351,6 +359,29 @@ async function onRootClick(e) {
   if (action === "resume") hydrateSession();
   if (action === "save-feedback") { const text = state.feedbackDraft.trim(); if (text) { state.feedbackItems = [{ id: uuid(), text, time: nowIso() }, ...state.feedbackItems].slice(0, 20); state.feedbackDraft = ""; state.statusText = "Feedback saved locally. Thank you."; persistState(); } }
   if (action === "clear-feedback") { state.feedbackItems = []; persistState(); }
+  if (action === "thumb-up" || action === "thumb-down") {
+    const msgId = btn.dataset.msgId;
+    const rating = action === "thumb-up" ? 5 : 1;
+    const helpful = action === "thumb-up";
+    const msg = state.messages.find((m) => m.id === msgId);
+    if (msg && !state.feedbackRatings[msgId]) {
+      state.feedbackRatings[msgId] = action === "thumb-up" ? "up" : "down";
+      persistState();
+      // Fire-and-forget: post feedback to backend
+      fetch("/v1/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: state.userId ?? "anon",
+          conversationId: state.conversationId ?? null,
+          spiritkinName: msg.spiritkinName ?? state.selectedSpiritkin?.name ?? "unknown",
+          rating,
+          helpful,
+          messageId: msgId,
+        }),
+      }).catch(() => {});
+    }
+  }
   render();
 }
 

@@ -21,6 +21,10 @@ import { buildContainer }        from "./src/container.mjs";
 import { interactRoutes }        from "./src/routes/interact.mjs";
 import { spiritkinRoutes }       from "./src/routes/spiritkins.mjs";
 import { conversationRoutes }    from "./src/routes/conversations.mjs";
+// -- Analytics & Feedback Layer
+import { createAnalyticsService } from "./src/services/analyticsService.mjs";
+import { createFeedbackService }  from "./src/services/feedbackService.mjs";
+import { analyticsRoutes }        from "./src/routes/analytics.mjs";
 // ── Phase F: Production hardening ───────────────────────────────────────────
 import { validateConfig, config } from "./src/config.mjs";
 import { getPinoOptions, setAppLogger } from "./src/logger.mjs";
@@ -431,6 +435,12 @@ try {
 app.decorate("container",    container);
 app.decorate("orchestrator", container.orchestrator);
 
+// -- Analytics & Feedback services (non-blocking, safe to fail)
+const analyticsService = createAnalyticsService({ supabase: container.supabase });
+const feedbackService  = createFeedbackService({ supabase: container.supabase, analyticsService });
+app.decorate("analyticsService", analyticsService);
+app.decorate("feedbackService",  feedbackService);
+
 // Wire the app logger into the service-layer logger (Phase F)
 setAppLogger(app.log);
 
@@ -444,9 +454,17 @@ await app.register(spiritkinRoutes, {
   registry: container.registry,
 });
 
+// Analytics & Feedback routes
+await app.register(analyticsRoutes, {
+  feedbackService,
+  analyticsService,
+  supabase: container.supabase,
+});
+
 await app.register(conversationRoutes, {
   prefix: "/",
   conversationService: container.conversationService,
+  analyticsService,
 });
 
 // Phase F: Health, readiness, and metrics endpoints
@@ -461,6 +479,7 @@ try {
   await app.listen({ port: PORT, host: "0.0.0.0" });
   app.log.info(`[SpiritCore] Phase F running on port ${PORT} (USE_LLM=${USE_LLM}, DEBUG=${DEBUG})`);
   app.log.info(`[SpiritCore] Routes: /v1/interact, /v1/spiritkins, /v1/conversations, /health, /ready, /metrics`);
+  app.log.info(`[SpiritCore] Analytics: /v1/feedback, /v1/analytics/event, /v1/analytics/spiritkin/:name, /v1/analytics/summary`);
 } catch (e) {
   app.log.error(e, "Failed to start");
   process.exit(1);
