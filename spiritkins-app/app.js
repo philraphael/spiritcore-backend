@@ -21,6 +21,9 @@ const SK_META = {
     strap: "A reflective companion for emotional clarity.",
     ambient: "Rose-violet glow",
     bondLine: "A bonded presence for reflection, softness, and emotional steadiness.",
+    realm: "The Luminous Veil",
+    realmText: "A moonlit chamber of still water, soft constellations, and slow emotional clarity.",
+    atmosphereLine: "Rose-violet hush, mirrored water, lunar breath",
     prompts: [
       "I've been carrying too much today.",
       "Help me find a calmer center.",
@@ -34,6 +37,9 @@ const SK_META = {
     strap: "A steady force for truth, direction, and action.",
     ambient: "Amber current",
     bondLine: "A bonded presence for courage, honesty, and clean forward motion.",
+    realm: "The Ember Citadel",
+    realmText: "A bright forged hall of heat, resolve, and disciplined forward movement.",
+    atmosphereLine: "Solar metal, ember banners, charged horizon",
     prompts: [
       "I need help facing something hard.",
       "Show me where my strength already is.",
@@ -47,6 +53,9 @@ const SK_META = {
     strap: "A visionary guide for imagination and reframing.",
     ambient: "Celestial drift",
     bondLine: "A bonded presence for imagination, perspective, and discovery.",
+    realm: "The Astral Observatory",
+    realmText: "A lucid sky-realm of glass, stars, and shifting constellations of possibility.",
+    atmosphereLine: "Aether blue, distant stars, lucid horizon",
     prompts: [
       "I want to see this from a new angle.",
       "Help me open up a fresh possibility.",
@@ -111,6 +120,9 @@ function getMeta(name) {
     strap: "A governed companion of the Spiritverse.",
     ambient: "Guiding field",
     bondLine: "A governed bonded companion of the Spiritverse.",
+    realm: "The Spiritverse",
+    realmText: "A governed companion realm of memory, atmosphere, and presence.",
+    atmosphereLine: "Spirit light, presence, continuity",
     prompts: DEFAULT_PROMPTS
   };
 }
@@ -215,6 +227,10 @@ function hydrateSpiritkin(raw) {
 
 function normalizeStoredSpiritkin(raw) {
   return raw?.name ? hydrateSpiritkin(raw) : null;
+}
+
+function getAtmosphereSpiritkin() {
+  return state.primarySpiritkin || state.pendingBondSpiritkin || state.selectedSpiritkin || null;
 }
 
 const state = {
@@ -453,10 +469,13 @@ function render() {
 }
 
 function buildApp() {
+  const atmosphere = getAtmosphereSpiritkin();
+  const atmosphereClass = atmosphere ? `realm-${atmosphere.ui.cls}` : "realm-neutral";
   return `
-    <div class="sv-bg"></div>
+    <div class="sv-bg ${atmosphereClass}"></div>
     <div class="sv-noise"></div>
-    <div class="app-shell">
+    <div class="sv-orbit ${atmosphereClass}"></div>
+    <div class="app-shell ${atmosphereClass}">
       ${buildTopbar()}
       ${state.entryAccepted ? buildMain() : buildEntry()}
       ${buildBondModal()}
@@ -472,7 +491,7 @@ function buildTopbar() {
         <div class="topbar-logo">SV</div>
         <div>
           <div class="topbar-name">Spiritverse</div>
-          <div class="topbar-tag">Primary Companion Bonding Interface</div>
+          <div class="topbar-tag">${active ? esc(active.ui.realm) : "Primary Companion Bonding Interface"}</div>
         </div>
       </div>
       <div class="topbar-right">
@@ -523,7 +542,7 @@ function buildEntry() {
               <div class="entry-spirit-copy">
                 <span>${esc(meta.symbol)}</span>
                 <strong>${esc(name)}</strong>
-                <p>${esc(meta.bondLine)}</p>
+                <p>${esc(meta.realmText)}</p>
               </div>
             </article>
           `;
@@ -604,9 +623,12 @@ function buildBondedHomeView() {
         <div class="bond-home-copy panel-card">
           <p class="eyebrow">Primary companion</p>
           <h2>${esc(spiritkin.name)} holds the center of this space.</h2>
+          <div class="bond-home-realm">${esc(spiritkin.ui.realm)}</div>
           <p>
             Sessions and conversations now belong to ${esc(spiritkin.name)}. To switch, use Manage bond and confirm a rebonding decision.
           </p>
+          <p class="bond-home-atmosphere">${esc(spiritkin.ui.realmText)}</p>
+          <div class="bond-home-atlas">${esc(spiritkin.ui.atmosphereLine)}</div>
           <div class="bonded-actions">
             <button class="btn btn-primary" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
               ${state.loadingConv ? "Opening bonded channel..." : `Begin with ${esc(spiritkin.name)}`}
@@ -632,9 +654,11 @@ function buildBondPreview(spiritkin, pending) {
       <div class="selection-focus-copy">
         <div class="focus-kicker">${pending ? "Pending bond" : "Bonded companion"}</div>
         <h3>${esc(spiritkin.name)}</h3>
+        <div class="focus-realm">${esc(spiritkin.ui.realm)}</div>
         <p>${esc(spiritkin.title || spiritkin.ui.bondLine)}</p>
         <div class="focus-tags">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
         <div class="focus-tone">${esc(describePresence(spiritkin) || spiritkin.ui.bondLine)}</div>
+        <div class="focus-atmosphere">${esc(spiritkin.ui.realmText)}</div>
       </div>
     </div>
   `;
@@ -680,8 +704,10 @@ function buildChatView() {
         <div class="presence-summary">
           <div class="focus-kicker">${esc(meta.ambient)}</div>
           <h2>${esc(spiritkin.name)}</h2>
+          <div class="presence-realm">${esc(meta.realm)}</div>
           <p class="presence-title">${esc(spiritkin.title || spiritkin.role || meta.strap)}</p>
           <p class="presence-text">${esc(describePresence(spiritkin) || meta.bondLine)}</p>
+          <p class="presence-atmosphere">${esc(meta.realmText)}</p>
         </div>
         <div class="presence-bond-banner">This session is bonded to ${esc(spiritkin.name)}.</div>
         <div class="presence-stats">
@@ -707,6 +733,10 @@ function buildChatView() {
             <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>
             <div class="status-chip ${state.loadingReply ? "live" : ""}">${esc(state.loadingReply ? "Receiving reply" : "Ready for message")}</div>
           </div>
+        </div>
+        <div class="stage-atmosphere ${esc(meta.cls)}">
+          <div class="stage-atmosphere-mark">${esc(meta.realm)}</div>
+          <div class="stage-atmosphere-text">${esc(meta.atmosphereLine)}</div>
         </div>
 
         ${showPrompts ? `
@@ -798,6 +828,7 @@ function buildBondModal() {
         <div class="bond-modal-body">
           ${buildPortrait(target.name, "portrait-mini", target.ui.cls)}
           <div>
+            <div class="bond-modal-realm">${esc(target.ui.realm)}</div>
             <p>Rebonding will end the current bonded session view, clear the active conversation in this app, and make ${esc(target.name)} the new primary companion.</p>
             <p>This keeps switching intentional instead of casual in-session hopping.</p>
           </div>

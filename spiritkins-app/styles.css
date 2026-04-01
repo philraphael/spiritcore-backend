@@ -19,6 +19,13 @@
   --raien: #f6a45c;
   --kairo: #84c8ff;
   --generic: #b8a6ff;
+  --realm-accent: rgba(242, 219, 160, 0.9);
+  --realm-accent-soft: rgba(242, 219, 160, 0.18);
+  --realm-glow-a: rgba(132, 200, 255, 0.18);
+  --realm-glow-b: rgba(243, 159, 209, 0.16);
+  --realm-glow-c: rgba(246, 164, 92, 0.1);
+  --realm-panel: rgba(8, 23, 35, 0.8);
+  --realm-stage: rgba(6, 20, 31, 0.88);
 }
 
 *,
@@ -72,7 +79,8 @@ button:disabled {
 }
 
 .sv-bg,
-.sv-noise {
+.sv-noise,
+.sv-orbit {
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -80,9 +88,9 @@ button:disabled {
 
 .sv-bg {
   background:
-    radial-gradient(circle at 12% 18%, rgba(243, 159, 209, 0.16), transparent 28%),
-    radial-gradient(circle at 84% 17%, rgba(132, 200, 255, 0.18), transparent 33%),
-    radial-gradient(circle at 60% 82%, rgba(246, 164, 92, 0.12), transparent 25%),
+    radial-gradient(circle at 12% 18%, var(--realm-glow-b), transparent 28%),
+    radial-gradient(circle at 84% 17%, var(--realm-glow-a), transparent 33%),
+    radial-gradient(circle at 60% 82%, var(--realm-glow-c), transparent 25%),
     linear-gradient(180deg, #081721 0%, #030912 70%, #03070d 100%);
 }
 
@@ -95,6 +103,55 @@ button:disabled {
   mask-image: radial-gradient(circle at center, black 55%, transparent 95%);
 }
 
+.sv-orbit {
+  opacity: 0.7;
+  background:
+    radial-gradient(circle at 20% 78%, var(--realm-accent-soft), transparent 16%),
+    radial-gradient(circle at 72% 22%, rgba(255,255,255,0.08), transparent 18%),
+    radial-gradient(circle at 82% 70%, var(--realm-glow-a), transparent 20%);
+  filter: blur(42px);
+}
+
+.realm-neutral {
+  --realm-accent: rgba(242, 219, 160, 0.9);
+  --realm-accent-soft: rgba(242, 219, 160, 0.16);
+  --realm-glow-a: rgba(132, 200, 255, 0.18);
+  --realm-glow-b: rgba(243, 159, 209, 0.16);
+  --realm-glow-c: rgba(246, 164, 92, 0.1);
+  --realm-panel: rgba(8, 23, 35, 0.8);
+  --realm-stage: rgba(6, 20, 31, 0.88);
+}
+
+.realm-lyra {
+  --realm-accent: rgba(243, 159, 209, 0.92);
+  --realm-accent-soft: rgba(243, 159, 209, 0.18);
+  --realm-glow-a: rgba(163, 132, 255, 0.22);
+  --realm-glow-b: rgba(243, 159, 209, 0.24);
+  --realm-glow-c: rgba(255, 255, 255, 0.08);
+  --realm-panel: rgba(23, 15, 37, 0.76);
+  --realm-stage: rgba(18, 11, 31, 0.9);
+}
+
+.realm-raien {
+  --realm-accent: rgba(246, 164, 92, 0.94);
+  --realm-accent-soft: rgba(246, 164, 92, 0.18);
+  --realm-glow-a: rgba(255, 204, 119, 0.18);
+  --realm-glow-b: rgba(246, 164, 92, 0.24);
+  --realm-glow-c: rgba(255, 91, 42, 0.12);
+  --realm-panel: rgba(35, 18, 10, 0.76);
+  --realm-stage: rgba(28, 13, 7, 0.9);
+}
+
+.realm-kairo {
+  --realm-accent: rgba(132, 200, 255, 0.94);
+  --realm-accent-soft: rgba(132, 200, 255, 0.18);
+  --realm-glow-a: rgba(132, 200, 255, 0.24);
+  --realm-glow-b: rgba(108, 133, 255, 0.16);
+  --realm-glow-c: rgba(255, 255, 255, 0.08);
+  --realm-panel: rgba(7, 20, 37, 0.76);
+  --realm-stage: rgba(6, 18, 32, 0.9);
+}
+
 .app-shell {
   position: relative;
   z-index: 1;
@@ -102,6 +159,18 @@ button:disabled {
   min-height: 100dvh;
   margin: 0 auto;
   padding: 22px 0 40px;
+}
+
+.app-shell.realm-lyra .topbar-logo {
+  background: linear-gradient(135deg, rgba(243,159,209,0.32), rgba(118,93,255,0.24));
+}
+
+.app-shell.realm-raien .topbar-logo {
+  background: linear-gradient(135deg, rgba(246,164,92,0.34), rgba(255,214,102,0.24));
+}
+
+.app-shell.realm-kairo .topbar-logo {
+  background: linear-gradient(135deg, rgba(132,200,255,0.34), rgba(108,133,255,0.2));
 }
 
 .eyebrow,
@@ -134,8 +203,9 @@ button:disabled {
   margin-bottom: 20px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(5, 16, 24, 0.62);
+  background: color-mix(in srgb, var(--realm-panel) 78%, rgba(5, 16, 24, 0.35));
   backdrop-filter: blur(18px);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.16);
 }
 
 .topbar-brand,
@@ -213,7 +283,7 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 8px 12px;
-  background: rgba(255,255,255,0.03);
+  background: color-mix(in srgb, var(--realm-panel) 55%, rgba(255,255,255,0.04));
 }
 
 .presence-chip.lyra { box-shadow: inset 0 0 0 1px rgba(243,159,209,0.18); }
@@ -259,10 +329,11 @@ button:disabled {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, rgba(244, 219, 157, 0.96), rgba(245, 162, 123, 0.92));
+  background: linear-gradient(135deg, var(--realm-accent), rgba(244, 219, 157, 0.96));
   color: #0f1720;
   border-color: rgba(255,255,255,0.18);
   font-weight: 700;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.18);
 }
 
 .btn-ghost {
@@ -314,7 +385,7 @@ button:disabled {
 .loading-state {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--realm-panel) 88%, rgba(255,255,255,0.03));
   backdrop-filter: blur(18px);
   box-shadow: var(--shadow);
 }
@@ -416,6 +487,14 @@ button:disabled {
 
 .entry-spirit-copy strong {
   font-size: 1.35rem;
+}
+
+.entry-spirit.lyra,
+.entry-spirit.raien,
+.entry-spirit.kairo {
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.04), transparent 75%),
+    color-mix(in srgb, var(--realm-panel) 65%, rgba(255,255,255,0.03));
 }
 
 .portrait-frame {
@@ -545,8 +624,24 @@ button:disabled {
   line-height: 0.95;
 }
 
+.focus-realm,
+.bond-home-realm,
+.presence-realm,
+.bond-modal-realm {
+  color: var(--realm-accent);
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1.15rem;
+}
+
 .focus-tone {
   margin-top: 12px;
+}
+
+.focus-atmosphere,
+.bond-home-atmosphere,
+.presence-atmosphere {
+  margin-top: 10px;
+  color: var(--muted);
 }
 
 .spiritkin-grid {
@@ -559,6 +654,9 @@ button:disabled {
   padding: 22px;
   cursor: pointer;
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 50%),
+    color-mix(in srgb, var(--realm-panel) 78%, rgba(255,255,255,0.03));
 }
 
 .sk-card.selected {
@@ -577,6 +675,24 @@ button:disabled {
 
 .sk-card.subdued {
   opacity: 0.82;
+}
+
+.sk-card.lyra,
+.sk-card.raien,
+.sk-card.kairo {
+  position: relative;
+}
+
+.sk-card.lyra::before,
+.sk-card.raien::before,
+.sk-card.kairo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(160deg, var(--realm-accent-soft), transparent 45%);
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 .sk-card-top,
@@ -653,6 +769,13 @@ button:disabled {
   margin: 0;
 }
 
+.bond-home-atlas {
+  color: var(--gold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+}
+
 .bonded-actions {
   display: flex;
   flex-wrap: wrap;
@@ -670,6 +793,7 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
   gap: 20px;
+  align-items: stretch;
 }
 
 .presence-panel {
@@ -677,6 +801,9 @@ button:disabled {
   display: grid;
   align-content: start;
   gap: 18px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 28%),
+    color-mix(in srgb, var(--realm-panel) 92%, rgba(255,255,255,0.03));
 }
 
 .presence-summary {
@@ -687,6 +814,10 @@ button:disabled {
 .presence-title,
 .presence-text {
   margin: 0;
+}
+
+.presence-atmosphere {
+  padding-top: 2px;
 }
 
 .presence-stats {
@@ -718,9 +849,9 @@ button:disabled {
 .presence-bond-banner {
   padding: 12px 14px;
   border-radius: 18px;
-  color: var(--gold);
-  background: rgba(242, 219, 160, 0.08);
-  border: 1px solid rgba(242, 219, 160, 0.16);
+  color: var(--realm-accent);
+  background: color-mix(in srgb, var(--realm-accent-soft) 75%, rgba(255,255,255,0.02));
+  border: 1px solid color-mix(in srgb, var(--realm-accent) 30%, transparent);
 }
 
 .prompt-card,
@@ -729,7 +860,7 @@ button:disabled {
   text-align: left;
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(255,255,255,0.04);
+  background: color-mix(in srgb, var(--realm-panel) 55%, rgba(255,255,255,0.04));
   color: var(--text);
   border: 1px solid rgba(255,255,255,0.08);
   transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
@@ -738,8 +869,23 @@ button:disabled {
 .chat-stage {
   padding: 18px;
   display: grid;
-  grid-template-rows: auto auto minmax(280px, 1fr) auto auto auto;
+  grid-template-rows: auto auto auto minmax(280px, 1fr) auto auto auto;
   min-height: 760px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), transparent 18%),
+    radial-gradient(circle at 50% 0%, var(--realm-accent-soft), transparent 42%),
+    color-mix(in srgb, var(--realm-stage) 94%, rgba(255,255,255,0.02));
+  position: relative;
+  overflow: hidden;
+}
+
+.chat-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+  opacity: 0.2;
+  pointer-events: none;
 }
 
 .chat-header-bar {
@@ -755,6 +901,30 @@ button:disabled {
   line-height: 0.95;
 }
 
+.stage-atmosphere {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  color: var(--muted);
+}
+
+.stage-atmosphere-mark {
+  color: var(--realm-accent);
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1.1rem;
+}
+
+.stage-atmosphere-text {
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: right;
+}
+
 .starter-prompts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -766,7 +936,8 @@ button:disabled {
   overflow-y: auto;
   min-height: 340px;
   max-height: 56vh;
-  padding: 10px 4px 10px 0;
+  padding: 18px 8px 18px 0;
+  margin-top: 8px;
 }
 
 .thread {
@@ -779,19 +950,23 @@ button:disabled {
   display: grid;
   place-items: center;
   text-align: center;
+  border: 1px dashed rgba(255,255,255,0.08);
+  border-radius: 24px;
+  background: rgba(255,255,255,0.02);
 }
 
 .bubble {
   max-width: min(76%, 720px);
   padding: 16px 18px;
   border-radius: 22px;
-  background: rgba(255,255,255,0.04);
+  background: color-mix(in srgb, var(--realm-stage) 72%, rgba(255,255,255,0.05));
   border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.16);
 }
 
 .bubble.user {
   justify-self: end;
-  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(132,200,255,0.12));
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), color-mix(in srgb, var(--realm-accent-soft) 90%, rgba(132,200,255,0.1)));
 }
 
 .bubble.assistant.lyra {
@@ -869,6 +1044,7 @@ button:disabled {
   gap: 12px;
   align-items: end;
   padding-top: 16px;
+  margin-top: 6px;
 }
 
 .composer-context {
@@ -896,7 +1072,7 @@ button:disabled {
 .composer-send {
   min-height: 66px;
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(242, 219, 160, 1), rgba(245, 162, 123, 0.92));
+  background: linear-gradient(135deg, var(--realm-accent), rgba(244, 219, 157, 0.96));
   color: #08151d;
   font-weight: 800;
 }
