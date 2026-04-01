@@ -949,6 +949,8 @@ button:disabled {
 }
 
 .stage-atmosphere-text {
+  display: grid;
+  gap: 4px;
   font-size: 0.82rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;

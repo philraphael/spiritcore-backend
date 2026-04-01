@@ -242,6 +242,14 @@ function sanitizeScene(value) {
   return scene && scene.toLowerCase() !== "default" ? scene : "";
 }
 
+function formatSignal(value) {
+  const cleaned = typeof value === "string" ? value.trim() : "";
+  if (!cleaned) return "";
+  return cleaned
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
 function normalizeMessage(raw) {
   const tags = Array.isArray(raw?.tags) ? raw.tags.filter((tag) => typeof tag === "string") : [];
   return {
@@ -257,8 +265,8 @@ function getStageSignals() {
   for (let index = state.messages.length - 1; index >= 0; index -= 1) {
     const message = state.messages[index];
     if (message.role !== "assistant") continue;
-    const emotionTone = sanitizeTone(message.emotionTone);
-    const sceneName = sanitizeScene(message.sceneName);
+    const emotionTone = formatSignal(sanitizeTone(message.emotionTone));
+    const sceneName = formatSignal(sanitizeScene(message.sceneName));
     if (emotionTone || sceneName) {
       return { emotionTone, sceneName };
     }
@@ -801,7 +809,10 @@ function buildChatView() {
         </div>
         <div class="stage-atmosphere ${esc(meta.cls)}">
           <div class="stage-atmosphere-mark">${esc(meta.realm)}</div>
-          <div class="stage-atmosphere-text">${esc(meta.atmosphereLine)}</div>
+          <div class="stage-atmosphere-text">
+            ${esc(meta.atmosphereLine)}
+            ${signals.sceneName ? `<span>Scene held: ${esc(signals.sceneName)}</span>` : ""}
+          </div>
         </div>
 
         ${showPrompts ? `
