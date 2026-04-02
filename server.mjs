@@ -486,6 +486,24 @@ await app.register(conversationRoutes, {
   analyticsService,
 });
 
+// TTS endpoint — OpenAI speech synthesis for Spiritkins voices
+app.post("/v1/speech", async (req, reply) => {
+  try {
+    const { text, voice } = req.body;
+    if (!text || !voice) {
+      return sendError(reply, 400, "BAD_REQUEST", "Missing text or voice for speech generation.", {}, req.request_id);
+    }
+    const activeAdapter = container.adapters.getActive();
+    if (!activeAdapter || activeAdapter.name !== "openai" || !activeAdapter.generateSpeech) {
+      return sendError(reply, 500, "INTERNAL", "TTS not available for current adapter.", {}, req.request_id);
+    }
+    const audioBuffer = await activeAdapter.generateSpeech(text, voice);
+    return reply.type("audio/mpeg").send(Buffer.from(audioBuffer));
+  } catch (e) {
+    return sendError(reply, 500, "INTERNAL", String(e?.message ?? e), {}, req.request_id);
+  }
+});
+
 // Phase F: Health, readiness, and metrics endpoints
 await app.register(healthRoutes, {
   prefix:   "/",

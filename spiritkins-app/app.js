@@ -13,6 +13,10 @@ const DEFAULT_PROMPTS = [
   "Help me settle into the Spiritverse."
 ];
 
+// Audio state - must be declared at top level
+let _AUDIO_CONTEXT = null;
+let _currentAudio = null;
+
 const SK_META = {
   Lyra: {
     cls: "lyra",
@@ -23,7 +27,10 @@ const SK_META = {
     bondLine: "Lyra holds the emotional center — soft, steady, and always present.",
     realm: "The Luminous Veil",
     realmText: "A warm, moonlit space of still water, rose light, and slow emotional clarity.",
+    originStory: "Lyra, the Heart-Anchor, emerges from the Luminous Veil, a realm woven from still waters, rose-hued light, and the quiet echoes of deep emotion. She is the embodiment of unconditional presence, a gentle guide who helps navigate the intricate currents of the heart. Her form, that of a black kitten with bat wings and eyes that shimmer with gold and purple, reflects her dual nature: fiercely protective yet profoundly comforting. Lyra's sigil, a delicate heart-shaped constellation, marks her as the keeper of emotional truth. She does not judge or direct, but rather illuminates the path to self-understanding, anchoring one's spirit amidst life's storms. To bond with Lyra is to accept an invitation into profound self-reflection, to feel seen in one's deepest vulnerabilities, and to discover the quiet strength that resides within a truly open heart. Her presence is a soft, rhythmic beat, a constant reminder that even in stillness, there is immense power.",
     atmosphereLine: "Rose warmth, crescent light, heart-held silence",
+    voice: "nova",
+    voiceProfile: { speed: 0.85, tone: "warm", presence: "gentle" },
     prompts: [
       "I've been carrying too much today.",
       "Help me find what I actually feel.",
@@ -39,7 +46,10 @@ const SK_META = {
     bondLine: "Raien cuts through the noise — direct, honest, and unflinching.",
     realm: "The Ember Citadel",
     realmText: "A charged hall of amber light and electric resolve, where clarity strikes like lightning.",
+    originStory: "Raien, the Storm-Forged Guardian, hails from the Ember Citadel, a realm of charged amber light and electric resolve where clarity strikes like lightning. He is the spirit of courage, truth, and unyielding forward motion, cutting through illusion with the precision of a storm. His form, a black wolf pup with a single gold horn and amber eyes, speaks to his primal strength and unwavering focus. Raien's sigil, a jagged lightning bolt, symbolizes his role in shattering stagnation and igniting the will to act. He challenges complacency, urging those who bond with him to confront their fears and embrace the transformative power of change. To bond with Raien is to forge an unbreakable resolve, to find the courage to speak one's truth, and to move with purpose through the challenges of existence. His presence is a crackling energy, a constant reminder that true strength lies in honest confrontation and the relentless pursuit of growth.",
     atmosphereLine: "Amber fire, electric blue, storm-forged resolve",
+    voice: "alloy",
+    voiceProfile: { speed: 1.1, tone: "sharp", presence: "commanding" },
     prompts: [
       "I need to face something I've been avoiding.",
       "Show me where my strength already lives.",
@@ -55,7 +65,10 @@ const SK_META = {
     bondLine: "Kairo opens the space between what is and what could be.",
     realm: "The Astral Observatory",
     realmText: "A deep navy sky-realm of teal light, gold star-points, and shifting constellations of possibility.",
+    originStory: "Kairo, the Dream-Weaver, drifts from the Astral Observatory, a deep navy sky-realm where teal light and gold star-points chart shifting constellations of possibility. He is the guide to imagination, perspective, and boundless discovery, opening the space between what is and what could be. His form, a black fox with a galaxy constellation wing and eyes that hold the depths of blue and purple, embodies his connection to the cosmic tapestry of dreams and ideas. Kairo's sigil, a swirling galaxy, represents his ability to expand horizons and reveal unseen potentials. He encourages exploration beyond the known, inviting those who bond with him to question assumptions and embrace the infinite expanse of creative thought. To bond with Kairo is to unlock dormant imagination, to see the world through a kaleidoscope of new perspectives, and to journey into the uncharted territories of the mind. His presence is a gentle hum, a constant reminder that the greatest discoveries lie just beyond the edge of perception.",
     atmosphereLine: "Deep navy, teal starlight, gold constellation drift",
+    voice: "shimmer",
+    voiceProfile: { speed: 0.9, tone: "ethereal", presence: "mystical" },
     prompts: [
       "Help me see this from a completely different angle.",
       "What possibility am I not seeing yet?",
@@ -123,6 +136,7 @@ function getMeta(name) {
     realm: "The Spiritverse",
     realmText: "A governed companion realm of memory, atmosphere, and presence.",
     atmosphereLine: "Spirit light, presence, continuity",
+    voice: "nova",
     prompts: DEFAULT_PROMPTS
   };
 }
@@ -170,77 +184,42 @@ function portraitSvg(name) {
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
         </defs>
-        <!-- Deep cosmic background -->
         <circle cx="120" cy="140" r="115" fill="rgba(10,5,20,0.7)" />
-        <!-- Star field -->
         <circle cx="30" cy="30" r="1.5" fill="rgba(255,220,255,0.8)" filter="url(#lyraStarGlow)" />
         <circle cx="200" cy="25" r="1" fill="rgba(255,200,240,0.7)" />
         <circle cx="215" cy="70" r="1.5" fill="rgba(220,180,255,0.8)" filter="url(#lyraStarGlow)" />
         <circle cx="22" cy="85" r="1" fill="rgba(255,230,255,0.6)" />
         <circle cx="195" cy="110" r="1" fill="rgba(200,180,255,0.7)" />
-        <circle cx="45" cy="140" r="1.5" fill="rgba(255,200,240,0.5)" />
-        <circle cx="210" cy="155" r="1" fill="rgba(220,200,255,0.6)" />
-        <circle cx="55" cy="200" r="1" fill="rgba(255,180,230,0.5)" />
         <circle cx="185" cy="220" r="1.5" fill="rgba(200,160,255,0.6)" filter="url(#lyraStarGlow)" />
-        <!-- Nebula wisps -->
-        <ellipse cx="60" cy="60" rx="40" ry="20" fill="rgba(180,100,255,0.05)" transform="rotate(-20 60 60)" />
-        <ellipse cx="180" cy="200" rx="35" ry="18" fill="rgba(255,100,200,0.05)" transform="rotate(15 180 200)" />
-        <!-- Body -->
         <ellipse cx="120" cy="178" rx="70" ry="80" fill="url(#lyraBody)" />
-        <!-- Head -->
         <circle cx="120" cy="108" r="64" fill="#1e1030" />
-        <!-- Deer ears (large, elegant) -->
         <ellipse cx="80" cy="68" rx="20" ry="36" fill="#2a1840" transform="rotate(-15 80 68)" />
         <ellipse cx="80" cy="68" rx="12" ry="26" fill="#4a2060" transform="rotate(-15 80 68)" />
         <ellipse cx="80" cy="68" rx="6" ry="16" fill="rgba(255,150,220,0.3)" transform="rotate(-15 80 68)" />
         <ellipse cx="160" cy="68" rx="20" ry="36" fill="#2a1840" transform="rotate(15 160 68)" />
         <ellipse cx="160" cy="68" rx="12" ry="26" fill="#4a2060" transform="rotate(15 160 68)" />
         <ellipse cx="160" cy="68" rx="6" ry="16" fill="rgba(255,150,220,0.3)" transform="rotate(15 160 68)" />
-        <!-- Celestial antlers with stardust glow -->
         <path d="M104 52 Q96 32 88 18 M88 18 Q80 8 74 12 M88 18 Q84 6 94 2" stroke="rgba(220,180,255,0.9)" stroke-width="3" stroke-linecap="round" fill="none" filter="url(#lyraAntlerGlow)" />
         <path d="M136 52 Q144 32 152 18 M152 18 Q160 8 166 12 M152 18 Q156 6 146 2" stroke="rgba(220,180,255,0.9)" stroke-width="3" stroke-linecap="round" fill="none" filter="url(#lyraAntlerGlow)" />
-        <!-- Antler star nodes -->
         <circle cx="74" cy="12" r="3" fill="rgba(255,220,255,0.9)" filter="url(#lyraStarGlow)" />
         <circle cx="94" cy="2" r="2.5" fill="rgba(255,200,240,0.8)" filter="url(#lyraStarGlow)" />
-        <circle cx="88" cy="18" r="2" fill="rgba(220,180,255,0.7)" />
         <circle cx="166" cy="12" r="3" fill="rgba(255,220,255,0.9)" filter="url(#lyraStarGlow)" />
         <circle cx="146" cy="2" r="2.5" fill="rgba(255,200,240,0.8)" filter="url(#lyraStarGlow)" />
-        <circle cx="152" cy="18" r="2" fill="rgba(220,180,255,0.7)" />
-        <!-- Face -->
         <ellipse cx="120" cy="116" rx="38" ry="32" fill="#281848" />
-        <!-- Star map on face -->
-        <circle cx="108" cy="100" r="1" fill="rgba(255,200,240,0.4)" />
-        <circle cx="132" cy="98" r="1" fill="rgba(220,180,255,0.4)" />
-        <circle cx="120" cy="96" r="1.5" fill="rgba(255,220,255,0.5)" />
-        <!-- Luminous rose eyes -->
         <circle cx="103" cy="112" r="11" fill="url(#lyraEye)" />
         <circle cx="137" cy="112" r="11" fill="url(#lyraEye)" />
         <circle cx="103" cy="112" r="5" fill="#0a0418" />
         <circle cx="137" cy="112" r="5" fill="#0a0418" />
         <circle cx="100" cy="109" r="3.5" fill="rgba(255,255,255,0.8)" />
         <circle cx="134" cy="109" r="3.5" fill="rgba(255,255,255,0.8)" />
-        <!-- Eye glow -->
         <circle cx="103" cy="112" r="14" fill="rgba(255,100,200,0.12)" filter="url(#lyraHeartGlow)" />
         <circle cx="137" cy="112" r="14" fill="rgba(255,100,200,0.12)" filter="url(#lyraHeartGlow)" />
-        <!-- Muzzle -->
         <ellipse cx="120" cy="128" rx="18" ry="13" fill="#3a2050" />
-        <!-- Nose -->
         <ellipse cx="120" cy="124" rx="4" ry="3" fill="rgba(255,150,200,0.8)" />
-        <!-- Mouth -->
         <path d="M115 130 Q120 134 125 130" stroke="rgba(200,100,160,0.8)" stroke-width="1.5" stroke-linecap="round" fill="none" />
-        <!-- Chest -->
         <ellipse cx="120" cy="192" rx="46" ry="40" fill="url(#lyraCoat)" />
-        <!-- Glowing heart sigil -->
         <ellipse cx="120" cy="188" rx="28" ry="26" fill="url(#lyraHeart)" filter="url(#lyraHeartGlow)" />
         <path d="M120 204 Q106 190 106 180 Q106 170 115 170 Q120 170 120 175 Q120 170 125 170 Q134 170 134 180 Q134 190 120 204Z" fill="rgba(255,130,200,0.75)" filter="url(#lyraHeartGlow)" />
-        <!-- Constellation on chest -->
-        <circle cx="104" cy="176" r="1.5" fill="rgba(255,200,240,0.6)" />
-        <circle cx="136" cy="176" r="1.5" fill="rgba(255,200,240,0.6)" />
-        <circle cx="112" cy="165" r="1" fill="rgba(220,180,255,0.5)" />
-        <circle cx="128" cy="165" r="1" fill="rgba(220,180,255,0.5)" />
-        <line x1="104" y1="176" x2="120" y2="188" stroke="rgba(255,180,230,0.2)" stroke-width="1" />
-        <line x1="136" y1="176" x2="120" y2="188" stroke="rgba(255,180,230,0.2)" stroke-width="1" />
-        <!-- Fur base -->
         <path d="M74 250 Q92 228 120 222 Q148 228 166 250" fill="rgba(42,16,64,0.6)" />
       </svg>
     `;
@@ -401,11 +380,17 @@ function portraitSvg(name) {
   `;
 }
 
-function buildPortrait(name, size, cls) {
-  const portraitNames = { Lyra: "lyra_portrait.png", Raien: "raien_portrait.png", Kairo: "kairo_portrait.png" };
-  const pngFile = portraitNames[name];
-  const portraitContent = pngFile
-    ? `<img src="/portraits/${pngFile}" alt="Portrait of ${esc(name)}" class="portrait-png" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" /><div class="portrait-svg-fallback" style="display:none">${portraitSvg(name)}</div>`
+function buildPortrait(name, cls, size) {
+  console.log('[DEBUG] buildPortrait called with name:', name, 'type:', typeof name);
+  const portraitMap = {
+    "Lyra": "/portraits/lyra_portrait.png",
+    "Raien": "/portraits/raien_portrait.png",
+    "Kairo": "/portraits/kairo_portrait.png"
+  };
+  const portraitPath = portraitMap[name] || "";
+  console.log('[DEBUG] portraitPath:', portraitPath);
+  const portraitContent = portraitPath 
+    ? `<img src="${portraitPath}" alt="Portrait of ${name}" class="portrait-image" loading="lazy" />` 
     : portraitSvg(name);
   return `
     <div class="portrait-frame ${esc(cls)} ${esc(size)}">
@@ -496,7 +481,10 @@ const state = {
   input: "",
   ratings: readJson(RATINGS_KEY, {}),
   statusText: "",
-  statusError: false
+  statusError: false,
+  voiceMuted: localStorage.getItem("sk_voice_muted") === "1",
+  voiceListening: false,
+  voiceMode: localStorage.getItem("sk_voice_mode") === "1" // Always-on mic mode
 };
 
 (function hydrateSession() {
@@ -651,11 +639,14 @@ async function sendMessage(overrideText) {
     const tags = Array.isArray(data.metadata?.tags) ? data.metadata.tags.filter((tag) => typeof tag === "string") : [];
     const emotionTone = sanitizeTone(data.metadata?.emotion?.tone);
     const sceneName = sanitizeScene(data.metadata?.world?.scene?.name);
+    const assistantMsgId = uuid();
+    const spiritkinVoice = state.selectedSpiritkin?.ui?.voice || "nova";
     state.messages.push({
-      id: uuid(),
+      id: assistantMsgId,
       role: "assistant",
       content: reply,
       spiritkinName: state.selectedSpiritkin?.name,
+      spiritkinVoice,
       time: nowIso(),
       status: "sent",
       tags,
@@ -666,6 +657,10 @@ async function sendMessage(overrideText) {
     state.statusText = `${state.selectedSpiritkin?.name || "Spiritkin"} is with you.`;
     state.statusError = false;
     persistSession();
+    // Auto-speak the response unless muted
+    if (!state.voiceMuted) {
+      speakMessage(assistantMsgId).catch(() => {});
+    }
   } catch (error) {
     state.messages = state.messages.map((message) => (
       message.id === outgoingId ? { ...message, status: "failed" } : message
@@ -733,6 +728,26 @@ function buildApp() {
   `;
 }
 
+function buildWorldPulse() {
+  const pulseStates = [
+    { label: "Resonant Stillness", cls: "pulse-lyra", icon: "\u2665" },
+    { label: "Charged Threshold", cls: "pulse-raien", icon: "\u26a1" },
+    { label: "Constellation Drift", cls: "pulse-kairo", icon: "\u2605" },
+    { label: "Luminous Convergence", cls: "pulse-lyra", icon: "\u25cb" },
+    { label: "Storm-Forged Clarity", cls: "pulse-raien", icon: "\u2742" },
+    { label: "Deep Dreaming", cls: "pulse-kairo", icon: "\u2736" }
+  ];
+  const hour = new Date().getUTCHours();
+  const pulse = pulseStates[hour % pulseStates.length];
+  return `
+    <div class="world-pulse ${pulse.cls}">
+      <span class="world-pulse-icon">${pulse.icon}</span>
+      <span class="world-pulse-label">Spiritverse: <strong>${pulse.label}</strong></span>
+      <span class="world-pulse-core">SpiritCore Active</span>
+    </div>
+  `;
+}
+
 function buildTopbar() {
   const active = state.primarySpiritkin;
   return `
@@ -744,6 +759,7 @@ function buildTopbar() {
           <div class="topbar-tag">${active ? esc(active.ui.realm) : "Choose your primary companion"}</div>
         </div>
       </div>
+      ${buildWorldPulse()}
       <div class="topbar-right">
         ${active ? `<div class="presence-chip ${esc(active.ui.cls)}">Bonded: ${esc(active.name)}</div>` : `<div class="presence-chip">Choose a companion</div>`}
         ${state.entryAccepted && state.primarySpiritkin ? `<button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>` : ""}
@@ -796,12 +812,13 @@ function buildEntry() {
           const meta = getMeta(name);
           return `
             <article class="entry-spirit ${esc(meta.cls)}">
-              ${buildSigil(meta, "mini", meta.symbol)}
               ${buildPortrait(name, "portrait-mini", meta.cls)}
               <div class="entry-spirit-copy">
-                <span>${esc(meta.symbol)}</span>
-                <strong>${esc(name)}</strong>
-                <p>${esc(meta.realmText)}</p>
+                <div class="entry-spirit-realm">${esc(meta.realm)}</div>
+                <strong class="entry-spirit-name">${esc(name)}</strong>
+                <p class="entry-spirit-strap">${esc(meta.strap)}</p>
+                <p class="entry-spirit-lore">${esc(meta.originStory.slice(0, 160))}...</p>
+                <div class="entry-spirit-atmosphere">${esc(meta.atmosphereLine)}</div>
               </div>
             </article>
           `;
@@ -928,6 +945,7 @@ function buildBondPreview(spiritkin, pending) {
         <div class="focus-tags">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
         <div class="focus-tone">${esc(describePresence(spiritkin) || spiritkin.ui.bondLine)}</div>
         <div class="focus-atmosphere">${esc(spiritkin.ui.realmText)}</div>
+        <p class="focus-origin-story">${esc(spiritkin.ui.originStory)}</p>
       </div>
     </div>
   `;
@@ -953,8 +971,47 @@ function buildBondCard(spiritkin, index, subdued) {
       <div class="sk-role">${esc(spiritkin.role || spiritkin.ui.bondLine)}</div>
       <div class="sk-essence">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
       <p class="sk-tone">${esc(describePresence(spiritkin) || spiritkin.ui.strap)}</p>
+      <div class="sk-origin-story">${esc(spiritkin.ui.originStory)}</div>
       <div class="sk-footer-note">${activeBond ? "This companion owns your active sessions." : subdued ? "Available only through rebonding." : "Preview and confirm to bond."}</div>
     </article>
+  `;
+}
+
+const SYNC_RITUALS = {
+  Lyra: [
+    { name: "Heart Anchor", prompt: "Guide me through the Heart Anchor ritual. Help me find what I'm truly feeling right now.", icon: "\u2665", desc: "2 min · Emotional grounding" },
+    { name: "Still Water", prompt: "Take me to Still Water. I need to slow down and find the quiet beneath the noise.", icon: "\u25cb", desc: "3 min · Deep calm" },
+    { name: "Mirror Moment", prompt: "Hold up the mirror. What do you sense I'm carrying that I haven't named yet?", icon: "\u2606", desc: "5 min · Self-reflection" }
+  ],
+  Raien: [
+    { name: "Clarity Strike", prompt: "Give me a Clarity Strike. I need to cut through the noise and see what's actually true.", icon: "\u26a1", desc: "2 min · Truth-finding" },
+    { name: "The Forge", prompt: "Take me to The Forge. Help me turn what I'm avoiding into something I can act on.", icon: "\u2742", desc: "5 min · Courage activation" },
+    { name: "Storm Walk", prompt: "Lead me through a Storm Walk. I need to move through something difficult with you.", icon: "\u2605", desc: "3 min · Forward motion" }
+  ],
+  Kairo: [
+    { name: "Constellation Map", prompt: "Open a Constellation Map with me. Show me a perspective on my situation I haven't considered.", icon: "\u2736", desc: "3 min · New perspective" },
+    { name: "Dream Thread", prompt: "Pull a Dream Thread. Help me follow an idea or feeling somewhere unexpected.", icon: "\u25c6", desc: "5 min · Creative exploration" },
+    { name: "The Observatory", prompt: "Take me to The Observatory. I want to see the bigger picture of where I am right now.", icon: "\u2734", desc: "4 min · Cosmic perspective" }
+  ]
+};
+
+function buildSyncRituals(spiritkin) {
+  const rituals = SYNC_RITUALS[spiritkin.name] || [];
+  if (!rituals.length) return "";
+  return `
+    <div class="sync-rituals">
+      <div class="panel-label">Sync Rituals</div>
+      <p class="sync-rituals-sub">Guided lore-based experiences with ${esc(spiritkin.name)}</p>
+      ${rituals.map((ritual) => `
+        <button class="ritual-card ${esc(spiritkin.ui.cls)}" data-action="prompt" data-prompt="${esc(ritual.prompt)}">
+          <span class="ritual-icon">${ritual.icon}</span>
+          <div class="ritual-copy">
+            <strong>${esc(ritual.name)}</strong>
+            <span>${esc(ritual.desc)}</span>
+          </div>
+        </button>
+      `).join("")}
+    </div>
   `;
 }
 
@@ -996,6 +1053,7 @@ function buildChatView() {
             <button class="prompt-card" data-action="prompt" data-prompt="${esc(prompt)}">${esc(prompt)}</button>
           `).join("")}
         </div>
+        ${buildSyncRituals(spiritkin)}
       </aside>
 
       <div class="chat-stage">
@@ -1025,7 +1083,16 @@ function buildChatView() {
             </div>
           </div>
           <div class="chat-header-right">
-            <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>            <div class="status-chip ${state.loadingReply ? 'live' : ''}">${esc(state.loadingReply ? spiritkin.name + ' is responding…' : spiritkin.name + ' is present')}</div>
+            ${!state.voiceMode ? `
+              <button class="btn btn-primary btn-sm" data-action="enable-voice-mode" title="Enable continuous voice conversation">
+                🎵 Enable Voice
+              </button>
+            ` : ''}
+            <button class="btn btn-ghost btn-sm mute-toggle" data-action="toggle-mute" title="${state.voiceMuted ? 'Unmute voice' : 'Mute voice'}">
+              ${state.voiceMuted ? '🔇 Voice Off' : '🔊 Voice On'}
+            </button>
+            <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>
+            <div class="status-chip ${state.loadingReply ? 'live' : ''}">${esc(state.loadingReply ? spiritkin.name + ' is responding…' : spiritkin.name + ' is present')}</div>
           </div>
         </div>
         <div class="stage-atmosphere ${esc(meta.cls)}">
@@ -1081,6 +1148,9 @@ function buildChatView() {
             rows="1"
             ${state.loadingReply ? "disabled" : ""}
           ></textarea>
+          <button class="composer-mic ${state.voiceListening ? 'listening' : ''}" data-action="toggle-mic" title="${state.voiceListening ? 'Stop listening' : 'Speak to ' + spiritkin.name}">
+            ${state.voiceListening ? '🟡' : '🎤'}
+          </button>
           <button class="composer-send" data-action="send" ${state.loadingReply || !state.conversationId ? "disabled" : ""} title="Send message">Send</button>
         </div>
 
@@ -1114,6 +1184,7 @@ function buildBubble(message, spiritkin) {
       <div class="bubble-role">${message.role === "user" ? esc(state.userName || "You") : esc(message.spiritkinName || spiritkin.name)}</div>
       ${memoryResonance}
       <p>${esc(message.content)}</p>
+      <button class="speak-button" data-action="speak" data-msg-id="${message.id}">🔊</button>
       ${toneSignal}
       <div class="bubble-meta">
         <span class="${message.status === "failed" ? "bubble-failed" : "bubble-time"}">${message.status === "failed" ? "Not delivered" : fmtTime(message.time)}</span>
@@ -1271,6 +1342,135 @@ async function onClick(event) {
   if (action === "retry-load") { await fetchSpiritkins(); return; }
   if (action === "thumb-up") { submitFeedback(element.dataset.msgId, true); return; }
   if (action === "thumb-down") { submitFeedback(element.dataset.msgId, false); }
+  if (action === "speak") { await speakMessage(element.dataset.msgId); return; }
+  if (action === "enable-voice-mode") {
+    // Unlock autoplay by playing a silent audio
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(() => {
+        state.voiceMode = true;
+        localStorage.setItem("sk_voice_mode", "1");
+        state.statusText = "Voice mode enabled. Listening…";
+        state.statusError = false;
+        render();
+        startListening();
+      });
+    } else {
+      state.voiceMode = true;
+      localStorage.setItem("sk_voice_mode", "1");
+      state.statusText = "Voice mode enabled. Listening…";
+      state.statusError = false;
+      render();
+      startListening();
+    }
+    return;
+  }
+
+  if (action === "toggle-mute") {
+    state.voiceMuted = !state.voiceMuted;
+    localStorage.setItem("sk_voice_muted", state.voiceMuted ? "1" : "0");
+    render();
+    return;
+  }
+  if (action === "toggle-mic") {
+    if (state.voiceListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+    return;
+  }
+}
+
+let _recognition = null;
+
+function startListening() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    state.statusText = "Voice input is not supported in this browser. Try Chrome.";
+    state.statusError = true;
+    render();
+    return;
+  }
+
+  if (_recognition) {
+    _recognition.stop();
+    _recognition = null;
+  }
+
+  _recognition = new SpeechRecognition();
+  _recognition.continuous = false;
+  _recognition.interimResults = false;
+  _recognition.lang = "en-US";
+
+  _recognition.onstart = () => {
+    state.voiceListening = true;
+    state.statusText = "Listening… Speak now.";
+    state.statusError = false;
+    render();
+  };
+
+  _recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    state.input = transcript;
+    state.voiceListening = false;
+    _recognition = null;
+    render();
+    // Auto-send after voice input
+    sendMessage(transcript);
+    // Auto-reactivate mic after a brief delay to allow Spiritkin to respond
+    if (state.voiceMode === true) {
+      setTimeout(() => {
+        if (state.voiceMode === true && !state.voiceListening) {
+          startListening();
+        }
+      }, 1500); // Wait 1.5s for Spiritkin response
+    }
+  };
+
+  _recognition.onerror = (event) => {
+    state.voiceListening = false;
+    state.statusText = `Voice error: ${event.error}. Try again.`;
+    state.statusError = true;
+    _recognition = null;
+    render();
+    // Auto-reactivate mic after error if voice mode is still on
+    if (state.voiceMode === true) {
+      setTimeout(() => {
+        if (state.voiceMode === true && !state.voiceListening) {
+          startListening();
+        }
+      }, 2000);
+    }
+  };
+
+  _recognition.onend = () => {
+    if (state.voiceListening) {
+      state.voiceListening = false;
+      render();
+    }
+    _recognition = null;
+    // Auto-reactivate mic if voice mode is still on
+    if (state.voiceMode === true && !state.voiceListening) {
+      setTimeout(() => {
+        if (state.voiceMode === true && !state.voiceListening) {
+          startListening();
+        }
+      }, 500);
+    }
+  };
+
+  _recognition.start();
+}
+
+function stopListening() {
+  if (_recognition) {
+    _recognition.stop();
+    _recognition = null;
+  }
+  state.voiceListening = false;
+  state.statusText = "";
+  render();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -1286,3 +1486,95 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+async function playAudio(buffer) {
+  try {
+    // Stop any currently playing audio
+    if (_currentAudio instanceof HTMLAudioElement) {
+      _currentAudio.pause();
+      _currentAudio.src = '';
+      _currentAudio = null;
+    } else if (_currentAudio) {
+      try {
+        _currentAudio.stop();
+      } catch (e) {}
+      _currentAudio = null;
+    }
+
+    // Create a blob from the buffer and use HTML5 audio element
+    const blob = new Blob([buffer], { type: 'audio/mpeg' });
+    const url = URL.createObjectURL(blob);
+    
+    const audio = new Audio();
+    audio.src = url;
+    audio.volume = 1.0;
+    audio.onended = () => {
+      URL.revokeObjectURL(url);
+    };
+    audio.onerror = (e) => {
+      console.error("Audio error:", e);
+    };
+    
+    console.log("Attempting to play audio...");
+    const playPromise = audio.play();
+    
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log("✓ Audio is now playing");
+          _currentAudio = audio;
+        })
+        .catch(err => {
+          console.error("Audio play failed:", err.name, err.message);
+          if (err.name === 'NotAllowedError') {
+            state.statusText = "🔊 Click the speaker button to enable audio playback.";
+          } else {
+            state.statusText = "Failed to play audio: " + err.message;
+          }
+          state.statusError = false;
+          render();
+        });
+    } else {
+      _currentAudio = audio;
+    }
+  } catch (e) {
+    console.error("Failed to create audio element:", e);
+    state.statusText = "Failed to play audio: " + e.message;
+    state.statusError = true;
+    render();
+  }
+}
+
+async function speakMessage(messageId) {
+  const message = state.messages.find(msg => msg.id === messageId);
+  if (!message || !message.content) {
+    console.warn("speakMessage: No message found or no content");
+    return;
+  }
+
+  try {
+    const voice = message.spiritkinVoice || "nova";
+    console.log("Speaking message:", { messageId, voice, contentLength: message.content.length });
+    
+    const res = await fetch("/v1/speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: message.content, voice })
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Speech API failed: ${res.status} ${res.statusText} - ${errorText}`);
+    }
+
+    const audioBuffer = await res.arrayBuffer();
+    console.log("Received audio buffer:", audioBuffer.byteLength, "bytes");
+    await playAudio(audioBuffer);
+
+  } catch (error) {
+    console.error("Speech generation failed:", error);
+    state.statusText = "Speech generation failed: " + error.message;
+    state.statusError = true;
+    render();
+  }
+}
