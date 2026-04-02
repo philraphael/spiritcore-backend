@@ -1899,12 +1899,12 @@ function buildSurveyModal() {
               <button class="btn btn-primary survey-text-submit" onclick="(function(){
                 const val = document.getElementById('survey-text-input').value.trim();
                 if (!val) return;
-                const el = document.querySelector('[data-action=survey-text-confirm]');
+                const el = document.querySelector('.survey-text-confirm');
                 if (el) { el.dataset.answer = val; el.click(); }
               })()">Continue →</button>
               <button class="btn btn-ghost btn-sm survey-text-skip" data-action="survey-answer" data-question="${esc(q.id)}" data-answer="${esc(state.userName || "the seeker")}">Skip</button>
             </div>
-            <button style="display:none" data-action="survey-answer" data-question="${esc(q.id)}" data-answer="" class="survey-text-confirm" data-action="survey-text-confirm"></button>
+            <button style="display:none" data-action="survey-answer" data-question="${esc(q.id)}" data-answer="" class="survey-text-confirm"></button>
           ` : `
             <div class="survey-options">
               ${q.options.map((opt) => `
