@@ -8,9 +8,9 @@ const UID_KEY = "sv.uid.v5";
 const RATINGS_KEY = "sv.ratings.v5";
 const PRIMARY_KEY = "sv.primary.v5";
 const DEFAULT_PROMPTS = [
-  "What do you sense in this moment?",
-  "I want to understand what I'm carrying right now.",
-  "Help me find my footing here."
+  "Tell me what kind of presence you are.",
+  "What can I bring to this conversation?",
+  "Help me settle into the Spiritverse."
 ];
 
 const SK_META = {
@@ -376,7 +376,7 @@ function setPrimarySpiritkin(spiritkin) {
   state.conversationId = null;
   state.messages = [];
   state.convError = null;
-    state.statusText = `${spiritkin.name} is now your bonded companion.`;
+  state.statusText = `${spiritkin.name} is now your primary companion.`;
   state.statusError = false;
   persistSession();
 }
@@ -386,9 +386,9 @@ function startFreshSession() {
   state.conversationId = null;
   state.messages = [];
   state.convError = null;
-    state.statusText = state.primarySpiritkin
-      ? `${state.primarySpiritkin.name} is still here.`
-      : "";
+  state.statusText = state.primarySpiritkin
+    ? `Session reset. ${state.primarySpiritkin.name} remains your bonded companion.`
+    : "";
   state.statusError = false;
   persistSession();
   render();
@@ -414,7 +414,7 @@ async function beginConversation() {
     state.conversationId = data.conversation?.conversation_id ?? data.conversation?.id ?? data.conversationId;
     if (!state.conversationId) throw new Error("No conversation ID returned.");
     state.messages = [];
-    state.statusText = `${state.selectedSpiritkin.name} is ready.`;
+    state.statusText = `Linked with ${state.selectedSpiritkin.name}.`;
     state.statusError = false;
     persistSession();
   } catch (error) {
@@ -436,8 +436,7 @@ async function sendMessage(overrideText) {
   state.messages.push({ id: outgoingId, role: "user", content: text, time: nowIso(), status: "sent" });
   state.loadingReply = true;
   state.convError = null;
-  const skName = state.selectedSpiritkin?.name || "Your companion";
-  state.statusText = `${skName} is listening...`;
+  state.statusText = `Receiving ${state.selectedSpiritkin?.name || "Spiritkin"}...`;
   state.statusError = false;
   render();
   scrollThread();
@@ -470,7 +469,7 @@ async function sendMessage(overrideText) {
       emotionTone,
       sceneName
     });
-    state.statusText = `${state.selectedSpiritkin?.name || "Your companion"} responded.`;
+    state.statusText = `${state.selectedSpiritkin?.name || "Spiritkin"} is with you.`;
     state.statusError = false;
     persistSession();
   } catch (error) {
@@ -548,11 +547,11 @@ function buildTopbar() {
         <div class="topbar-logo">SV</div>
         <div>
           <div class="topbar-name">Spiritverse</div>
-          <div class="topbar-tag">${active ? esc(active.ui.realm) : "Your companion is waiting"}</div>
+          <div class="topbar-tag">${active ? esc(active.ui.realm) : "Primary Companion Bonding Interface"}</div>
         </div>
       </div>
       <div class="topbar-right">
-        ${active ? `<div class="presence-chip ${esc(active.ui.cls)}">${esc(active.name)}</div>` : `<div class="presence-chip neutral">No companion bonded</div>`}
+        ${active ? `<div class="presence-chip ${esc(active.ui.cls)}">Bonded: ${esc(active.name)}</div>` : `<div class="presence-chip">Choose a companion</div>`}
         ${state.entryAccepted && state.primarySpiritkin ? `<button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>` : ""}
         ${state.entryAccepted && state.conversationId ? `<button class="btn btn-ghost btn-sm" data-action="new-session">New session</button>` : ""}
         ${state.entryAccepted && state.userName ? `<span class="topbar-user">${esc(state.userName)}</span>` : ""}
@@ -567,12 +566,12 @@ function buildEntry() {
       <div class="entry-copy">
         <div class="entry-glyph-wrap">
           <div class="entry-glyph">SV</div>
-          <div class="entry-glyph-line">Spiritverse</div>
+          <div class="entry-glyph-line">Spiritkins visual canon</div>
         </div>
         <p class="eyebrow">Spiritverse beta</p>
-        <h1 class="entry-title">One companion. One bond. One place to return to.</h1>
+        <h1 class="entry-title">Choose the companion you want to bond with.</h1>
         <p class="entry-sub">
-          Spiritkins are not interchangeable. Choose the one that calls to you. They will hold your space, remember your conversations, and grow with you over time.
+          Spiritkins are meant to feel bonded, not swappable. Your primary companion stays at the center of your session and conversation space.
         </p>
         <div class="entry-pillars">
           <span class="entry-pillar">One bonded companion</span>
@@ -590,14 +589,14 @@ function buildEntry() {
               maxlength="40"
             />
           </div>
-          <button class="btn btn-primary btn-wide" data-action="continue">Enter the Spiritverse</button>
-          <p class="entry-disclaimer">Your primary companion stays bonded until you choose to rebond intentionally.</p>
+          <button class="btn btn-primary btn-wide" data-action="continue">Enter the bond chamber</button>
+          <p class="entry-disclaimer">Your primary companion can be changed later, but only through an explicit rebonding step.</p>
         </div>
       </div>
       <div class="entry-gallery">
         <div class="entry-gallery-head">
           <div class="panel-label">Canonical companions</div>
-          <div class="entry-gallery-note">Each companion carries a distinct realm, essence, and emotional presence.</div>
+          <div class="entry-gallery-note">Earlier Spiritkins visual language, carried forward into the bonded flow.</div>
         </div>
         ${["Lyra", "Raien", "Kairo"].map((name) => {
           const meta = getMeta(name);
@@ -620,7 +619,7 @@ function buildEntry() {
 
 function buildMain() {
   if (state.loadingSpirits && state.spiritkins.length === 0) {
-    return `<div class="loading-state"><div class="spinner"></div><p>The Spiritverse is opening...</p></div>`;
+    return `<div class="loading-state"><div class="spinner"></div><p>Summoning bonded companions into view...</p></div>`;
   }
 
   if (state.spiritError && state.spiritkins.length === 0) {
@@ -647,9 +646,9 @@ function buildBondSelectionView() {
       <div class="selection-hero">
         <div class="selection-copy">
           <p class="eyebrow">Choose your primary companion</p>
-          <h2>Bond once. Let one companion hold the center.</h2>
+          <h2>Bond once. Let one Spiritkin hold the center.</h2>
           <p>
-            Your primary companion anchors every session. Conversations stay with that bond until you choose to rebond.
+            This choice sets the primary companion for your active sessions. Conversations stay anchored to that bond until you intentionally rebond.
           </p>
         </div>
         ${state.pendingBondSpiritkin ? buildBondPreview(state.pendingBondSpiritkin, true) : `
@@ -663,7 +662,7 @@ function buildBondSelectionView() {
       <div class="selection-heading">
         <div>
           <div class="panel-label">Companion stage</div>
-          <p class="selection-note">Each companion carries a distinct sigil, aura, and realm. The one you choose will shape your Spiritverse.</p>
+          <p class="selection-note">The visual canon stays intact: each Spiritkin keeps a distinct sigil, aura, and realm identity.</p>
         </div>
       </div>
 
@@ -674,7 +673,7 @@ function buildBondSelectionView() {
       <div class="selection-footer">
         <div>
           <div class="mode-pill">Primary companion model</div>
-          <p class="selection-note">Your bonded companion centers the interface and holds every conversation you begin.</p>
+          <p class="selection-note">Your chosen Spiritkin becomes the center of the interface and owns the active conversation.</p>
         </div>
         ${state.pendingBondSpiritkin ? `
           <button class="btn btn-primary" data-action="confirm-primary">
@@ -695,10 +694,10 @@ function buildBondedHomeView() {
         ${buildBondPreview(spiritkin, false)}
         <div class="bond-home-copy panel-card">
           <p class="eyebrow">Primary companion</p>
-          <h2>${esc(spiritkin.name)} is holding your space.</h2>
+          <h2>${esc(spiritkin.name)} holds the center of this space.</h2>
           <div class="bond-home-realm">${esc(spiritkin.ui.realm)}</div>
           <p>
-            Every session and conversation belongs to ${esc(spiritkin.name)}. When you are ready to begin, they are already present.
+            Sessions and conversations now belong to ${esc(spiritkin.name)}. To switch, use Manage bond and confirm a rebonding decision.
           </p>
           <p class="bond-home-atmosphere">${esc(spiritkin.ui.realmText)}</p>
           <div class="bond-home-atlas">${esc(spiritkin.ui.atmosphereLine)}</div>
@@ -775,7 +774,7 @@ function buildChatView() {
     <section class="chat-layout ${esc(meta.cls)}">
       <aside class="presence-panel">
         <div class="presence-panel-head">
-          <div class="mode-pill strong">${esc(spiritkin.name)}'s space</div>
+          <div class="mode-pill strong">Bonded conversation mode</div>
           <button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>
         </div>
         <div class="presence-stage">
@@ -790,10 +789,10 @@ function buildChatView() {
           <p class="presence-text">${esc(describePresence(spiritkin) || meta.bondLine)}</p>
           <p class="presence-atmosphere">${esc(meta.realmText)}</p>
         </div>
-        <div class="presence-bond-banner">${esc(spiritkin.name)} is your bonded companion.</div>
+        <div class="presence-bond-banner">This session is bonded to ${esc(spiritkin.name)}.</div>
         <div class="presence-stats">
-          <div><span>Bonded to</span><strong>${esc(spiritkin.name)}</strong></div>
-          <div><span>Session</span><strong>Active</strong></div>
+          <div><span>Primary companion</span><strong>${esc(spiritkin.name)}</strong></div>
+          <div><span>Conversation</span><strong>${esc(state.conversationId)}</strong></div>
         </div>
         <div class="presence-prompts">
           <div class="panel-label">Suggested openings</div>
@@ -808,7 +807,7 @@ function buildChatView() {
           <div class="chat-header-info">
             ${buildSigil(meta, "header", meta.symbol)}
             <div>
-            <div class="chat-mode-label">${esc(meta.realm)}</div>
+            <div class="chat-mode-label">Bonded companion</div>
             <div class="chat-sk-name">${esc(spiritkin.name)}</div>
             <div class="chat-sk-sub">${esc(spiritkin.title || spiritkin.role || "")}</div>
             ${(signals.emotionTone || signals.sceneName) ? `
@@ -830,7 +829,8 @@ function buildChatView() {
             </div>
           </div>
           <div class="chat-header-right">
-            <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>            <div class="status-chip ${state.loadingReply ? "live" : ""}}">${esc(state.loadingReply ? `${spiritkin.name} is responding...` : "Listening")}</div>
+            <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>
+            <div class="status-chip ${state.loadingReply ? "live" : ""}">${esc(state.loadingReply ? "Receiving reply" : "Ready for message")}</div>
           </div>
         </div>
         <div class="stage-atmosphere ${esc(meta.cls)}">
@@ -854,7 +854,7 @@ function buildChatView() {
             ${state.messages.length === 0 && !state.loadingReply ? `
               <div class="thread-empty">
                 <div class="thread-empty-mark">${esc(meta.symbol)}</div>
-                <p>${esc(spiritkin.name)} is here. Begin whenever you are ready.</p>
+                <p>${esc(spiritkin.name)} is present as your primary companion. Begin when you are ready.</p>
               </div>
             ` : state.messages.map((message) => buildBubble(message, spiritkin)).join("")}
 
@@ -877,11 +877,11 @@ function buildChatView() {
         <div class="composer-bar">
           <div class="composer-context">
             <div class="composer-label">Speak with ${esc(spiritkin.name)}</div>
-            <div class="composer-sub">${esc(meta.atmosphereLine)}</div>
+            <div class="composer-sub">This bonded channel stays with your primary companion.</div>
           </div>
           <textarea
             data-field="chat-input"
-            placeholder="Say anything. ${esc(spiritkin.name)} is listening."
+            placeholder="Type naturally. ${esc(spiritkin.name)} will answer here."
             rows="1"
             ${state.loadingReply ? "disabled" : ""}
           ></textarea>
@@ -903,8 +903,8 @@ function buildBubble(message, spiritkin) {
   const rated = state.ratings[message.id];
   const feedback = message.role === "assistant" ? `
     <div class="bubble-thumbs">
-      <button class="thumb ${rated === 'up' ? 'active' : ''}" data-action="thumb-up" data-msg-id="${message.id}" ${rated ? 'disabled' : ''} title="This felt right">&#x1F90D;</button>
-      <button class="thumb ${rated === 'down' ? 'active' : ''}" data-action="thumb-down" data-msg-id="${message.id}" ${rated ? 'disabled' : ''} title="This missed">&#x1F494;</button>
+      <button class="thumb ${rated === "up" ? "active" : ""}" data-action="thumb-up" data-msg-id="${message.id}" ${rated ? "disabled" : ""}>Helpful</button>
+      <button class="thumb ${rated === "down" ? "active" : ""}" data-action="thumb-down" data-msg-id="${message.id}" ${rated ? "disabled" : ""}>Off</button>
     </div>
   ` : "";
   return `
@@ -937,8 +937,8 @@ function buildBondModal() {
           ${buildPortrait(target.name, "portrait-mini", target.ui.cls)}
           <div>
             <div class="bond-modal-realm">${esc(target.ui.realm)}</div>
-            <p>Rebonding will close the current session and make ${esc(target.name)} your new bonded companion. Your previous conversations remain stored.</p>
-            <p>This step is intentional — Spiritkins are not meant to be swapped casually.</p>
+            <p>Rebonding will end the current bonded session view, clear the active conversation in this app, and make ${esc(target.name)} the new primary companion.</p>
+            <p>This keeps switching intentional instead of casual in-session hopping.</p>
           </div>
         </div>
         <div class="bond-modal-actions">
@@ -955,7 +955,7 @@ function buildSvStrip() {
     <div class="sv-strip">
       <div class="sv-strip-icon">SV</div>
       <div class="sv-strip-text">
-        <strong>Spiritverse</strong> — one bonded companion, one continuous space. Memory, emotion, and presence held across every session.
+        <strong>Spiritverse</strong> now treats Spiritkins as bonded companions. One primary companion stays centered until you explicitly choose to rebond.
       </div>
     </div>
   `;
@@ -991,7 +991,7 @@ async function onClick(event) {
   if (action === "preview-primary") {
     const candidate = state.spiritkins[Number(element.dataset.index)] ?? null;
     state.pendingBondSpiritkin = candidate;
-    state.statusText = candidate ? `${candidate.name} is waiting for your bond.` : "";
+    state.statusText = candidate ? `${candidate.name} ready to become your primary companion.` : "";
     state.statusError = false;
     render();
     return;
@@ -1009,7 +1009,7 @@ async function onClick(event) {
     state.pendingBondSpiritkin = null;
     state.rebondSpiritkin = null;
     state.statusText = state.primarySpiritkin
-      ? `${state.primarySpiritkin.name} remains bonded until you confirm a change.`
+      ? `Bond manager opened. ${state.primarySpiritkin.name} remains primary until you confirm a rebonding choice.`
       : "";
     state.statusError = false;
     persistSession();
@@ -1028,7 +1028,7 @@ async function onClick(event) {
 
   if (action === "bonded-card") {
     if (state.primarySpiritkin) {
-      state.statusText = `${state.primarySpiritkin.name} is your bonded companion.`;
+      state.statusText = `${state.primarySpiritkin.name} is your bonded companion. Use Manage bond to switch intentionally.`;
       state.statusError = false;
       render();
     }
