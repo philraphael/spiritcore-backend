@@ -477,7 +477,7 @@ await app.register(healthRoutes, {
 // Start
 try {
   await app.listen({ port: PORT, host: "0.0.0.0" });
-  app.log.info(`[SpiritCore] Phase F running on port ${PORT} (USE_LLM=${USE_LLM}, DEBUG=${DEBUG})`);
+  app.log.info(`[SpiritCore] Phase F running on port ${PORT} (ADAPTER=${container.adapters.activeName}, DEBUG=${DEBUG})`);
   app.log.info(`[SpiritCore] Routes: /v1/interact, /v1/spiritkins, /v1/conversations, /health, /ready, /metrics`);
   app.log.info(`[SpiritCore] Analytics: /v1/feedback, /v1/analytics/event, /v1/analytics/spiritkin/:name, /v1/analytics/summary`);
 } catch (e) {
