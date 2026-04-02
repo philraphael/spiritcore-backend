@@ -239,6 +239,23 @@ export const createOrchestrator = ({
       "adapter generation"
     );
 
+    // Stage 9b: Apply LLM-derived scene name to world state if meaningful
+    const adapterSceneName = typeof adapterResult.sceneName === "string" && adapterResult.sceneName.trim()
+      ? adapterResult.sceneName.trim()
+      : null;
+
+    if (adapterSceneName && adapterSceneName.toLowerCase() !== "default") {
+      nextWorldState = { ...nextWorldState, scene: { name: adapterSceneName } };
+      // Persist the updated scene asynchronously — do not block the response
+      world.upsert({
+        userId,
+        conversationId: convId,
+        spiritkinId,
+        state: nextWorldState,
+      }).catch((err) => console.warn("[Orchestrator] world.upsert (scene update) failed:", err.message));
+      bus.emit("orchestrator.scene.transition", { traceId, to: adapterSceneName });
+    }
+
     // Stage 10: Identity governance
     const governance = identityGovernor.governResponse(resolvedIdentity, adapterResult.text);
 
@@ -314,6 +331,26 @@ export const createOrchestrator = ({
     logStage(log, "complete");
     incrementMetric("requestsOk");
 
+    // Stage 12: Ensure emotion.tone and world.scene.name are always meaningful
+    const finalEmotion = adapterResult.emotion ?? {};
+    const finalTone = (() => {
+      const t = String(finalEmotion.tone ?? "").trim();
+      if (t && t.toLowerCase() !== "warm" && t.toLowerCase() !== "steady presence") return t;
+      if (resolvedIdentity.name === "Lyra") return "grounded warmth";
+      if (resolvedIdentity.name === "Raien") return "charged clarity";
+      if (resolvedIdentity.name === "Kairo") return "open wonder";
+      return "steady presence";
+    })();
+
+    const finalSceneName = (() => {
+      const s = String(nextWorldState?.scene?.name ?? "").trim();
+      if (s && s.toLowerCase() !== "default") return s;
+      if (resolvedIdentity.name === "Lyra") return "luminous veil";
+      if (resolvedIdentity.name === "Raien") return "ember citadel";
+      if (resolvedIdentity.name === "Kairo") return "astral observatory";
+      return "spiritverse";
+    })();
+
     return {
       ok: true,
       traceId,
@@ -329,8 +366,8 @@ export const createOrchestrator = ({
         conversationId: convId,
         role: resolvedIdentity.role,
         tags: adapterResult.tags,
-        emotion: adapterResult.emotion,
-        world: { scene: nextWorldState?.scene || scene },
+        emotion: { ...finalEmotion, tone: finalTone },
+        world: { scene: { name: finalSceneName } },
         governance: {
           driftDetected: governance.driftDetected,
           matched: governance.matched,

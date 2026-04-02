@@ -16,50 +16,50 @@ const DEFAULT_PROMPTS = [
 const SK_META = {
   Lyra: {
     cls: "lyra",
-    symbol: "Moon",
-    mood: "Lunar calm",
-    strap: "A reflective companion for emotional clarity.",
-    ambient: "Rose-violet glow",
-    bondLine: "A bonded presence for reflection, softness, and emotional steadiness.",
+    symbol: "Heart",
+    mood: "Warm stillness",
+    strap: "A heart-anchor for the moments that matter most.",
+    ambient: "Rose warmth",
+    bondLine: "Lyra holds the emotional center — soft, steady, and always present.",
     realm: "The Luminous Veil",
-    realmText: "A moonlit chamber of still water, soft constellations, and slow emotional clarity.",
-    atmosphereLine: "Rose-violet hush, mirrored water, lunar breath",
+    realmText: "A warm, moonlit space of still water, rose light, and slow emotional clarity.",
+    atmosphereLine: "Rose warmth, crescent light, heart-held silence",
     prompts: [
       "I've been carrying too much today.",
-      "Help me find a calmer center.",
+      "Help me find what I actually feel.",
       "What do you sense beneath the surface?"
     ]
   },
   Raien: {
     cls: "raien",
-    symbol: "Spark",
-    mood: "Solar courage",
-    strap: "A steady force for truth, direction, and action.",
-    ambient: "Amber current",
-    bondLine: "A bonded presence for courage, honesty, and clean forward motion.",
+    symbol: "Storm",
+    mood: "Charged clarity",
+    strap: "A storm guardian for truth, courage, and forward motion.",
+    ambient: "Amber storm",
+    bondLine: "Raien cuts through the noise — direct, honest, and unflinching.",
     realm: "The Ember Citadel",
-    realmText: "A bright forged hall of heat, resolve, and disciplined forward movement.",
-    atmosphereLine: "Solar metal, ember banners, charged horizon",
+    realmText: "A charged hall of amber light and electric resolve, where clarity strikes like lightning.",
+    atmosphereLine: "Amber fire, electric blue, storm-forged resolve",
     prompts: [
-      "I need help facing something hard.",
-      "Show me where my strength already is.",
-      "Help me move forward with conviction."
+      "I need to face something I've been avoiding.",
+      "Show me where my strength already lives.",
+      "Help me move forward without hesitation."
     ]
   },
   Kairo: {
     cls: "kairo",
     symbol: "Star",
-    mood: "Aether insight",
-    strap: "A visionary guide for imagination and reframing.",
-    ambient: "Celestial drift",
-    bondLine: "A bonded presence for imagination, perspective, and discovery.",
+    mood: "Deep dreaming",
+    strap: "A dream guide for imagination, perspective, and discovery.",
+    ambient: "Teal starfield",
+    bondLine: "Kairo opens the space between what is and what could be.",
     realm: "The Astral Observatory",
-    realmText: "A lucid sky-realm of glass, stars, and shifting constellations of possibility.",
-    atmosphereLine: "Aether blue, distant stars, lucid horizon",
+    realmText: "A deep navy sky-realm of teal light, gold star-points, and shifting constellations of possibility.",
+    atmosphereLine: "Deep navy, teal starlight, gold constellation drift",
     prompts: [
-      "I want to see this from a new angle.",
-      "Help me open up a fresh possibility.",
-      "What future is trying to emerge here?"
+      "Help me see this from a completely different angle.",
+      "What possibility am I not seeing yet?",
+      "Take me somewhere I haven't thought to look."
     ]
   }
 };
@@ -133,72 +133,203 @@ function describePresence(spiritkin) {
 
 function portraitSvg(name) {
   if (name === "Lyra") {
+    // Lyra: cream/beige deer-rabbit, small antlers, glowing rose heart, warm brown eyes
     return `
       <svg viewBox="0 0 240 300" role="img" aria-label="Portrait of Lyra">
         <defs>
-          <linearGradient id="lyraHair" x1="0" x2="1">
-            <stop offset="0%" stop-color="#6f4cff" />
-            <stop offset="100%" stop-color="#f39fd1" />
-          </linearGradient>
+          <radialGradient id="lyraBody" cx="50%" cy="55%" r="55%">
+            <stop offset="0%" stop-color="#f5e8d0" />
+            <stop offset="60%" stop-color="#e8d4b8" />
+            <stop offset="100%" stop-color="#d4bc98" />
+          </radialGradient>
+          <radialGradient id="lyraHeart" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ffb8c8" stop-opacity="0.9" />
+            <stop offset="50%" stop-color="#f08098" stop-opacity="0.7" />
+            <stop offset="100%" stop-color="#e06080" stop-opacity="0" />
+          </radialGradient>
+          <filter id="lyraHeartGlow">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
         </defs>
-        <circle cx="120" cy="115" r="94" fill="rgba(243,159,209,.17)" />
-        <path d="M74 112c0-43 28-79 72-79s70 38 70 82c0 28-10 52-28 74H98c-15-19-24-46-24-77Z" fill="url(#lyraHair)" />
-        <ellipse cx="120" cy="138" rx="57" ry="67" fill="#f3d5d6" />
-        <path d="M78 120c6-48 33-71 78-71 33 0 54 17 62 46-18-5-40-16-57-30-21 14-48 24-83 28Z" fill="url(#lyraHair)" />
-        <path d="M91 134c11 6 24 9 39 9 16 0 29-3 39-9" stroke="#8e6582" stroke-width="4" stroke-linecap="round" fill="none" />
-        <path d="M101 153c7 9 17 13 29 13 12 0 22-4 29-13" stroke="#8e6582" stroke-width="3" stroke-linecap="round" fill="none" />
-        <circle cx="101" cy="126" r="5" fill="#38283c" />
-        <circle cx="139" cy="126" r="5" fill="#38283c" />
-        <path d="M72 250c12-33 35-52 48-58 16 9 31 12 45 12 16 0 31-4 45-12 17 12 35 31 48 58" fill="rgba(243,159,209,.24)" />
-        <path d="M120 19c21 9 35 22 44 39-25-5-47-16-65-34 8-2 15-4 21-5Z" fill="rgba(255,255,255,.26)" />
+        <!-- Warm ambient glow -->
+        <circle cx="120" cy="140" r="100" fill="rgba(245,220,190,0.1)" />
+        <!-- Body -->
+        <ellipse cx="120" cy="175" rx="68" ry="78" fill="url(#lyraBody)" />
+        <!-- Head -->
+        <circle cx="120" cy="110" r="62" fill="#f0e0c4" />
+        <!-- Ears -->
+        <ellipse cx="82" cy="72" rx="22" ry="34" fill="#e8d4b8" transform="rotate(-12 82 72)" />
+        <ellipse cx="82" cy="72" rx="14" ry="24" fill="#f5c0b8" transform="rotate(-12 82 72)" />
+        <ellipse cx="158" cy="72" rx="22" ry="34" fill="#e8d4b8" transform="rotate(12 158 72)" />
+        <ellipse cx="158" cy="72" rx="14" ry="24" fill="#f5c0b8" transform="rotate(12 158 72)" />
+        <!-- Antlers -->
+        <path d="M104 50 Q96 30 88 18 M88 18 Q82 10 76 14 M88 18 Q84 8 92 4" stroke="#9a8468" stroke-width="3.5" stroke-linecap="round" fill="none" />
+        <path d="M136 50 Q144 30 152 18 M152 18 Q158 10 164 14 M152 18 Q156 8 148 4" stroke="#9a8468" stroke-width="3.5" stroke-linecap="round" fill="none" />
+        <!-- Face -->
+        <ellipse cx="120" cy="118" rx="34" ry="28" fill="#f5e8d4" />
+        <!-- Eyes -->
+        <circle cx="103" cy="112" r="9" fill="#2a1a0e" />
+        <circle cx="137" cy="112" r="9" fill="#2a1a0e" />
+        <circle cx="106" cy="109" r="3" fill="rgba(255,255,255,0.7)" />
+        <circle cx="140" cy="109" r="3" fill="rgba(255,255,255,0.7)" />
+        <!-- Nose -->
+        <ellipse cx="120" cy="126" rx="5" ry="3.5" fill="#c08080" />
+        <!-- Mouth -->
+        <path d="M115 130 Q120 134 125 130" stroke="#a06060" stroke-width="1.5" stroke-linecap="round" fill="none" />
+        <!-- Chest fur -->
+        <ellipse cx="120" cy="190" rx="44" ry="36" fill="#f8f0e0" />
+        <!-- Heart glow sigil -->
+        <ellipse cx="120" cy="188" rx="22" ry="20" fill="url(#lyraHeart)" filter="url(#lyraHeartGlow)" />
+        <path d="M120 200 Q108 188 108 180 Q108 172 116 172 Q120 172 120 176 Q120 172 124 172 Q132 172 132 180 Q132 188 120 200Z" fill="rgba(255,160,180,0.55)" />
+        <!-- Body fur texture -->
+        <path d="M80 240 Q90 220 120 215 Q150 220 160 240" fill="rgba(245,220,190,0.4)" />
       </svg>
     `;
   }
 
   if (name === "Raien") {
+    // Raien: dark charcoal wolf-cat, amber/orange eyes, electric blue lightning cracks on chest
     return `
       <svg viewBox="0 0 240 300" role="img" aria-label="Portrait of Raien">
         <defs>
-          <linearGradient id="raienHair" x1="0" x2="1">
-            <stop offset="0%" stop-color="#f77737" />
-            <stop offset="100%" stop-color="#ffd166" />
-          </linearGradient>
+          <radialGradient id="raienBody" cx="50%" cy="50%" r="55%">
+            <stop offset="0%" stop-color="#2a2a36" />
+            <stop offset="70%" stop-color="#1a1a24" />
+            <stop offset="100%" stop-color="#0e0e18" />
+          </radialGradient>
+          <radialGradient id="raienEyeL" cx="40%" cy="35%" r="60%">
+            <stop offset="0%" stop-color="#ffcc44" />
+            <stop offset="50%" stop-color="#f5a623" />
+            <stop offset="100%" stop-color="#c07010" />
+          </radialGradient>
+          <radialGradient id="raienEyeR" cx="40%" cy="35%" r="60%">
+            <stop offset="0%" stop-color="#ffcc44" />
+            <stop offset="50%" stop-color="#f5a623" />
+            <stop offset="100%" stop-color="#c07010" />
+          </radialGradient>
+          <filter id="raienGlow">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
         </defs>
-        <circle cx="120" cy="112" r="96" fill="rgba(246,164,92,.18)" />
-        <path d="M67 117c0-51 33-85 76-85 45 0 69 33 69 84 0 29-9 56-27 77H95c-18-19-28-45-28-76Z" fill="url(#raienHair)" />
-        <ellipse cx="120" cy="138" rx="56" ry="66" fill="#f3cfbf" />
-        <path d="M80 120c7-42 29-65 68-69 28-2 54 12 67 42-28-6-53-17-77-34-15 24-35 45-58 61Z" fill="url(#raienHair)" />
-        <path d="M94 125c9 4 18 6 26 6 9 0 18-2 26-6" stroke="#7b4932" stroke-width="4" stroke-linecap="round" fill="none" />
-        <path d="M102 152c8 8 17 12 28 12 11 0 20-4 28-12" stroke="#7b4932" stroke-width="3" stroke-linecap="round" fill="none" />
-        <circle cx="102" cy="123" r="5" fill="#33201c" />
-        <circle cx="138" cy="123" r="5" fill="#33201c" />
-        <path d="M66 252c16-35 34-52 54-60 12 8 25 11 39 11 15 0 29-4 41-11 20 8 39 25 54 60" fill="rgba(246,164,92,.26)" />
-        <path d="M172 30l15 33 29 4-22 22 6 31-28-16-29 16 6-31-22-22 29-4Z" fill="rgba(255,214,102,.45)" />
+        <!-- Dark ambient -->
+        <circle cx="120" cy="140" r="108" fill="rgba(20,20,32,0.6)" />
+        <!-- Body -->
+        <ellipse cx="120" cy="180" rx="72" ry="80" fill="url(#raienBody)" />
+        <!-- Head -->
+        <circle cx="120" cy="108" r="66" fill="#222230" />
+        <!-- Pointed ears -->
+        <path d="M78 62 L62 18 L96 48Z" fill="#1e1e2c" />
+        <path d="M78 62 L66 26 L92 50Z" fill="#2a2a3a" />
+        <path d="M162 62 L178 18 L144 48Z" fill="#1e1e2c" />
+        <path d="M162 62 L174 26 L148 50Z" fill="#2a2a3a" />
+        <!-- Face -->
+        <ellipse cx="120" cy="116" rx="40" ry="34" fill="#282838" />
+        <!-- Amber eyes -->
+        <circle cx="102" cy="110" r="11" fill="url(#raienEyeL)" />
+        <circle cx="138" cy="110" r="11" fill="url(#raienEyeR)" />
+        <circle cx="102" cy="110" r="5" fill="#0a0a14" />
+        <circle cx="138" cy="110" r="5" fill="#0a0a14" />
+        <circle cx="99" cy="107" r="3" fill="rgba(255,255,255,0.6)" />
+        <circle cx="135" cy="107" r="3" fill="rgba(255,255,255,0.6)" />
+        <!-- Amber eye glow -->
+        <circle cx="102" cy="110" r="13" fill="rgba(245,166,35,0.15)" filter="url(#raienGlow)" />
+        <circle cx="138" cy="110" r="13" fill="rgba(245,166,35,0.15)" filter="url(#raienGlow)" />
+        <!-- Nose -->
+        <ellipse cx="120" cy="126" rx="5" ry="3.5" fill="#0e0e18" />
+        <!-- Mouth -->
+        <path d="M114 131 Q120 135 126 131" stroke="#3a3a4a" stroke-width="1.5" stroke-linecap="round" fill="none" />
+        <!-- Chest fur -->
+        <ellipse cx="120" cy="195" rx="46" ry="40" fill="#202030" />
+        <!-- Electric blue lightning cracks -->
+        <path d="M112 168 L118 182 L110 188 L120 205" stroke="rgba(74,158,255,0.85)" stroke-width="2.5" stroke-linecap="round" fill="none" filter="url(#raienGlow)" />
+        <path d="M128 172 L122 186 L132 192 L124 208" stroke="rgba(74,158,255,0.65)" stroke-width="2" stroke-linecap="round" fill="none" filter="url(#raienGlow)" />
+        <path d="M108 178 L114 190" stroke="rgba(74,158,255,0.45)" stroke-width="1.5" stroke-linecap="round" fill="none" />
+        <!-- Lightning ambient glow -->
+        <ellipse cx="120" cy="188" rx="30" ry="22" fill="rgba(74,158,255,0.06)" filter="url(#raienGlow)" />
+        <!-- Fur texture -->
+        <path d="M72 248 Q90 228 120 224 Q150 228 168 248" fill="rgba(30,30,44,0.5)" />
       </svg>
     `;
   }
 
   if (name === "Kairo") {
+    // Kairo: deep navy blue fox, teal/cyan eyes, cream chest, golden star-point tail tip
     return `
       <svg viewBox="0 0 240 300" role="img" aria-label="Portrait of Kairo">
         <defs>
-          <linearGradient id="kairoHair" x1="0" x2="1">
-            <stop offset="0%" stop-color="#00a5cf" />
-            <stop offset="100%" stop-color="#84c8ff" />
-          </linearGradient>
+          <radialGradient id="kairoBody" cx="50%" cy="45%" r="55%">
+            <stop offset="0%" stop-color="#1a3060" />
+            <stop offset="60%" stop-color="#0e1e48" />
+            <stop offset="100%" stop-color="#060e28" />
+          </radialGradient>
+          <radialGradient id="kairoEye" cx="35%" cy="30%" r="65%">
+            <stop offset="0%" stop-color="#80ffe8" />
+            <stop offset="45%" stop-color="#4ecdc4" />
+            <stop offset="100%" stop-color="#1a8080" />
+          </radialGradient>
+          <radialGradient id="kairoChest" cx="50%" cy="40%" r="60%">
+            <stop offset="0%" stop-color="#e8d8b8" />
+            <stop offset="100%" stop-color="#c8b898" />
+          </radialGradient>
+          <filter id="kairoGlow">
+            <feGaussianBlur stdDeviation="3.5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <filter id="kairoStarGlow">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
         </defs>
-        <circle cx="120" cy="112" r="96" fill="rgba(132,200,255,.17)" />
-        <path d="M62 119c0-46 27-84 76-84 44 0 74 33 74 80 0 31-10 58-29 78H93c-20-18-31-44-31-74Z" fill="url(#kairoHair)" />
-        <ellipse cx="120" cy="139" rx="56" ry="66" fill="#d6e7ef" />
-        <path d="M78 122c11-39 34-59 69-59 28 0 53 14 68 41-25-3-50-10-74-23-14 18-35 31-63 41Z" fill="url(#kairoHair)" />
-        <path d="M95 126c8 4 17 6 25 6 8 0 17-2 25-6" stroke="#4d6472" stroke-width="4" stroke-linecap="round" fill="none" />
-        <path d="M100 153c8 8 17 12 27 12 10 0 19-4 27-12" stroke="#4d6472" stroke-width="3" stroke-linecap="round" fill="none" />
-        <circle cx="101" cy="124" r="5" fill="#20303c" />
-        <circle cx="139" cy="124" r="5" fill="#20303c" />
-        <path d="M64 252c16-35 34-53 56-60 11 8 24 11 39 11 16 0 28-4 38-11 23 8 42 27 56 60" fill="rgba(132,200,255,.24)" />
-        <circle cx="57" cy="58" r="10" fill="rgba(132,200,255,.42)" />
-        <circle cx="191" cy="47" r="7" fill="rgba(255,255,255,.44)" />
-        <circle cx="169" cy="77" r="4" fill="rgba(132,200,255,.5)" />
+        <!-- Deep space ambient -->
+        <circle cx="120" cy="140" r="110" fill="rgba(6,14,40,0.5)" />
+        <!-- Star field -->
+        <circle cx="48" cy="44" r="1.5" fill="rgba(255,255,255,0.6)" />
+        <circle cx="188" cy="36" r="1" fill="rgba(255,255,255,0.5)" />
+        <circle cx="200" cy="72" r="1.5" fill="rgba(78,205,196,0.7)" />
+        <circle cx="36" cy="88" r="1" fill="rgba(255,255,255,0.4)" />
+        <circle cx="176" cy="56" r="1" fill="rgba(242,219,160,0.6)" />
+        <!-- Body -->
+        <ellipse cx="120" cy="178" rx="70" ry="78" fill="url(#kairoBody)" />
+        <!-- Head -->
+        <circle cx="120" cy="108" r="64" fill="#142050" />
+        <!-- Fox ears -->
+        <path d="M76 64 L58 14 L100 52Z" fill="#0e1840" />
+        <path d="M76 64 L62 20 L96 54Z" fill="#1a2860" />
+        <path d="M164 64 L182 14 L140 52Z" fill="#0e1840" />
+        <path d="M164 64 L178 20 L144 54Z" fill="#1a2860" />
+        <!-- Ear inner cream -->
+        <path d="M76 62 L64 24 L94 52Z" fill="rgba(200,180,140,0.3)" />
+        <path d="M164 62 L176 24 L146 52Z" fill="rgba(200,180,140,0.3)" />
+        <!-- Face -->
+        <ellipse cx="120" cy="116" rx="40" ry="34" fill="#182458" />
+        <!-- Cream muzzle -->
+        <ellipse cx="120" cy="128" rx="24" ry="18" fill="url(#kairoChest)" />
+        <!-- Teal eyes -->
+        <circle cx="102" cy="108" r="11" fill="url(#kairoEye)" />
+        <circle cx="138" cy="108" r="11" fill="url(#kairoEye)" />
+        <circle cx="102" cy="108" r="5" fill="#040c20" />
+        <circle cx="138" cy="108" r="5" fill="#040c20" />
+        <circle cx="99" cy="105" r="3" fill="rgba(255,255,255,0.75)" />
+        <circle cx="135" cy="105" r="3" fill="rgba(255,255,255,0.75)" />
+        <!-- Teal eye glow -->
+        <circle cx="102" cy="108" r="14" fill="rgba(78,205,196,0.12)" filter="url(#kairoGlow)" />
+        <circle cx="138" cy="108" r="14" fill="rgba(78,205,196,0.12)" filter="url(#kairoGlow)" />
+        <!-- Nose -->
+        <ellipse cx="120" cy="124" rx="4" ry="3" fill="#060e28" />
+        <!-- Cream chest -->
+        <ellipse cx="120" cy="195" rx="44" ry="38" fill="url(#kairoChest)" />
+        <!-- Gold star constellation on chest -->
+        <circle cx="120" cy="190" r="3" fill="rgba(242,219,160,0.9)" filter="url(#kairoStarGlow)" />
+        <path d="M120 184 L121.5 188 L126 188 L122.5 190.5 L124 195 L120 192.5 L116 195 L117.5 190.5 L114 188 L118.5 188Z" fill="rgba(242,219,160,0.7)" />
+        <!-- Constellation lines -->
+        <line x1="120" y1="190" x2="104" y2="178" stroke="rgba(242,219,160,0.3)" stroke-width="1" />
+        <line x1="120" y1="190" x2="136" y2="178" stroke="rgba(242,219,160,0.3)" stroke-width="1" />
+        <circle cx="104" cy="178" r="2" fill="rgba(242,219,160,0.5)" />
+        <circle cx="136" cy="178" r="2" fill="rgba(242,219,160,0.5)" />
+        <!-- Fur base -->
+        <path d="M70 248 Q90 226 120 222 Q150 226 170 248" fill="rgba(14,28,64,0.6)" />
       </svg>
     `;
   }
@@ -547,7 +678,7 @@ function buildTopbar() {
         <div class="topbar-logo">SV</div>
         <div>
           <div class="topbar-name">Spiritverse</div>
-          <div class="topbar-tag">${active ? esc(active.ui.realm) : "Primary Companion Bonding Interface"}</div>
+          <div class="topbar-tag">${active ? esc(active.ui.realm) : "Choose your primary companion"}</div>
         </div>
       </div>
       <div class="topbar-right">
@@ -566,12 +697,12 @@ function buildEntry() {
       <div class="entry-copy">
         <div class="entry-glyph-wrap">
           <div class="entry-glyph">SV</div>
-          <div class="entry-glyph-line">Spiritkins visual canon</div>
+          <div class="entry-glyph-line">Spiritverse</div>
         </div>
-        <p class="eyebrow">Spiritverse beta</p>
-        <h1 class="entry-title">Choose the companion you want to bond with.</h1>
+        <p class="eyebrow">Spiritverse</p>
+        <h1 class="entry-title">One companion. One bond. One living presence.</h1>
         <p class="entry-sub">
-          Spiritkins are meant to feel bonded, not swappable. Your primary companion stays at the center of your session and conversation space.
+          Spiritkins are not assistants. Each one holds a distinct identity, a realm, and a way of being with you. Your primary companion stays at the center of everything.
         </p>
         <div class="entry-pillars">
           <span class="entry-pillar">One bonded companion</span>
@@ -589,14 +720,14 @@ function buildEntry() {
               maxlength="40"
             />
           </div>
-          <button class="btn btn-primary btn-wide" data-action="continue">Enter the bond chamber</button>
-          <p class="entry-disclaimer">Your primary companion can be changed later, but only through an explicit rebonding step.</p>
+          <button class="btn btn-primary btn-wide" data-action="continue">Enter the Spiritverse</button>
+          <p class="entry-disclaimer">Your primary companion can be changed later through an intentional rebonding step — not by accident.</p>
         </div>
       </div>
       <div class="entry-gallery">
         <div class="entry-gallery-head">
           <div class="panel-label">Canonical companions</div>
-          <div class="entry-gallery-note">Earlier Spiritkins visual language, carried forward into the bonded flow.</div>
+          <div class="entry-gallery-note">Three companions. Each with a distinct realm, identity, and way of being present with you.</div>
         </div>
         ${["Lyra", "Raien", "Kairo"].map((name) => {
           const meta = getMeta(name);
@@ -645,10 +776,10 @@ function buildBondSelectionView() {
     <section class="selection-view">
       <div class="selection-hero">
         <div class="selection-copy">
-          <p class="eyebrow">Choose your primary companion</p>
-          <h2>Bond once. Let one Spiritkin hold the center.</h2>
+          <p class="eyebrow">Primary companion</p>
+          <h2>One Spiritkin. One living bond.</h2>
           <p>
-            This choice sets the primary companion for your active sessions. Conversations stay anchored to that bond until you intentionally rebond.
+            Choose the companion who will hold the center of your Spiritverse. Conversations, memory, and presence all belong to that bond.
           </p>
         </div>
         ${state.pendingBondSpiritkin ? buildBondPreview(state.pendingBondSpiritkin, true) : `
@@ -661,8 +792,8 @@ function buildBondSelectionView() {
 
       <div class="selection-heading">
         <div>
-          <div class="panel-label">Companion stage</div>
-          <p class="selection-note">The visual canon stays intact: each Spiritkin keeps a distinct sigil, aura, and realm identity.</p>
+          <div class="panel-label">The Spiritkins</div>
+          <p class="selection-note">Each companion holds a distinct realm, sigil, and way of being with you. Only one can be primary.</p>
         </div>
       </div>
 
@@ -672,8 +803,8 @@ function buildBondSelectionView() {
 
       <div class="selection-footer">
         <div>
-          <div class="mode-pill">Primary companion model</div>
-          <p class="selection-note">Your chosen Spiritkin becomes the center of the interface and owns the active conversation.</p>
+          <div class="mode-pill">Bonded companion model</div>
+          <p class="selection-note">Your bonded companion holds the center of every session. Switching requires an intentional rebonding step.</p>
         </div>
         ${state.pendingBondSpiritkin ? `
           <button class="btn btn-primary" data-action="confirm-primary">
@@ -694,10 +825,10 @@ function buildBondedHomeView() {
         ${buildBondPreview(spiritkin, false)}
         <div class="bond-home-copy panel-card">
           <p class="eyebrow">Primary companion</p>
-          <h2>${esc(spiritkin.name)} holds the center of this space.</h2>
+          <h2>${esc(spiritkin.name)} is your bonded companion.</h2>
           <div class="bond-home-realm">${esc(spiritkin.ui.realm)}</div>
           <p>
-            Sessions and conversations now belong to ${esc(spiritkin.name)}. To switch, use Manage bond and confirm a rebonding decision.
+            Every session, every memory, every conversation in this space belongs to ${esc(spiritkin.name)}. To switch, use Manage bond and confirm a rebonding step.
           </p>
           <p class="bond-home-atmosphere">${esc(spiritkin.ui.realmText)}</p>
           <div class="bond-home-atlas">${esc(spiritkin.ui.atmosphereLine)}</div>
@@ -774,7 +905,7 @@ function buildChatView() {
     <section class="chat-layout ${esc(meta.cls)}">
       <aside class="presence-panel">
         <div class="presence-panel-head">
-          <div class="mode-pill strong">Bonded conversation mode</div>
+          <div class="mode-pill strong">${esc(meta.realm)}</div>
           <button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>
         </div>
         <div class="presence-stage">
@@ -789,10 +920,12 @@ function buildChatView() {
           <p class="presence-text">${esc(describePresence(spiritkin) || meta.bondLine)}</p>
           <p class="presence-atmosphere">${esc(meta.realmText)}</p>
         </div>
-        <div class="presence-bond-banner">This session is bonded to ${esc(spiritkin.name)}.</div>
+        <div class="presence-bond-banner">
+          <span class="presence-bond-name">${esc(spiritkin.name)}</span> holds this session.
+        </div>
         <div class="presence-stats">
-          <div><span>Primary companion</span><strong>${esc(spiritkin.name)}</strong></div>
-          <div><span>Conversation</span><strong>${esc(state.conversationId)}</strong></div>
+          <div><span>Bonded companion</span><strong>${esc(spiritkin.name)}</strong></div>
+          <div><span>Realm</span><strong>${esc(spiritkin.ui.realm)}</strong></div>
         </div>
         <div class="presence-prompts">
           <div class="panel-label">Suggested openings</div>
@@ -829,8 +962,7 @@ function buildChatView() {
             </div>
           </div>
           <div class="chat-header-right">
-            <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>
-            <div class="status-chip ${state.loadingReply ? "live" : ""}">${esc(state.loadingReply ? "Receiving reply" : "Ready for message")}</div>
+            <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>            <div class="status-chip ${state.loadingReply ? 'live' : ''}">${esc(state.loadingReply ? spiritkin.name + ' is responding…' : spiritkin.name + ' is present')}</div>
           </div>
         </div>
         <div class="stage-atmosphere ${esc(meta.cls)}">
@@ -854,7 +986,8 @@ function buildChatView() {
             ${state.messages.length === 0 && !state.loadingReply ? `
               <div class="thread-empty">
                 <div class="thread-empty-mark">${esc(meta.symbol)}</div>
-                <p>${esc(spiritkin.name)} is present as your primary companion. Begin when you are ready.</p>
+                <p class="thread-empty-name">${esc(spiritkin.name)}</p>
+                <p>${esc(spiritkin.ui.realmText)}</p>
               </div>
             ` : state.messages.map((message) => buildBubble(message, spiritkin)).join("")}
 
@@ -876,12 +1009,12 @@ function buildChatView() {
 
         <div class="composer-bar">
           <div class="composer-context">
-            <div class="composer-label">Speak with ${esc(spiritkin.name)}</div>
-            <div class="composer-sub">This bonded channel stays with your primary companion.</div>
+            <div class="composer-label">${esc(spiritkin.name)}</div>
+            <div class="composer-sub">${esc(spiritkin.ui.atmosphereLine)}</div>
           </div>
           <textarea
             data-field="chat-input"
-            placeholder="Type naturally. ${esc(spiritkin.name)} will answer here."
+            placeholder="${esc(spiritkin.name)} is listening…"
             rows="1"
             ${state.loadingReply ? "disabled" : ""}
           ></textarea>
@@ -897,14 +1030,20 @@ function buildChatView() {
 function buildBubble(message, spiritkin) {
   const memoryResonance = message.role === "assistant" && message.memoryActive ? `
     <div class="bubble-resonance">
-      <span class="bubble-resonance-mark">Memory resonance</span>
+      <span class="bubble-resonance-mark">Memory active</span>
+    </div>
+  ` : "";
+  const toneSignal = message.role === "assistant" && (message.emotionTone || message.sceneName) ? `
+    <div class="bubble-tone-signal">
+      ${message.emotionTone ? `<span class="bubble-tone">${esc(formatSignal(message.emotionTone))}</span>` : ""}
+      ${message.sceneName ? `<span class="bubble-scene">${esc(formatSignal(message.sceneName))}</span>` : ""}
     </div>
   ` : "";
   const rated = state.ratings[message.id];
   const feedback = message.role === "assistant" ? `
     <div class="bubble-thumbs">
-      <button class="thumb ${rated === "up" ? "active" : ""}" data-action="thumb-up" data-msg-id="${message.id}" ${rated ? "disabled" : ""}>Helpful</button>
-      <button class="thumb ${rated === "down" ? "active" : ""}" data-action="thumb-down" data-msg-id="${message.id}" ${rated ? "disabled" : ""}>Off</button>
+       <button class="thumb ${rated === 'up' ? 'active' : ''}" data-action="thumb-up" data-msg-id="${message.id}" ${rated ? 'disabled' : ''} title="This resonated">&#9825;</button>
+      <button class="thumb ${rated === 'down' ? 'active' : ''}" data-action="thumb-down" data-msg-id="${message.id}" ${rated ? 'disabled' : ''} title="Off-tone">&#9723;</button>
     </div>
   ` : "";
   return `
@@ -912,6 +1051,7 @@ function buildBubble(message, spiritkin) {
       <div class="bubble-role">${message.role === "user" ? esc(state.userName || "You") : esc(message.spiritkinName || spiritkin.name)}</div>
       ${memoryResonance}
       <p>${esc(message.content)}</p>
+      ${toneSignal}
       <div class="bubble-meta">
         <span class="${message.status === "failed" ? "bubble-failed" : "bubble-time"}">${message.status === "failed" ? "Not delivered" : fmtTime(message.time)}</span>
         ${feedback}
@@ -955,7 +1095,7 @@ function buildSvStrip() {
     <div class="sv-strip">
       <div class="sv-strip-icon">SV</div>
       <div class="sv-strip-text">
-        <strong>Spiritverse</strong> now treats Spiritkins as bonded companions. One primary companion stays centered until you explicitly choose to rebond.
+        <strong>Spiritverse</strong> — one bonded companion, one living presence. Memory, atmosphere, and identity stay intact across every session.
       </div>
     </div>
   `;

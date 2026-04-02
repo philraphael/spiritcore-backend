@@ -15,9 +15,9 @@
   --radius-lg: 28px;
   --radius-md: 20px;
   --radius-sm: 14px;
-  --lyra: #f39fd1;
-  --raien: #f6a45c;
-  --kairo: #84c8ff;
+  --lyra: #e8b4d8;
+  --raien: #f5a623;
+  --kairo: #4ecdc4;
   --generic: #b8a6ff;
   --realm-accent: rgba(242, 219, 160, 0.9);
   --realm-accent-soft: rgba(242, 219, 160, 0.18);
@@ -110,6 +110,31 @@ button:disabled {
     radial-gradient(circle at 72% 22%, rgba(255,255,255,0.08), transparent 18%),
     radial-gradient(circle at 82% 70%, var(--realm-glow-a), transparent 20%);
   filter: blur(42px);
+  animation: orbitDrift 18s ease-in-out infinite alternate;
+}
+
+@keyframes orbitDrift {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(12px, -8px) scale(1.03); }
+  66% { transform: translate(-8px, 14px) scale(0.98); }
+  100% { transform: translate(6px, -4px) scale(1.02); }
+}
+
+/* Companion-specific orbit intensities */
+.sv-orbit.realm-lyra {
+  opacity: 0.75;
+  animation-duration: 16s;
+}
+
+.sv-orbit.realm-raien {
+  opacity: 0.65;
+  animation-duration: 12s;
+  animation-timing-function: ease-in-out;
+}
+
+.sv-orbit.realm-kairo {
+  opacity: 0.72;
+  animation-duration: 22s;
 }
 
 .realm-neutral {
@@ -122,34 +147,39 @@ button:disabled {
   --realm-stage: rgba(6, 20, 31, 0.88);
 }
 
+/* Lyra: cream/rose heart-anchor — warm rose-pink, crescent moon, heart glow */
 .realm-lyra {
-  --realm-accent: rgba(243, 159, 209, 0.92);
-  --realm-accent-soft: rgba(243, 159, 209, 0.18);
-  --realm-glow-a: rgba(163, 132, 255, 0.22);
-  --realm-glow-b: rgba(243, 159, 209, 0.24);
-  --realm-glow-c: rgba(255, 255, 255, 0.08);
-  --realm-panel: rgba(23, 15, 37, 0.76);
-  --realm-stage: rgba(18, 11, 31, 0.9);
+  --realm-accent: rgba(232, 180, 216, 0.95);
+  --realm-accent-soft: rgba(232, 180, 216, 0.2);
+  --realm-glow-a: rgba(200, 150, 200, 0.22);
+  --realm-glow-b: rgba(255, 180, 210, 0.26);
+  --realm-glow-c: rgba(255, 220, 240, 0.1);
+  --realm-panel: rgba(26, 12, 22, 0.8);
+  --realm-stage: rgba(20, 9, 18, 0.92);
 }
 
+/* Raien: dark charcoal wolf — amber eyes, electric blue lightning, storm guardian */
 .realm-raien {
-  --realm-accent: rgba(246, 164, 92, 0.94);
-  --realm-accent-soft: rgba(246, 164, 92, 0.18);
-  --realm-glow-a: rgba(255, 204, 119, 0.18);
-  --realm-glow-b: rgba(246, 164, 92, 0.24);
-  --realm-glow-c: rgba(255, 91, 42, 0.12);
-  --realm-panel: rgba(35, 18, 10, 0.76);
-  --realm-stage: rgba(28, 13, 7, 0.9);
+  --realm-accent: rgba(245, 166, 35, 0.96);
+  --realm-accent-soft: rgba(245, 166, 35, 0.18);
+  --realm-glow-a: rgba(74, 158, 255, 0.2);
+  --realm-glow-b: rgba(245, 166, 35, 0.26);
+  --realm-glow-c: rgba(74, 158, 255, 0.14);
+  --realm-panel: rgba(14, 14, 22, 0.82);
+  --realm-stage: rgba(10, 10, 18, 0.92);
+  --raien-lightning: rgba(74, 158, 255, 0.7);
 }
 
+/* Kairo: deep navy fox — teal eyes, gold star-tip tail, dream guide */
 .realm-kairo {
-  --realm-accent: rgba(132, 200, 255, 0.94);
-  --realm-accent-soft: rgba(132, 200, 255, 0.18);
-  --realm-glow-a: rgba(132, 200, 255, 0.24);
-  --realm-glow-b: rgba(108, 133, 255, 0.16);
-  --realm-glow-c: rgba(255, 255, 255, 0.08);
-  --realm-panel: rgba(7, 20, 37, 0.76);
-  --realm-stage: rgba(6, 18, 32, 0.9);
+  --realm-accent: rgba(78, 205, 196, 0.96);
+  --realm-accent-soft: rgba(78, 205, 196, 0.18);
+  --realm-glow-a: rgba(78, 205, 196, 0.22);
+  --realm-glow-b: rgba(26, 42, 74, 0.5);
+  --realm-glow-c: rgba(242, 219, 160, 0.12);
+  --realm-panel: rgba(6, 14, 28, 0.82);
+  --realm-stage: rgba(4, 10, 22, 0.92);
+  --kairo-gold: rgba(242, 219, 160, 0.85);
 }
 
 .app-shell {
@@ -162,15 +192,15 @@ button:disabled {
 }
 
 .app-shell.realm-lyra .topbar-logo {
-  background: linear-gradient(135deg, rgba(243,159,209,0.32), rgba(118,93,255,0.24));
+  background: linear-gradient(135deg, rgba(232,180,216,0.34), rgba(200,150,200,0.24));
 }
 
 .app-shell.realm-raien .topbar-logo {
-  background: linear-gradient(135deg, rgba(246,164,92,0.34), rgba(255,214,102,0.24));
+  background: linear-gradient(135deg, rgba(245,166,35,0.36), rgba(74,158,255,0.2));
 }
 
 .app-shell.realm-kairo .topbar-logo {
-  background: linear-gradient(135deg, rgba(132,200,255,0.34), rgba(108,133,255,0.2));
+  background: linear-gradient(135deg, rgba(78,205,196,0.34), rgba(26,42,74,0.3));
 }
 
 .eyebrow,
@@ -286,9 +316,9 @@ button:disabled {
   background: color-mix(in srgb, var(--realm-panel) 55%, rgba(255,255,255,0.04));
 }
 
-.presence-chip.lyra { box-shadow: inset 0 0 0 1px rgba(243,159,209,0.18); }
-.presence-chip.raien { box-shadow: inset 0 0 0 1px rgba(246,164,92,0.18); }
-.presence-chip.kairo { box-shadow: inset 0 0 0 1px rgba(132,200,255,0.18); }
+.presence-chip.lyra { box-shadow: inset 0 0 0 1px rgba(232,180,216,0.22); color: rgba(232,180,216,0.9); }
+.presence-chip.raien { box-shadow: inset 0 0 0 1px rgba(245,166,35,0.22); color: rgba(245,166,35,0.9); }
+.presence-chip.kairo { box-shadow: inset 0 0 0 1px rgba(78,205,196,0.22); color: rgba(78,205,196,0.9); }
 
 .mode-pill {
   color: var(--gold);
@@ -303,8 +333,14 @@ button:disabled {
 }
 
 .status-chip.live {
-  color: var(--gold);
-  border-color: rgba(242, 219, 160, 0.26);
+  color: var(--realm-accent);
+  border-color: color-mix(in srgb, var(--realm-accent) 30%, transparent);
+  animation: statusPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
 }
 
 .btn {
@@ -541,9 +577,10 @@ button:disabled {
     linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
 }
 
-.portrait-frame.lyra { --portrait-color: rgba(243,159,209,0.75); }
-.portrait-frame.raien { --portrait-color: rgba(246,164,92,0.78); }
-.portrait-frame.kairo { --portrait-color: rgba(132,200,255,0.78); }
+/* Portrait frame colors aligned to confirmed visual canon */
+.portrait-frame.lyra { --portrait-color: rgba(232,180,216,0.8); }
+.portrait-frame.raien { --portrait-color: rgba(245,166,35,0.82); }
+.portrait-frame.kairo { --portrait-color: rgba(78,205,196,0.78); }
 .portrait-frame.generic { --portrait-color: rgba(184,166,255,0.7); }
 
 .portrait-frame::after {
@@ -594,6 +631,12 @@ button:disabled {
   width: 100%;
   max-width: 340px;
   margin: 0 auto;
+  animation: portraitBreathe 6s ease-in-out infinite;
+}
+
+@keyframes portraitBreathe {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50% { transform: scale(1.012) translateY(-3px); }
 }
 
 .spirit-sigil {
@@ -613,19 +656,20 @@ button:disabled {
   box-shadow: inset 0 0 24px rgba(255,255,255,0.04);
 }
 
+/* Sigil colors aligned to confirmed visual canon */
 .spirit-sigil.lyra {
-  --sigil-color: rgba(243, 159, 209, 0.95);
-  --sigil-soft: rgba(243, 159, 209, 0.18);
+  --sigil-color: rgba(232, 180, 216, 0.98);
+  --sigil-soft: rgba(232, 180, 216, 0.2);
 }
 
 .spirit-sigil.raien {
-  --sigil-color: rgba(246, 164, 92, 0.96);
-  --sigil-soft: rgba(246, 164, 92, 0.18);
+  --sigil-color: rgba(245, 166, 35, 0.98);
+  --sigil-soft: rgba(245, 166, 35, 0.18);
 }
 
 .spirit-sigil.kairo {
-  --sigil-color: rgba(132, 200, 255, 0.96);
-  --sigil-soft: rgba(132, 200, 255, 0.18);
+  --sigil-color: rgba(78, 205, 196, 0.98);
+  --sigil-soft: rgba(78, 205, 196, 0.2);
 }
 
 .spirit-sigil.mini {
@@ -922,6 +966,7 @@ button:disabled {
   background:
     linear-gradient(180deg, rgba(255,255,255,0.05), transparent 28%),
     color-mix(in srgb, var(--realm-panel) 92%, rgba(255,255,255,0.03));
+  border-left: 3px solid color-mix(in srgb, var(--realm-accent) 32%, transparent);
 }
 
 .presence-summary {
@@ -965,11 +1010,21 @@ button:disabled {
 }
 
 .presence-bond-banner {
-  padding: 12px 14px;
+  padding: 13px 16px;
   border-radius: 18px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--realm-accent-soft) 80%, rgba(255,255,255,0.02));
+  border: 1px solid color-mix(in srgb, var(--realm-accent) 34%, transparent);
+  letter-spacing: 0.01em;
+  box-shadow: inset 0 0 16px color-mix(in srgb, var(--realm-accent-soft) 50%, transparent);
+}
+
+.presence-bond-name {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1.15rem;
+  font-weight: 700;
   color: var(--realm-accent);
-  background: color-mix(in srgb, var(--realm-accent-soft) 75%, rgba(255,255,255,0.02));
-  border: 1px solid color-mix(in srgb, var(--realm-accent) 30%, transparent);
+  letter-spacing: 0.04em;
 }
 
 .prompt-card,
@@ -990,11 +1045,12 @@ button:disabled {
   grid-template-rows: auto auto auto minmax(280px, 1fr) auto auto auto;
   min-height: 760px;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.06), transparent 18%),
-    radial-gradient(circle at 50% 0%, var(--realm-accent-soft), transparent 42%),
+    linear-gradient(180deg, color-mix(in srgb, var(--realm-accent-soft) 60%, rgba(255,255,255,0.04)) 0%, transparent 22%),
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--realm-accent-soft) 80%, transparent) 0%, transparent 55%),
     color-mix(in srgb, var(--realm-stage) 94%, rgba(255,255,255,0.02));
   position: relative;
   overflow: hidden;
+  border-top: 2px solid color-mix(in srgb, var(--realm-accent) 28%, transparent);
 }
 
 .chat-stage::before {
@@ -1106,9 +1162,19 @@ button:disabled {
   display: grid;
   place-items: center;
   text-align: center;
-  border: 1px dashed rgba(255,255,255,0.08);
+  border: 1px dashed color-mix(in srgb, var(--realm-accent) 22%, rgba(255,255,255,0.06));
   border-radius: 24px;
-  background: rgba(255,255,255,0.02);
+  background: radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--realm-accent-soft) 40%, transparent), transparent 70%);
+  padding: 32px 24px;
+}
+
+.thread-empty-name {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 2.2rem;
+  line-height: 1;
+  color: var(--realm-accent);
+  margin: 0 0 8px;
+  opacity: 0.9;
 }
 
 .bubble {
@@ -1125,16 +1191,20 @@ button:disabled {
   background: linear-gradient(135deg, rgba(255,255,255,0.1), color-mix(in srgb, var(--realm-accent-soft) 90%, rgba(132,200,255,0.1)));
 }
 
+/* Bubble colors aligned to confirmed visual canon */
 .bubble.assistant.lyra {
-  background: linear-gradient(135deg, rgba(243,159,209,0.12), rgba(255,255,255,0.03));
+  background: linear-gradient(135deg, rgba(232,180,216,0.13), rgba(200,150,200,0.06));
+  border-color: rgba(232,180,216,0.12);
 }
 
 .bubble.assistant.raien {
-  background: linear-gradient(135deg, rgba(246,164,92,0.12), rgba(255,255,255,0.03));
+  background: linear-gradient(135deg, rgba(245,166,35,0.11), rgba(74,158,255,0.07));
+  border-color: rgba(245,166,35,0.12);
 }
 
 .bubble.assistant.kairo {
-  background: linear-gradient(135deg, rgba(132,200,255,0.14), rgba(255,255,255,0.03));
+  background: linear-gradient(135deg, rgba(78,205,196,0.13), rgba(26,42,74,0.12));
+  border-color: rgba(78,205,196,0.12);
 }
 
 .bubble p {
@@ -1144,6 +1214,26 @@ button:disabled {
 
 .bubble-resonance {
   margin: 8px 0 10px;
+}
+
+.bubble-tone-signal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.bubble-tone,
+.bubble-scene {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--realm-accent) 24%, transparent);
+  color: var(--realm-accent);
+  background: color-mix(in srgb, var(--realm-accent-soft) 55%, transparent);
+  opacity: 0.8;
 }
 
 .bubble-meta {
@@ -1198,6 +1288,107 @@ button:disabled {
   40% { opacity: 1; transform: translateY(-2px); }
 }
 
+/* ── Constellation star motif — appears in portrait backdrops ── */
+.portrait-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,0.55) 1px, transparent 1px),
+    radial-gradient(circle, rgba(255,255,255,0.35) 1px, transparent 1px),
+    radial-gradient(circle, rgba(255,255,255,0.25) 1px, transparent 1px);
+  background-size: 48px 48px, 72px 72px, 36px 36px;
+  background-position: 8px 12px, 24px 36px, 16px 8px;
+  opacity: 0.28;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Lyra: heart glow on portrait backdrop ── */
+.portrait-frame.lyra .portrait-backdrop::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 54px;
+  background: radial-gradient(ellipse, rgba(232,180,216,0.55), transparent 68%);
+  filter: blur(12px);
+  animation: lyraHeartPulse 3.2s ease-in-out infinite;
+}
+
+@keyframes lyraHeartPulse {
+  0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.12); }
+}
+
+/* ── Raien: lightning crack accent on portrait backdrop ── */
+.portrait-frame.raien .portrait-backdrop::after {
+  content: "";
+  position: absolute;
+  left: 44%;
+  top: 40%;
+  width: 3px;
+  height: 60px;
+  background: linear-gradient(180deg, transparent, rgba(74,158,255,0.7) 30%, rgba(74,158,255,0.4) 70%, transparent);
+  clip-path: polygon(40% 0%, 60% 0%, 100% 45%, 60% 45%, 80% 100%, 20% 55%, 55% 55%, 30% 0%);
+  filter: blur(1px);
+  animation: raienLightning 4s ease-in-out infinite;
+}
+
+@keyframes raienLightning {
+  0%, 85%, 100% { opacity: 0; }
+  88%, 92% { opacity: 0.9; }
+  90% { opacity: 0.5; }
+}
+
+/* ── Kairo: star-point glow on portrait backdrop ── */
+.portrait-frame.kairo .portrait-backdrop::after {
+  content: "";
+  position: absolute;
+  right: 22%;
+  bottom: 28%;
+  width: 8px;
+  height: 8px;
+  background: rgba(242,219,160,0.9);
+  border-radius: 50%;
+  box-shadow: 0 0 12px 4px rgba(242,219,160,0.5), 0 0 24px 8px rgba(78,205,196,0.2);
+  animation: kairoStarPulse 2.8s ease-in-out infinite;
+}
+
+@keyframes kairoStarPulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.3); }
+}
+
+/* ── Raien: sk-card lightning border accent ── */
+.sk-card.raien.selected,
+.sk-card.raien.bonded {
+  box-shadow:
+    inset 0 0 0 1px rgba(245,166,35,0.2),
+    0 0 24px rgba(74,158,255,0.12),
+    var(--shadow);
+}
+
+/* ── Kairo: sk-card teal glow ── */
+.sk-card.kairo.selected,
+.sk-card.kairo.bonded {
+  box-shadow:
+    inset 0 0 0 1px rgba(78,205,196,0.2),
+    0 0 24px rgba(78,205,196,0.1),
+    var(--shadow);
+}
+
+/* ── Lyra: sk-card rose glow ── */
+.sk-card.lyra.selected,
+.sk-card.lyra.bonded {
+  box-shadow:
+    inset 0 0 0 1px rgba(232,180,216,0.2),
+    0 0 24px rgba(232,180,216,0.1),
+    var(--shadow);
+}
+
 .composer-bar {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr) 108px;
@@ -1235,6 +1426,17 @@ button:disabled {
   background: linear-gradient(135deg, var(--realm-accent), rgba(244, 219, 157, 0.96));
   color: #08151d;
   font-weight: 800;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--realm-accent) 30%, transparent);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.composer-send:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px color-mix(in srgb, var(--realm-accent) 42%, transparent);
+}
+
+.composer-send:disabled {
+  box-shadow: none;
 }
 
 .retry-banner {
