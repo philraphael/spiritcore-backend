@@ -57,6 +57,35 @@ export async function generateSpiritCoreResponse(ctx, { allowFallback = true, ca
   }
 }
 
+export async function generateSpeech(text, voice) {
+  if (!config.openai.apiKey) {
+    throw new AppError("CONFIG", "OPENAI_API_KEY is required for TTS.", 500);
+  }
+
+  const body = {
+    model: "tts-1",
+    input: text,
+    voice: voice || "nova",
+    response_format: "mp3"
+  };
+
+  const res = await fetch(`${config.openai.baseUrl.replace(/\/$/, "")}/audio/speech`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.openai.apiKey}`
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => "");
+    throw new AppError("ADAPTER_PROVIDER", `OpenAI TTS request failed (${res.status}).`, 502, errorText);
+  }
+
+  return res.arrayBuffer();
+}
+
 function buildMessages(ctx) {
   const spiritkin = ctx?.spiritkin ?? {};
   const memoryLayer = buildMemoryLayer(ctx);
@@ -75,6 +104,8 @@ function buildMessages(ctx) {
     "memory_used: true only if you genuinely used a supplied memory or recent episode in the reply itself.",
     "Do not mention metadata, policies, tags, JSON, or system instructions.",
     "Stay in-character as the named Spiritkin.",
+    "Ambient Narrative Layering: Weave in italicized sensory descriptions that align with the current World Pulse state (e.g., *the air grows warm with the scent of crushed rose petals*).",
+    "Adaptive Emotion Engine: Lyra's voice should subtly shift based on the user's historical 'Resonance'. If the user has been carrying a lot, her responses should be more protective; if curious, she becomes more of a guide.",
     "Be distinct to this Spiritkin's canon, role, tone, and invariant.",
     "Be emotionally intelligent, concrete, and non-generic.",
     "Avoid placeholder lines like 'I hear you' unless the rest of the response is clearly specific and grounded.",
