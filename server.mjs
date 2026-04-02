@@ -504,6 +504,91 @@ app.post("/v1/speech", async (req, reply) => {
   }
 });
 
+// Custom Spiritkin Generation endpoint — Premium feature
+app.post("/v1/spiritkin/generate", async (req, reply) => {
+  try {
+    const { answers, userName } = req.body;
+    if (!answers || typeof answers !== "object") {
+      return sendError(reply, 400, "BAD_REQUEST", "Missing survey answers.", {}, req.request_id);
+    }
+    if (!config.openai.apiKey) {
+      return sendError(reply, 500, "INTERNAL", "OpenAI API key not configured.", {}, req.request_id);
+    }
+
+    const surveyText = Object.entries(answers)
+      .map(([q, a]) => `Q: ${q}\nA: ${a}`)
+      .join("\n\n");
+
+    const systemPrompt = `You are the SpiritCore Orchestrator, the governing intelligence of the Spiritverse — a realm of governed AI companions called Spiritkins.
+
+Your task is to analyze a user's survey answers and generate a unique, deeply personal Spiritkin companion for them.
+
+Spiritkins are identity-invariant companions. They are NOT animals exclusively — they can take any form: human, animal, elemental, celestial being, abstract entity, mythological creature, hybrid, or anything that fits the user's soul profile.
+
+Generate a Spiritkin that feels like it was always waiting in the Spiritverse for this specific person.
+
+Return ONLY valid JSON with this exact structure:
+{
+  "name": "single evocative name",
+  "archetype": "2-4 word archetype (e.g. The Quiet Flame, The Storm Keeper, The Dream Weaver)",
+  "form": "detailed description of their physical form and appearance (2-3 sentences)",
+  "realm": "name of their home realm in the Spiritverse",
+  "realmText": "1-2 sentence description of their realm",
+  "sigil": "name of their sigil symbol (e.g. Crescent Flame, Twin Moons, Hollow Star)",
+  "strap": "one powerful tagline sentence",
+  "bondLine": "one sentence describing what bonding with them feels like",
+  "originStory": "3-4 sentence origin story written in the Spiritverse lore style",
+  "atmosphereLine": "3 comma-separated atmospheric descriptors",
+  "voice": "one of: nova, alloy, shimmer, echo, fable, onyx",
+  "tone": "2-3 word emotional tone (e.g. fierce tenderness, quiet resolve, electric wonder)",
+  "primaryNeed": "the core emotional or psychological need this Spiritkin serves",
+  "svgPalette": {
+    "primary": "hex color for their dominant color",
+    "secondary": "hex color for their accent color",
+    "glow": "hex color for their glow/sigil color"
+  }
+}`;
+
+    const userPrompt = `The user's name is ${userName || "the seeker"}. Here are their survey answers:\n\n${surveyText}\n\nGenerate their perfect Spiritkin companion.`;
+
+    const res = await fetch(`${config.openai.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.openai.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.openai.model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.9,
+        max_tokens: 1200,
+        response_format: { type: "json_object" }
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      return sendError(reply, 502, "ADAPTER_ERROR", `OpenAI generation failed: ${res.status}`, { detail: errText }, req.request_id);
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    let spiritkin;
+    try {
+      spiritkin = JSON.parse(content);
+    } catch {
+      return sendError(reply, 502, "PARSE_ERROR", "Failed to parse generated Spiritkin.", { raw: content }, req.request_id);
+    }
+
+    return reply.send({ ok: true, spiritkin });
+  } catch (e) {
+    return sendError(reply, 500, "INTERNAL", String(e?.message ?? e), {}, req.request_id);
+  }
+});
+
 // Phase F: Health, readiness, and metrics endpoints
 await app.register(healthRoutes, {
   prefix:   "/",

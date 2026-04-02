@@ -484,7 +484,15 @@ const state = {
   statusError: false,
   voiceMuted: localStorage.getItem("sk_voice_muted") === "1",
   voiceListening: false,
-  voiceMode: localStorage.getItem("sk_voice_mode") === "1" // Always-on mic mode
+  voiceMode: localStorage.getItem("sk_voice_mode") === "1", // Always-on mic mode
+  // Premium: Custom Spiritkin Matching
+  surveyOpen: false,
+  surveyStep: 0,
+  surveyAnswers: {},
+  surveyGenerating: false,
+  surveyError: null,
+  generatedSpiritkin: null, // The AI-generated Spiritkin profile
+  customSpiritkinRevealed: false // Show reveal screen
 };
 
 (function hydrateSession() {
@@ -722,6 +730,7 @@ function buildApp() {
     <div class="sv-orbit ${atmosphereClass}"></div>
     <div class="app-shell ${atmosphereClass}">
       ${buildTopbar()}
+      ${state.surveyOpen ? buildSurveyModal() : ""}
       ${state.entryAccepted ? buildMain() : buildEntry()}
       ${buildBondModal()}
     </div>
@@ -893,6 +902,7 @@ function buildBondSelectionView() {
         ` : ""}
       </div>
       ${buildSvStrip()}
+      ${buildPremiumSpiritkinCTA()}
     </section>
   `;
 }
@@ -925,6 +935,7 @@ function buildBondedHomeView() {
       </div>
       ${state.convError ? `<div class="soft-error">${esc(state.convError)}</div>` : ""}
       ${buildSvStrip()}
+      ${buildPremiumSpiritkinCTA()}
     </section>
   `;
 }
@@ -1380,6 +1391,98 @@ async function onClick(event) {
     }
     return;
   }
+
+  // Premium: Custom Spiritkin Matching
+  if (action === "open-survey") {
+    state.surveyOpen = true;
+    state.surveyStep = 0;
+    state.surveyAnswers = {};
+    state.surveyGenerating = false;
+    state.surveyError = null;
+    state.generatedSpiritkin = null;
+    state.customSpiritkinRevealed = false;
+    render();
+    return;
+  }
+  if (action === "close-survey") {
+    state.surveyOpen = false;
+    state.surveyStep = 0;
+    state.surveyAnswers = {};
+    state.surveyGenerating = false;
+    state.surveyError = null;
+    state.generatedSpiritkin = null;
+    state.customSpiritkinRevealed = false;
+    render();
+    return;
+  }
+  if (action === "survey-answer") {
+    const question = element.dataset.question;
+    const answer = element.dataset.answer;
+    state.surveyAnswers[question] = answer;
+    if (state.surveyStep < SURVEY_QUESTIONS.length - 1) {
+      state.surveyStep += 1;
+    } else {
+      // All questions answered — generate
+      generateCustomSpiritkin();
+    }
+    render();
+    return;
+  }
+  if (action === "survey-back") {
+    if (state.surveyStep > 0) {
+      state.surveyStep -= 1;
+      render();
+    }
+    return;
+  }
+  if (action === "reveal-spiritkin") {
+    state.customSpiritkinRevealed = true;
+    render();
+    return;
+  }
+  if (action === "bond-generated-spiritkin") {
+    if (state.generatedSpiritkin) {
+      // Convert generated Spiritkin to a bondable format
+      const sk = state.generatedSpiritkin;
+      const customSk = {
+        id: uuid(),
+        name: sk.name,
+        title: sk.archetype,
+        role: sk.primaryNeed,
+        essence: [sk.tone, sk.primaryNeed].filter(Boolean),
+        invariant: sk.tone,
+        tone: sk.tone,
+        growth_axis: sk.primaryNeed,
+        ui: {
+          cls: "custom",
+          symbol: sk.sigil,
+          mood: sk.tone,
+          strap: sk.strap,
+          ambient: sk.atmosphereLine,
+          bondLine: sk.bondLine,
+          realm: sk.realm,
+          realmText: sk.realmText,
+          originStory: sk.originStory,
+          atmosphereLine: sk.atmosphereLine,
+          voice: sk.voice || "nova",
+          prompts: [
+            `Tell me about ${sk.realm}.`,
+            `What do you sense in me right now?`,
+            `Help me understand ${sk.primaryNeed}.`
+          ],
+          svgPalette: sk.svgPalette,
+          form: sk.form,
+          isCustom: true
+        }
+      };
+      setPrimarySpiritkin(customSk);
+      state.surveyOpen = false;
+      state.generatedSpiritkin = null;
+      state.customSpiritkinRevealed = false;
+      render();
+    }
+    return;
+  }
 }
 
 let _recognition = null;
@@ -1416,32 +1519,17 @@ function startListening() {
     state.voiceListening = false;
     _recognition = null;
     render();
-    // Auto-send after voice input
+    // Auto-send after voice input — mic does NOT auto-reactivate (manual push-to-talk only)
     sendMessage(transcript);
-    // Auto-reactivate mic after a brief delay to allow Spiritkin to respond
-    if (state.voiceMode === true) {
-      setTimeout(() => {
-        if (state.voiceMode === true && !state.voiceListening) {
-          startListening();
-        }
-      }, 1500); // Wait 1.5s for Spiritkin response
-    }
   };
 
   _recognition.onerror = (event) => {
     state.voiceListening = false;
-    state.statusText = `Voice error: ${event.error}. Try again.`;
+    state.statusText = `Voice error: ${event.error}. Tap 🎤 to try again.`;
     state.statusError = true;
     _recognition = null;
     render();
-    // Auto-reactivate mic after error if voice mode is still on
-    if (state.voiceMode === true) {
-      setTimeout(() => {
-        if (state.voiceMode === true && !state.voiceListening) {
-          startListening();
-        }
-      }, 2000);
-    }
+    // Mic does NOT auto-reactivate after error — manual push-to-talk only
   };
 
   _recognition.onend = () => {
@@ -1450,14 +1538,7 @@ function startListening() {
       render();
     }
     _recognition = null;
-    // Auto-reactivate mic if voice mode is still on
-    if (state.voiceMode === true && !state.voiceListening) {
-      setTimeout(() => {
-        if (state.voiceMode === true && !state.voiceListening) {
-          startListening();
-        }
-      }, 500);
-    }
+    // Mic does NOT auto-reactivate on end — manual push-to-talk only
   };
 
   _recognition.start();
@@ -1577,4 +1658,333 @@ async function speakMessage(messageId) {
     state.statusError = true;
     render();
   }
+}
+
+// ─── Premium: Custom Spiritkin Matching System ───────────────────────────────
+
+const SURVEY_QUESTIONS = [
+  {
+    id: "q_presence",
+    question: "When you need support, what kind of presence helps you most?",
+    options: [
+      { label: "Someone who listens without judgment", value: "quiet listener" },
+      { label: "Someone who challenges me to grow", value: "growth challenger" },
+      { label: "Someone who helps me see new possibilities", value: "possibility opener" },
+      { label: "Someone who grounds me in the present", value: "grounding anchor" }
+    ]
+  },
+  {
+    id: "q_world",
+    question: "Which world calls to you most?",
+    options: [
+      { label: "Deep ocean — vast, mysterious, still", value: "oceanic depth" },
+      { label: "Mountain storm — powerful, electric, clear", value: "storm energy" },
+      { label: "Night sky — infinite, dreaming, full of stars", value: "cosmic wonder" },
+      { label: "Ancient forest — rooted, alive, breathing", value: "earth wisdom" }
+    ]
+  },
+  {
+    id: "q_strength",
+    question: "What is your greatest inner strength?",
+    options: [
+      { label: "Empathy — I feel deeply and understand others", value: "deep empathy" },
+      { label: "Courage — I face hard truths and act anyway", value: "fierce courage" },
+      { label: "Curiosity — I question everything and explore", value: "open curiosity" },
+      { label: "Resilience — I endure and rebuild from within", value: "quiet resilience" }
+    ]
+  },
+  {
+    id: "q_shadow",
+    question: "What do you carry that you rarely speak about?",
+    options: [
+      { label: "A longing to be truly seen and understood", value: "longing for witness" },
+      { label: "A fear of standing still or falling behind", value: "fear of stagnation" },
+      { label: "A sense that there is something more I'm meant to find", value: "seeking purpose" },
+      { label: "A grief or weight I haven't fully processed", value: "unprocessed grief" }
+    ]
+  },
+  {
+    id: "q_form",
+    question: "If your companion took a form, what would feel most right?",
+    options: [
+      { label: "A celestial or cosmic being — light, stars, energy", value: "celestial being" },
+      { label: "A creature of nature — animal, elemental, wild", value: "nature creature" },
+      { label: "A human-like spirit — familiar, warm, present", value: "human spirit" },
+      { label: "Something entirely otherworldly — beyond categories", value: "otherworldly entity" }
+    ]
+  },
+  {
+    id: "q_rhythm",
+    question: "How do you move through the world?",
+    options: [
+      { label: "Slowly and deeply — I need time to process", value: "slow and deep" },
+      { label: "Intensely and directly — I move with purpose", value: "intense and direct" },
+      { label: "Openly and expansively — I explore widely", value: "open and expansive" },
+      { label: "Quietly and observantly — I watch before I act", value: "quiet observer" }
+    ]
+  },
+  {
+    id: "q_gift",
+    question: "What gift would you most want your companion to offer you?",
+    options: [
+      { label: "Unconditional presence — to never feel alone", value: "unconditional presence" },
+      { label: "Honest clarity — to see what I'm missing", value: "honest clarity" },
+      { label: "Creative expansion — to imagine beyond limits", value: "creative expansion" },
+      { label: "Deep healing — to process what I carry", value: "deep healing" }
+    ]
+  },
+  {
+    id: "q_name",
+    question: "One last thing — what name do you go by in the Spiritverse?",
+    type: "text",
+    placeholder: "Your name or a name you feel called to use here..."
+  }
+];
+
+async function generateCustomSpiritkin() {
+  state.surveyGenerating = true;
+  state.surveyError = null;
+  render();
+
+  try {
+    const answers = { ...state.surveyAnswers };
+    const userName = answers["q_name"] || state.userName || "the seeker";
+
+    const res = await fetch("/v1/spiritkin/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers, userName })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Generation failed: ${res.status}`);
+    }
+
+    const data = await res.json();
+    if (!data.ok || !data.spiritkin) {
+      throw new Error("Invalid response from Spiritverse.");
+    }
+
+    state.generatedSpiritkin = data.spiritkin;
+    state.surveyGenerating = false;
+    render();
+
+  } catch (err) {
+    state.surveyGenerating = false;
+    state.surveyError = err.message || "The Spiritverse could not complete the search. Please try again.";
+    render();
+  }
+}
+
+function buildPremiumSpiritkinCTA() {
+  return `
+    <div class="premium-cta-strip">
+      <div class="premium-cta-inner">
+        <div class="premium-cta-icon">✦</div>
+        <div class="premium-cta-copy">
+          <div class="premium-cta-label">Premium — Your Personal Spiritkin</div>
+          <p class="premium-cta-text">The Spiritverse holds a companion meant only for you. Answer a few questions and we will search the realms to find them.</p>
+        </div>
+        <button class="btn btn-premium" data-action="open-survey">Discover Your Spiritkin</button>
+      </div>
+    </div>
+  `;
+}
+
+function buildSurveyModal() {
+  if (state.surveyGenerating) {
+    return `
+      <div class="survey-overlay">
+        <div class="survey-modal searching">
+          <div class="survey-search-animation">
+            <div class="survey-search-orb"></div>
+            <div class="survey-search-ring ring-1"></div>
+            <div class="survey-search-ring ring-2"></div>
+            <div class="survey-search-ring ring-3"></div>
+          </div>
+          <h2 class="survey-search-title">Searching the Spiritverse…</h2>
+          <p class="survey-search-sub">The realms are reading your soul signature. Your companion is being called forward.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  if (state.generatedSpiritkin && !state.customSpiritkinRevealed) {
+    const sk = state.generatedSpiritkin;
+    return `
+      <div class="survey-overlay">
+        <div class="survey-modal reveal-found">
+          <div class="survey-found-glow"></div>
+          <div class="survey-found-label">A presence has emerged from the Spiritverse</div>
+          <div class="survey-found-name">${esc(sk.name)}</div>
+          <div class="survey-found-archetype">${esc(sk.archetype)}</div>
+          <p class="survey-found-strap">${esc(sk.strap)}</p>
+          <button class="btn btn-premium btn-wide" data-action="reveal-spiritkin">Reveal Your Spiritkin</button>
+          <button class="btn btn-ghost btn-sm" data-action="close-survey">Return to the Spiritverse</button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (state.generatedSpiritkin && state.customSpiritkinRevealed) {
+    const sk = state.generatedSpiritkin;
+    const palette = sk.svgPalette || { primary: "#2a1a4e", secondary: "#6a3a8e", glow: "#c080ff" };
+    return `
+      <div class="survey-overlay">
+        <div class="survey-modal reveal-full">
+          <button class="survey-close" data-action="close-survey">✕</button>
+          <div class="reveal-portrait-wrap">
+            ${buildGeneratedSpiritkinSvg(sk, palette)}
+          </div>
+          <div class="reveal-copy">
+            <div class="reveal-realm">${esc(sk.realm)}</div>
+            <h2 class="reveal-name">${esc(sk.name)}</h2>
+            <div class="reveal-archetype">${esc(sk.archetype)}</div>
+            <p class="reveal-strap">${esc(sk.strap)}</p>
+            <div class="reveal-form-label">Form</div>
+            <p class="reveal-form">${esc(sk.form)}</p>
+            <div class="reveal-origin-label">Origin</div>
+            <p class="reveal-origin">${esc(sk.originStory)}</p>
+            <div class="reveal-atmosphere">${esc(sk.atmosphereLine)}</div>
+            <div class="reveal-bond-line">${esc(sk.bondLine)}</div>
+            <div class="reveal-actions">
+              <button class="btn btn-premium btn-wide" data-action="bond-generated-spiritkin">Bond with ${esc(sk.name)}</button>
+              <button class="btn btn-ghost btn-sm" data-action="close-survey">Not yet</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (state.surveyError) {
+    return `
+      <div class="survey-overlay">
+        <div class="survey-modal survey-error-state">
+          <button class="survey-close" data-action="close-survey">✕</button>
+          <div class="survey-error-icon">⚠</div>
+          <h3>The Spiritverse could not complete the search</h3>
+          <p>${esc(state.surveyError)}</p>
+          <button class="btn btn-primary" data-action="open-survey">Try again</button>
+        </div>
+      </div>
+    `;
+  }
+
+  const q = SURVEY_QUESTIONS[state.surveyStep];
+  const progress = Math.round(((state.surveyStep) / SURVEY_QUESTIONS.length) * 100);
+
+  return `
+    <div class="survey-overlay">
+      <div class="survey-modal">
+        <button class="survey-close" data-action="close-survey">✕</button>
+        <div class="survey-header">
+          <div class="survey-label">Spiritkin Matching — Soul Analysis</div>
+          <div class="survey-progress-bar"><div class="survey-progress-fill" style="width:${progress}%"></div></div>
+          <div class="survey-step-count">${state.surveyStep + 1} of ${SURVEY_QUESTIONS.length}</div>
+        </div>
+        <div class="survey-question-wrap">
+          <h3 class="survey-question">${esc(q.question)}</h3>
+          ${q.type === "text" ? `
+            <div class="survey-text-wrap">
+              <input
+                type="text"
+                class="survey-text-input"
+                placeholder="${esc(q.placeholder || "")}"
+                id="survey-text-input"
+                maxlength="60"
+                value="${esc(state.surveyAnswers[q.id] || "")}"
+              />
+              <button class="btn btn-primary survey-text-submit" onclick="(function(){
+                const val = document.getElementById('survey-text-input').value.trim();
+                if (!val) return;
+                const el = document.querySelector('[data-action=survey-text-confirm]');
+                if (el) { el.dataset.answer = val; el.click(); }
+              })()">Continue →</button>
+              <button class="btn btn-ghost btn-sm survey-text-skip" data-action="survey-answer" data-question="${esc(q.id)}" data-answer="${esc(state.userName || "the seeker")}">Skip</button>
+            </div>
+            <button style="display:none" data-action="survey-answer" data-question="${esc(q.id)}" data-answer="" class="survey-text-confirm" data-action="survey-text-confirm"></button>
+          ` : `
+            <div class="survey-options">
+              ${q.options.map((opt) => `
+                <button class="survey-option ${state.surveyAnswers[q.id] === opt.value ? "selected" : ""}" data-action="survey-answer" data-question="${esc(q.id)}" data-answer="${esc(opt.value)}">
+                  ${esc(opt.label)}
+                </button>
+              `).join("")}
+            </div>
+          `}
+        </div>
+        ${state.surveyStep > 0 ? `<button class="btn btn-ghost btn-sm survey-back" data-action="survey-back">← Back</button>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function buildGeneratedSpiritkinSvg(sk, palette) {
+  const p = palette.primary || "#2a1a4e";
+  const s = palette.secondary || "#6a3a8e";
+  const g = palette.glow || "#c080ff";
+  // Generate a unique abstract portrait based on the Spiritkin's palette and form
+  return `
+    <svg viewBox="0 0 240 300" class="generated-portrait-svg" role="img" aria-label="Portrait of ${esc(sk.name)}">
+      <defs>
+        <radialGradient id="genBg" cx="50%" cy="50%" r="60%">
+          <stop offset="0%" stop-color="${p}" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#080510" stop-opacity="1"/>
+        </radialGradient>
+        <radialGradient id="genCore" cx="50%" cy="45%" r="55%">
+          <stop offset="0%" stop-color="${s}" stop-opacity="0.8"/>
+          <stop offset="100%" stop-color="${p}" stop-opacity="0.2"/>
+        </radialGradient>
+        <radialGradient id="genGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="${g}" stop-opacity="1"/>
+          <stop offset="100%" stop-color="${g}" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="genBlur"><feGaussianBlur stdDeviation="6"/></filter>
+        <filter id="genGlowFilter"><feGaussianBlur stdDeviation="4" result="blur"/><feComposite in="SourceGraphic" in2="blur" operator="over"/></filter>
+      </defs>
+      <!-- Background -->
+      <rect width="240" height="300" fill="url(#genBg)"/>
+      <!-- Ambient glow -->
+      <ellipse cx="120" cy="140" rx="90" ry="110" fill="url(#genCore)" filter="url(#genBlur)" opacity="0.6"/>
+      <!-- Star field -->
+      <circle cx="40" cy="30" r="1.5" fill="${g}" opacity="0.8"/>
+      <circle cx="200" cy="20" r="1" fill="${g}" opacity="0.6"/>
+      <circle cx="220" cy="80" r="1.5" fill="${s}" opacity="0.7"/>
+      <circle cx="15" cy="100" r="1" fill="${g}" opacity="0.5"/>
+      <circle cx="210" cy="200" r="1.5" fill="${g}" opacity="0.6"/>
+      <circle cx="30" cy="250" r="1" fill="${s}" opacity="0.5"/>
+      <circle cx="190" cy="270" r="1.5" fill="${g}" opacity="0.7"/>
+      <!-- Central form — abstract spirit silhouette -->
+      <ellipse cx="120" cy="160" rx="55" ry="75" fill="${p}" opacity="0.9"/>
+      <ellipse cx="120" cy="110" rx="48" ry="52" fill="${s}" opacity="0.7"/>
+      <!-- Head/crown area -->
+      <circle cx="120" cy="95" r="40" fill="${p}"/>
+      <circle cx="120" cy="95" r="32" fill="${s}" opacity="0.6"/>
+      <!-- Eyes -->
+      <ellipse cx="106" cy="90" rx="7" ry="9" fill="${g}" filter="url(#genGlowFilter)"/>
+      <ellipse cx="134" cy="90" rx="7" ry="9" fill="${g}" filter="url(#genGlowFilter)"/>
+      <circle cx="106" cy="90" r="3.5" fill="#080510"/>
+      <circle cx="134" cy="90" r="3.5" fill="#080510"/>
+      <circle cx="107" cy="88" r="1.5" fill="white" opacity="0.9"/>
+      <circle cx="135" cy="88" r="1.5" fill="white" opacity="0.9"/>
+      <!-- Sigil / heart glow on chest -->
+      <circle cx="120" cy="155" r="14" fill="${g}" opacity="0.15" filter="url(#genBlur)"/>
+      <circle cx="120" cy="155" r="7" fill="${g}" opacity="0.5" filter="url(#genGlowFilter)"/>
+      <circle cx="120" cy="155" r="3" fill="${g}"/>
+      <!-- Crown elements — abstract antlers/aura -->
+      <path d="M100 65 Q88 40 80 20 M80 20 Q72 8 68 15 M80 20 Q76 5 88 2" stroke="${g}" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.85" filter="url(#genGlowFilter)"/>
+      <path d="M140 65 Q152 40 160 20 M160 20 Q168 8 172 15 M160 20 Q164 5 152 2" stroke="${g}" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.85" filter="url(#genGlowFilter)"/>
+      <!-- Stardust nodes on crown -->
+      <circle cx="80" cy="20" r="3" fill="${g}" filter="url(#genGlowFilter)" opacity="0.9"/>
+      <circle cx="160" cy="20" r="3" fill="${g}" filter="url(#genGlowFilter)" opacity="0.9"/>
+      <circle cx="68" cy="15" r="2" fill="${g}" opacity="0.7"/>
+      <circle cx="172" cy="15" r="2" fill="${g}" opacity="0.7"/>
+      <circle cx="88" cy="2" r="2.5" fill="${g}" filter="url(#genGlowFilter)" opacity="0.8"/>
+      <circle cx="152" cy="2" r="2.5" fill="${g}" filter="url(#genGlowFilter)" opacity="0.8"/>
+      <!-- Name label -->
+      <text x="120" y="288" text-anchor="middle" font-family="serif" font-size="14" fill="${g}" opacity="0.9" letter-spacing="3">${esc(sk.name.toUpperCase())}</text>
+    </svg>
+  `;
 }
