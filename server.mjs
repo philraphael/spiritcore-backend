@@ -168,6 +168,25 @@ app.get("/app/:asset", async (req, reply) => {
   return reply.type(mime).send(content);
 });
 
+// Serve portrait images from public/portraits
+app.get("/portraits/:filename", async (req, reply) => {
+  const { filename } = req.params;
+  // Whitelist portrait filenames to prevent directory traversal
+  const allowedPortraits = ["lyra_portrait.png", "raien_portrait.png", "kairo_portrait.png"];
+  if (!allowedPortraits.includes(filename)) {
+    return reply.code(404).send({ ok: false, error: "Portrait not found" });
+  }
+
+  try {
+    const filePath = path.join(USER_APP_DIR, "public", "portraits", filename);
+    const content = await readFile(filePath);
+    return reply.type("image/png").send(content);
+  } catch (err) {
+    app.log.warn(`Failed to serve portrait ${filename}: ${err.message}`);
+    return reply.code(404).send({ ok: false, error: "Portrait not found" });
+  }
+});
+
 /* ------------------------ Runtime endpoints ------------------------ */
 
 app.post("/runtime/interaction/:userId", async (req, reply) => {

@@ -133,57 +133,115 @@ function describePresence(spiritkin) {
 
 function portraitSvg(name) {
   if (name === "Lyra") {
-    // Lyra: cream/beige deer-rabbit, small antlers, glowing rose heart, warm brown eyes
+    // Lyra: Celestial Fawn — dark star-mapped coat, luminous rose heart sigil, ethereal antlers with stardust
     return `
       <svg viewBox="0 0 240 300" role="img" aria-label="Portrait of Lyra">
         <defs>
-          <radialGradient id="lyraBody" cx="50%" cy="55%" r="55%">
-            <stop offset="0%" stop-color="#f5e8d0" />
-            <stop offset="60%" stop-color="#e8d4b8" />
-            <stop offset="100%" stop-color="#d4bc98" />
+          <radialGradient id="lyraBody" cx="50%" cy="45%" r="60%">
+            <stop offset="0%" stop-color="#2a1a3e" />
+            <stop offset="50%" stop-color="#1a0e2e" />
+            <stop offset="100%" stop-color="#0e0818" />
+          </radialGradient>
+          <radialGradient id="lyraCoat" cx="50%" cy="40%" r="55%">
+            <stop offset="0%" stop-color="#3d2060" />
+            <stop offset="60%" stop-color="#251440" />
+            <stop offset="100%" stop-color="#120a28" />
           </radialGradient>
           <radialGradient id="lyraHeart" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#ffb8c8" stop-opacity="0.9" />
-            <stop offset="50%" stop-color="#f08098" stop-opacity="0.7" />
-            <stop offset="100%" stop-color="#e06080" stop-opacity="0" />
+            <stop offset="0%" stop-color="#ff88cc" stop-opacity="1" />
+            <stop offset="40%" stop-color="#e060a0" stop-opacity="0.9" />
+            <stop offset="100%" stop-color="#a02060" stop-opacity="0" />
+          </radialGradient>
+          <radialGradient id="lyraEye" cx="35%" cy="30%" r="65%">
+            <stop offset="0%" stop-color="#ffd4f0" />
+            <stop offset="40%" stop-color="#e080c8" />
+            <stop offset="100%" stop-color="#802060" />
           </radialGradient>
           <filter id="lyraHeartGlow">
-            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <filter id="lyraStarGlow">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <filter id="lyraAntlerGlow">
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
         </defs>
-        <!-- Warm ambient glow -->
-        <circle cx="120" cy="140" r="100" fill="rgba(245,220,190,0.1)" />
+        <!-- Deep cosmic background -->
+        <circle cx="120" cy="140" r="115" fill="rgba(10,5,20,0.7)" />
+        <!-- Star field -->
+        <circle cx="30" cy="30" r="1.5" fill="rgba(255,220,255,0.8)" filter="url(#lyraStarGlow)" />
+        <circle cx="200" cy="25" r="1" fill="rgba(255,200,240,0.7)" />
+        <circle cx="215" cy="70" r="1.5" fill="rgba(220,180,255,0.8)" filter="url(#lyraStarGlow)" />
+        <circle cx="22" cy="85" r="1" fill="rgba(255,230,255,0.6)" />
+        <circle cx="195" cy="110" r="1" fill="rgba(200,180,255,0.7)" />
+        <circle cx="45" cy="140" r="1.5" fill="rgba(255,200,240,0.5)" />
+        <circle cx="210" cy="155" r="1" fill="rgba(220,200,255,0.6)" />
+        <circle cx="55" cy="200" r="1" fill="rgba(255,180,230,0.5)" />
+        <circle cx="185" cy="220" r="1.5" fill="rgba(200,160,255,0.6)" filter="url(#lyraStarGlow)" />
+        <!-- Nebula wisps -->
+        <ellipse cx="60" cy="60" rx="40" ry="20" fill="rgba(180,100,255,0.05)" transform="rotate(-20 60 60)" />
+        <ellipse cx="180" cy="200" rx="35" ry="18" fill="rgba(255,100,200,0.05)" transform="rotate(15 180 200)" />
         <!-- Body -->
-        <ellipse cx="120" cy="175" rx="68" ry="78" fill="url(#lyraBody)" />
+        <ellipse cx="120" cy="178" rx="70" ry="80" fill="url(#lyraBody)" />
         <!-- Head -->
-        <circle cx="120" cy="110" r="62" fill="#f0e0c4" />
-        <!-- Ears -->
-        <ellipse cx="82" cy="72" rx="22" ry="34" fill="#e8d4b8" transform="rotate(-12 82 72)" />
-        <ellipse cx="82" cy="72" rx="14" ry="24" fill="#f5c0b8" transform="rotate(-12 82 72)" />
-        <ellipse cx="158" cy="72" rx="22" ry="34" fill="#e8d4b8" transform="rotate(12 158 72)" />
-        <ellipse cx="158" cy="72" rx="14" ry="24" fill="#f5c0b8" transform="rotate(12 158 72)" />
-        <!-- Antlers -->
-        <path d="M104 50 Q96 30 88 18 M88 18 Q82 10 76 14 M88 18 Q84 8 92 4" stroke="#9a8468" stroke-width="3.5" stroke-linecap="round" fill="none" />
-        <path d="M136 50 Q144 30 152 18 M152 18 Q158 10 164 14 M152 18 Q156 8 148 4" stroke="#9a8468" stroke-width="3.5" stroke-linecap="round" fill="none" />
+        <circle cx="120" cy="108" r="64" fill="#1e1030" />
+        <!-- Deer ears (large, elegant) -->
+        <ellipse cx="80" cy="68" rx="20" ry="36" fill="#2a1840" transform="rotate(-15 80 68)" />
+        <ellipse cx="80" cy="68" rx="12" ry="26" fill="#4a2060" transform="rotate(-15 80 68)" />
+        <ellipse cx="80" cy="68" rx="6" ry="16" fill="rgba(255,150,220,0.3)" transform="rotate(-15 80 68)" />
+        <ellipse cx="160" cy="68" rx="20" ry="36" fill="#2a1840" transform="rotate(15 160 68)" />
+        <ellipse cx="160" cy="68" rx="12" ry="26" fill="#4a2060" transform="rotate(15 160 68)" />
+        <ellipse cx="160" cy="68" rx="6" ry="16" fill="rgba(255,150,220,0.3)" transform="rotate(15 160 68)" />
+        <!-- Celestial antlers with stardust glow -->
+        <path d="M104 52 Q96 32 88 18 M88 18 Q80 8 74 12 M88 18 Q84 6 94 2" stroke="rgba(220,180,255,0.9)" stroke-width="3" stroke-linecap="round" fill="none" filter="url(#lyraAntlerGlow)" />
+        <path d="M136 52 Q144 32 152 18 M152 18 Q160 8 166 12 M152 18 Q156 6 146 2" stroke="rgba(220,180,255,0.9)" stroke-width="3" stroke-linecap="round" fill="none" filter="url(#lyraAntlerGlow)" />
+        <!-- Antler star nodes -->
+        <circle cx="74" cy="12" r="3" fill="rgba(255,220,255,0.9)" filter="url(#lyraStarGlow)" />
+        <circle cx="94" cy="2" r="2.5" fill="rgba(255,200,240,0.8)" filter="url(#lyraStarGlow)" />
+        <circle cx="88" cy="18" r="2" fill="rgba(220,180,255,0.7)" />
+        <circle cx="166" cy="12" r="3" fill="rgba(255,220,255,0.9)" filter="url(#lyraStarGlow)" />
+        <circle cx="146" cy="2" r="2.5" fill="rgba(255,200,240,0.8)" filter="url(#lyraStarGlow)" />
+        <circle cx="152" cy="18" r="2" fill="rgba(220,180,255,0.7)" />
         <!-- Face -->
-        <ellipse cx="120" cy="118" rx="34" ry="28" fill="#f5e8d4" />
-        <!-- Eyes -->
-        <circle cx="103" cy="112" r="9" fill="#2a1a0e" />
-        <circle cx="137" cy="112" r="9" fill="#2a1a0e" />
-        <circle cx="106" cy="109" r="3" fill="rgba(255,255,255,0.7)" />
-        <circle cx="140" cy="109" r="3" fill="rgba(255,255,255,0.7)" />
+        <ellipse cx="120" cy="116" rx="38" ry="32" fill="#281848" />
+        <!-- Star map on face -->
+        <circle cx="108" cy="100" r="1" fill="rgba(255,200,240,0.4)" />
+        <circle cx="132" cy="98" r="1" fill="rgba(220,180,255,0.4)" />
+        <circle cx="120" cy="96" r="1.5" fill="rgba(255,220,255,0.5)" />
+        <!-- Luminous rose eyes -->
+        <circle cx="103" cy="112" r="11" fill="url(#lyraEye)" />
+        <circle cx="137" cy="112" r="11" fill="url(#lyraEye)" />
+        <circle cx="103" cy="112" r="5" fill="#0a0418" />
+        <circle cx="137" cy="112" r="5" fill="#0a0418" />
+        <circle cx="100" cy="109" r="3.5" fill="rgba(255,255,255,0.8)" />
+        <circle cx="134" cy="109" r="3.5" fill="rgba(255,255,255,0.8)" />
+        <!-- Eye glow -->
+        <circle cx="103" cy="112" r="14" fill="rgba(255,100,200,0.12)" filter="url(#lyraHeartGlow)" />
+        <circle cx="137" cy="112" r="14" fill="rgba(255,100,200,0.12)" filter="url(#lyraHeartGlow)" />
+        <!-- Muzzle -->
+        <ellipse cx="120" cy="128" rx="18" ry="13" fill="#3a2050" />
         <!-- Nose -->
-        <ellipse cx="120" cy="126" rx="5" ry="3.5" fill="#c08080" />
+        <ellipse cx="120" cy="124" rx="4" ry="3" fill="rgba(255,150,200,0.8)" />
         <!-- Mouth -->
-        <path d="M115 130 Q120 134 125 130" stroke="#a06060" stroke-width="1.5" stroke-linecap="round" fill="none" />
-        <!-- Chest fur -->
-        <ellipse cx="120" cy="190" rx="44" ry="36" fill="#f8f0e0" />
-        <!-- Heart glow sigil -->
-        <ellipse cx="120" cy="188" rx="22" ry="20" fill="url(#lyraHeart)" filter="url(#lyraHeartGlow)" />
-        <path d="M120 200 Q108 188 108 180 Q108 172 116 172 Q120 172 120 176 Q120 172 124 172 Q132 172 132 180 Q132 188 120 200Z" fill="rgba(255,160,180,0.55)" />
-        <!-- Body fur texture -->
-        <path d="M80 240 Q90 220 120 215 Q150 220 160 240" fill="rgba(245,220,190,0.4)" />
+        <path d="M115 130 Q120 134 125 130" stroke="rgba(200,100,160,0.8)" stroke-width="1.5" stroke-linecap="round" fill="none" />
+        <!-- Chest -->
+        <ellipse cx="120" cy="192" rx="46" ry="40" fill="url(#lyraCoat)" />
+        <!-- Glowing heart sigil -->
+        <ellipse cx="120" cy="188" rx="28" ry="26" fill="url(#lyraHeart)" filter="url(#lyraHeartGlow)" />
+        <path d="M120 204 Q106 190 106 180 Q106 170 115 170 Q120 170 120 175 Q120 170 125 170 Q134 170 134 180 Q134 190 120 204Z" fill="rgba(255,130,200,0.75)" filter="url(#lyraHeartGlow)" />
+        <!-- Constellation on chest -->
+        <circle cx="104" cy="176" r="1.5" fill="rgba(255,200,240,0.6)" />
+        <circle cx="136" cy="176" r="1.5" fill="rgba(255,200,240,0.6)" />
+        <circle cx="112" cy="165" r="1" fill="rgba(220,180,255,0.5)" />
+        <circle cx="128" cy="165" r="1" fill="rgba(220,180,255,0.5)" />
+        <line x1="104" y1="176" x2="120" y2="188" stroke="rgba(255,180,230,0.2)" stroke-width="1" />
+        <line x1="136" y1="176" x2="120" y2="188" stroke="rgba(255,180,230,0.2)" stroke-width="1" />
+        <!-- Fur base -->
+        <path d="M74 250 Q92 228 120 222 Q148 228 166 250" fill="rgba(42,16,64,0.6)" />
       </svg>
     `;
   }
@@ -344,10 +402,15 @@ function portraitSvg(name) {
 }
 
 function buildPortrait(name, size, cls) {
+  const portraitNames = { Lyra: "lyra_portrait.png", Raien: "raien_portrait.png", Kairo: "kairo_portrait.png" };
+  const pngFile = portraitNames[name];
+  const portraitContent = pngFile
+    ? `<img src="/portraits/${pngFile}" alt="Portrait of ${esc(name)}" class="portrait-png" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" /><div class="portrait-svg-fallback" style="display:none">${portraitSvg(name)}</div>`
+    : portraitSvg(name);
   return `
     <div class="portrait-frame ${esc(cls)} ${esc(size)}">
       <div class="portrait-backdrop"></div>
-      <div class="portrait-art">${portraitSvg(name)}</div>
+      <div class="portrait-art">${portraitContent}</div>
     </div>
   `;
 }
