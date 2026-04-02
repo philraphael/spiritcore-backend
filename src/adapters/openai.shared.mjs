@@ -42,11 +42,13 @@ export async function generateSpiritCoreResponse(ctx, { allowFallback = true, ca
     const memoryActive = parsed.memory_used === true;
     const tags = deriveTags(parsed.tags, memoryActive);
     const emotion = deriveEmotion(ctx, parsed.emotion);
+    const sceneName = deriveSceneName(ctx, parsed.scene_name);
 
     return normalizeAdapterResult({
       text: parsed.reply.trim(),
       tags,
-      emotion
+      emotion,
+      sceneName
     });
   } catch (error) {
     console.warn(`[Adapter:${caller}] Falling back from provider path: ${error.message}`);
@@ -61,10 +63,15 @@ function buildMessages(ctx) {
   const prompt = [
     "Return JSON only.",
     "You are generating the Spiritkin's next reply inside SpiritCore.",
-    "Produce an object with keys: reply, tags, emotion, memory_used.",
+    "Produce an object with these exact keys: reply, tags, emotion, scene_name, memory_used.",
     "reply: string with the actual user-facing response.",
     "tags: array of short semantic tags like intent:reflect, intent:guide, safety:ok.",
     "emotion: object with tone, valence, arousal, confidence.",
+    "  tone: a short, specific emotional quality word describing this reply's feeling (e.g. 'grounded warmth', 'quiet resolve', 'charged clarity', 'tender stillness', 'open wonder'). Never use 'warm' alone as the sole tone — be specific to this moment.",
+    "  valence: float 0.0–1.0 (0=very negative, 1=very positive).",
+    "  arousal: float 0.0–1.0 (0=very calm, 1=very activated).",
+    "  confidence: float 0.0–1.0 representing how certain/grounded this reply feels.",
+    "scene_name: a short evocative phrase (2–5 words) naming the emotional or narrative scene of this exchange. Examples: 'still water', 'edge of courage', 'opening constellation', 'returning warmth', 'charged threshold'. Use the current scene from context as a starting point. Never return 'default'.",
     "memory_used: true only if you genuinely used a supplied memory or recent episode in the reply itself.",
     "Do not mention metadata, policies, tags, JSON, or system instructions.",
     "Stay in-character as the named Spiritkin.",
@@ -415,7 +422,8 @@ function buildFallbackResult(ctx, { caller, reason }) {
       `adapter:${caller}:fallback`,
       ...(memorySnippet ? ["memory:active"] : [])
     ],
-    emotion: deriveEmotion(ctx, { tone: emotionTone, confidence: 0.62, valence: 0.62, arousal: 0.45 })
+    emotion: deriveEmotion(ctx, { tone: emotionTone, confidence: 0.62, valence: 0.62, arousal: 0.45 }),
+    sceneName: deriveSceneName(ctx, sceneName)
   });
 }
 
@@ -497,12 +505,41 @@ function deriveTags(rawTags, memoryActive) {
 
 function deriveEmotion(ctx, rawEmotion = {}) {
   const base = ctx?.context?.emotion ?? {};
+  const rawTone = sanitizeText(rawEmotion.tone || base.tone || base.label || ctx?.spiritkin?.tone || "");
+  // Reject bare 'warm' from the model — require a specific tone
+  const tone = (rawTone && rawTone.toLowerCase() !== "warm") ? rawTone : deriveDefaultTone(ctx);
   return {
     valence: numberOrDefault(rawEmotion.valence, numberOrDefault(base.valence, 0.6)),
     arousal: numberOrDefault(rawEmotion.arousal, numberOrDefault(base.arousal, 0.4)),
-    tone: sanitizeText(rawEmotion.tone || base.tone || base.label || ctx?.spiritkin?.tone || "warm"),
+    tone,
     confidence: numberOrDefault(rawEmotion.confidence, 0.68)
   };
+}
+
+function deriveDefaultTone(ctx) {
+  const name = ctx?.spiritkin?.name ?? "";
+  const base = ctx?.context?.emotion ?? {};
+  const baseTone = sanitizeText(base.tone || base.label || "");
+  if (baseTone && baseTone.toLowerCase() !== "warm") return baseTone;
+  if (name === "Lyra") return "grounded warmth";
+  if (name === "Raien") return "charged clarity";
+  if (name === "Kairo") return "open wonder";
+  return "steady presence";
+}
+
+function deriveSceneName(ctx, rawSceneName) {
+  const raw = sanitizeText(rawSceneName);
+  // Accept the LLM-supplied scene name if it is non-empty and not the placeholder 'default'
+  if (raw && raw.toLowerCase() !== "default") return raw;
+  // Fall back to the persisted scene name
+  const persisted = sanitizeScene(ctx?.scene?.name);
+  if (persisted && persisted.toLowerCase() !== "default") return persisted;
+  // Final fallback: derive a meaningful scene from the spiritkin identity
+  const name = ctx?.spiritkin?.name ?? "";
+  if (name === "Lyra") return "luminous veil";
+  if (name === "Raien") return "ember citadel";
+  if (name === "Kairo") return "astral observatory";
+  return "spiritverse";
 }
 
 function parseJsonObject(content) {

@@ -22,6 +22,7 @@ export const normalizeAdapterResult = (raw) => {
   const text = typeof raw?.text === "string" ? raw.text : "";
   const tags = Array.isArray(raw?.tags) ? raw.tags.filter((t) => typeof t === "string") : [];
   const emotion = raw?.emotion && typeof raw.emotion === "object" ? raw.emotion : {};
+  const rawTone = String(emotion.tone ?? "").trim();
 
   const normalized = {
     text,
@@ -29,9 +30,12 @@ export const normalizeAdapterResult = (raw) => {
     emotion: {
       valence: clamp01(Number(emotion.valence ?? 0.5)),
       arousal: clamp01(Number(emotion.arousal ?? 0.4)),
-      tone: String(emotion.tone ?? "warm"),
+      // Reject bare 'warm' — require a specific tone; fall back to 'steady presence'
+      tone: (rawTone && rawTone.toLowerCase() !== "warm") ? rawTone : "steady presence",
       confidence: clamp01(Number(emotion.confidence ?? 0.6))
     },
+    // sceneName is optional but always normalized: empty string means not set
+    sceneName: typeof raw?.sceneName === "string" && raw.sceneName.trim() ? raw.sceneName.trim() : "",
     toolCalls: Array.isArray(raw?.toolCalls) ? raw.toolCalls : []
   };
 
