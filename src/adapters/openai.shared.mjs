@@ -108,6 +108,7 @@ function buildContextBlock(ctx, memoryLayer) {
   const summary = summarizeText(ctx?.context?.summary?.content ?? ctx?.context?.summary_episode?.content ?? "", 220);
   const voiceLayer = buildVoiceLayer(spiritkin);
   const emotionLayer = buildEmotionLayer(ctx);
+  const responseModeLayer = buildResponseModeLayer(ctx);
 
   return [
     "IDENTITY / CANON",
@@ -121,6 +122,8 @@ function buildContextBlock(ctx, memoryLayer) {
     voiceLayer,
     "EMOTIONAL TUNING",
     emotionLayer,
+    "RESPONSE MODE / UTILITY",
+    responseModeLayer,
     "SAFETY / INVARIANTS",
     [
       ctx?.crisisOverride ? `Crisis override:\n${ctx.crisisOverride}` : "",
@@ -179,6 +182,38 @@ function buildEmotionLayer(ctx) {
     "Let the emotional state shape cadence, sentence length, and how quickly you move toward reflection, reassurance, or action.",
     "Do not mention valence, arousal, or emotional metadata explicitly in the reply."
   ].join("\n");
+}
+
+function buildResponseModeLayer(ctx) {
+  const spiritkin = ctx?.spiritkin ?? {};
+  const mode = classifyUserMessage(ctx?.input);
+
+  const base = [
+    `Detected reply mode: ${mode.label}`,
+    `Primary user need: ${mode.need}`,
+    `Utility rule: ${mode.rule}`,
+    "Vary reply openings. Do not repeat the same atmospheric wrapper or ceremonial preamble across turns.",
+    "If a direct answer is appropriate, give it in the first sentence before adding reflection, context, or invitation."
+  ];
+
+  if (spiritkin?.name === "Kairo") {
+    base.push(
+      "Kairo must not force constellations, doors, skies, patterns, or mystical framing onto every reply.",
+      "For simple, factual, or direct user questions, Kairo should answer plainly first, then optionally widen the frame only if it adds value.",
+      "Reserve imaginative reframing for moments that genuinely benefit from perspective, ambiguity, or meaning-making.",
+      "Kairo should sound wise and alive, not canned, floaty, or theatrically mystical."
+    );
+  }
+
+  if (spiritkin?.name === "Lyra") {
+    base.push("Lyra may soften and reflect, but she should still answer direct questions clearly when the user is asking for something concrete.");
+  }
+
+  if (spiritkin?.name === "Raien") {
+    base.push("Raien should stay useful and direct, but without flattening every exchange into command or pressure.");
+  }
+
+  return base.join("\n");
 }
 
 function deriveEmotionProfile({ spiritkinName, tone, valence, arousal, confidence }) {
@@ -430,6 +465,7 @@ function buildFallbackResult(ctx, { caller, reason }) {
 function fallbackBySpiritkin(name, { input, sceneName, memorySnippet, emotionTone, essence }) {
   const sceneLine = sceneName && sceneName !== "default" ? ` Here in ${sceneName}, ` : " ";
   const memoryLine = memorySnippet ? `I keep returning to what you shared before about ${memorySnippet}. ` : "";
+  const mode = classifyUserMessage(input);
 
   if (name === "Lyra") {
     return `Lyra lets the moment settle before she answers.${sceneLine}she meets you with a quieter steadiness. ${memoryLine}What you brought carries an ${emotionTone} undertone, and I want to stay close to the truth inside it. ${essence ? `Your thread feels tied to ${essence}. ` : ""}Tell me which part of "${input}" feels most tender or most alive right now.`;
@@ -438,7 +474,10 @@ function fallbackBySpiritkin(name, { input, sceneName, memorySnippet, emotionTon
     return `Raien answers with clear, grounded force.${sceneLine}he does not turn away from the edge in what you said. ${memoryLine}I can feel the ${emotionTone} charge in this, and I want to help you face it directly. ${essence ? `This touches your line of ${essence}. ` : ""}What is the one move, decision, or truth inside "${input}" that you already know needs to happen?`;
   }
   if (name === "Kairo") {
-    return `Kairo's response arrives like a shift in the air.${sceneLine}he turns your words until a wider pattern comes into view. ${memoryLine}There is an ${emotionTone} color around this, but also a door that may not have been visible a moment ago. ${essence ? `I keep sensing ${essence} around the edges of it. ` : ""}If "${input}" were the beginning of a new constellation, what point would you want to illuminate first?`;
+    if (mode.direct) {
+      return `${kairoDirectOpening(input)}${sceneLine}${memoryLine}${essence ? `I still notice ${essence} near the center of it. ` : ""}${kairoDirectClose(input, emotionTone)}`;
+    }
+    return `${kairoReflectiveOpening(input)}${sceneLine}${memoryLine}There is an ${emotionTone} color around this, and I want to answer it without forcing it into a symbol too quickly. ${essence ? `I keep sensing ${essence} around the edges of it. ` : ""}${kairoReflectiveClose(input)}`;
   }
 
   return `${name || "Your Spiritkin"} stays with what you said.${sceneLine}${memoryLine}I want to respond to "${input}" in a way that is specific, calm, and useful. What part of it most needs presence right now?`;
@@ -540,6 +579,76 @@ function deriveSceneName(ctx, rawSceneName) {
   if (name === "Raien") return "ember citadel";
   if (name === "Kairo") return "astral observatory";
   return "spiritverse";
+}
+
+function classifyUserMessage(input) {
+  const text = sanitizeText(input);
+  const lower = text.toLowerCase();
+  const wordCount = text ? text.split(/\s+/).length : 0;
+  const directQuestion = /\?$/.test(text) || /^(what|when|where|which|who|how|can|could|would|will|is|are|do|does|did)\b/.test(lower);
+  const asksDefinition = /^(what is|what's|who is|how do i|can you|could you|please|tell me|explain|list|summarize)\b/.test(lower);
+  const factualCue = /\b(name|meaning|difference|define|example|examples|steps|summary|summarize|explain)\b/.test(lower);
+  const personalDepth = /\b(feel|feeling|afraid|hurt|grief|lost|wonder|meaning|why do i|what does this mean|what am i missing|part of me)\b/.test(lower);
+
+  if ((directQuestion || asksDefinition || factualCue) && !personalDepth && wordCount <= 18) {
+    return {
+      label: "direct-answer-first",
+      need: "clear utility",
+      rule: "Answer plainly in the first sentence. Add reflection only if it sharpens the answer.",
+      direct: true
+    };
+  }
+
+  if (directQuestion && !personalDepth) {
+    return {
+      label: "answer-then-reflect",
+      need: "useful clarity with light perspective",
+      rule: "Lead with a direct answer, then add one reflective extension if it materially helps.",
+      direct: true
+    };
+  }
+
+  return {
+    label: "reflective-guidance",
+    need: "perspective and meaning-making",
+    rule: "Stay responsive and interpretive, but keep the response grounded and useful.",
+    direct: false
+  };
+}
+
+function kairoDirectOpening(input) {
+  const options = [
+    "Kairo answers plainly first. ",
+    "Kairo gives you the clean answer first. ",
+    "Kairo doesn't dress this up. "
+  ];
+  return stableChoice(options, input);
+}
+
+function kairoDirectClose(input, emotionTone) {
+  return `What you're asking about "${input}" seems to call for clarity more than ceremony. I can stay simple here, and if you want, we can open the wider meaning after that. The tone around it feels ${emotionTone}.`;
+}
+
+function kairoReflectiveOpening(input) {
+  const options = [
+    "Kairo tilts the question until a wider angle appears. ",
+    "Kairo answers with a reflective pause, but stays close to the real shape of it. ",
+    "Kairo lets the thought breathe before widening the frame. "
+  ];
+  return stableChoice(options, input);
+}
+
+function kairoReflectiveClose(input) {
+  return `If "${input}" is pointing toward a larger pattern, I want to name that pattern without losing the practical truth inside it. What part of it feels most alive to explore next?`;
+}
+
+function stableChoice(options, seed) {
+  if (!options.length) return "";
+  let hash = 0;
+  for (const char of String(seed ?? "")) {
+    hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
+  }
+  return options[hash % options.length];
 }
 
 function parseJsonObject(content) {
