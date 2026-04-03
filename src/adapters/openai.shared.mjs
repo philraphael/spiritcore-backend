@@ -132,6 +132,42 @@ function buildMessages(ctx) {
   ];
 }
 
+function buildReturningUserBlock(ctx) {
+  const memories = Array.isArray(ctx?.context?.memories) ? ctx.context.memories : [];
+  const episodes = Array.isArray(ctx?.context?.episodes) ? ctx.context.episodes : [];
+  const hasMemory = memories.length > 0 || episodes.length > 0;
+  if (!hasMemory) return null;
+
+  const semanticFacts = memories
+    .filter(m => m?.kind === 'semantic' && m?.content)
+    .slice(0, 5)
+    .map(m => `- ${sanitizeText(m.content).slice(0, 120)}`)
+    .join('\n');
+
+  const episodicFacts = memories
+    .filter(m => m?.kind === 'episodic' && m?.content)
+    .slice(0, 3)
+    .map(m => `- ${sanitizeText(m.content).slice(0, 120)}`)
+    .join('\n');
+
+  const parts = [
+    'RETURNING USER — WHAT YOU KNOW',
+    'This user has shared things with you before. You carry this knowledge naturally, not as a list to recite.',
+    'Weave relevant facts into your response only when they genuinely serve the moment.',
+  ];
+
+  if (semanticFacts) {
+    parts.push(`Known facts about this person:\n${semanticFacts}`);
+  }
+  if (episodicFacts) {
+    parts.push(`Significant moments shared:\n${episodicFacts}`);
+  }
+
+  parts.push('Do not mention that you are "remembering" or "recalling" — simply know. Speak from continuity, not from retrieval.');
+
+  return parts.join('\n\n');
+}
+
 function buildContextBlock(ctx, memoryLayer) {
   const spiritkin = ctx?.spiritkin ?? {};
   const sceneName = sanitizeScene(ctx?.scene?.name);
@@ -139,6 +175,7 @@ function buildContextBlock(ctx, memoryLayer) {
   const summary = summarizeText(ctx?.context?.summary?.content ?? ctx?.context?.summary_episode?.content ?? "", 220);
   const voiceLayer = buildVoiceLayer(spiritkin);
   const emotionLayer = buildEmotionLayer(ctx);
+  const returningUserBlock = buildReturningUserBlock(ctx);
 
   return [
     "IDENTITY / CANON",
@@ -158,6 +195,7 @@ function buildContextBlock(ctx, memoryLayer) {
       ctx?.safetyInstruction ? `Safety instruction:\n${ctx.safetyInstruction}` : "",
       "Do not break canon, drift into generic assistant voice, or flatten this Spiritkin into neutral support language."
     ].filter(Boolean).join("\n\n"),
+    returningUserBlock,
     "MEMORY / CONTEXT",
     [
       sceneName ? `Current scene: ${sceneName}` : "Current scene: default",

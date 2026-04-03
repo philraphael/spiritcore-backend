@@ -39,6 +39,7 @@ import { createOrchestrator }        from "./services/orchestrator.mjs";
 import { buildAdapterRegistry }      from "./adapters/index.mjs";
 import { createMessageService }      from "./services/messageService.mjs";
 import { createSafetyGovernor }      from "./services/safetyGovernor.mjs";
+import { createMemoryExtractor }     from "./services/memoryExtractor.mjs";
 
 /**
  * Build and return the fully wired service container.
@@ -86,6 +87,9 @@ export function buildContainer() {
   const messageService  = createMessageService({ supabase });
   const safetyGovernor  = createSafetyGovernor({ supabase });
 
+  // --- Phase G: Deep Memory Extraction ---
+  const memoryExtractor = createMemoryExtractor({ memoryService });
+
   // --- Orchestrator ---
   const orchestrator = createOrchestrator({
     bus,
@@ -100,6 +104,7 @@ export function buildContainer() {
     episodeService,
     messageService,   // Phase E
     safetyGovernor,   // Phase E
+    memoryExtractor,  // Phase G: deep memory
   });
 
   return {
@@ -116,6 +121,7 @@ export function buildContainer() {
     conversationService,
     contextService,
     safetyGovernor,
+    memoryExtractor,
     adapters,
     orchestrator,
   };

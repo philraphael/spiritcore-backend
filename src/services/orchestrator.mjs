@@ -38,6 +38,7 @@ export const createOrchestrator = ({
   episodeService,
   messageService,
   safetyGovernor,
+  memoryExtractor,
 }) => {
   const interact = async ({ userId, input, spiritkin, conversationId, context = {} }) => {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
@@ -326,6 +327,16 @@ export const createOrchestrator = ({
           ]
         : []),
     ]);
+
+    // Stage 11c: Memory extraction (fire-and-forget — never blocks response)
+    if (memoryExtractor && policyState.state !== "delete_due") {
+      memoryExtractor.extractAndPersist({
+        userId,
+        spiritkinId,
+        conversationId: convId,
+        userMessage: input,
+      }).catch(() => {}); // non-critical, swallow all errors
+    }
 
     bus.emit("orchestrator.complete", { traceId });
     logStage(log, "complete");
