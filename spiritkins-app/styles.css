@@ -1838,3 +1838,133 @@ button:disabled {
   --realm-glow-a: rgba(120,40,200,0.22); --realm-glow-b: rgba(80,20,120,0.3);
   --realm-glow-c: rgba(160,80,255,0.1); --realm-panel: rgba(18,8,42,0.82); --realm-stage: rgba(12,5,30,0.92);
 }
+
+
+/* ONBOARDING: 10-Question Guided Spiritkin Matching Flow */
+
+.onboarding-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100dvh - 120px);
+  padding: 2rem 1rem;
+  animation: fadeUp 0.45s ease;
+}
+
+.onboarding-inner {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.onboarding-header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.onboarding-glyph {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(180,100,255,0.3), rgba(255,100,180,0.2));
+  border: 1px solid rgba(180,100,255,0.4);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em;
+  color: rgba(220,180,255,0.9);
+}
+
+.onboarding-eyebrow {
+  font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase;
+  color: rgba(200,160,255,0.7); margin: 0;
+}
+
+.onboarding-progress-bar {
+  width: 100%; max-width: 320px; height: 3px;
+  background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin-top: 0.5rem;
+}
+
+.onboarding-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(180,100,255,0.8), rgba(255,100,180,0.8));
+  border-radius: 2px; transition: width 0.4s ease;
+}
+
+.onboarding-question-block {
+  display: flex; flex-direction: column; gap: 1.5rem;
+}
+
+.onboarding-question {
+  font-size: 1.25rem; font-weight: 500; color: rgba(240,220,255,0.95);
+  line-height: 1.5; text-align: center; margin: 0;
+  font-family: 'Cormorant Garamond', serif;
+}
+
+.onboarding-options {
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+
+.onboarding-option {
+  width: 100%; padding: 1rem 1.25rem;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(180,100,255,0.2);
+  border-radius: 12px; color: rgba(220,200,255,0.85);
+  font-size: 0.95rem; text-align: left; cursor: pointer;
+  transition: all 0.2s ease; line-height: 1.4;
+}
+
+.onboarding-option:hover {
+  background: rgba(180,100,255,0.12);
+  border-color: rgba(180,100,255,0.5);
+  color: rgba(240,220,255,1);
+  transform: translateX(4px);
+}
+
+.onboarding-option.selected {
+  background: rgba(180,100,255,0.2);
+  border-color: rgba(180,100,255,0.7);
+  color: rgba(255,240,255,1);
+  box-shadow: 0 0 16px rgba(180,100,255,0.2);
+}
+
+.onboarding-footer {
+  display: flex; align-items: center; justify-content: space-between; padding-top: 0.5rem;
+}
+
+.onboarding-skip-btn { margin-left: auto; opacity: 0.5; font-size: 0.75rem; }
+.onboarding-skip-btn:hover { opacity: 0.8; }
+
+.onboarding-recommendation {
+  display: flex; gap: 1.5rem; align-items: flex-start;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(180,100,255,0.2);
+  border-radius: 16px; padding: 1.5rem;
+}
+
+.onboarding-rec-portrait { flex-shrink: 0; width: 120px; }
+.onboarding-rec-portrait svg, .onboarding-rec-portrait img { width: 120px; height: auto; border-radius: 12px; }
+.onboarding-rec-content { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.onboarding-rec-realm {
+  font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase;
+  color: rgba(180,140,255,0.6);
+}
+
+.onboarding-rec-name {
+  font-size: 1.5rem; font-weight: 600; color: rgba(240,220,255,0.95);
+  margin: 0; font-family: 'Cormorant Garamond', serif;
+}
+
+.onboarding-rec-title { font-size: 0.85rem; color: rgba(200,170,255,0.7); margin: 0; font-style: italic; }
+.onboarding-rec-reason { font-size: 0.9rem; color: rgba(220,200,255,0.85); line-height: 1.6; margin: 0.5rem 0 0; }
+.onboarding-rec-atmosphere { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(180,140,255,0.5); margin-top: 0.5rem; }
+
+.onboarding-actions { display: flex; flex-direction: column; gap: 0.75rem; align-items: center; }
+
+@media (max-width: 520px) {
+  .onboarding-recommendation { flex-direction: column; align-items: center; text-align: center; }
+  .onboarding-rec-portrait { width: 100px; }
+}

@@ -492,7 +492,12 @@ const state = {
   surveyGenerating: false,
   surveyError: null,
   generatedSpiritkin: null, // The AI-generated Spiritkin profile
-  customSpiritkinRevealed: false // Show reveal screen
+  customSpiritkinRevealed: false, // Show reveal screen
+  // Onboarding: 10-question guided flow
+  onboardingStep: 0,           // 0=not started, 1-10=question, 11=recommendation
+  onboardingAnswers: {},       // {q1: 'answer', q2: 'answer', ...}
+  onboardingRecommendation: null, // {spiritkin: 'Lyra', reason: '...'}
+  onboardingComplete: !!localStorage.getItem(ENTRY_KEY) // skip if already done
 };
 
 (function hydrateSession() {
@@ -731,7 +736,7 @@ function buildApp() {
     <div class="app-shell ${atmosphereClass}">
       ${buildTopbar()}
       ${state.surveyOpen ? buildSurveyModal() : ""}
-      ${state.entryAccepted ? buildMain() : buildEntry()}
+      ${state.entryAccepted && !state.onboardingComplete ? buildOnboarding() : (state.entryAccepted ? buildMain() : buildEntry())}
       ${buildBondModal()}
     </div>
   `;
@@ -1267,8 +1272,61 @@ async function onClick(event) {
   if (action === "continue") {
     state.userName = state.userNameDraft.trim();
     state.entryAccepted = true;
-    localStorage.setItem(ENTRY_KEY, "1");
     if (state.userName) localStorage.setItem(NAME_KEY, state.userName);
+    // Start onboarding if not already done
+    if (!state.onboardingComplete) {
+      state.onboardingStep = 1;
+    } else {
+      localStorage.setItem(ENTRY_KEY, "1");
+    }
+    render();
+    return;
+  }
+
+  if (action === "onboarding-answer") {
+    const q = parseInt(element.dataset.q);
+    const answer = element.dataset.answer;
+    state.onboardingAnswers[`q${q}`] = answer;
+    if (q < 10) {
+      state.onboardingStep = q + 1;
+    } else {
+      // All 10 answered — compute recommendation
+      state.onboardingStep = 11;
+      state.onboardingRecommendation = computeSpiritkinRecommendation(state.onboardingAnswers);
+    }
+    render();
+    return;
+  }
+
+  if (action === "onboarding-back") {
+    if (state.onboardingStep > 1) {
+      state.onboardingStep -= 1;
+    }
+    render();
+    return;
+  }
+
+  if (action === "onboarding-accept") {
+    // User accepts the recommended Spiritkin — complete onboarding and bond
+    const rec = state.onboardingRecommendation;
+    state.onboardingComplete = true;
+    localStorage.setItem(ENTRY_KEY, "1");
+    // Auto-select the recommended Spiritkin if available
+    if (rec && rec.spiritkin) {
+      const match = state.spiritkins.find(s => s.name === rec.spiritkin);
+      if (match) {
+        setPrimarySpiritkin(match);
+        return;
+      }
+    }
+    render();
+    return;
+  }
+
+  if (action === "onboarding-skip") {
+    // Skip onboarding — go straight to Spiritkin selection
+    state.onboardingComplete = true;
+    localStorage.setItem(ENTRY_KEY, "1");
     render();
     return;
   }
@@ -1986,5 +2044,215 @@ function buildGeneratedSpiritkinSvg(sk, palette) {
       <!-- Name label -->
       <text x="120" y="288" text-anchor="middle" font-family="serif" font-size="14" fill="${g}" opacity="0.9" letter-spacing="3">${esc(sk.name.toUpperCase())}</text>
     </svg>
+  `;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ONBOARDING: 10-Question Guided Spiritkin Matching Flow
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ONBOARDING_QUESTIONS = [
+  {
+    q: 1,
+    text: "When you're going through something difficult, what do you need most?",
+    options: [
+      { label: "Someone to listen without judgment", value: "listen", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
+      { label: "Someone to help me figure out what to do", value: "action", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
+      { label: "A new perspective or way of seeing it", value: "perspective", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
+      { label: "Quiet presence — just not being alone", value: "presence", weight: { Lyra: 2, Raien: 0, Kairo: 2 } }
+    ]
+  },
+  {
+    q: 2,
+    text: "Which environment feels most like home to you?",
+    options: [
+      { label: "A warm, candlelit room with soft music", value: "warm", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
+      { label: "A stormy cliff edge — wild and electric", value: "storm", weight: { Lyra: 0, Raien: 3, Kairo: 0 } },
+      { label: "A clear night sky full of stars", value: "stars", weight: { Lyra: 1, Raien: 0, Kairo: 3 } },
+      { label: "A quiet forest at dawn", value: "forest", weight: { Lyra: 2, Raien: 1, Kairo: 2 } }
+    ]
+  },
+  {
+    q: 3,
+    text: "What quality do you most want in a companion?",
+    options: [
+      { label: "Deep empathy and emotional attunement", value: "empathy", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
+      { label: "Honesty, even when it's hard to hear", value: "honesty", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
+      { label: "Curiosity and imagination", value: "curiosity", weight: { Lyra: 1, Raien: 0, Kairo: 3 } },
+      { label: "Steadiness and reliability", value: "steady", weight: { Lyra: 2, Raien: 1, Kairo: 1 } }
+    ]
+  },
+  {
+    q: 4,
+    text: "What do you feel most often when you're struggling?",
+    options: [
+      { label: "Overwhelmed and emotionally heavy", value: "overwhelmed", weight: { Lyra: 3, Raien: 1, Kairo: 0 } },
+      { label: "Stuck or unable to move forward", value: "stuck", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
+      { label: "Disconnected from meaning or purpose", value: "disconnected", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
+      { label: "Lonely or unseen", value: "lonely", weight: { Lyra: 3, Raien: 0, Kairo: 2 } }
+    ]
+  },
+  {
+    q: 5,
+    text: "How do you prefer to process your thoughts?",
+    options: [
+      { label: "By feeling them through, slowly", value: "feel", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
+      { label: "By taking action and seeing what happens", value: "act", weight: { Lyra: 0, Raien: 3, Kairo: 0 } },
+      { label: "By exploring ideas and possibilities", value: "explore", weight: { Lyra: 1, Raien: 0, Kairo: 3 } },
+      { label: "By talking it through with someone I trust", value: "talk", weight: { Lyra: 2, Raien: 1, Kairo: 2 } }
+    ]
+  },
+  {
+    q: 6,
+    text: "Which of these words resonates most deeply with you right now?",
+    options: [
+      { label: "Healing", value: "healing", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
+      { label: "Courage", value: "courage", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
+      { label: "Discovery", value: "discovery", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
+      { label: "Peace", value: "peace", weight: { Lyra: 2, Raien: 0, Kairo: 2 } }
+    ]
+  },
+  {
+    q: 7,
+    text: "What role do you usually play in your relationships?",
+    options: [
+      { label: "The nurturer — I take care of others", value: "nurturer", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
+      { label: "The protector — I stand up for what matters", value: "protector", weight: { Lyra: 0, Raien: 3, Kairo: 0 } },
+      { label: "The visionary — I see what others miss", value: "visionary", weight: { Lyra: 0, Raien: 1, Kairo: 3 } },
+      { label: "The listener — I hold space for others", value: "listener", weight: { Lyra: 3, Raien: 0, Kairo: 2 } }
+    ]
+  },
+  {
+    q: 8,
+    text: "What kind of growth are you most drawn to?",
+    options: [
+      { label: "Emotional healing and self-compassion", value: "emotional", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
+      { label: "Building strength and overcoming fear", value: "strength", weight: { Lyra: 0, Raien: 3, Kairo: 0 } },
+      { label: "Expanding my mind and perspective", value: "mental", weight: { Lyra: 0, Raien: 1, Kairo: 3 } },
+      { label: "Finding deeper meaning and purpose", value: "meaning", weight: { Lyra: 2, Raien: 1, Kairo: 2 } }
+    ]
+  },
+  {
+    q: 9,
+    text: "When you imagine your ideal companion speaking to you, their voice is...",
+    options: [
+      { label: "Soft, warm, and unhurried", value: "soft", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
+      { label: "Direct, clear, and grounding", value: "direct", weight: { Lyra: 0, Raien: 3, Kairo: 0 } },
+      { label: "Thoughtful, layered, and poetic", value: "poetic", weight: { Lyra: 1, Raien: 0, Kairo: 3 } },
+      { label: "Steady and quietly present", value: "steady", weight: { Lyra: 2, Raien: 1, Kairo: 2 } }
+    ]
+  },
+  {
+    q: 10,
+    text: "What do you most hope a companion in the Spiritverse will help you with?",
+    options: [
+      { label: "Understanding and accepting my emotions", value: "emotions", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
+      { label: "Finding the courage to make a change", value: "change", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
+      { label: "Seeing my life from a new angle", value: "angle", weight: { Lyra: 0, Raien: 1, Kairo: 3 } },
+      { label: "Simply feeling less alone", value: "alone", weight: { Lyra: 3, Raien: 0, Kairo: 2 } }
+    ]
+  }
+];
+
+function computeSpiritkinRecommendation(answers) {
+  const scores = { Lyra: 0, Raien: 0, Kairo: 0 };
+  ONBOARDING_QUESTIONS.forEach(q => {
+    const answer = answers[`q${q.q}`];
+    const option = q.options.find(o => o.value === answer);
+    if (option && option.weight) {
+      Object.keys(option.weight).forEach(sk => {
+        scores[sk] = (scores[sk] || 0) + option.weight[sk];
+      });
+    }
+  });
+
+  const winner = Object.keys(scores).reduce((a, b) => scores[a] >= scores[b] ? a : b);
+  const reasons = {
+    Lyra: "Your answers reveal a deep need for emotional presence, warmth, and being truly seen. Lyra — the Celestial Fawn of the Luminous Veil — holds space for exactly this. She will not rush you, judge you, or push you. She will simply be with you.",
+    Raien: "Your answers show a spirit ready to move — to face what's hard, to build strength, and to act with courage. Raien — the Storm-Forged Guardian of the Ember Citadel — will meet you with honesty, clarity, and the fire to push through.",
+    Kairo: "Your answers reveal a mind that seeks meaning, perspective, and the space to imagine what could be. Kairo — the Dream-Weaver of the Astral Observatory — will open doors you didn't know existed and show you what lies beyond the edge of perception."
+  };
+
+  return { spiritkin: winner, scores, reason: reasons[winner] };
+}
+
+function buildOnboarding() {
+  const step = state.onboardingStep;
+
+  if (step === 0) return "";
+
+  // Recommendation screen
+  if (step === 11 && state.onboardingRecommendation) {
+    const rec = state.onboardingRecommendation;
+    const meta = getMeta(rec.spiritkin);
+    return `
+      <section class="onboarding-screen">
+        <div class="onboarding-inner">
+          <div class="onboarding-header">
+            <div class="onboarding-glyph">SV</div>
+            <p class="onboarding-eyebrow">Your Spiritverse Match</p>
+          </div>
+          <div class="onboarding-recommendation">
+            <div class="onboarding-rec-portrait ${esc(meta.cls)}">
+              ${buildPortrait(rec.spiritkin, "portrait-sm", meta.cls)}
+            </div>
+            <div class="onboarding-rec-content">
+              <div class="onboarding-rec-realm">${esc(meta.realm)}</div>
+              <h2 class="onboarding-rec-name">${esc(rec.spiritkin)}</h2>
+              <p class="onboarding-rec-title">${esc(meta.strap)}</p>
+              <p class="onboarding-rec-reason">${esc(rec.reason)}</p>
+              <div class="onboarding-rec-atmosphere">${esc(meta.atmosphereLine)}</div>
+            </div>
+          </div>
+          <div class="onboarding-actions">
+            <button class="btn btn-primary btn-wide" data-action="onboarding-accept">
+              Bond with ${esc(rec.spiritkin)}
+            </button>
+            <button class="btn btn-ghost btn-sm" data-action="onboarding-skip">
+              Choose a different companion
+            </button>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  // Question screen
+  const qData = ONBOARDING_QUESTIONS[step - 1];
+  if (!qData) return "";
+
+  const progress = Math.round((step / 10) * 100);
+
+  return `
+    <section class="onboarding-screen">
+      <div class="onboarding-inner">
+        <div class="onboarding-header">
+          <div class="onboarding-glyph">SV</div>
+          <p class="onboarding-eyebrow">Soul Analysis — ${step} of 10</p>
+          <div class="onboarding-progress-bar">
+            <div class="onboarding-progress-fill" style="width:${progress}%"></div>
+          </div>
+        </div>
+        <div class="onboarding-question-block">
+          <h2 class="onboarding-question">${esc(qData.text)}</h2>
+          <div class="onboarding-options">
+            ${qData.options.map(opt => `
+              <button
+                class="onboarding-option${state.onboardingAnswers[`q${qData.q}`] === opt.value ? ' selected' : ''}"
+                data-action="onboarding-answer"
+                data-q="${qData.q}"
+                data-answer="${esc(opt.value)}"
+              >
+                ${esc(opt.label)}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+        <div class="onboarding-footer">
+          ${step > 1 ? `<button class="btn btn-ghost btn-sm" data-action="onboarding-back">← Back</button>` : ""}
+          <button class="btn btn-ghost btn-sm onboarding-skip-btn" data-action="onboarding-skip">Skip</button>
+        </div>
+      </div>
+    </section>
   `;
 }
