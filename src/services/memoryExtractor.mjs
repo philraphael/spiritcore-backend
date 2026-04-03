@@ -4,17 +4,14 @@
  * Runs asynchronously after each interaction to extract semantic facts
  * from the user's message and persist them to the memories table.
  *
- * This is the bridge between raw conversation and deep memory —
- * transforming what users say into what Spiritkins remember.
+ * Uses native fetch (same pattern as openai.shared.mjs) — no openai package required.
  *
  * Memory kinds:
  *   - "semantic"  : structured facts (name, relationships, goals, fears)
  *   - "episodic"  : significant emotional events
  *   - "procedural": interaction patterns and preferences
  */
-import OpenAI from "openai";
-
-const client = new OpenAI();
+import { config } from "../config.mjs";
 
 const EXTRACTION_PROMPT = `You are a memory extraction engine for SpiritCore, an AI companion platform.
 
@@ -34,39 +31,54 @@ Rules:
 - Return [] if there are no meaningful facts to extract
 - Maximum 3 memories per message
 - Do not extract generic statements like "I'm fine" or "I had a good day"
-- Do not extract things that are already obvious from context
 - Keep content under 100 characters
 - Always return valid JSON array, nothing else`;
 
 /**
- * Extract semantic memories from a user message.
+ * Extract semantic memories from a user message using native fetch.
  * Returns array of {kind, content, weight} objects.
  */
 async function extractMemories(userMessage) {
   if (!userMessage || userMessage.trim().length < 10) return [];
+  if (!config.openai?.apiKey) return [];
 
   try {
-    const response = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
-        { role: "system", content: EXTRACTION_PROMPT },
-        { role: "user", content: `User message: "${userMessage.slice(0, 500)}"` }
-      ],
-      temperature: 0.1,
-      max_tokens: 300,
-      response_format: { type: "json_object" }
+    const baseUrl = (config.openai.baseUrl || "https://api.openai.com/v1").replace(/\/$/, "");
+    const model = config.openai.model || "gpt-4.1-mini";
+
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.openai.apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: EXTRACTION_PROMPT },
+          { role: "user", content: `User message: "${userMessage.slice(0, 500)}"` },
+        ],
+        temperature: 0.1,
+        max_tokens: 300,
+      }),
     });
 
-    const raw = response.choices[0]?.message?.content ?? "{}";
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const raw = data?.choices?.[0]?.message?.content?.trim() ?? "";
+    if (!raw) return [];
+
     let parsed;
     try {
-      parsed = JSON.parse(raw);
+      // Handle both direct array and wrapped object responses
+      const match = raw.match(/\[[\s\S]*\]/);
+      parsed = match ? JSON.parse(match[0]) : [];
     } catch {
       return [];
     }
 
-    // Handle both {memories: [...]} and direct array responses
-    const arr = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.memories) ? parsed.memories : []);
+    const arr = Array.isArray(parsed) ? parsed : [];
     return arr
       .filter(m => m && typeof m.content === "string" && m.content.trim().length > 5)
       .slice(0, 3);
@@ -104,8 +116,8 @@ export function createMemoryExtractor({ memoryService }) {
               weight: mem.weight ?? 1,
               conversationId: conversationId ?? null,
               source: "auto_extract",
-              extractedAt: new Date().toISOString()
-            }
+              extractedAt: new Date().toISOString(),
+            },
           })
         )
       );
