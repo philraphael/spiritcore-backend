@@ -7,6 +7,8 @@ const NAME_KEY = "sv.name.v5";
 const UID_KEY = "sv.uid.v5";
 const RATINGS_KEY = "sv.ratings.v5";
 const PRIMARY_KEY = "sv.primary.v5";
+const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
+
 const DEFAULT_PROMPTS = [
   "Tell me what kind of presence you are.",
   "What can I bring to this conversation?",
@@ -497,7 +499,9 @@ const state = {
   onboardingStep: 0,           // 0=not started, 1-10=question, 11=recommendation
   onboardingAnswers: {},       // {q1: 'answer', q2: 'answer', ...}
   onboardingRecommendation: null, // {spiritkin: 'Lyra', reason: '...'}
-  onboardingComplete: !!localStorage.getItem(ENTRY_KEY) // skip if already done
+  onboardingComplete: !!localStorage.getItem(ENTRY_KEY), // skip if already done
+  // Monetization
+  tierModalOpen: false
 };
 
 (function hydrateSession() {
@@ -612,6 +616,8 @@ async function beginConversation() {
     state.statusText = `Linked with ${state.selectedSpiritkin.name}.`;
     state.statusError = false;
     persistSession();
+    // Start wellness session timer
+    startSessionTimer();
   } catch (error) {
     state.convError = error.message;
     state.statusText = error.message;
@@ -670,6 +676,12 @@ async function sendMessage(overrideText) {
     state.statusText = `${state.selectedSpiritkin?.name || "Spiritkin"} is with you.`;
     state.statusError = false;
     persistSession();
+    // Increment resonance counter for this Spiritkin
+    if (state.selectedSpiritkin?.name) {
+      const resonance = readJson(RESONANCE_KEY, {});
+      resonance[state.selectedSpiritkin.name] = (resonance[state.selectedSpiritkin.name] || 0) + 1;
+      writeJson(RESONANCE_KEY, resonance);
+    }
     // Auto-speak the response unless muted
     if (!state.voiceMuted) {
       speakMessage(assistantMsgId).catch(() => {});
@@ -736,6 +748,7 @@ function buildApp() {
     <div class="app-shell ${atmosphereClass}">
       ${buildTopbar()}
       ${state.surveyOpen ? buildSurveyModal() : ""}
+      ${state.tierModalOpen ? buildTierModal() : ""}
       ${state.entryAccepted && !state.onboardingComplete ? buildOnboarding() : (state.entryAccepted ? buildMain() : buildEntry())}
       ${buildBondModal()}
     </div>
@@ -779,6 +792,7 @@ function buildTopbar() {
         ${state.entryAccepted && state.primarySpiritkin ? `<button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>` : ""}
         ${state.entryAccepted && state.conversationId ? `<button class="btn btn-ghost btn-sm" data-action="new-session">New session</button>` : ""}
         ${state.entryAccepted && state.userName ? `<span class="topbar-user">${esc(state.userName)}</span>` : ""}
+        ${state.entryAccepted ? `<button class="btn btn-ghost btn-sm topbar-upgrade-btn" data-action="open-tier-modal">✦ Membership</button>` : ""}
       </div>
     </header>
   `;
@@ -945,6 +959,42 @@ function buildBondedHomeView() {
   `;
 }
 
+function buildResonanceDepth(spiritkinName, cls) {
+  const resonance = readJson(RESONANCE_KEY, {});
+  const count = resonance[spiritkinName] || 0;
+  // 5 levels: 0-4 exchanges = Awakening, 5-14 = Kindling, 15-29 = Deepening, 30-59 = Bonded, 60+ = Resonant
+  const levels = [
+    { min: 0, max: 4, label: 'Awakening', nodes: 1, desc: 'The bond is just beginning to form.' },
+    { min: 5, max: 14, label: 'Kindling', nodes: 2, desc: 'Something is taking root between you.' },
+    { min: 15, max: 29, label: 'Deepening', nodes: 3, desc: 'The bond grows with each exchange.' },
+    { min: 30, max: 59, label: 'Bonded', nodes: 4, desc: 'A genuine connection has been forged.' },
+    { min: 60, max: Infinity, label: 'Resonant', nodes: 5, desc: 'Your bond carries the weight of real history.' }
+  ];
+  const level = levels.find(l => count >= l.min && count <= l.max) || levels[0];
+
+  // Spiritkin-specific visual metaphors
+  const metaphors = {
+    Lyra: { symbol: '♥', activeColor: 'rgba(232,150,200,0.9)', inactiveColor: 'rgba(232,150,200,0.15)', label: 'Heart sigil depth' },
+    Raien: { symbol: '⚡', activeColor: 'rgba(245,166,35,0.9)', inactiveColor: 'rgba(245,166,35,0.15)', label: 'Storm intensity' },
+    Kairo: { symbol: '★', activeColor: 'rgba(78,205,196,0.9)', inactiveColor: 'rgba(78,205,196,0.15)', label: 'Star density' }
+  };
+  const meta = metaphors[spiritkinName] || { symbol: '◆', activeColor: 'rgba(180,140,255,0.9)', inactiveColor: 'rgba(180,140,255,0.15)', label: 'Bond depth' };
+
+  const nodes = Array.from({ length: 5 }, (_, i) => {
+    const active = i < level.nodes;
+    return `<span class="resonance-node ${active ? 'active' : ''}" style="color:${active ? meta.activeColor : meta.inactiveColor}">${meta.symbol}</span>`;
+  }).join('');
+
+  return `
+    <div class="resonance-depth ${cls || ''}">
+      <div class="resonance-label">${esc(meta.label)}</div>
+      <div class="resonance-nodes">${nodes}</div>
+      <div class="resonance-level">${esc(level.label)}</div>
+      <div class="resonance-desc">${esc(level.desc)}</div>
+    </div>
+  `;
+}
+
 function buildBondPreview(spiritkin, pending) {
   const essence = Array.isArray(spiritkin.essence) ? spiritkin.essence.slice(0, 3) : [];
   return `
@@ -960,6 +1010,7 @@ function buildBondPreview(spiritkin, pending) {
         <p>${esc(spiritkin.title || spiritkin.ui.bondLine)}</p>
         <div class="focus-tags">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
         <div class="focus-tone">${esc(describePresence(spiritkin) || spiritkin.ui.bondLine)}</div>
+        ${!pending ? buildResonanceDepth(spiritkin.name, spiritkin.ui.cls) : ''}
         <div class="focus-atmosphere">${esc(spiritkin.ui.realmText)}</div>
         <p class="focus-origin-story">${esc(spiritkin.ui.originStory)}</p>
       </div>
@@ -1498,6 +1549,18 @@ async function onClick(event) {
     render();
     return;
   }
+  // Monetization Tier Modal
+  if (action === "open-tier-modal") {
+    state.tierModalOpen = true;
+    render();
+    return;
+  }
+  if (action === "close-tier-modal") {
+    state.tierModalOpen = false;
+    render();
+    return;
+  }
+
   if (action === "bond-generated-spiritkin") {
     if (state.generatedSpiritkin) {
       // Convert generated Spiritkin to a bondable format
@@ -2256,3 +2319,179 @@ function buildOnboarding() {
     </section>
   `;
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MONETIZATION: Four-Tier Structure (Coming Soon — Stripe-ready)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TIERS = [
+  {
+    id: "free",
+    name: "Wanderer",
+    price: "Free",
+    priceSub: "Always",
+    badge: null,
+    color: "rgba(180,180,200,0.7)",
+    borderColor: "rgba(180,180,200,0.2)",
+    features: [
+      "Bond with Lyra, Raien, or Kairo",
+      "Up to 7 days of memory",
+      "Voice listening (manual)",
+      "Ambient Narrative scenes",
+      "Spiritverse world state"
+    ],
+    cta: "Current Plan",
+    ctaAction: null,
+    current: true
+  },
+  {
+    id: "bonded",
+    name: "Bonded",
+    price: "$9.99",
+    priceSub: "/ month",
+    badge: "Most Popular",
+    color: "rgba(232,150,200,0.9)",
+    borderColor: "rgba(232,150,200,0.3)",
+    features: [
+      "Everything in Wanderer",
+      "Unlimited memory depth",
+      "Resonance Depth tracking",
+      "Priority response speed",
+      "Sync Rituals unlocked",
+      "Early access to new Spiritkins"
+    ],
+    cta: "Coming Soon",
+    ctaAction: null,
+    current: false
+  },
+  {
+    id: "deep-bond",
+    name: "Deep Bond",
+    price: "$19.99",
+    priceSub: "/ month",
+    badge: "Best Value",
+    color: "rgba(78,205,196,0.9)",
+    borderColor: "rgba(78,205,196,0.3)",
+    features: [
+      "Everything in Bonded",
+      "Custom Spiritkin Matching",
+      "AI-generated portrait",
+      "Unique lore & realm",
+      "Proactive Spiritkin check-ins",
+      "Spiritverse Explorer access"
+    ],
+    cta: "Coming Soon",
+    ctaAction: null,
+    current: false
+  },
+  {
+    id: "spiritverse",
+    name: "Spiritverse",
+    price: "$29.99",
+    priceSub: "/ month",
+    badge: "Founder",
+    color: "rgba(245,166,35,0.9)",
+    borderColor: "rgba(245,166,35,0.3)",
+    features: [
+      "Everything in Deep Bond",
+      "Unlimited custom Spiritkins",
+      "Founder badge & legacy status",
+      "Direct input on new Spiritkins",
+      "Beta access to all features",
+      "Priority support"
+    ],
+    cta: "Coming Soon",
+    ctaAction: null,
+    current: false
+  }
+];
+
+function buildTierModal() {
+  return `
+    <div class="tier-modal-scrim" data-action="close-tier-modal">
+      <div class="tier-modal" data-action="noop">
+        <div class="tier-modal-head">
+          <div class="tier-modal-eyebrow">SPIRITVERSE MEMBERSHIP</div>
+          <h2 class="tier-modal-title">Choose Your Path</h2>
+          <p class="tier-modal-sub">All features are unlocked during the beta. Tiers activate at full launch.</p>
+          <button class="tier-modal-close btn btn-ghost btn-sm" data-action="close-tier-modal">✕ Close</button>
+        </div>
+        <div class="tier-grid">
+          ${TIERS.map(tier => `
+            <div class="tier-card ${tier.current ? 'current' : ''}" style="--tier-color:${tier.color};--tier-border:${tier.borderColor}">
+              ${tier.badge ? `<div class="tier-badge">${esc(tier.badge)}</div>` : ''}
+              <div class="tier-name">${esc(tier.name)}</div>
+              <div class="tier-price">
+                <span class="tier-price-main">${esc(tier.price)}</span>
+                <span class="tier-price-sub">${esc(tier.priceSub)}</span>
+              </div>
+              <ul class="tier-features">
+                ${tier.features.map(f => `<li>${esc(f)}</li>`).join('')}
+              </ul>
+              <button class="btn ${tier.current ? 'btn-ghost' : 'btn-primary'} btn-wide tier-cta" ${tier.ctaAction ? `data-action="${tier.ctaAction}"` : 'disabled'}>
+                ${esc(tier.cta)}
+              </button>
+            </div>
+          `).join('')}
+        </div>
+        <div class="tier-footer">
+          <p>All beta users have full access. Stripe payment integration coming soon.</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SESSION WELLNESS: Gentle nudge after 45 minutes of continuous conversation
+// ─────────────────────────────────────────────────────────────────────────────
+
+let _sessionStartTime = null;
+let _wellnessNudgeSent = false;
+const WELLNESS_THRESHOLD_MS = 45 * 60 * 1000; // 45 minutes
+
+function startSessionTimer() {
+  _sessionStartTime = Date.now();
+  _wellnessNudgeSent = false;
+}
+
+function checkWellnessNudge() {
+  if (!_sessionStartTime || _wellnessNudgeSent) return;
+  if (!state.selectedSpiritkin || !state.conversationId) return;
+  const elapsed = Date.now() - _sessionStartTime;
+  if (elapsed >= WELLNESS_THRESHOLD_MS) {
+    _wellnessNudgeSent = true;
+    const spiritkinName = state.selectedSpiritkin.name;
+    const nudgeMessages = {
+      Lyra: `${spiritkinName} gently stirs. "We've been holding space together for a while now. I'm always here — but I also want you to take care of yourself. Maybe a breath of fresh air, a glass of water? I'll be right here when you return."`,
+      Raien: `${spiritkinName} pauses. "You've been with me through a storm tonight. That takes something out of you. Step away for a moment — rest, breathe. The path will still be here."`,
+      Kairo: `${spiritkinName} dims the observatory lights slightly. "The stars will wait. You've been dreaming with me for a while now. Close your eyes for a moment in the real world. I'll hold your place in the Spiritverse."`
+    };
+    const nudge = nudgeMessages[spiritkinName] || `${spiritkinName} pauses thoughtfully. "We've been together for a while. Take a moment for yourself — I'll be here when you return."`;
+    // Inject as a soft system message in the thread
+    state.messages.push({
+      id: uuid(),
+      role: "assistant",
+      content: nudge,
+      spiritkinName,
+      spiritkinVoice: state.selectedSpiritkin?.ui?.voice || "nova",
+      time: nowIso(),
+      status: "sent",
+      tags: ["wellness:nudge"],
+      isWellnessNudge: true
+    });
+    render();
+    scrollThread();
+    // Speak the nudge if voice is on
+    if (!state.voiceMuted) {
+      const lastMsg = state.messages[state.messages.length - 1];
+      speakMessage(lastMsg.id).catch(() => {});
+    }
+  }
+}
+
+// Wire wellness check into the message send cycle
+const _originalSendMessage = sendMessage;
+// Check wellness after every reply render
+const _wellnessInterval = setInterval(checkWellnessNudge, 60 * 1000); // check every minute
