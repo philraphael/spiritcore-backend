@@ -126,6 +126,37 @@ if (DEBUG) {
 
 // Root
 app.get("/", async (req, reply) => {
+  if (req.headers["accept"]?.includes("text/html")) {
+    return reply.type("text/html").send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>SpiritCore Gateway</title>
+          <style>
+              body { background: #0a0514; color: #e0d5f0; font-family: 'Manrope', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+              .card { background: rgba(255,255,255,0.05); padding: 3rem; border-radius: 24px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.5); max-width: 400px; }
+              h1 { font-family: 'Cormorant Garamond', serif; font-size: 2.5rem; margin-bottom: 0.5rem; color: #fff; }
+              p { opacity: 0.7; margin-bottom: 2rem; line-height: 1.6; }
+              .btn { display: block; width: 100%; padding: 1rem; margin-bottom: 1rem; border-radius: 12px; text-decoration: none; font-weight: 700; transition: all 0.3s ease; box-sizing: border-box; }
+              .btn-primary { background: #7c4dff; color: #fff; }
+              .btn-primary:hover { background: #9575cd; transform: translateY(-2px); }
+              .btn-secondary { background: rgba(255,255,255,0.1); color: #e0d5f0; border: 1px solid rgba(255,255,255,0.2); }
+              .btn-secondary:hover { background: rgba(255,255,255,0.15); transform: translateY(-2px); }
+          </style>
+      </head>
+      <body>
+          <div class="card">
+              <h1>SpiritCore</h1>
+              <p>Welcome to the governing intelligence of the Spiritverse.</p>
+              <a href="/command-center" class="btn btn-primary">Open Command Center</a>
+              <a href="/app" class="btn btn-secondary">Enter Spiritverse App</a>
+          </div>
+      </body>
+      </html>
+    `);
+  }
   return {
     ok: true,
     name: "SpiritCore",
