@@ -1,0 +1,70 @@
+{
+  "services": [
+    "analyticsService.mjs",
+    "contextService.mjs",
+    "conversationService.mjs",
+    "emotionService.mjs",
+    "entitlements.mjs",
+    "episodeService.mjs",
+    "feedbackService.mjs",
+    "identityGovernor.mjs",
+    "memory.mjs",
+    "memoryExtractor.mjs",
+    "messageService.mjs",
+    "orchestrator.mjs",
+    "safetyClassifier.mjs",
+    "safetyGovernor.mjs",
+    "spiritkinRegistry.mjs",
+    "world.mjs"
+  ],
+  "routes": [
+    "analytics.mjs",
+    "conversations.mjs",
+    "entitlements.mjs",
+    "health.mjs",
+    "interact.mjs",
+    "memory.mjs",
+    "spiritkins.mjs",
+    "world.mjs"
+  ],
+  "schemas": [
+    "004_analytics_feedback_schema.sql" 
+  ],
+  "models": [
+    "spiritkinIdentity.mjs"
+  ],
+  "adapters": [
+    "adapter.contract.mjs",
+    "localAdapter.mjs",
+    "openai.shared.mjs",
+    "openaiAdapter.mjs",
+    "templateAdapter.mjs"
+  ],
+  "middleware": [
+    "rateLimiter.mjs"
+  ],
+  "utils": [
+    "id.mjs",
+    "sanitize.mjs",
+    "time.mjs",
+    "timeout.mjs"
+  ],
+  "bus": [
+    "eventBus.mjs"
+  ],
+  "config": [
+    "config.mjs"
+  ],
+  "container": [
+    "container.mjs"
+  ],
+  "errors": [
+    "errors.mjs"
+  ],
+  "logger": [
+    "logger.mjs"
+  ],
+  "supabase": [
+    "supabase.mjs"
+  ]
+}

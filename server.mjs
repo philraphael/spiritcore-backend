@@ -163,7 +163,7 @@ app.get("/command-center", async (_req, reply) => {
 
 app.get("/app/:asset", async (req, reply) => {
   const { asset } = req.params;
-  if (!["app.js", "styles.css", "reveal-animation.js", "video-player.js", "command-center.js", "command-center.css"].includes(asset)) {
+  if (!["app.js", "styles.css", "reveal-animation.js", "video-player.js", "command-center.js", "command-center.css", "spirit-icons.svg", "spirit-background.jpg"].includes(asset)) {
     return reply.code(404).send({ ok: false, error: "Not found" });
   }
 
