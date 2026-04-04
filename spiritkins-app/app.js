@@ -831,6 +831,12 @@ function buildEntry() {
               Your browser does not support the video tag.
             </video>
             <div class="video-player-overlay"></div>
+            <div class="video-player-controls-overlay">
+              <button class="video-unmute-btn" data-action="unmute-video" title="Unmute audio">
+                <span class="unmute-icon">🔊</span>
+                <span class="unmute-text">Sound On</span>
+              </button>
+            </div>
             <div class="video-player-autoplay-badge">Autoplay</div>
           </div>
         </div>
@@ -1055,6 +1061,12 @@ function buildBondPreview(spiritkin, pending) {
                   Your browser does not support the video tag.
                 </video>
                 <div class="video-player-overlay"></div>
+                <div class="video-player-controls-overlay">
+                  <button class="video-unmute-btn" data-action="unmute-video" title="Unmute audio">
+                    <span class="unmute-icon">🔊</span>
+                    <span class="unmute-text">Sound On</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1378,6 +1390,22 @@ async function onClick(event) {
   const action = element.dataset.action;
 
   if (action === "noop") return;
+
+  if (action === "unmute-video") {
+    const video = event.target.closest(".video-player-wrapper")?.querySelector("video");
+    if (video) {
+      video.muted = !video.muted;
+      const btn = event.target.closest(".video-unmute-btn");
+      if (btn) {
+        if (video.muted) {
+          btn.innerHTML = '<span class="unmute-icon">🔊</span><span class="unmute-text">Sound On</span>';
+        } else {
+          btn.innerHTML = '<span class="unmute-icon">🔇</span><span class="unmute-text">Sound Off</span>';
+        }
+      }
+    }
+    return;
+  }
 
   if (action === "continue") {
     state.userName = state.userNameDraft.trim();

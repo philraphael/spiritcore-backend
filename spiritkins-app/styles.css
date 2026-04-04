@@ -2707,3 +2707,76 @@ button:disabled {
     font-size: 1.1rem;
   }
 }
+
+
+/* Video Controls Overlay - Unmute Button */
+.video-player-controls-overlay {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 100;
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.video-player-wrapper:hover .video-player-controls-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.video-unmute-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(242, 219, 160, 0.3);
+  border-radius: 20px;
+  color: var(--gold);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+  font-family: "Manrope", system-ui, sans-serif;
+}
+
+.video-unmute-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+  border-color: rgba(242, 219, 160, 0.6);
+  box-shadow: 0 4px 16px rgba(242, 219, 160, 0.2);
+  transform: translateY(-2px);
+}
+
+.video-unmute-btn:active {
+  transform: translateY(0);
+}
+
+.unmute-icon {
+  font-size: 16px;
+  display: inline-block;
+}
+
+.unmute-text {
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .video-unmute-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  
+  .unmute-icon {
+    font-size: 14px;
+  }
+  
+  .unmute-text {
+    font-size: 11px;
+  }
+}
