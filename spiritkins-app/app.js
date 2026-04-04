@@ -9,6 +9,10 @@ const RATINGS_KEY = "sv.ratings.v5";
 const PRIMARY_KEY = "sv.primary.v5";
 const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
 
+import RevealAnimation from "./reveal-animation.js";
+
+let revealAnimationInstance = null;
+
 const DEFAULT_PROMPTS = [
   "Tell me what kind of presence you are.",
   "What can I bring to this conversation?",
@@ -383,14 +387,14 @@ function portraitSvg(name) {
 }
 
 function buildPortrait(name, cls, size) {
-  console.log('[DEBUG] buildPortrait called with name:', name, 'type:', typeof name);
+
   const portraitMap = {
     "Lyra": "/portraits/lyra_portrait.png",
     "Raien": "/portraits/raien_portrait.png",
     "Kairo": "/portraits/kairo_portrait.png"
   };
   const portraitPath = portraitMap[name] || "";
-  console.log('[DEBUG] portraitPath:', portraitPath);
+
   const portraitContent = portraitPath 
     ? `<img src="${portraitPath}" alt="Portrait of ${name}" class="portrait-image" loading="lazy" />` 
     : portraitSvg(name);
@@ -730,7 +734,22 @@ function render() {
   const root = document.getElementById("root");
   if (!root) return;
   root.innerHTML = buildApp();
-  const textarea = root.querySelector("textarea[data-field='chat-input']");
+
+  // Handle RevealAnimation lifecycle
+  if (state.customSpiritkinRevealed && state.generatedSpiritkin) {
+    if (!revealAnimationInstance) {
+      const palette = state.generatedSpiritkin.ui.palette || { primary: "#2a1a4e", secondary: "#6a3a8e", glow: "#c080ff" };
+      revealAnimationInstance = new RevealAnimation("reveal-canvas", palette);
+      revealAnimationInstance.start();
+    }
+  } else {
+    if (revealAnimationInstance) {
+      revealAnimationInstance.stop();
+      revealAnimationInstance = null;
+    }
+  }
+
+  const textarea = root.querySelector("textarea[data-field=\'chat-input\']");
   if (textarea) {
     textarea.value = state.input;
     textarea.style.height = "auto";
@@ -801,6 +820,24 @@ function buildTopbar() {
 function buildEntry() {
   return `
     <section class="entry-screen">
+      <div class="entry-welcome-video">
+        <div class="video-player-container welcome-video">
+          <div class="video-player-wrapper welcome-video">
+            <video
+              class="video-player-element"
+              autoplay
+              muted
+              playsinline
+              preload="metadata"
+            >
+              <source src="/videos/welcome_intro.mp4" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+            <div class="video-player-overlay"></div>
+            <div class="video-player-autoplay-badge">Autoplay</div>
+          </div>
+        </div>
+      </div>
       <div class="entry-copy">
         <div class="entry-glyph-wrap">
           <div class="entry-glyph">SV</div>
@@ -997,9 +1034,33 @@ function buildResonanceDepth(spiritkinName, cls) {
 
 function buildBondPreview(spiritkin, pending) {
   const essence = Array.isArray(spiritkin.essence) ? spiritkin.essence.slice(0, 3) : [];
+  const introVideoMap = {
+    Lyra: '/videos/lyra_intro.mp4',
+    Raien: '/videos/raien_intro.mp4',
+    Kairo: '/videos/kairo_intro.mp4'
+  };
+  const introVideo = introVideoMap[spiritkin.name];
   return `
     <div class="selection-focus ${esc(spiritkin.ui.cls)} ${pending ? "pending" : "bonded"}">
       <div class="selection-focus-stage">
+        ${introVideo ? `
+          <div class="spiritkin-intro-video">
+            <div class="video-player-container spiritkin-intro">
+              <div class="video-player-wrapper spiritkin-intro">
+                <video
+                  class="video-player-element"
+                  muted
+                  playsinline
+                  preload="metadata"
+                >
+                  <source src="${introVideo}" type="video/mp4">
+                  Your browser does not support the video tag.
+                </video>
+                <div class="video-player-overlay"></div>
+              </div>
+            </div>
+          </div>
+        ` : ''}
         ${buildSigil(spiritkin.ui, "focus", spiritkin.ui.symbol)}
         ${buildPortrait(spiritkin.name, "portrait-focus", spiritkin.ui.cls)}
       </div>
@@ -1441,6 +1502,23 @@ async function onClick(event) {
     return;
   }
 
+  if (action === "bond-with-custom-spiritkin") {
+    if (state.generatedSpiritkin) {
+      setPrimarySpiritkin(state.generatedSpiritkin);
+      state.customSpiritkinRevealed = false;
+      state.generatedSpiritkin = null;
+    }
+    render();
+    return;
+  }
+
+  if (action === "cancel-custom-spiritkin") {
+    state.customSpiritkinRevealed = false;
+    state.generatedSpiritkin = null;
+    render();
+    return;
+  }
+
   if (action === "begin") { await beginConversation(); return; }
   if (action === "send") { await sendMessage(); return; }
   if (action === "prompt") { await sendMessage(element.dataset.prompt || ""); return; }
@@ -1714,20 +1792,20 @@ async function playAudio(buffer) {
       URL.revokeObjectURL(url);
     };
     audio.onerror = (e) => {
-      console.error("Audio error:", e);
+      // Audio error handler
     };
     
-    console.log("Attempting to play audio...");
+    // Attempting to play audio
     const playPromise = audio.play();
     
     if (playPromise !== undefined) {
       playPromise
         .then(() => {
-          console.log("✓ Audio is now playing");
+          // Audio is now playing
           _currentAudio = audio;
         })
         .catch(err => {
-          console.error("Audio play failed:", err.name, err.message);
+          // Audio play failed
           if (err.name === 'NotAllowedError') {
             state.statusText = "🔊 Click the speaker button to enable audio playback.";
           } else {
@@ -1740,7 +1818,7 @@ async function playAudio(buffer) {
       _currentAudio = audio;
     }
   } catch (e) {
-    console.error("Failed to create audio element:", e);
+    // Failed to create audio element
     state.statusText = "Failed to play audio: " + e.message;
     state.statusError = true;
     render();
@@ -1750,13 +1828,13 @@ async function playAudio(buffer) {
 async function speakMessage(messageId) {
   const message = state.messages.find(msg => msg.id === messageId);
   if (!message || !message.content) {
-    console.warn("speakMessage: No message found or no content");
+    // No message found or no content
     return;
   }
 
   try {
     const voice = message.spiritkinVoice || "nova";
-    console.log("Speaking message:", { messageId, voice, contentLength: message.content.length });
+    // Speaking message
     
     const res = await fetch("/v1/speech", {
       method: "POST",
@@ -1770,11 +1848,11 @@ async function speakMessage(messageId) {
     }
 
     const audioBuffer = await res.arrayBuffer();
-    console.log("Received audio buffer:", audioBuffer.byteLength, "bytes");
+    // Received audio buffer
     await playAudio(audioBuffer);
 
   } catch (error) {
-    console.error("Speech generation failed:", error);
+    // Speech generation failed
     state.statusText = "Speech generation failed: " + error.message;
     state.statusError = true;
     render();
@@ -1949,34 +2027,7 @@ function buildSurveyModal() {
   }
 
   if (state.generatedSpiritkin && state.customSpiritkinRevealed) {
-    const sk = state.generatedSpiritkin;
-    const palette = sk.svgPalette || { primary: "#2a1a4e", secondary: "#6a3a8e", glow: "#c080ff" };
-    return `
-      <div class="survey-overlay">
-        <div class="survey-modal reveal-full">
-          <button class="survey-close" data-action="close-survey">✕</button>
-          <div class="reveal-portrait-wrap">
-            ${buildGeneratedSpiritkinSvg(sk, palette)}
-          </div>
-          <div class="reveal-copy">
-            <div class="reveal-realm">${esc(sk.realm)}</div>
-            <h2 class="reveal-name">${esc(sk.name)}</h2>
-            <div class="reveal-archetype">${esc(sk.archetype)}</div>
-            <p class="reveal-strap">${esc(sk.strap)}</p>
-            <div class="reveal-form-label">Form</div>
-            <p class="reveal-form">${esc(sk.form)}</p>
-            <div class="reveal-origin-label">Origin</div>
-            <p class="reveal-origin">${esc(sk.originStory)}</p>
-            <div class="reveal-atmosphere">${esc(sk.atmosphereLine)}</div>
-            <div class="reveal-bond-line">${esc(sk.bondLine)}</div>
-            <div class="reveal-actions">
-              <button class="btn btn-premium btn-wide" data-action="bond-generated-spiritkin">Bond with ${esc(sk.name)}</button>
-              <button class="btn btn-ghost btn-sm" data-action="close-survey">Not yet</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
+    return buildCustomSpiritkinReveal();
   }
 
   if (state.surveyError) {
@@ -2037,6 +2088,37 @@ function buildSurveyModal() {
           `}
         </div>
         ${state.surveyStep > 0 ? `<button class="btn btn-ghost btn-sm survey-back" data-action="survey-back">← Back</button>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function buildCustomSpiritkinReveal() {
+  const sk = state.generatedSpiritkin;
+  if (!sk) return "";
+
+  const palette = sk.ui.palette || {};
+  const p = palette.primary || "#2a1a4e";
+  const s = palette.secondary || "#6a3a8e";
+  const g = palette.glow || "#c080ff";
+
+  return `
+    <div class="custom-spiritkin-reveal-screen">
+      <canvas id="reveal-canvas" class="reveal-canvas"></canvas>
+      <div class="reveal-content">
+        <div class="reveal-header">
+          <p class="eyebrow">Your new companion</p>
+          <h1 class="reveal-title">Behold, ${esc(sk.name)}!</h1>
+        </div>
+        <div class="reveal-portrait-wrap">
+          ${buildGeneratedSpiritkinSvg(sk, palette)}
+        </div>
+        <div class="reveal-details">
+          <p class="reveal-strap">${esc(sk.ui.strap)}</p>
+          <p class="reveal-realm">From the ${esc(sk.ui.realm)}</p>
+          <button class="btn btn-primary btn-wide" data-action="bond-with-custom-spiritkin">Bond with ${esc(sk.name)}</button>
+          <button class="btn btn-ghost btn-sm" data-action="cancel-custom-spiritkin">Not now</button>
+        </div>
       </div>
     </div>
   `;
