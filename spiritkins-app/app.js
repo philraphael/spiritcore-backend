@@ -2577,3 +2577,16 @@ function checkWellnessNudge() {
 const _originalSendMessage = sendMessage;
 // Check wellness after every reply render
 const _wellnessInterval = setInterval(checkWellnessNudge, 60 * 1000); // check every minute
+
+
+// ── Initialize the application ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  render();
+});
+
+// Also render immediately in case DOMContentLoaded has already fired
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', render);
+} else {
+  render();
+}
