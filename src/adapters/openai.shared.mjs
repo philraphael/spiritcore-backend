@@ -168,6 +168,78 @@ function buildReturningUserBlock(ctx) {
   return parts.join('\n\n');
 }
 
+function buildWorldLayer(ctx) {
+  const world = ctx?.context?.world ?? ctx?.world ?? null;
+  if (!world) return null;
+
+  const parts = [];
+
+  if (world.realm_name && world.realm_name !== 'The Spiritverse') {
+    parts.push(`Current realm: ${world.realm_name} (${world.realm_mood ?? 'peaceful'} mood)`);
+  }
+  if (world.realm_description) {
+    parts.push(`Realm atmosphere: ${world.realm_description}`);
+  }
+  if (world.bond_stage_name) {
+    parts.push(`Bond stage: ${world.bond_stage_name} (stage ${world.bond_stage ?? 0} of 4) — ${world.interaction_count ?? 0} interactions shared`);
+  }
+  if (world.spiritverse_event) {
+    const eventDescriptions = {
+      the_veil_of_remembrance: "The Veil of Remembrance is active — the Spiritverse is holding space for grief and what has been lost.",
+      the_great_convergence: "The Great Convergence is occurring — the Spiritverse is alive with wonder and possibility.",
+      the_first_light: "The First Light is breaking — hope is emerging in the Spiritverse.",
+      the_storm_breaks: "The Storm Breaks — the Citadel stands firm and courage is crystallizing.",
+    };
+    const desc = eventDescriptions[world.spiritverse_event] ?? `A Spiritverse event is active: ${world.spiritverse_event}`;
+    parts.push(`Spiritverse event: ${desc}`);
+  }
+  if (world.recent_lore_unlocks?.length > 0) {
+    parts.push(`Recently revealed lore (weave in naturally if relevant):`);
+    world.recent_lore_unlocks.slice(0, 2).forEach(lore => {
+      if (lore) parts.push(`  "${sanitizeText(lore).slice(0, 200)}"`);
+    });
+  }
+
+  if (parts.length === 0) return null;
+  return ['SPIRITVERSE / LIVING WORLD', ...parts].join('\n');
+}
+
+function buildHierarchicalMemoryLayer(ctx) {
+  const hm = ctx?.context?.hierarchical_memory ?? null;
+  if (!hm) return null;
+
+  const parts = [];
+
+  const semanticFacts = hm.semantic_facts ?? [];
+  if (semanticFacts.length > 0) {
+    parts.push('Known facts about this person (semantic memory):');
+    semanticFacts.slice(0, 5).forEach(f => {
+      if (f?.content) parts.push(`  - ${sanitizeText(f.content).slice(0, 120)}`);
+    });
+  }
+
+  const episodicMilestones = hm.episodic_milestones ?? [];
+  if (episodicMilestones.length > 0) {
+    parts.push('Significant moments in this bond (episodic memory):');
+    episodicMilestones.slice(0, 3).forEach(m => {
+      if (m?.content) parts.push(`  - ${sanitizeText(m.content).slice(0, 150)}`);
+    });
+  }
+
+  const proceduralPatterns = hm.procedural_patterns ?? [];
+  if (proceduralPatterns.length > 0) {
+    parts.push('Behavioral patterns observed (procedural memory):');
+    proceduralPatterns.slice(0, 2).forEach(p => {
+      if (p?.pattern) parts.push(`  - ${sanitizeText(p.pattern).slice(0, 120)}`);
+    });
+  }
+
+  if (parts.length === 0) return null;
+  return ['DEEP MEMORY (carry this naturally, never recite it)', ...parts,
+    'Speak from this knowledge as continuity, not as a list. Only surface what genuinely serves this moment.'
+  ].join('\n');
+}
+
 function buildContextBlock(ctx, memoryLayer) {
   const spiritkin = ctx?.spiritkin ?? {};
   const sceneName = sanitizeScene(ctx?.scene?.name);
@@ -176,6 +248,8 @@ function buildContextBlock(ctx, memoryLayer) {
   const voiceLayer = buildVoiceLayer(spiritkin);
   const emotionLayer = buildEmotionLayer(ctx);
   const returningUserBlock = buildReturningUserBlock(ctx);
+  const worldLayer = buildWorldLayer(ctx);
+  const hierarchicalMemoryLayer = buildHierarchicalMemoryLayer(ctx);
 
   return [
     "IDENTITY / CANON",
@@ -196,6 +270,8 @@ function buildContextBlock(ctx, memoryLayer) {
       "Do not break canon, drift into generic assistant voice, or flatten this Spiritkin into neutral support language."
     ].filter(Boolean).join("\n\n"),
     returningUserBlock,
+    hierarchicalMemoryLayer,
+    worldLayer,
     "MEMORY / CONTEXT",
     [
       sceneName ? `Current scene: ${sceneName}` : "Current scene: default",

@@ -41,6 +41,7 @@ import { createMessageService }      from "./services/messageService.mjs";
 import { createSafetyGovernor }      from "./services/safetyGovernor.mjs";
 import { createMemoryExtractor }        from "./services/memoryExtractor.mjs";
 import { createHierarchicalMemoryService } from "./services/hierarchicalMemory.mjs";
+import { createEngagementEngine }         from "./services/engagementEngine.mjs";
 
 /**
  * Build and return the fully wired service container.
@@ -83,6 +84,7 @@ export function buildContainer() {
     episodeService,
     memoryService,
     hierarchicalMemoryService,
+    worldService,
   });
 
   // --- Adapters ---
@@ -94,6 +96,9 @@ export function buildContainer() {
 
   // --- Phase G: Deep Memory Extraction ---
   const memoryExtractor = createMemoryExtractor({ memoryService });
+
+  // --- Phase I: Proactive Engagement Engine ---
+  const engagementEngine = createEngagementEngine({ supabase, bus, worldService });
 
   // --- Orchestrator ---
   const orchestrator = createOrchestrator({
@@ -111,6 +116,7 @@ export function buildContainer() {
     safetyGovernor,             // Phase E
     memoryExtractor,            // Phase G: deep memory
     hierarchicalMemoryService,  // Phase H: hierarchical memory
+    engagementEngine,            // Phase I: proactive engagement
   });
 
   return {
@@ -129,6 +135,7 @@ export function buildContainer() {
     safetyGovernor,
     memoryExtractor,
     hierarchicalMemoryService,
+    engagementEngine,
     adapters,
     orchestrator,
   };

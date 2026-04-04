@@ -39,6 +39,8 @@ export const createOrchestrator = ({
   messageService,
   safetyGovernor,
   memoryExtractor,
+  hierarchicalMemoryService,
+  engagementEngine,
 }) => {
   const interact = async ({ userId, input, spiritkin, conversationId, context = {} }) => {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
@@ -342,7 +344,42 @@ export const createOrchestrator = ({
     logStage(log, "complete");
     incrementMetric("requestsOk");
 
-    // Stage 12: Ensure emotion.tone and world.scene.name are always meaningful
+    // Stage 12: React to interaction — update Living Spiritverse world state
+    // This fires asynchronously and never blocks the response
+    if (world?.reactToInteraction) {
+      const emotionMeta = adapterResult.emotion?.metadata_json ?? {};
+      const emotionLabel = adapterResult.emotion?.tone ?? emotionMeta?.label ?? "neutral";
+      const arc = emotionMeta?.arc ?? "opening";
+      const isSignificant = (emotionMeta?.intensity ?? 0) > 0.6 || arc === "deepening" || arc === "crisis";
+      const milestone = isSignificant
+        ? `${resolvedIdentity.name} — ${emotionLabel} moment (${new Date().toLocaleDateString()})`
+        : null;
+
+      world.reactToInteraction({
+        userId,
+        conversationId: convId,
+        spiritkinId,
+        spiritkinName: resolvedIdentity.name,
+        emotionLabel,
+        arc,
+        milestone,
+        isSignificant,
+      }).catch(err => console.warn("[Orchestrator] world.reactToInteraction failed:", err.message));
+    }
+
+    // Stage 12b: Record interaction for engagement engine (async, non-blocking)
+    if (engagementEngine?.recordInteraction) {
+      const emotionMeta2 = adapterResult.emotion?.metadata_json ?? {};
+      engagementEngine.recordInteraction({
+        userId,
+        spiritkinId,
+        emotionLabel: adapterResult.emotion?.tone ?? emotionMeta2?.label ?? "neutral",
+        arc: emotionMeta2?.arc ?? "opening",
+        intensity: emotionMeta2?.intensity ?? 0,
+      }).catch(() => {});
+    }
+
+    // Stage 13: Ensure emotion.tone and world.scene.name are always meaningful
     const finalEmotion = adapterResult.emotion ?? {};
     const finalTone = (() => {
       const t = String(finalEmotion.tone ?? "").trim();

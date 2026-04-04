@@ -16,7 +16,7 @@
 import { AppError } from "../errors.mjs";
 import { getLoreFragment } from "../canon/spiritverseLore.mjs";
 
-export function createContextService({ supabase, emotionService, episodeService, memoryService, hierarchicalMemoryService }) {
+export function createContextService({ supabase, emotionService, episodeService, memoryService, hierarchicalMemoryService, worldService }) {
 
   /**
    * Assemble the full context bundle for a conversation turn.
@@ -31,7 +31,7 @@ export function createContextService({ supabase, emotionService, episodeService,
     const maxEpisodes = policy.max_episodes ?? 5;
 
     // Run all context reads in parallel for efficiency
-    const [emotion, episodes, summary, memories, hierarchical] = await Promise.allSettled([
+    const [emotion, episodes, summary, memories, hierarchical, worldCtx] = await Promise.allSettled([
       emotionService.getState({ userId, spiritkinId, conversationId }),
       episodeService.fetchRecent({ userId, spiritkinId, conversationId, limit: maxEpisodes }),
       episodeService.fetchLatestSummary({ userId, spiritkinId, conversationId }),
@@ -39,6 +39,9 @@ export function createContextService({ supabase, emotionService, episodeService,
       hierarchicalMemoryService
         ? hierarchicalMemoryService.getHierarchicalContext({ userId, spiritkinId, limit: 5 })
         : Promise.resolve({ semantic: [], episodic: [], procedural: [] }),
+      worldService && conversationId
+        ? worldService.getWorldContext({ userId, conversationId, spiritkinName })
+        : Promise.resolve(null),
     ]);
 
     const emotionValue = emotion.status === "fulfilled" ? emotion.value : null;
@@ -74,6 +77,14 @@ export function createContextService({ supabase, emotionService, episodeService,
       procedural_patterns: hierarchicalValue.procedural ?? [],
       // Lore injection
       lore: loreFragment,
+      // Living Spiritverse world context
+      world: worldCtx.status === 'fulfilled' ? worldCtx.value : null,
+      // Hierarchical memory for adapter layer
+      hierarchical_memory: {
+        semantic_facts: hierarchicalValue.semantic ?? [],
+        episodic_milestones: hierarchicalValue.episodic ?? [],
+        procedural_patterns: hierarchicalValue.procedural ?? [],
+      },
       recent_text: String(recentText),
       built_at: new Date().toISOString(),
     };

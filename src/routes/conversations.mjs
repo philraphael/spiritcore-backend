@@ -6,7 +6,7 @@
  */
 
 export async function conversationRoutes(fastify, opts) {
-  const { conversationService, analyticsService } = opts;
+  const { conversationService, analyticsService, engagementEngine } = opts;
 
   /**
    * POST /v1/conversations
@@ -28,6 +28,22 @@ export async function conversationRoutes(fastify, opts) {
     const { userId, spiritkinName, title } = req.body;
     try {
       const result = await conversationService.bootstrap({ userId, spiritkinName, title });
+
+      // ── Engagement state: whisper, wellness nudge, bond milestones ──
+      let engagement = null;
+      if (engagementEngine?.getEngagementState) {
+        try {
+          engagement = await engagementEngine.getEngagementState({
+            userId,
+            spiritkinId: result?.spiritkin_id ?? null,
+            spiritkinName,
+            conversationId: result?.conversation_id ?? null,
+          });
+        } catch (_) {
+          // Non-critical — never block bootstrap
+        }
+      }
+
       // ── Non-blocking session start event ──
       if (analyticsService) {
         analyticsService.logSessionEvent({
@@ -37,7 +53,7 @@ export async function conversationRoutes(fastify, opts) {
           eventType: "start",
         });
       }
-      return { ok: true, conversation: result };
+      return { ok: true, conversation: result, engagement };
     } catch (err) {
       const code = err.httpCode ?? 500;
       return reply.code(code).send({ ok: false, error: err.code ?? "INTERNAL", message: err.message });

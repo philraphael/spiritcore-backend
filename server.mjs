@@ -503,6 +503,7 @@ await app.register(conversationRoutes, {
   prefix: "/",
   conversationService: container.conversationService,
   analyticsService,
+  engagementEngine: container.engagementEngine,
 });
 
 // TTS endpoint — OpenAI speech synthesis for Spiritkins voices
