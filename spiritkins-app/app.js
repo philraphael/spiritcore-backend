@@ -2577,6 +2577,9 @@ const _wellnessInterval = setInterval(checkWellnessNudge, 60 * 1000); // check e
 
 
 // ── Initialize the application ──────────────────────────────────────────────
+// Make render globally accessible
+window.render = render;
+
 document.addEventListener('DOMContentLoaded', () => {
   render();
 });

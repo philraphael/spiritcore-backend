@@ -149,3 +149,6 @@ class RevealAnimation {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = RevealAnimation;
 }
+
+// Make globally accessible in browser
+window.RevealAnimation = RevealAnimation;
