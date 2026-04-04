@@ -158,7 +158,7 @@ app.get("/app", async (_req, reply) => {
 
 app.get("/app/:asset", async (req, reply) => {
   const { asset } = req.params;
-  if (!["app.js", "styles.css"].includes(asset)) {
+  if (!["app.js", "styles.css", "reveal-animation.js", "video-player.js"].includes(asset)) {
     return reply.code(404).send({ ok: false, error: "Not found" });
   }
 
@@ -184,6 +184,25 @@ app.get("/portraits/:filename", async (req, reply) => {
   } catch (err) {
     app.log.warn(`Failed to serve portrait ${filename}: ${err.message}`);
     return reply.code(404).send({ ok: false, error: "Portrait not found" });
+  }
+});
+
+// Serve cinematic videos from public/videos
+app.get("/videos/:filename", async (req, reply) => {
+  const { filename } = req.params;
+  // Whitelist video filenames to prevent directory traversal
+  const allowedVideos = ["lyra_intro.mp4", "raien_intro.mp4", "kairo_intro.mp4", "welcome_intro.mp4"];
+  if (!allowedVideos.includes(filename)) {
+    return reply.code(404).send({ ok: false, error: "Video not found" });
+  }
+
+  try {
+    const filePath = path.join(USER_APP_DIR, "public", "videos", filename);
+    const content = await readFile(filePath);
+    return reply.type("video/mp4").send(content);
+  } catch (err) {
+    app.log.warn(`Failed to serve video ${filename}: ${err.message}`);
+    return reply.code(404).send({ ok: false, error: "Video not found" });
   }
 });
 
