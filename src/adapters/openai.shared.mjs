@@ -225,20 +225,55 @@ function buildVoiceLayer(spiritkin) {
 function buildEmotionLayer(ctx) {
   const spiritkin = ctx?.spiritkin ?? {};
   const emotion = ctx?.context?.emotion ?? {};
-  const tone = sanitizeText(emotion.tone || emotion.label || spiritkin.tone || "steady");
+  const meta = emotion.metadata_json ?? {};
+
+  // Support both legacy flat fields and new rich metadata
+  const tone = sanitizeText(emotion.tone || emotion.label || meta.label || spiritkin.tone || "steady");
   const valence = numberOrDefault(emotion.valence, 0.5);
   const arousal = numberOrDefault(emotion.arousal, 0.4);
   const confidence = numberOrDefault(emotion.confidence, 0.6);
+  const intensity = numberOrDefault(meta.intensity, 0.3);
+  const trajectory = meta.trajectory ?? "stable";
+  const arc = meta.arc ?? "opening";
+  const secondary = meta.secondary ?? null;
+  const isCrisis = meta.is_crisis ?? false;
+
   const profile = deriveEmotionProfile({
     spiritkinName: spiritkin.name,
     tone,
     valence,
     arousal,
-    confidence
+    confidence,
+    intensity,
+    trajectory,
+    arc
   });
 
+  const intensityWord = intensity > 0.7 ? "deeply" : intensity > 0.4 ? "noticeably" : "gently";
+  const trajectoryPhrase = trajectory === "rising"
+    ? "User's emotional state is improving — lean into that momentum."
+    : trajectory === "falling"
+      ? "User's emotional state is worsening — prioritize stabilization and care."
+      : "User's emotional state is steady — maintain attunement.";
+
+  const arcGuidance = {
+    opening: "This is an early or fresh emotional moment — be present and exploratory.",
+    deepening: "The user is going deeper — honor the weight and don't rush toward resolution.",
+    resolving: "The user is moving toward resolution — support and affirm the forward movement.",
+    crisis: "CRISIS STATE — stabilize, de-escalate, and direct to real-world support immediately.",
+    plateau: "The user is in a steady state — gently invite new depth or forward motion."
+  }[arc] ?? "Stay present and responsive.";
+
+  const secondaryNote = secondary
+    ? `Undertone of ${secondary} is also present — acknowledge this complexity if it serves the moment.`
+    : "";
+
   return [
-    `Detected emotional field: tone=${tone}, valence=${valence.toFixed(2)}, arousal=${arousal.toFixed(2)}, confidence=${confidence.toFixed(2)}`,
+    `Detected emotional field: ${intensityWord} ${tone}${secondary ? ` with ${secondary} undertones` : ""}`,
+    `Valence=${valence.toFixed(2)}, arousal=${arousal.toFixed(2)}, intensity=${intensity.toFixed(2)}`,
+    `Trajectory: ${trajectory} — ${trajectoryPhrase}`,
+    `Session arc: ${arc} — ${arcGuidance}`,
+    secondaryNote,
     `Desired pacing: ${profile.pacing}`,
     `Desired directness: ${profile.directness}`,
     `Desired warmth: ${profile.warmth}`,
@@ -246,8 +281,8 @@ function buildEmotionLayer(ctx) {
     `Approach: ${profile.approach}`,
     `Spiritkin emphasis: ${profile.spiritkinGuidance}`,
     "Let the emotional state shape cadence, sentence length, and how quickly you move toward reflection, reassurance, or action.",
-    "Do not mention valence, arousal, or emotional metadata explicitly in the reply."
-  ].join("\n");
+    "Do not mention valence, arousal, intensity, trajectory, or emotional metadata explicitly in the reply."
+  ].filter(Boolean).join("\n");
 }
 
 function deriveEmotionProfile({ spiritkinName, tone, valence, arousal, confidence }) {

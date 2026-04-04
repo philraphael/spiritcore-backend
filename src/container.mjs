@@ -39,7 +39,8 @@ import { createOrchestrator }        from "./services/orchestrator.mjs";
 import { buildAdapterRegistry }      from "./adapters/index.mjs";
 import { createMessageService }      from "./services/messageService.mjs";
 import { createSafetyGovernor }      from "./services/safetyGovernor.mjs";
-import { createMemoryExtractor }     from "./services/memoryExtractor.mjs";
+import { createMemoryExtractor }        from "./services/memoryExtractor.mjs";
+import { createHierarchicalMemoryService } from "./services/hierarchicalMemory.mjs";
 
 /**
  * Build and return the fully wired service container.
@@ -71,6 +72,9 @@ export function buildContainer() {
   const registry        = createSpiritkinRegistry({ supabase });
   const identityGovernor = createIdentityGovernor({ registry });
 
+  // --- Phase H: Hierarchical Memory (Semantic, Episodic, Procedural) ---
+  const hierarchicalMemoryService = createHierarchicalMemoryService({ supabase, bus });
+
   // --- Conversation & Context ---
   const conversationService = createConversationService({ supabase, registry });
   const contextService      = createContextService({
@@ -78,6 +82,7 @@ export function buildContainer() {
     emotionService,
     episodeService,
     memoryService,
+    hierarchicalMemoryService,
   });
 
   // --- Adapters ---
@@ -102,9 +107,10 @@ export function buildContainer() {
     contextService,
     emotionService,
     episodeService,
-    messageService,   // Phase E
-    safetyGovernor,   // Phase E
-    memoryExtractor,  // Phase G: deep memory
+    messageService,             // Phase E
+    safetyGovernor,             // Phase E
+    memoryExtractor,            // Phase G: deep memory
+    hierarchicalMemoryService,  // Phase H: hierarchical memory
   });
 
   return {
@@ -122,6 +128,7 @@ export function buildContainer() {
     contextService,
     safetyGovernor,
     memoryExtractor,
+    hierarchicalMemoryService,
     adapters,
     orchestrator,
   };
