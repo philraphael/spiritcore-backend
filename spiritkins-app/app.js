@@ -502,7 +502,15 @@ const state = {
   onboardingRecommendation: null, // {spiritkin: 'Lyra', reason: '...'}
   onboardingComplete: !!localStorage.getItem(ENTRY_KEY), // skip if already done
   // Monetization
-  tierModalOpen: false
+  tierModalOpen: false,
+  // Engagement Engine state
+  engagementWhisper: null,      // {text, type, spiritkinName} — returned on bootstrap
+  engagementMilestones: [],     // [{label, icon}] — bond milestones to celebrate
+  engagementLoreUnlocks: [],    // [{title, text}] — new lore fragments unlocked
+  engagementWellnessNudge: null,// {text} — wellness nudge if session is long
+  showWhisperBanner: false,     // whether to show the whisper banner
+  showLoreUnlock: false,        // whether to show the lore unlock notification
+  currentLoreUnlock: null       // the lore unlock to display
 };
 
 (function hydrateSession() {
@@ -619,6 +627,25 @@ async function beginConversation() {
     persistSession();
     // Start wellness session timer
     startSessionTimer();
+    // Process engagement state from backend
+    if (data.engagement) {
+      const eng = data.engagement;
+      if (eng.whisper?.text) {
+        state.engagementWhisper = eng.whisper;
+        state.showWhisperBanner = true;
+      }
+      if (Array.isArray(eng.milestones) && eng.milestones.length > 0) {
+        state.engagementMilestones = eng.milestones;
+      }
+      if (Array.isArray(eng.loreUnlocks) && eng.loreUnlocks.length > 0) {
+        state.engagementLoreUnlocks = eng.loreUnlocks;
+        state.currentLoreUnlock = eng.loreUnlocks[0];
+        state.showLoreUnlock = true;
+      }
+      if (eng.wellnessNudge?.text) {
+        state.engagementWellnessNudge = eng.wellnessNudge;
+      }
+    }
   } catch (error) {
     state.convError = error.message;
     state.statusText = error.message;
@@ -1241,6 +1268,39 @@ function buildChatView() {
           </div>
         </div>
 
+        ${state.showWhisperBanner && state.engagementWhisper ? `
+          <div class="whisper-banner ${esc(state.engagementWhisper.type || 'return')}" data-action="dismiss-whisper">
+            <div class="whisper-banner-icon">${state.engagementWhisper.type === 'milestone' ? '✦' : state.engagementWhisper.type === 'lore' ? '◈' : '◎'}</div>
+            <div class="whisper-banner-body">
+              <div class="whisper-banner-label">${esc(spiritkin.name)} whispers</div>
+              <p class="whisper-banner-text">${esc(state.engagementWhisper.text)}</p>
+            </div>
+            <button class="whisper-banner-dismiss" data-action="dismiss-whisper" title="Dismiss">✕</button>
+          </div>
+        ` : ''}
+
+        ${state.showLoreUnlock && state.currentLoreUnlock ? `
+          <div class="lore-unlock-banner" data-action="dismiss-lore-unlock">
+            <div class="lore-unlock-icon">◈</div>
+            <div class="lore-unlock-body">
+              <div class="lore-unlock-label">Lore unlocked: ${esc(state.currentLoreUnlock.title || 'New Fragment')}</div>
+              <p class="lore-unlock-text">${esc(state.currentLoreUnlock.text || '')}</p>
+            </div>
+            <button class="lore-unlock-dismiss" data-action="dismiss-lore-unlock" title="Dismiss">✕</button>
+          </div>
+        ` : ''}
+
+        ${state.engagementMilestones.length > 0 ? `
+          <div class="milestone-strip">
+            ${state.engagementMilestones.map(m => `
+              <div class="milestone-chip">
+                <span class="milestone-icon">${esc(m.icon || '✦')}</span>
+                <span class="milestone-label">${esc(m.label || '')}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+
         ${showPrompts ? `
           <div class="starter-prompts">
             ${(meta.prompts || DEFAULT_PROMPTS).map((prompt) => `
@@ -1390,6 +1450,20 @@ async function onClick(event) {
   const action = element.dataset.action;
 
   if (action === "noop") return;
+
+  if (action === "dismiss-whisper") {
+    state.showWhisperBanner = false;
+    state.engagementWhisper = null;
+    render();
+    return;
+  }
+
+  if (action === "dismiss-lore-unlock") {
+    state.showLoreUnlock = false;
+    state.currentLoreUnlock = null;
+    render();
+    return;
+  }
 
   if (action === "unmute-video") {
     const video = event.target.closest(".video-player-wrapper")?.querySelector("video");

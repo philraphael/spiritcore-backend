@@ -2780,3 +2780,339 @@ button:disabled {
     font-size: 11px;
   }
 }
+
+/* ============================================================
+   PHASE 7 — UI/UX FLUIDITY & ENGAGEMENT ENGINE VISUALS
+   ============================================================ */
+
+/* --- Screen transition animations --- */
+.app-shell {
+  animation: sv-fade-in 0.35s ease forwards;
+}
+
+@keyframes sv-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.chat-layout,
+.selection-view,
+.entry-screen {
+  animation: sv-slide-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes sv-slide-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Whisper Banner --- */
+.whisper-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 20px;
+  margin: 0 0 16px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(232, 180, 216, 0.12), rgba(132, 100, 200, 0.08));
+  border: 1px solid rgba(232, 180, 216, 0.22);
+  animation: whisper-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  position: relative;
+  cursor: default;
+}
+
+.whisper-banner.milestone {
+  background: linear-gradient(135deg, rgba(242, 219, 160, 0.12), rgba(200, 150, 60, 0.08));
+  border-color: rgba(242, 219, 160, 0.25);
+}
+
+.whisper-banner.lore {
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.12), rgba(40, 120, 120, 0.08));
+  border-color: rgba(78, 205, 196, 0.22);
+}
+
+@keyframes whisper-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.whisper-banner-icon {
+  font-size: 22px;
+  line-height: 1;
+  opacity: 0.85;
+  flex-shrink: 0;
+  margin-top: 2px;
+  animation: whisper-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes whisper-pulse {
+  0%, 100% { opacity: 0.7; }
+  50%       { opacity: 1; }
+}
+
+.whisper-banner-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.whisper-banner-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.whisper-banner-text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  margin: 0;
+  font-style: italic;
+}
+
+.whisper-banner-dismiss {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 2px 6px;
+  cursor: pointer;
+  opacity: 0.6;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+
+.whisper-banner-dismiss:hover {
+  opacity: 1;
+}
+
+/* --- Lore Unlock Banner --- */
+.lore-unlock-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 18px;
+  margin: 0 0 14px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.1), rgba(30, 80, 90, 0.12));
+  border: 1px solid rgba(78, 205, 196, 0.2);
+  animation: whisper-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.lore-unlock-icon {
+  font-size: 18px;
+  color: var(--kairo);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.lore-unlock-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.lore-unlock-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--kairo);
+  margin-bottom: 4px;
+}
+
+.lore-unlock-text {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0;
+  font-style: italic;
+}
+
+.lore-unlock-dismiss {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 2px 6px;
+  cursor: pointer;
+  opacity: 0.6;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+
+.lore-unlock-dismiss:hover { opacity: 1; }
+
+/* --- Milestone Strip --- */
+.milestone-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0 14px;
+  animation: sv-fade-in 0.4s ease forwards;
+}
+
+.milestone-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(242, 219, 160, 0.1);
+  border: 1px solid rgba(242, 219, 160, 0.2);
+  font-size: 12px;
+  color: var(--gold);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.milestone-icon {
+  font-size: 13px;
+}
+
+/* --- Improved Composer Bar --- */
+.composer-bar {
+  transition: box-shadow 0.2s ease;
+}
+
+.composer-bar:focus-within {
+  box-shadow: 0 0 0 2px rgba(132, 200, 255, 0.2), 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.composer-bar textarea {
+  transition: height 0.15s ease;
+}
+
+/* --- Improved Button Transitions --- */
+.btn {
+  transition: background 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* --- Improved Bond Card Hover --- */
+.sk-card {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.sk-card:hover:not(.bonded) {
+  transform: translateY(-3px) scale(1.01);
+}
+
+/* --- Improved Topbar --- */
+.topbar {
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* --- Improved Thread Bubbles --- */
+.bubble {
+  animation: bubble-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Improved Loading State --- */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  gap: 20px;
+  animation: sv-fade-in 0.4s ease forwards;
+}
+
+.loading-state p {
+  color: var(--muted);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
+/* --- Realm-themed Spinner --- */
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(132, 200, 255, 0.15);
+  border-top-color: rgba(132, 200, 255, 0.7);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Realm-specific spinner colors */
+.realm-lyra .spinner   { border-top-color: var(--lyra); }
+.realm-raien .spinner  { border-top-color: var(--raien); }
+.realm-kairo .spinner  { border-top-color: var(--kairo); }
+
+/* --- Improved Presence Panel --- */
+.presence-panel {
+  transition: background 0.3s ease;
+}
+
+/* --- Improved Status Chip --- */
+.status-chip {
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.status-chip.live {
+  animation: status-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+  0%, 100% { opacity: 0.8; }
+  50%       { opacity: 1; }
+}
+
+/* --- Improved Resonance Depth --- */
+.resonance-node {
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+.resonance-node.active {
+  text-shadow: 0 0 8px currentColor;
+}
+
+/* --- Improved Entry Gallery --- */
+.entry-spirit {
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease;
+}
+
+.entry-spirit:hover {
+  transform: translateY(-4px);
+}
+
+/* --- Improved Bond Preview --- */
+.selection-focus {
+  transition: box-shadow 0.3s ease;
+}
+
+/* --- Smooth World Pulse --- */
+.world-pulse {
+  transition: background 0.5s ease, border-color 0.5s ease;
+}
+
+/* --- Improved Prompt Cards --- */
+.prompt-card {
+  transition: background 0.18s ease, transform 0.15s ease, border-color 0.18s ease;
+}
+
+.prompt-card:hover {
+  transform: translateY(-2px);
+}
+
+/* ============================================================
+   END PHASE 7 STYLES
+   ============================================================ */
