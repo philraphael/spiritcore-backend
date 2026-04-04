@@ -1,5 +1,3 @@
-"use strict";
-
 const API = "";
 const SESSION_KEY = "sv.session.v5";
 const ENTRY_KEY = "sv.entry.v5";
@@ -9,8 +7,7 @@ const RATINGS_KEY = "sv.ratings.v5";
 const PRIMARY_KEY = "sv.primary.v5";
 const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
 
-import RevealAnimation from "./reveal-animation.js";
-
+// RevealAnimation will be loaded as a separate module
 let revealAnimationInstance = null;
 
 const DEFAULT_PROMPTS = [
