@@ -1,0 +1,498 @@
+/**
+ * SpiritCore Command Center Styling
+ * Professional admin interface with Spiritverse theming
+ */
+
+:root {
+  --cc-bg-primary: #0f1419;
+  --cc-bg-secondary: #1a1f2e;
+  --cc-bg-tertiary: #242b3d;
+  --cc-border: #3a4558;
+  --cc-text-primary: #e8eef7;
+  --cc-text-secondary: #a0a8b8;
+  --cc-accent: #d4af37;
+  --cc-accent-light: #e8c547;
+  --cc-success: #4ade80;
+  --cc-error: #ef4444;
+  --cc-transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
+
+.command-center {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--cc-bg-primary) 0%, var(--cc-bg-secondary) 100%);
+  color: var(--cc-text-primary);
+  font-family: "Manrope", sans-serif;
+}
+
+.cc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2rem;
+  border-bottom: 1px solid var(--cc-border);
+  background: rgba(10, 13, 18, 0.8);
+  backdrop-filter: blur(10px);
+}
+
+.cc-header-content h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--cc-accent);
+  font-family: "Cormorant Garamond", serif;
+}
+
+.cc-tagline {
+  margin: 0.5rem 0 0 0;
+  color: var(--cc-text-secondary);
+  font-size: 0.95rem;
+}
+
+.cc-layout {
+  display: flex;
+  flex: 1;
+  gap: 0;
+}
+
+/* ─── Sidebar ────────────────────────────────────────────────────────────── */
+
+.cc-sidebar {
+  width: 240px;
+  background: var(--cc-bg-secondary);
+  border-right: 1px solid var(--cc-border);
+  padding: 1.5rem 0;
+  overflow-y: auto;
+  max-height: calc(100vh - 120px);
+}
+
+.cc-section-title {
+  padding: 0 1.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--cc-accent);
+  margin-bottom: 1rem;
+}
+
+.cc-spiritkin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+}
+
+.cc-spiritkin-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all var(--cc-transition);
+  color: var(--cc-text-secondary);
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.cc-spiritkin-item:hover {
+  background: var(--cc-bg-tertiary);
+  border-color: var(--cc-border);
+  color: var(--cc-text-primary);
+}
+
+.cc-spiritkin-item.active {
+  background: var(--cc-bg-tertiary);
+  border-color: var(--cc-accent);
+  color: var(--cc-accent);
+  font-weight: 600;
+}
+
+.cc-sk-icon {
+  font-size: 1.2rem;
+}
+
+.cc-sk-name {
+  flex: 1;
+}
+
+.cc-sk-voice {
+  font-size: 0.75rem;
+  color: var(--cc-text-secondary);
+  background: rgba(212, 175, 55, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+/* ─── Main Content ───────────────────────────────────────────────────────── */
+
+.cc-main {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+  max-height: calc(100vh - 120px);
+}
+
+.cc-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--cc-text-secondary);
+  font-size: 1.2rem;
+}
+
+/* ─── Sections ───────────────────────────────────────────────────────────── */
+
+.cc-section {
+  margin-bottom: 2.5rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-section:last-child {
+  border-bottom: none;
+}
+
+.cc-section h2 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0 0 1.5rem 0;
+  color: var(--cc-accent);
+  font-family: "Cormorant Garamond", serif;
+}
+
+.cc-section h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  color: var(--cc-text-primary);
+}
+
+/* ─── Spiritkin Profile ──────────────────────────────────────────────────── */
+
+.cc-spiritkin-profile {
+  background: var(--cc-bg-tertiary);
+  border: 1px solid var(--cc-border);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+}
+
+.cc-profile-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.cc-profile-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cc-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--cc-text-secondary);
+}
+
+.cc-value {
+  font-size: 1rem;
+  color: var(--cc-text-primary);
+}
+
+.cc-voice-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--cc-accent), var(--cc-accent-light));
+  color: #000;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+/* ─── Voice Grid ─────────────────────────────────────────────────────────── */
+
+.cc-voice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.cc-voice-card {
+  position: relative;
+  padding: 1.25rem;
+  background: var(--cc-bg-tertiary);
+  border: 2px solid var(--cc-border);
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all var(--cc-transition);
+  text-align: center;
+}
+
+.cc-voice-card:hover {
+  border-color: var(--cc-accent);
+  background: rgba(212, 175, 55, 0.05);
+  transform: translateY(-2px);
+}
+
+.cc-voice-card.selected {
+  border-color: var(--cc-accent);
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
+}
+
+.cc-voice-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--cc-text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.cc-voice-desc {
+  font-size: 0.85rem;
+  color: var(--cc-text-secondary);
+  line-height: 1.4;
+}
+
+.cc-voice-checkmark {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  background: var(--cc-accent);
+  color: #000;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+/* ─── Test Area ──────────────────────────────────────────────────────────── */
+
+.cc-test-area {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cc-test-input {
+  width: 100%;
+  min-height: 100px;
+  padding: 1rem;
+  background: var(--cc-bg-tertiary);
+  border: 1px solid var(--cc-border);
+  border-radius: 0.5rem;
+  color: var(--cc-text-primary);
+  font-family: "Manrope", sans-serif;
+  font-size: 0.95rem;
+  resize: vertical;
+  transition: border-color var(--cc-transition);
+}
+
+.cc-test-input:focus {
+  outline: none;
+  border-color: var(--cc-accent);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
+}
+
+.cc-test-btn {
+  align-self: flex-start;
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+}
+
+/* ─── Tone Controls ──────────────────────────────────────────────────────── */
+
+.cc-tone-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  background: var(--cc-bg-tertiary);
+  border: 1px solid var(--cc-border);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+}
+
+.cc-tone-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cc-tone-row label {
+  min-width: 80px;
+  font-weight: 600;
+  color: var(--cc-text-primary);
+}
+
+.cc-slider {
+  flex: 1;
+  height: 6px;
+  background: var(--cc-bg-secondary);
+  border-radius: 3px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.cc-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--cc-accent);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all var(--cc-transition);
+}
+
+.cc-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+}
+
+.cc-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--cc-accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  transition: all var(--cc-transition);
+}
+
+.cc-slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+}
+
+.cc-select {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  background: var(--cc-bg-secondary);
+  border: 1px solid var(--cc-border);
+  border-radius: 0.5rem;
+  color: var(--cc-text-primary);
+  font-family: "Manrope", sans-serif;
+  cursor: pointer;
+  transition: border-color var(--cc-transition);
+}
+
+.cc-select:hover,
+.cc-select:focus {
+  border-color: var(--cc-accent);
+  outline: none;
+}
+
+#cc-speed-val {
+  min-width: 50px;
+  text-align: right;
+  color: var(--cc-accent);
+  font-weight: 600;
+}
+
+/* ─── Save Button ────────────────────────────────────────────────────────── */
+
+.cc-save-btn {
+  padding: 1rem 2rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  width: 100%;
+  max-width: 300px;
+}
+
+.cc-help-text {
+  margin-top: 1rem;
+  color: var(--cc-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* ─── Error & Status ─────────────────────────────────────────────────────── */
+
+.cc-error {
+  padding: 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--cc-error);
+  border-radius: 0.5rem;
+  color: var(--cc-error);
+  margin-top: 1rem;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .cc-layout {
+    flex-direction: column;
+  }
+
+  .cc-sidebar {
+    width: 100%;
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--cc-border);
+  }
+
+  .cc-spiritkin-list {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0 1rem;
+  }
+
+  .cc-spiritkin-item {
+    flex-shrink: 0;
+  }
+
+  .cc-header {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .cc-header-content h1 {
+    font-size: 1.5rem;
+  }
+
+  .cc-voice-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  .cc-profile-info {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .cc-header {
+    padding: 1rem;
+  }
+
+  .cc-main {
+    padding: 1rem;
+  }
+
+  .cc-voice-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cc-tone-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cc-tone-row label {
+    min-width: auto;
+  }
+}

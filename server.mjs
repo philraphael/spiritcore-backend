@@ -156,9 +156,14 @@ app.get("/app", async (_req, reply) => {
   return reply.type("text/html; charset=utf-8").send(html);
 });
 
+app.get("/command-center", async (_req, reply) => {
+  const html = await readFile(path.join(USER_APP_DIR, "command-center.html"), "utf8");
+  return reply.type("text/html; charset=utf-8").send(html);
+});
+
 app.get("/app/:asset", async (req, reply) => {
   const { asset } = req.params;
-  if (!["app.js", "styles.css", "reveal-animation.js", "video-player.js"].includes(asset)) {
+  if (!["app.js", "styles.css", "reveal-animation.js", "video-player.js", "command-center.js", "command-center.css"].includes(asset)) {
     return reply.code(404).send({ ok: false, error: "Not found" });
   }
 
