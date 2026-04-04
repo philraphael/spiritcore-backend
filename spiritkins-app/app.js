@@ -1046,6 +1046,7 @@ function buildBondPreview(spiritkin, pending) {
               <div class="video-player-wrapper spiritkin-intro">
                 <video
                   class="video-player-element"
+                  autoplay
                   muted
                   playsinline
                   preload="metadata"
