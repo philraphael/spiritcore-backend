@@ -544,7 +544,7 @@ await app.register(conversationRoutes, {
 });
 
 await app.register(adminRoutes, {
-  prefix: "/v1/admin",
+  prefix: "/",
   supabase: container.supabase,
   messageService: container.messageService,
   conversationService: container.conversationService,
