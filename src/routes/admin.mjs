@@ -7,7 +7,7 @@
  */
 
 export async function adminRoutes(fastify, opts) {
-  const { supabase, messageService, conversationService } = opts;
+  const { supabase, messageService, registry } = opts;
 
   // ── GET /v1/admin/conversations/recent ──────────────────────────────────────
   fastify.get("/v1/admin/conversations/recent", async (req, reply) => {
@@ -15,12 +15,22 @@ export async function adminRoutes(fastify, opts) {
       const limit = Math.min(Number(req.query?.limit ?? 50), 200);
       const { data, error } = await supabase
         .from("conversations")
-        .select("id, user_id, spiritkin_name, title, created_at")
+        .select("id, user_id, spiritkin_id, title, created_at")
         .order("created_at", { ascending: false })
         .limit(limit);
 
       if (error) throw error;
-      return { ok: true, conversations: data };
+
+      // Resolve spiritkin names from registry
+      const spiritkins = await registry.listCanonical();
+      const skMap = Object.fromEntries(spiritkins.map(sk => [sk.id, sk.name]));
+      
+      const enriched = (data || []).map(conv => ({
+        ...conv,
+        spiritkin_name: skMap[conv.spiritkin_id] || "Unknown"
+      }));
+
+      return { ok: true, conversations: enriched };
     } catch (err) {
       return reply.code(500).send({ ok: false, error: "DB_ERROR", message: err.message });
     }

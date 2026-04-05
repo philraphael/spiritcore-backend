@@ -193,6 +193,17 @@ app.get("/command-center", async (_req, reply) => {
   return reply.type("text/html; charset=utf-8").send(html);
 });
 
+// Serve assets for Command Center specifically
+app.get("/command-center.js", async (_req, reply) => {
+  const content = await readFile(path.join(USER_APP_DIR, "command-center.js"), "utf8");
+  return reply.type("text/javascript; charset=utf-8").send(content);
+});
+
+app.get("/command-center.css", async (_req, reply) => {
+  const content = await readFile(path.join(USER_APP_DIR, "command-center.css"), "utf8");
+  return reply.type("text/css; charset=utf-8").send(content);
+});
+
 app.get("/app/:asset", async (req, reply) => {
   const { asset } = req.params;
   if (!["app.js", "styles.css", "reveal-animation.js", "video-player.js", "command-center.js", "command-center.css", "spirit-icons.svg", "spirit-background.jpg"].includes(asset)) {
@@ -201,7 +212,7 @@ app.get("/app/:asset", async (req, reply) => {
 
   const filePath = path.join(USER_APP_DIR, asset);
   const content = await readFile(filePath, "utf8");
-  const mime = asset.endsWith(".js") ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8";
+  const mime = asset.endsWith(".js") ? "text/javascript; charset=utf-8" : (asset.endsWith(".css") ? "text/css; charset=utf-8" : "application/octet-stream");
   return reply.type(mime).send(content);
 });
 
@@ -548,6 +559,7 @@ await app.register(adminRoutes, {
   supabase: container.supabase,
   messageService: container.messageService,
   conversationService: container.conversationService,
+  registry: container.registry,
 });
 
 // TTS endpoint — OpenAI speech synthesis for Spiritkins voices
