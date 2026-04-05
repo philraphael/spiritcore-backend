@@ -21,6 +21,7 @@ import { buildContainer }        from "./src/container.mjs";
 import { interactRoutes }        from "./src/routes/interact.mjs";
 import { spiritkinRoutes }       from "./src/routes/spiritkins.mjs";
 import { conversationRoutes }    from "./src/routes/conversations.mjs";
+import { adminRoutes }           from "./src/routes/admin.mjs";
 // -- Analytics & Feedback Layer
 import { createAnalyticsService } from "./src/services/analyticsService.mjs";
 import { createFeedbackService }  from "./src/services/feedbackService.mjs";
@@ -540,6 +541,13 @@ await app.register(conversationRoutes, {
   conversationService: container.conversationService,
   analyticsService,
   engagementEngine: container.engagementEngine,
+});
+
+await app.register(adminRoutes, {
+  prefix: "/",
+  supabase: container.supabase,
+  messageService: container.messageService,
+  conversationService: container.conversationService,
 });
 
 // TTS endpoint — OpenAI speech synthesis for Spiritkins voices
