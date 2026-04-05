@@ -10,7 +10,7 @@ export async function adminRoutes(fastify, opts) {
   const { supabase, messageService, conversationService } = opts;
 
   // ── GET /v1/admin/conversations/recent ──────────────────────────────────────
-  fastify.get("/v1/admin/conversations/recent", async (req, reply) => {
+  fastify.get("/conversations/recent", async (req, reply) => {
     try {
       const limit = Math.min(Number(req.query?.limit ?? 50), 200);
       const { data, error } = await supabase
@@ -27,7 +27,7 @@ export async function adminRoutes(fastify, opts) {
   });
 
   // ── GET /v1/admin/messages/:conversationId ──────────────────────────────────
-  fastify.get("/v1/admin/messages/:conversationId", async (req, reply) => {
+  fastify.get("/messages/:conversationId", async (req, reply) => {
     const { conversationId } = req.params;
     try {
       const messages = await messageService.fetchRecent({ conversationId, limit: 100 });
@@ -38,7 +38,7 @@ export async function adminRoutes(fastify, opts) {
   });
 
   // ── GET /v1/admin/stats ─────────────────────────────────────────────────────
-  fastify.get("/v1/admin/stats", async (req, reply) => {
+  fastify.get("/stats", async (req, reply) => {
     try {
       const { count: totalUsers } = await supabase.from("entitlements").select("*", { count: "exact", head: true });
       const { count: totalMessages } = await supabase.from("messages").select("*", { count: "exact", head: true });
