@@ -7,6 +7,8 @@ const RATINGS_KEY = "sv.ratings.v5";
 const PRIMARY_KEY = "sv.primary.v5";
 const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
 
+import { SPIRITVERSE_LORE, SPIRITKIN_LORE } from "./spiritverse-lore.js";
+
 // RevealAnimation will be loaded as a separate module
 let revealAnimationInstance = null;
 
@@ -510,7 +512,8 @@ const state = {
   engagementWellnessNudge: null,// {text} — wellness nudge if session is long
   showWhisperBanner: false,     // whether to show the whisper banner
   showLoreUnlock: false,        // whether to show the lore unlock notification
-  currentLoreUnlock: null       // the lore unlock to display
+  currentLoreUnlock: null,      // the lore unlock to display
+  activePresenceTab: "profile"  // profile, lore, charter
 };
 
 (function hydrateSession() {
@@ -1186,6 +1189,24 @@ function buildChatView() {
   const signals = getStageSignals();
   const failed = [...state.messages].reverse().find((message) => message.role === "user" && message.status === "failed");
   const showPrompts = state.messages.length === 0 && !state.loadingReply;
+
+  // Lore & Charter Logic
+  const resonance = readJson(RESONANCE_KEY, {});
+  const msgCount = resonance[spiritkin.name] || 0;
+  const bondLevels = [
+    { min: 0, max: 4, stage: 0 },
+    { min: 5, max: 14, stage: 1 },
+    { min: 15, max: 29, stage: 2 },
+    { min: 30, max: 59, stage: 3 },
+    { min: 60, max: 99, stage: 4 },
+    { min: 100, max: Infinity, stage: 5 }
+  ];
+  const currentBond = bondLevels.find(l => msgCount >= l.min && msgCount <= l.max) || bondLevels[0];
+  const stageData = SPIRITVERSE_LORE.bond_stages[currentBond.stage];
+  const unlockedLore = (SPIRITKIN_LORE[spiritkin.name]?.lore_fragments || []).slice(0, currentBond.stage + 1);
+  const unlockedLaws = SPIRITVERSE_LORE.charter.laws.slice(0, currentBond.stage + 1);
+  const depthLore = SPIRITKIN_LORE[spiritkin.name];
+
   return `
     <section class="chat-layout ${esc(meta.cls)}">
       <aside class="presence-panel">
@@ -1193,32 +1214,111 @@ function buildChatView() {
           <div class="mode-pill strong">${esc(meta.realm)}</div>
           <button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>
         </div>
-        <div class="presence-stage">
-          ${buildSigil(meta, "hero", meta.symbol)}
-          ${buildPortrait(spiritkin.name, "portrait-hero", meta.cls)}
+
+        <div class="presence-tabs">
+          <button class="presence-tab ${state.activePresenceTab === 'profile' ? 'active' : ''}" data-action="set-presence-tab" data-tab="profile">Profile</button>
+          <button class="presence-tab ${state.activePresenceTab === 'lore' ? 'active' : ''}" data-action="set-presence-tab" data-tab="lore">Lore (${unlockedLore.length})</button>
+          <button class="presence-tab ${state.activePresenceTab === 'charter' ? 'active' : ''}" data-action="set-presence-tab" data-tab="charter">Charter</button>
         </div>
-        <div class="presence-summary">
-          <div class="focus-kicker">${esc(meta.ambient)}</div>
-          <h2>${esc(spiritkin.name)}</h2>
-          <div class="presence-realm">${esc(meta.realm)}</div>
-          <p class="presence-title">${esc(spiritkin.title || spiritkin.role || meta.strap)}</p>
-          <p class="presence-text">${esc(describePresence(spiritkin) || meta.bondLine)}</p>
-          <p class="presence-atmosphere">${esc(meta.realmText)}</p>
+
+        <div class="presence-tab-content">
+          ${state.activePresenceTab === 'profile' ? `
+            <div class="presence-stage">
+              ${buildSigil(meta, "hero", meta.symbol)}
+              ${buildPortrait(spiritkin.name, "portrait-hero", meta.cls)}
+            </div>
+            <div class="presence-summary">
+              <div class="focus-kicker">${esc(meta.ambient)}</div>
+              <h2>${esc(spiritkin.name)}</h2>
+              <div class="presence-realm">${esc(meta.realm)}</div>
+              <p class="presence-title">${esc(spiritkin.title || spiritkin.role || meta.strap)}</p>
+              
+              <div class="bond-stage-box">
+                <div class="bond-stage-label">Bond Stage: ${esc(stageData.name)}</div>
+                <p class="bond-stage-desc">${esc(stageData.description)}</p>
+              </div>
+
+              ${currentBond.stage >= 1 ? `
+                <div class="depth-profile">
+                  <div class="depth-section">
+                    <div class="depth-label">Nature</div>
+                    <p>${esc(depthLore.nature)}</p>
+                  </div>
+                  <div class="depth-section">
+                    <div class="depth-label">Gifts</div>
+                    <ul class="depth-list">
+                      ${depthLore.gifts.map(g => `<li>${esc(g)}</li>`).join('')}
+                    </ul>
+                  </div>
+                  ${currentBond.stage >= 2 ? `
+                    <div class="depth-section shadow">
+                      <div class="depth-label">Shadow</div>
+                      <p>${esc(depthLore.shadows)}</p>
+                    </div>
+                  ` : ''}
+                </div>
+              ` : ''}
+              
+              <p class="presence-atmosphere">${esc(meta.realmText)}</p>
+            </div>
+            <div class="presence-prompts">
+              <div class="panel-label">Suggested openings</div>
+              ${(meta.prompts || DEFAULT_PROMPTS).map((prompt) => `
+                <button class="prompt-card" data-action="prompt" data-prompt="${esc(prompt)}">${esc(prompt)}</button>
+              `).join("")}
+            </div>
+            ${buildSyncRituals(spiritkin)}
+          ` : ''}
+
+          ${state.activePresenceTab === 'lore' ? `
+            <div class="lore-library">
+              <div class="panel-label">Lore Library</div>
+              <p class="lore-intro">Fragments of ${esc(spiritkin.name)}'s story revealed through your bond.</p>
+              <div class="lore-fragments">
+                ${unlockedLore.map(frag => `
+                  <div class="lore-fragment-card">
+                    <div class="lore-frag-head">
+                      <span class="lore-frag-icon">◈</span>
+                      <strong>${esc(frag.title)}</strong>
+                    </div>
+                    <p>${esc(frag.text)}</p>
+                  </div>
+                `).join('')}
+                ${unlockedLore.length < (SPIRITKIN_LORE[spiritkin.name]?.lore_fragments || []).length ? `
+                  <div class="lore-locked">
+                    <span class="lock-icon">🔒</span>
+                    <span>Deepen your bond to unlock more fragments</span>
+                  </div>
+                ` : ''}
+              </div>
+              <div class="lore-origin-box">
+                <div class="panel-label">Origin</div>
+                <p>${esc(depthLore.origin)}</p>
+              </div>
+            </div>
+          ` : ''}
+
+          ${state.activePresenceTab === 'charter' ? `
+            <div class="charter-view">
+              <div class="panel-label">The Charter</div>
+              <p class="charter-preamble">${esc(SPIRITVERSE_LORE.charter.preamble)}</p>
+              <div class="charter-laws">
+                ${unlockedLaws.map((law, i) => `
+                  <div class="charter-law-card">
+                    <div class="law-number">Law ${i + 1}</div>
+                    <p>${esc(law)}</p>
+                  </div>
+                `).join('')}
+                ${unlockedLaws.length < 6 ? `
+                  <div class="charter-locked">
+                    <div class="law-number locked">Law ${unlockedLaws.length + 1}</div>
+                    <p>Revealed at the next bond stage.</p>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          ` : ''}
         </div>
-        <div class="presence-bond-banner">
-          <span class="presence-bond-name">${esc(spiritkin.name)}</span> holds this session.
-        </div>
-        <div class="presence-stats">
-          <div><span>Bonded companion</span><strong>${esc(spiritkin.name)}</strong></div>
-          <div><span>Realm</span><strong>${esc(spiritkin.ui.realm)}</strong></div>
-        </div>
-        <div class="presence-prompts">
-          <div class="panel-label">Suggested openings</div>
-          ${(meta.prompts || DEFAULT_PROMPTS).map((prompt) => `
-            <button class="prompt-card" data-action="prompt" data-prompt="${esc(prompt)}">${esc(prompt)}</button>
-          `).join("")}
-        </div>
-        ${buildSyncRituals(spiritkin)}
       </aside>
 
       <div class="chat-stage">
@@ -1263,8 +1363,36 @@ function buildChatView() {
         <div class="stage-atmosphere ${esc(meta.cls)}">
           <div class="stage-atmosphere-mark">${esc(meta.realm)}</div>
           <div class="stage-atmosphere-text">
-            ${esc(meta.atmosphereLine)}
-            ${signals.sceneName ? `<span>Scene held: ${esc(signals.sceneName)}</span>` : ""}
+            ${(() => {
+              const realmLore = SPIRITVERSE_LORE.realms[spiritkin.name];
+              if (!realmLore) return esc(meta.atmosphereLine);
+              
+              // Map emotion tone to mood variant
+              const tone = (signals.emotionTone || "").toLowerCase();
+              let moodText = realmLore.description;
+              
+              if (spiritkin.name === "Lyra") {
+                if (tone.includes("peace") || tone.includes("still")) moodText = realmLore.moods.peaceful;
+                else if (tone.includes("tender") || tone.includes("warm")) moodText = realmLore.moods.tender;
+                else if (tone.includes("heavy") || tone.includes("sad")) moodText = realmLore.moods.heavy;
+                else if (tone.includes("hope") || tone.includes("bright")) moodText = realmLore.moods.hopeful;
+              } else if (spiritkin.name === "Raien") {
+                if (tone.includes("charge") || tone.includes("electric")) moodText = realmLore.moods.charged;
+                else if (tone.includes("resolve") || tone.includes("clear")) moodText = realmLore.moods.resolved;
+                else if (tone.includes("protect") || tone.includes("safe")) moodText = realmLore.moods.protective;
+                else if (tone.includes("fierce") || tone.includes("strong")) moodText = realmLore.moods.fierce;
+              } else if (spiritkin.name === "Kairo") {
+                if (tone.includes("wonder") || tone.includes("curious")) moodText = realmLore.moods.wondering;
+                else if (tone.includes("expand") || tone.includes("vast")) moodText = realmLore.moods.expansive;
+                else if (tone.includes("search") || tone.includes("seek")) moodText = realmLore.moods.searching;
+                else if (tone.includes("illum") || tone.includes("light")) moodText = realmLore.moods.illuminated;
+              }
+              
+              return `
+                <div class="realm-mood-desc">${esc(moodText)}</div>
+                ${signals.sceneName ? `<div class="scene-held-label">Scene held: ${esc(signals.sceneName)}</div>` : ""}
+              `;
+            })()}
           </div>
         </div>
 
@@ -1676,6 +1804,12 @@ async function onClick(event) {
     } else {
       startListening();
     }
+    return;
+  }
+
+  if (action === "set-presence-tab") {
+    state.activePresenceTab = element.dataset.tab;
+    render();
     return;
   }
 
