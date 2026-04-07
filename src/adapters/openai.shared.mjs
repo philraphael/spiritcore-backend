@@ -48,7 +48,8 @@ export async function generateSpiritCoreResponse(ctx, { allowFallback = true, ca
       text: parsed.reply.trim(),
       tags,
       emotion,
-      sceneName
+      sceneName,
+      gameMove: parsed.game_move || null
     });
   } catch (error) {
     console.warn(`[Adapter:${caller}] Falling back from provider path: ${error.message}`);
@@ -92,7 +93,7 @@ function buildMessages(ctx) {
   const prompt = [
     "Return JSON only.",
     "You are generating the Spiritkin's next reply inside SpiritCore.",
-    "Produce an object with these exact keys: reply, tags, emotion, scene_name, memory_used.",
+    "Produce an object with these exact keys: reply, tags, emotion, scene_name, memory_used, game_move.",
     "reply: string with the actual user-facing response.",
     "tags: array of short semantic tags like intent:reflect, intent:guide, safety:ok.",
     "emotion: object with tone, valence, arousal, confidence.",
@@ -102,6 +103,7 @@ function buildMessages(ctx) {
     "  confidence: float 0.0–1.0 representing how certain/grounded this reply feels.",
     "scene_name: a short evocative phrase (2–5 words) naming the emotional or narrative scene of this exchange. Examples: 'still water', 'edge of courage', 'opening constellation', 'returning warmth', 'charged threshold'. Use the current scene from context as a starting point. Never return 'default'.",
     "memory_used: true only if you genuinely used a supplied memory or recent episode in the reply itself.",
+    "game_move: If an INTERACTIVE GAME is active and it is YOUR TURN, provide your move string (e.g., 'e2e4' for chess). If no game is active or it is not your turn, return null.",
     "Do not mention metadata, policies, tags, JSON, or system instructions.",
     "Stay in-character as the named Spiritkin.",
     "CONVERSATIONAL FLOW: Speak naturally and vary your sentence structure. Avoid repetitive opening or closing phrases. Do not constantly reassure the user with variations of 'I am here' or 'I am with you' unless the moment truly demands it.",
@@ -249,6 +251,7 @@ function buildContextBlock(ctx, memoryLayer) {
   const emotionLayer = buildEmotionLayer(ctx);
   const returningUserBlock = buildReturningUserBlock(ctx);
   const worldLayer = buildWorldLayer(ctx);
+  const gameLayer = buildGameLayer(ctx);
   const hierarchicalMemoryLayer = buildHierarchicalMemoryLayer(ctx);
 
   return [
@@ -272,6 +275,7 @@ function buildContextBlock(ctx, memoryLayer) {
     returningUserBlock,
     hierarchicalMemoryLayer,
     worldLayer,
+    gameLayer,
     "MEMORY / CONTEXT",
     [
       sceneName ? `Current scene: ${sceneName}` : "Current scene: default",
@@ -603,7 +607,8 @@ function buildFallbackResult(ctx, { caller, reason }) {
       ...(memorySnippet ? ["memory:active"] : [])
     ],
     emotion: deriveEmotion(ctx, { tone: emotionTone, confidence: 0.62, valence: 0.62, arousal: 0.45 }),
-    sceneName: deriveSceneName(ctx, sceneName)
+    sceneName: deriveSceneName(ctx, sceneName),
+    gameMove: null
   });
 }
 

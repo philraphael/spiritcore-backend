@@ -298,6 +298,35 @@ export const createOrchestrator = ({
       violations: safetyPostResult.violations,
     });
 
+    // Stage 11d: Process Spiritkin game move if present
+    if (adapterResult.gameMove && nextWorldState.flags?.active_game?.status === "active") {
+      const game = nextWorldState.flags.active_game;
+      if (game.turn === "spiritkin") {
+        game.history.push({
+          player: "spiritkin",
+          move: adapterResult.gameMove,
+          timestamp: new Date().toISOString()
+        });
+        game.turn = "user";
+        // Update game data (e.g. FEN for chess) if we had an engine here.
+        // For now, we trust the LLM's move and update the world state.
+        await world.upsert({
+          userId,
+          conversationId: convId,
+          spiritkinId,
+          state: nextWorldState
+        }).catch(err => console.warn("[Orchestrator] game move persist failed:", err.message));
+        
+        bus.emit("game.move_made", { 
+          userId, 
+          conversationId: convId, 
+          gameType: game.type, 
+          player: "spiritkin", 
+          move: adapterResult.gameMove 
+        });
+      }
+    }
+
     // Stage 11b: Persist outbound message + derived artifacts
     await Promise.allSettled([
       ...(messageService && convId
@@ -415,7 +444,10 @@ export const createOrchestrator = ({
         role: resolvedIdentity.role,
         tags: adapterResult.tags,
         emotion: { ...finalEmotion, tone: finalTone },
-        world: { scene: { name: finalSceneName } },
+        world: { 
+          scene: { name: finalSceneName },
+          game: nextWorldState.flags?.active_game || null
+        },
         governance: {
           driftDetected: governance.driftDetected,
           matched: governance.matched,

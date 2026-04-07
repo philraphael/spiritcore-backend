@@ -42,6 +42,7 @@ import { createSafetyGovernor }      from "./services/safetyGovernor.mjs";
 import { createMemoryExtractor }        from "./services/memoryExtractor.mjs";
 import { createHierarchicalMemoryService } from "./services/hierarchicalMemory.mjs";
 import { createEngagementEngine }         from "./services/engagementEngine.mjs";
+import { createGameEngine }             from "./services/gameEngine.mjs";
 
 /**
  * Build and return the fully wired service container.
@@ -100,6 +101,9 @@ export function buildContainer() {
   // --- Phase I: Proactive Engagement Engine ---
   const engagementEngine = createEngagementEngine({ supabase, bus, worldService });
 
+  // --- Phase J: Interactive Game Engine ---
+  const gameEngine = createGameEngine({ bus, world: worldService, messageService });
+
   // --- Orchestrator ---
   const orchestrator = createOrchestrator({
     bus,
@@ -136,6 +140,7 @@ export function buildContainer() {
     memoryExtractor,
     hierarchicalMemoryService,
     engagementEngine,
+    gameEngine,                  // Phase J
     adapters,
     orchestrator,
   };

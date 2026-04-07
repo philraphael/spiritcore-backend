@@ -36,6 +36,7 @@ export const normalizeAdapterResult = (raw) => {
     },
     // sceneName is optional but always normalized: empty string means not set
     sceneName: typeof raw?.sceneName === "string" && raw.sceneName.trim() ? raw.sceneName.trim() : "",
+    gameMove: typeof raw?.gameMove === "string" && raw.gameMove.trim() ? raw.gameMove.trim() : null,
     toolCalls: Array.isArray(raw?.toolCalls) ? raw.toolCalls : []
   };
 

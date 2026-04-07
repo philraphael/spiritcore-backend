@@ -3329,3 +3329,54 @@ button:disabled {
 .stage-atmosphere-text {
   max-width: 600px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* GAMES VIEW */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.games-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.games-intro {
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.games-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.game-status-box {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.active-game-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--realm-accent);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.active-game-card strong {
+  color: var(--realm-accent);
+  font-size: 1rem;
+}
+
+.active-game-card p {
+  font-size: 0.85rem;
+  color: var(--fg-dim);
+}

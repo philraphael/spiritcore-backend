@@ -706,6 +706,9 @@ async function sendMessage(overrideText) {
     });
     state.statusText = `${state.selectedSpiritkin?.name || "Spiritkin"} is with you.`;
     state.statusError = false;
+    if (data.metadata?.world?.game) {
+      state.activeGame = data.metadata.world.game;
+    }
     persistSession();
     // Increment resonance counter for this Spiritkin
     if (state.selectedSpiritkin?.name) {
@@ -1219,6 +1222,7 @@ function buildChatView() {
           <button class="presence-tab ${state.activePresenceTab === 'profile' ? 'active' : ''}" data-action="set-presence-tab" data-tab="profile">Profile</button>
           <button class="presence-tab ${state.activePresenceTab === 'lore' ? 'active' : ''}" data-action="set-presence-tab" data-tab="lore">Lore (${unlockedLore.length})</button>
           <button class="presence-tab ${state.activePresenceTab === 'charter' ? 'active' : ''}" data-action="set-presence-tab" data-tab="charter">Charter</button>
+          <button class="presence-tab ${state.activePresenceTab === 'games' ? 'active' : ''}" data-action="set-presence-tab" data-tab="games">Games</button>
         </div>
 
         <div class="presence-tab-content">
@@ -1316,6 +1320,39 @@ function buildChatView() {
                   </div>
                 ` : ''}
               </div>
+            </div>
+          ` : ''}
+          ${state.activePresenceTab === 'games' ? `
+            <div class="games-view">
+              <div class="panel-label">Spiritverse Games</div>
+              <p class="games-intro">Engage in strategy and collaborative play with ${esc(spiritkin.name)}.</p>
+              <div class="games-list">
+                ${[
+                  { id: "chess", name: "Celestial Chess", icon: "♟️" },
+                  { id: "checkers", name: "Veil Checkers", icon: "🏁" },
+                  { id: "go", name: "Star-Mapping (Go)", icon: "🌌" },
+                  { id: "spirit_cards", name: "Spirit-Cards", icon: "🃏" },
+                  { id: "echo_trials", name: "Echo Trials", icon: "🔔" }
+                ].map(game => `
+                  <button class="ritual-card ${esc(meta.cls)}" data-action="start-game" data-game="${game.id}">
+                    <span class="ritual-icon">${game.icon}</span>
+                    <div class="ritual-copy">
+                      <strong>${esc(game.name)}</strong>
+                      <span>Play with ${esc(spiritkin.name)}</span>
+                    </div>
+                  </button>
+                `).join('')}
+              </div>
+              ${state.activeGame ? `
+                <div class="game-status-box">
+                  <div class="panel-label">Active Game</div>
+                  <div class="active-game-card">
+                    <strong>${esc(state.activeGame.type)}</strong>
+                    <p>Turn: ${state.activeGame.turn === 'user' ? 'Your turn' : `${esc(spiritkin.name)}'s turn`}</p>
+                    <button class="btn btn-ghost btn-sm" data-action="prompt" data-prompt="What is the current state of our game?">Status</button>
+                  </div>
+                </div>
+              ` : ''}
             </div>
           ` : ''}
         </div>
@@ -1810,6 +1847,38 @@ async function onClick(event) {
   if (action === "set-presence-tab") {
     state.activePresenceTab = element.dataset.tab;
     render();
+    return;
+  }
+
+  if (action === "start-game") {
+    const gameType = element.dataset.game;
+    if (!state.conversationId) return;
+    try {
+      state.statusText = `Preparing ${gameType}...`;
+      render();
+      const res = await fetch(`${API}/v1/games/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: state.userId,
+          conversationId: state.conversationId,
+          gameType,
+          spiritkinName: state.selectedSpiritkin.name
+        })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        state.activeGame = data.game;
+        addMessage("system", `A new game of ${gameType} has begun. It is your turn.`, state.selectedSpiritkin.name);
+        state.statusText = "Game started.";
+        render();
+      }
+    } catch (err) {
+      console.error("Failed to start game", err);
+      state.statusText = "Failed to start game.";
+      state.statusError = true;
+      render();
+    }
     return;
   }
 
