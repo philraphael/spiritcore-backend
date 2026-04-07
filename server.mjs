@@ -569,7 +569,7 @@ await app.register(gameRoutes, {
 });
 
 // TTS endpoint
-— OpenAI speech synthesis for Spiritkins voices
+// OpenAI speech synthesis for Spiritkins voices
 app.post("/v1/speech", async (req, reply) => {
   try {
     const { text, voice } = req.body;
