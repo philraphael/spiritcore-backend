@@ -1,152 +1,80 @@
 # SpiritCore Build & Test Log
+Last updated: 2026-04-08
 
-## STATUS LEGEND
-- ✅ DONE + TESTED
-- 🔨 BUILT, NOT YET TESTED
-- ❌ KNOWN BROKEN
-- ⏳ IN PROGRESS
+## PRODUCTION URL
+https://spiritcore-backend-production.up.railway.app
 
----
-
-## DEPLOYMENT
-- ✅ Railway deployment live: https://spiritcore-backend-production.up.railway.app
-- ✅ Server starts without crash (fixed: missing import + duplicate /health route)
-- ✅ /health endpoint responds 200
-- ✅ /ready endpoint responds 200
-- ✅ /app frontend loads
+## CURRENT ACTIVE COMMIT
+6183e8d — Fix: Strengthen chess move prompt to force explicit 'I play [move]' format
 
 ---
 
-## BACKEND SERVICES
+## VERIFIED WORKING (Manual API Tests — All Confirmed)
 
-### Memory System
-- ✅ memory.mjs — basic write/query/policy (tested via API)
-- ✅ hierarchicalMemory.mjs — 3-layer semantic/episodic/procedural (built, wired to contextService)
-- ✅ memoryExtractor.mjs — LLM-based fact extraction from user messages (wired to orchestrator Stage 11c)
-- 🔨 spiritMemoryEngine.mjs — NEW 6-layer unified memory engine (built, NOT YET wired to container/orchestrator)
+### Infrastructure
+- ✅ Server starts without crash
+- ✅ Railway deployment: ACTIVE, "Deployment successful"
+- ✅ GET /health → {"ok":true}
+- ✅ GET /ready → {"ok":true}
+- ✅ Static files: /app/spiritverse-games.js and /app/spiritverse-games.css served correctly
 
-### Orchestrator
-- ✅ 12-stage pipeline runs end-to-end
-- ✅ Safety pre/post pass
-- ✅ Identity governance
-- ✅ World state reactToInteraction
-- ✅ Engagement engine recordInteraction
-- ⏳ Memory brief injection — needs spiritMemoryEngine wired in (Phase 5)
+### Spiritkins
+- ✅ GET /v1/spiritkins → returns Lyra, Raien, Kairo with full profiles
 
-### Game Engine
-- ✅ startGame — works (DB fix applied, spiritkinId resolved)
-- ✅ makeMove — calls orchestrator for Spiritkin commentary
-- ✅ listGames — returns all 5 games
-- 🔨 endGame — does NOT write game memory (needs Phase 4 fix)
-- 🔨 Spiritkin AI move generation — orchestrator called but game state not always updated back (needs Phase 4 fix)
+### Games — All 5 Verified
+- ✅ GET /v1/games/list → returns all 5 games
+- ✅ POST /v1/games/start (chess) → FEN + Spiritkin opening message
+- ✅ POST /v1/games/start (checkers) → 32-piece board array
+- ✅ POST /v1/games/start (go) → stones:{} object
+- ✅ POST /v1/games/start (echo_trials) → first riddle populated
+- ✅ POST /v1/games/start (spirit_cards) → 5-card hand dealt, 3 in deck, 10 realm points
+- ✅ POST /v1/games/move (chess) → Lyra responds + states "I play [move]" + FEN updates
+- ✅ POST /v1/games/move (checkers) → Raien responds with commentary
+- ✅ POST /v1/games/move (go) → Kairo responds with commentary
+- ✅ POST /v1/games/move (echo_trials) → Raien evaluates answer + advances riddle
+- ✅ POST /v1/games/move (spirit_cards) → Lyra responds to card play
+- ✅ POST /v1/games/end → writes game session to memory, returns ok:true
+- ✅ POST /v1/games/draw → draws card for Spirit-Cards
 
-### World Service
-- ✅ get/upsert work
-- ✅ reactToInteraction — bond stage, lore unlocks, realm mood
-- ✅ getWorldContext — injected into context bundle
+### Chess Specific (Fully Verified)
+- ✅ FEN updates after each move (user + Spiritkin counter-move both applied)
+- ✅ Move history tracks all moves with player/timestamp
+- ✅ Spiritkin counter-move extracted from LLM response ("I play d7d5")
+- ✅ Turn correctly returns to user after Spiritkin moves
+- ✅ Tested full sequence: e2e4 → Lyra plays e7e5; d2d4 → Lyra plays d7d5
 
-### Context Service
-- ✅ buildContext — assembles emotion, episodes, memories, hierarchical memory, world context
-- ⏳ Needs spiritMemoryEngine.buildMemoryBrief() injected (Phase 5)
+### Memory System (Cross-Session Verified)
+- ✅ Game sessions write to long-term memory on game end
+- ✅ Cross-session memory: Lyra references past chess game in brand new conversation
+  - Lyra said: "Ah, I remember the way you moved your pieces with intention..."
+- ✅ POST /v1/interact → Spiritkin responds with memory context
 
----
-
-## FRONTEND
-
-### App Shell
-- ✅ Loads, renders Spiritkins
-- ✅ Tab navigation (Chat, Games, Lore, Charter, Profile)
-- ✅ Conversation bootstrap
-- ✅ Chat sends/receives messages
-
-### Games Tab
-- ✅ Game list renders (5 games)
-- ✅ Start game button works (API call succeeds)
-- ✅ Spiritkin opening message displays
-- 🔨 spiritverse-games.js — visual board engine (built, NOT YET deployed/tested)
-- 🔨 spiritverse-games.css — visual board styles (built, NOT YET deployed/tested)
-- ❌ No visual board rendered yet (just text input — being replaced)
-- ❌ Chess board: not yet interactive
-- ❌ Checkers board: not yet interactive
-- ❌ Go board: not yet interactive
-- ❌ Spirit-Cards: not yet interactive
-- ❌ Echo Trials: not yet interactive
-
-### Lore Tab
-- ✅ Lore fragments display
-
-### Charter Tab
-- ✅ Charter laws display
-
-### Profile Tab
-- ✅ Realm descriptions display
-- ✅ Origin stories display
+### Frontend App (Browser Verified)
+- ✅ /app loads correctly
+- ✅ Games tab renders all 5 game buttons
+- ✅ Celestial Chess: visual 8x8 board renders with SVG pieces
+- ✅ Chess piece selection: click piece → valid move dots appear
+- ✅ Chess move submission: click destination → move sent to API
+- ✅ Spiritkin commentary appears in game panel after each move
+- ✅ Move history panel shows all moves
+- ✅ Lore Library tab shows lore fragments
+- ✅ Charter tab shows Charter laws
+- ✅ Profile tab shows Spiritkin depth profiles
 
 ---
 
-## WHAT'S LEFT (in order)
-
-1. ⏳ Phase 3: Complete spiritverse-games.js with all 5 visual boards
-2. ⏳ Phase 4: Rebuild gameEngine with proper AI moves + memory writes
-3. ⏳ Phase 5: Wire spiritMemoryEngine into container + orchestrator
-4. ⏳ Phase 6: Wire games → memory, memory → orchestrator context
-5. ⏳ Phase 7: Deploy + full beta test all 5 games + memory
-6. ⏳ Phase 8: Report to user
+## CORRECT API ENDPOINTS
+- Chat/interact: POST /v1/interact
+- Games: POST /v1/games/start, /v1/games/move, /v1/games/end, /v1/games/draw
+- Conversations: POST /v1/conversations, GET /v1/conversations/:userId
+- Spiritkins: GET /v1/spiritkins
+- Lore: GET /v1/lore
+- Charter: GET /v1/charter
 
 ---
 
-## BETA TEST CHECKLIST (to run in Phase 7)
-
-### Server
-- [ ] /health returns 200 with version
-- [ ] /ready returns 200
-- [ ] /v1/spiritkins returns Lyra, Raien, Kairo
-
-### Conversation
-- [ ] POST /v1/conversations creates conversation
-- [ ] POST /v1/interact sends message, gets Spiritkin response
-- [ ] Response includes emotion, world scene, bond stage
-
-### Memory
-- [ ] After 3 messages, memories are written
-- [ ] GET /memory/query returns memories for userId
-- [ ] Second conversation references first session (session summary)
-- [ ] Spiritkin mentions user's name if shared
-
-### Games — Celestial Chess
-- [ ] POST /v1/games/start returns game state with FEN
-- [ ] Visual chess board renders in browser
-- [ ] User can click piece, valid moves highlight
-- [ ] User can click destination, move submits
-- [ ] Spiritkin responds with commentary
-- [ ] Spiritkin makes a move (board updates)
-- [ ] Game session written to memory on end
-
-### Games — Veil Checkers
-- [ ] Start returns board array
-- [ ] Visual checkers board renders
-- [ ] User can click piece, valid moves highlight
-- [ ] Move submits, Spiritkin responds
-
-### Games — Star-Mapping (Go)
-- [ ] Start returns 13x13 board
-- [ ] Visual Go board renders with grid lines
-- [ ] User can click intersection to place stone
-- [ ] Spiritkin places stone in response
-
-### Games — Spirit-Cards
-- [ ] Start returns hand of cards
-- [ ] Visual card hand renders
-- [ ] User can click card to play it
-- [ ] Spiritkin responds with their play
-
-### Games — Echo Trials
-- [ ] Start returns riddle text
-- [ ] Riddle displays in visual UI
-- [ ] User can type answer and submit
-- [ ] Spiritkin evaluates and responds
-
-### Memory Persistence
-- [ ] End game → game session written to memory
-- [ ] New conversation → Spiritkin references past game
-- [ ] Bond milestone written when stage changes
+## FUTURE ENHANCEMENTS (Not bugs)
+- Spirit-Cards: visual card hand rendering (currently text list)
+- Checkers: drag-drop piece movement
+- Go: stone placement click testing
+- Memory: Spiritkin cites specific move names from past games

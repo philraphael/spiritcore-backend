@@ -33,6 +33,8 @@ import { registerRateLimiter }    from "./src/middleware/rateLimiter.mjs";
 import { gameRoutes }             from "./src/routes/games.mjs";
 import { veilCrossingRoutes }     from "./src/routes/veilCrossing.mjs";
 import { bondJournalRoutes }      from "./src/routes/bondJournal.mjs";
+import { spiritverseEventRoutes } from "./src/routes/spiritverseEvents.mjs";
+import { dailyQuestRoutes }       from "./src/routes/dailyQuests.mjs";
 import { healthRoutes }           from "./src/routes/health.mjs";
 
 // Fail fast on missing required env vars
@@ -685,6 +687,18 @@ Return ONLY valid JSON with this exact structure:
   } catch (e) {
     return sendError(reply, 500, "INTERNAL", String(e?.message ?? e), {}, req.request_id);
   }
+});
+
+// Phase 6: Shared Spiritverse Events
+await app.register(async (instance) => {
+  await spiritverseEventRoutes(instance);
+});
+
+// Phase 7: Daily Quest Generator
+await app.register(async (instance) => {
+  instance.decorate("spiritMemoryEngine", container.spiritMemoryEngine ?? null);
+  instance.decorate("worldService", container.worldService ?? null);
+  await dailyQuestRoutes(instance);
 });
 
 // Phase F: Health, readiness, and metrics endpoints

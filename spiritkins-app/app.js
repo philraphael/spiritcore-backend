@@ -520,7 +520,16 @@ const state = {
   gameInput: "",                 // move input field value
   gameSpiritkinMessage: null,    // last Spiritkin commentary on a game move
   gameInstructions: null,        // instructions for the current game type
-  gameLoading: false             // loading state for game moves
+  gameLoading: false,            // loading state for game moves
+  // Phase 6: Shared Spiritverse Events
+  spiritverseEvent: null,        // current active Spiritverse event
+  spiritverseEventNext: null,    // time until next event
+  spiritverseEventLoading: false,
+  // Phase 7: Daily Quest
+  dailyQuest: null,              // today's personalized daily quest
+  dailyQuestRefreshesIn: null,   // time until quest refreshes
+  dailyQuestLoading: false,
+  dailyQuestStarted: false,      // user clicked "Begin Quest"
 };
 
 (function hydrateSession() {
@@ -586,11 +595,73 @@ async function fetchSpiritkins() {
   render();
 }
 
+// ── Phase 6: Fetch Spiritverse Event ────────────────────────────────────────
+async function fetchSpiritverseEvent() {
+  if (!state.primarySpiritkin) return;
+  state.spiritverseEventLoading = true;
+  try {
+    const resonance = readJson(RESONANCE_KEY, {});
+    const msgCount = resonance[state.primarySpiritkin.name] || 0;
+    const bondLevels = [
+      { min: 0, max: 4, stage: 0 }, { min: 5, max: 14, stage: 1 },
+      { min: 15, max: 29, stage: 2 }, { min: 30, max: 59, stage: 3 },
+      { min: 60, max: 99, stage: 4 }, { min: 100, max: Infinity, stage: 5 }
+    ];
+    const bondStage = (bondLevels.find(l => msgCount >= l.min && msgCount <= l.max) || bondLevels[0]).stage;
+    const res = await fetch(`${API}/v1/spiritverse/events/current?bondStage=${bondStage}`);
+    const data = await res.json();
+    if (data.ok) {
+      state.spiritverseEvent = data.event;
+      state.spiritverseEventNext = data.next;
+    }
+  } catch (err) {
+    // Graceful fallback — events are not critical
+  }
+  state.spiritverseEventLoading = false;
+  render();
+}
+
+// ── Phase 7: Fetch Daily Quest ────────────────────────────────────────────────
+async function fetchDailyQuest() {
+  if (!state.primarySpiritkin || !state.userId) return;
+  state.dailyQuestLoading = true;
+  try {
+    const resonance = readJson(RESONANCE_KEY, {});
+    const msgCount = resonance[state.primarySpiritkin.name] || 0;
+    const bondLevels = [
+      { min: 0, max: 4, stage: 0 }, { min: 5, max: 14, stage: 1 },
+      { min: 15, max: 29, stage: 2 }, { min: 30, max: 59, stage: 3 },
+      { min: 60, max: 99, stage: 4 }, { min: 100, max: Infinity, stage: 5 }
+    ];
+    const bondStage = (bondLevels.find(l => msgCount >= l.min && msgCount <= l.max) || bondLevels[0]).stage;
+    const params = new URLSearchParams({
+      userId: state.userId,
+      spiritkinName: state.primarySpiritkin.name,
+      bondStage: String(bondStage)
+    });
+    const res = await fetch(`${API}/v1/quests/daily?${params}`);
+    const data = await res.json();
+    if (data.ok) {
+      state.dailyQuest = data.quest;
+      state.dailyQuestRefreshesIn = data.refreshesIn;
+    }
+  } catch (err) {
+    // Graceful fallback
+  }
+  state.dailyQuestLoading = false;
+  render();
+}
+
 function setPrimarySpiritkin(spiritkin) {
   state.primarySpiritkin = spiritkin;
   state.selectedSpiritkin = spiritkin;
   state.pendingBondSpiritkin = null;
   state.rebondSpiritkin = null;
+  // Reload events and quest for new spiritkin
+  state.spiritverseEvent = null;
+  state.dailyQuest = null;
+  state.dailyQuestStarted = false;
+  setTimeout(() => { fetchSpiritverseEvent(); fetchDailyQuest(); }, 200);
   state.conversationId = null;
   state.messages = [];
   state.convError = null;
@@ -1088,6 +1159,31 @@ function buildBondedHomeView() {
         ${state.spiritkins.filter((item) => item.name !== spiritkin.name).map((item, index) => buildBondCard(item, index, true)).join("")}
       </div>
       ${state.convError ? `<div class="soft-error">${esc(state.convError)}</div>` : ""}
+      ${state.spiritverseEvent ? `
+        <div class="sv-event-banner">
+          <span class="sv-event-banner-icon">${esc(state.spiritverseEvent.icon)}</span>
+          <div class="sv-event-banner-text">
+            <div class="sv-event-banner-title">${esc(state.spiritverseEvent.title)}</div>
+            <div class="sv-event-banner-sub">${esc(state.spiritverseEvent.description.slice(0, 80))}${state.spiritverseEvent.description.length > 80 ? '...' : ''}</div>
+          </div>
+          <div class="sv-event-banner-badge">Live Event</div>
+        </div>
+      ` : ''}
+      ${state.dailyQuest && !state.dailyQuestStarted ? `
+        <div class="sv-quest-home-banner">
+          <span class="sv-quest-home-icon">${esc(state.dailyQuest.icon || '\u25ce')}</span>
+          <div class="sv-quest-home-body">
+            <div class="sv-quest-home-label">Daily Quest</div>
+            <div class="sv-quest-home-title">${esc(state.dailyQuest.title)}</div>
+            <p class="sv-quest-home-desc">${esc(state.dailyQuest.description)}</p>
+            ${state.dailyQuest.prompt ? `
+              <button class="btn btn-primary sv-quest-home-begin" data-action="begin-daily-quest" data-prompt="${esc(state.dailyQuest.prompt)}">
+                Begin Quest
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      ` : ''}
       ${buildSvStrip()}
       ${buildPremiumSpiritkinCTA()}
     </section>
@@ -1286,6 +1382,8 @@ function buildChatView() {
           <button class="presence-tab ${state.activePresenceTab === 'charter' ? 'active' : ''}" data-action="set-presence-tab" data-tab="charter">Charter</button>
           <button class="presence-tab ${state.activePresenceTab === 'games' ? 'active' : ''}" data-action="set-presence-tab" data-tab="games">Games</button>
           <button class="presence-tab ${state.activePresenceTab === 'journal' ? 'active' : ''}" data-action="set-presence-tab" data-tab="journal">Bond Journal</button>
+          <button class="presence-tab ${state.activePresenceTab === 'events' ? 'active' : ''}" data-action="set-presence-tab" data-tab="events">Realm Events</button>
+          <button class="presence-tab ${state.activePresenceTab === 'quest' ? 'active' : ''}" data-action="set-presence-tab" data-tab="quest">Daily Quest</button>
         </div>
 
         <div class="presence-tab-content">
@@ -1527,9 +1625,83 @@ function buildChatView() {
               `}
             </div>
           ` : ''}
+          ${state.activePresenceTab === 'events' ? `
+            <div class="sv-events-panel">
+              <div class="panel-label">Realm Events</div>
+              <p class="panel-sub">SpiritCore broadcasts living events across the Spiritverse. All bonded users experience these together.</p>
+              ${state.spiritverseEventLoading ? `
+                <div class="sv-event-loading"><div class="spinner-sm"></div><span>Reading the Veil...</span></div>
+              ` : state.spiritverseEvent ? `
+                <div class="sv-event-card sv-event-${esc(state.spiritverseEvent.color)}">
+                  <div class="sv-event-header">
+                    <span class="sv-event-icon">${esc(state.spiritverseEvent.icon)}</span>
+                    <div class="sv-event-type-badge">${esc(state.spiritverseEvent.type.replace(/_/g, ' '))}</div>
+                  </div>
+                  <div class="sv-event-title">${esc(state.spiritverseEvent.title)}</div>
+                  <p class="sv-event-description">${esc(state.spiritverseEvent.description)}</p>
+                  ${state.spiritverseEvent.effect ? `
+                    <div class="sv-event-effect">
+                      <span class="sv-event-effect-label">Active Effect</span>
+                      <span class="sv-event-effect-text">${esc(state.spiritverseEvent.effect)}</span>
+                    </div>
+                  ` : ''}
+                  ${state.spiritverseEventNext ? `
+                    <div class="sv-event-timer">
+                      Next event in ${state.spiritverseEventNext.hoursUntil}h ${state.spiritverseEventNext.minutesUntil}m
+                    </div>
+                  ` : ''}
+                </div>
+                <button class="btn btn-ghost btn-sm sv-event-refresh-btn" data-action="refresh-spiritverse-event">Refresh event</button>
+              ` : `
+                <div class="sv-event-empty">
+                  <div class="sv-event-empty-icon">◈</div>
+                  <p>The Spiritverse is quiet. Check back soon.</p>
+                  <button class="btn btn-ghost btn-sm" data-action="refresh-spiritverse-event">Check for events</button>
+                </div>
+              `}
+            </div>
+          ` : ''}
+          ${state.activePresenceTab === 'quest' ? `
+            <div class="sv-quest-panel">
+              <div class="panel-label">Daily Quest</div>
+              <p class="panel-sub">SpiritCore generates a new quest for you each day. Quests are personal — shaped by your bond, your Spiritkin, and the current realm.</p>
+              ${state.dailyQuestLoading ? `
+                <div class="sv-event-loading"><div class="spinner-sm"></div><span>Generating your quest...</span></div>
+              ` : state.dailyQuest ? `
+                <div class="sv-quest-card sv-quest-${esc(meta.cls)}">
+                  <div class="sv-quest-header">
+                    <span class="sv-quest-icon">${esc(state.dailyQuest.icon || '◎')}</span>
+                    <div class="sv-quest-type-badge">${esc((state.dailyQuest.type || 'quest').replace(/_/g, ' '))}</div>
+                  </div>
+                  <div class="sv-quest-title">${esc(state.dailyQuest.title)}</div>
+                  <p class="sv-quest-description">${esc(state.dailyQuest.description)}</p>
+                  ${state.dailyQuest.prompt && !state.dailyQuestStarted ? `
+                    <button class="btn btn-primary sv-quest-begin-btn" data-action="begin-daily-quest" data-prompt="${esc(state.dailyQuest.prompt)}">
+                      Begin Quest
+                    </button>
+                  ` : state.dailyQuestStarted ? `
+                    <div class="sv-quest-started">
+                      <span class="sv-quest-started-icon">✦</span>
+                      Quest begun. ${esc(spiritkin.name)} is with you.
+                    </div>
+                  ` : ''}
+                  ${state.dailyQuestRefreshesIn ? `
+                    <div class="sv-quest-timer">
+                      New quest in ${state.dailyQuestRefreshesIn.hoursUntil}h ${state.dailyQuestRefreshesIn.minutesUntil}m
+                    </div>
+                  ` : ''}
+                </div>
+              ` : `
+                <div class="sv-event-empty">
+                  <div class="sv-event-empty-icon">◎</div>
+                  <p>No quest yet. Begin a conversation with ${esc(spiritkin.name)} first.</p>
+                  <button class="btn btn-ghost btn-sm" data-action="refresh-daily-quest">Generate quest</button>
+                </div>
+              `}
+            </div>
+          ` : ''}
         </div>
       </aside>
-
       <div class="chat-stage">
         <div class="chat-header-bar">
           <div class="chat-header-info">
@@ -2023,10 +2195,48 @@ async function onClick(event) {
     return;
   }
 
+  // Phase 6: Refresh Spiritverse Event
+  if (action === "refresh-spiritverse-event") {
+    await fetchSpiritverseEvent();
+    return;
+  }
+  // Phase 7: Refresh Daily Quest
+  if (action === "refresh-daily-quest") {
+    await fetchDailyQuest();
+    return;
+  }
+  // Phase 7: Begin Daily Quest — pre-fill the chat input with the quest prompt
+  if (action === "begin-daily-quest") {
+    const prompt = element.dataset.prompt;
+    if (prompt) {
+      state.input = prompt;
+      state.dailyQuestStarted = true;
+      state.activePresenceTab = 'profile'; // Switch back to chat
+      render();
+      // Focus the textarea
+      setTimeout(() => {
+        const textarea = document.querySelector('[data-field="chat-input"]');
+        if (textarea) {
+          textarea.value = prompt;
+          textarea.focus();
+          textarea.style.height = 'auto';
+          textarea.style.height = Math.min(textarea.scrollHeight, 180) + 'px';
+        }
+      }, 50);
+    }
+    return;
+  }
   if (action === "set-presence-tab") {
     const tab = element.dataset.tab;
     state.activePresenceTab = tab;
     render();
+    // Load events/quest when those tabs are opened
+    if (tab === 'events' && !state.spiritverseEvent) {
+      fetchSpiritverseEvent();
+    }
+    if (tab === 'quest' && !state.dailyQuest) {
+      fetchDailyQuest();
+    }
     // Load bond journal data when journal tab is opened
     if (tab === 'journal' && state.conversationId && state.userId) {
       fetch(`${API}/v1/bond-journal?userId=${encodeURIComponent(state.userId)}&conversationId=${encodeURIComponent(state.conversationId)}`)
@@ -2391,6 +2601,11 @@ function stopListening() {
 document.addEventListener("DOMContentLoaded", () => {
   render();
   fetchSpiritkins();
+  // Phase 6 & 7: Load Spiritverse events and daily quest after spiritkins load
+  setTimeout(() => {
+    fetchSpiritverseEvent();
+    fetchDailyQuest();
+  }, 800);
   const root = document.getElementById("root");
   root.addEventListener("input", onInput);
   root.addEventListener("click", onClick);
