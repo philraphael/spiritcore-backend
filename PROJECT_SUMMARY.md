@@ -119,7 +119,7 @@ Premium users can generate custom Spiritkins through a guided survey. The reveal
 The application tracks the depth of each user's bond with their Spiritkins through conversation exchange counts, displaying this through visual metaphors (hearts, lightning, stars).
 
 ### 5. Sync Rituals
-Each Spiritkin offers lore-based guided experiences that deepen the user's connection and provide meaningful interactions.
+Each Spiritkin offers echoes-based guided experiences that deepen the user's connection and provide meaningful interactions.
 
 ## User Experience Enhancements
 

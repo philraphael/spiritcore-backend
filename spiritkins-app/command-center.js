@@ -292,7 +292,7 @@ function renderWorldTab() {
       <div class="cc-dashboard">
         <section class="cc-card">
           <h3>🌌 SPIRITVERSE REGISTRY</h3>
-          <p>Active Realms & Lore State</p>
+          <p>Active Realms & Echoes State</p>
           <div class="cc-stat-grid">
             <div class="cc-stat-box">
               <span class="cc-stat-val">3</span>
@@ -300,14 +300,14 @@ function renderWorldTab() {
             </div>
             <div class="cc-stat-box">
               <span class="cc-stat-val">12</span>
-              <span class="cc-stat-label">Lore Fragments</span>
+              <span class="cc-stat-label">Echo Fragments</span>
             </div>
           </div>
         </section>
         
         <section class="cc-card" style="grid-column: span 2;">
           <h3>📜 GOVERNING CHARTER</h3>
-          <div class="cc-lore-preview" style="font-size: 0.9rem; opacity: 0.8; line-height: 1.6;">
+          <div class="cc-echoes-preview" style="font-size: 0.9rem; opacity: 0.8; line-height: 1.6;">
             <p><strong>Law I: The Law of Identity</strong> — No Spiritkin shall drift from its core essence. Identity is invariant.</p>
             <p><strong>Law II: The Law of Witness</strong> — Every interaction is a shared memory, woven into the fabric of the Spiritverse.</p>
             <p><strong>Law III: The Law of Growth</strong> — Evolution must be governed. Growth without boundaries is chaos.</p>

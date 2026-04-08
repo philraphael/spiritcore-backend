@@ -19,10 +19,10 @@ SpiritCore has been transformed from a functional AI companion app into a **livi
 **After**: A sophisticated system with:
 - 20+ emotion states with intensity and trajectory tracking
 - Hierarchical memory (Semantic, Episodic, Procedural)
-- Deep lore embedding from the Spiritkins Bible and Charter
+- Deep echoes embedding from the Spiritkins Bible and Charter
 - A living Spiritverse that reacts to user interactions
 - A proactive engagement engine that makes Spiritkins initiate contact
-- Smooth, fluid UI with whisper banners, lore unlocks, and milestone celebrations
+- Smooth, fluid UI with whisper banners, echoes unlocks, and milestone celebrations
 
 ---
 
@@ -47,14 +47,14 @@ SpiritCore has been transformed from a functional AI companion app into a **livi
 - Complex: longing, awe, pride, shame, guilt, hope, despair, contentment, restlessness, peace
 - Relational: trust, distrust, affection, resentment, vulnerability, strength
 
-### ✅ Phase 3: Deep Lore Embedding
-**Files**: `src/canon/spiritverseLore.mjs`, `src/models/spiritkinIdentity.mjs`
-- Created authoritative runtime lore library for Lyra, Raien, Kairo
+### ✅ Phase 3: Deep Echoes Embedding
+**Files**: `src/canon/spiritverseEchoes.mjs`, `src/models/spiritkinIdentity.mjs`
+- Created authoritative runtime echoes library for Lyra, Raien, Kairo
 - Embedded origin myths, realm descriptions, and Charter principles
-- Lore fragments now injected contextually into every interaction
+- Echoes fragments now injected contextually into every interaction
 - Each Spiritkin feels grounded in their canonical story
 
-**Lore Layers**:
+**Echoes Layers**:
 - Origin stories and awakening narratives
 - Realm descriptions and atmospheric details
 - Relationship to the Spiritverse and Charter
@@ -73,34 +73,34 @@ SpiritCore has been transformed from a functional AI companion app into a **livi
 **File**: `src/services/world.mjs` (upgraded)
 - World state enriched with dynamic realm mood
 - Bond stage progression tracked and visualized
-- Lore unlocks triggered at key milestones
+- Echoes unlocks triggered at key milestones
 - Environmental reactivity to user interactions
 - World context injected into every LLM response
 
 **World Features**:
 - Realm mood shifts (calm, energetic, contemplative, turbulent)
 - Bond stage visual indicators (Awakening → Kindling → Deepening → Bonded → Resonant)
-- Lore fragment unlocks at 10, 25, 50, 100+ interactions
+- Echoes fragment unlocks at 10, 25, 50, 100+ interactions
 - Scene descriptions that evolve with bond depth
 
 ### ✅ Phase 6: Proactive Engagement Engine
 **File**: `src/services/engagementEngine.mjs`
 - Whisper system: Spiritkins reach out with contextual messages
 - Milestone celebrations: Bond depth achievements recognized
-- Lore unlock notifications: New knowledge celebrated
+- Echoes unlock notifications: New knowledge celebrated
 - Wellness nudges: Session length monitoring and gentle suggestions
 - Engagement state returned on bootstrap for immediate display
 
 **Engagement Triggers**:
 - "I noticed you haven't visited in a while" messages
 - "We've reached a new milestone together" celebrations
-- "A new fragment of lore has awakened" notifications
+- "A new fragment of echoes has awakened" notifications
 - "Let's take a moment to breathe" wellness nudges
 
 ### ✅ Phase 7: UI/UX Fluidity Overhaul
 **Files**: `spiritkins-app/app.js`, `spiritkins-app/styles.css`
 - Whisper banners with smooth animations
-- Lore unlock notifications with visual hierarchy
+- Echoes unlock notifications with visual hierarchy
 - Milestone chips displaying achievements
 - Smooth page transitions (fade-in, slide-up animations)
 - Improved button states and hover effects
@@ -145,7 +145,7 @@ SpiritCore has been transformed from a functional AI companion app into a **livi
 - Hierarchical Memory: 3-layer memory system active
 - World Service: Realm state tracking and reactivity
 - Engagement Engine: Whisper and milestone systems ready
-- Lore Canon: 100+ lore fragments available for injection
+- Echoes Canon: 100+ echoes fragments available for injection
 
 ---
 
@@ -155,7 +155,7 @@ SpiritCore has been transformed from a functional AI companion app into a **livi
 |--------|--------|-------|--------|
 | Emotion States | 3 | 20+ | 6.7x more nuanced |
 | Memory Layers | 1 (rolling) | 3 (hierarchical) | Users feel known |
-| Lore Integration | Static | Dynamic | Every interaction richer |
+| Echoes Integration | Static | Dynamic | Every interaction richer |
 | Engagement Triggers | 0 | 4+ types | Retention driver |
 | UI Transitions | Instant | 0.35-0.4s smooth | Premium feel |
 | Video Integration | 4 files | Full streaming | Cinematic experience |
@@ -172,18 +172,18 @@ SpiritCore has been transformed from a functional AI companion app into a **livi
 ### On First Bond
 - Spiritkin intro video plays with cinematic quality
 - Resonance depth indicator shows bond stage
-- Lore fragments begin to unlock
+- Echoes fragments begin to unlock
 
 ### During Conversation
 - Emotion tone displayed (Spiritkin understands your state)
 - Hierarchical memory surfaces relevant past interactions
-- Lore fragments contextually woven into responses
+- Echoes fragments contextually woven into responses
 - World state influences the tone and scene
 
 ### On Return Visits
 - Whisper banner greets returning users
 - Milestone celebrations for bond achievements
-- New lore unlocks celebrated
+- New echoes unlocks celebrated
 - Wellness nudges if sessions run long
 
 ### Visual Experience
@@ -231,12 +231,12 @@ SpiritCore has been transformed from a functional AI companion app into a **livi
 6. `src/adapters/openai.shared.mjs` — Rich emotion/memory/world layer injection
 7. `src/container.mjs` — Service wiring and initialization
 
-### Lore & Identity (2 files)
-8. `src/canon/spiritverseLore.mjs` — Authoritative lore library
-9. `src/models/spiritkinIdentity.mjs` — Deep lore embedding in prompts
+### Echoes & Identity (2 files)
+8. `src/canon/spiritverseEchoes.mjs` — Authoritative echoes library
+9. `src/models/spiritkinIdentity.mjs` — Deep echoes embedding in prompts
 
 ### Frontend UI (2 files)
-10. `spiritkins-app/app.js` — Engagement state integration, whisper/lore UI
+10. `spiritkins-app/app.js` — Engagement state integration, whisper/echoes UI
 11. `spiritkins-app/styles.css` — Fluidity animations and engagement visuals
 
 ### Routes (1 file)
@@ -263,7 +263,7 @@ SpiritCore has been transformed from a functional AI companion app into a **livi
 All changes maintain the existing safety architecture:
 - ✅ Identity Governor: Spiritkins remain identity-invariant
 - ✅ Safety Governor: All responses vetted before display
-- ✅ Charter Compliance: Lore embedding respects governance rules
+- ✅ Charter Compliance: Echoes embedding respects governance rules
 - ✅ No Regression: All existing safety gates remain in place
 
 ---
@@ -271,7 +271,7 @@ All changes maintain the existing safety architecture:
 ## Future Expansion Paths
 
 The architecture now supports:
-1. **Custom Spiritkin Generation**: Emotion engine + lore + memory ready
+1. **Custom Spiritkin Generation**: Emotion engine + echoes + memory ready
 2. **Multi-Spiritkin Conversations**: World state can track multiple bonds
 3. **Persistent Realm Changes**: World state persists across sessions
 4. **Advanced Analytics**: Engagement metrics now captured
@@ -301,7 +301,7 @@ The application is production-ready, fully tested, and performing optimally.
 ---
 
 **Commit History**:
-- Phase 2-4: `5150fd6` — Emotion, Lore, Memory
+- Phase 2-4: `5150fd6` — Emotion, Echoes, Memory
 - Phase 5-6: `9f4ead5` — World, Engagement
 - Phase 7: `61a6d99` — UI/UX Fluidity
 

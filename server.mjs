@@ -212,7 +212,7 @@ app.get("/command-center.css", async (_req, reply) => {
 
 app.get("/app/:asset", async (req, reply) => {
   const { asset } = req.params;
-  if (!["app.js", "styles.css", "reveal-animation.js", "spiritverse-lore.js", "video-player.js", "command-center.js", "command-center.css", "spirit-icons.svg", "spirit-background.jpg", "spiritverse-games.js", "spiritverse-games.css"].includes(asset)) {
+  if (!["app.js", "styles.css", "reveal-animation.js", "spiritverse-echoes.js", "video-player.js", "command-center.js", "command-center.css", "spirit-icons.svg", "spirit-background.jpg", "spiritverse-games.js", "spiritverse-games.css"].includes(asset)) {
     return reply.code(404).send({ ok: false, error: "Not found" });
   }
 
@@ -637,7 +637,7 @@ Return ONLY valid JSON with this exact structure:
   "sigil": "name of their sigil symbol (e.g. Crescent Flame, Twin Moons, Hollow Star)",
   "strap": "one powerful tagline sentence",
   "bondLine": "one sentence describing what bonding with them feels like",
-  "originStory": "3-4 sentence origin story written in the Spiritverse lore style",
+  "originStory": "3-4 sentence origin story written in the Spiritverse echoes style",
   "atmosphereLine": "3 comma-separated atmospheric descriptors",
   "voice": "one of: nova, alloy, shimmer, echo, fable, onyx",
   "tone": "2-3 word emotional tone (e.g. fierce tenderness, quiet resolve, electric wonder)",

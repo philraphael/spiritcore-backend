@@ -1,7 +1,7 @@
 /**
  * SpiritCore — Context Service (v2)
  *
- * Upgraded to inject hierarchical memory layers and lore fragments
+ * Upgraded to inject hierarchical memory layers and echoes fragments
  * into the context bundle passed to the adapter layer.
  *
  * Context bundle now includes:
@@ -10,11 +10,11 @@
  *   - latest summary episode
  *   - recent memories (canonical path: `memories` table)
  *   - hierarchical memory (semantic facts, episodic milestones, procedural patterns)
- *   - lore fragment (realm description, contextual phrase, Charter law)
+ *   - echoes fragment (realm description, contextual phrase, Charter law)
  */
 
 import { AppError } from "../errors.mjs";
-import { getLoreFragment } from "../canon/spiritverseLore.mjs";
+import { getEchoFragment } from "../canon/spiritverseEchoes.mjs";
 
 export function createContextService({ supabase, emotionService, episodeService, memoryService, hierarchicalMemoryService, worldService }) {
 
@@ -49,13 +49,13 @@ export function createContextService({ supabase, emotionService, episodeService,
     const emotionLabel = emotionValue?.label ?? emotionMeta?.label ?? "neutral";
     const arc = emotionMeta?.arc ?? "opening";
 
-    // Inject lore fragment based on current emotional state and Spiritkin
-    let loreFragment = null;
+    // Inject echoes fragment based on current emotional state and Spiritkin
+    let echoFragment = null;
     if (spiritkinName) {
       try {
-        loreFragment = getLoreFragment({ spiritkinName, emotionLabel, arc, bondStage });
+        echoFragment = getEchoFragment({ spiritkinName, emotionLabel, arc, bondStage });
       } catch (_) {
-        // Non-critical — lore injection should never break the pipeline
+        // Non-critical — echoes injection should never break the pipeline
       }
     }
 
@@ -75,8 +75,8 @@ export function createContextService({ supabase, emotionService, episodeService,
       semantic_facts: hierarchicalValue.semantic ?? [],
       episodic_milestones: hierarchicalValue.episodic ?? [],
       procedural_patterns: hierarchicalValue.procedural ?? [],
-      // Lore injection
-      lore: loreFragment,
+      // Echoes injection
+      echoes: echoFragment,
       // Living Spiritverse world context
       world: worldCtx.status === 'fulfilled' ? worldCtx.value : null,
       // Hierarchical memory for adapter layer

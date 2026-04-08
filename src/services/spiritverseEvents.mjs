@@ -45,7 +45,7 @@ const SPIRITVERSE_EVENTS = [
     min_bond_stage: 1,
     realm: null,
     spiritkin: null,
-    effect: "Rare lore fragments may surface in conversation tonight.",
+    effect: "Rare echoes fragments may surface in conversation tonight.",
   },
   {
     id: "lyra_resonance_surge",

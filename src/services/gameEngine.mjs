@@ -44,8 +44,8 @@ export const createGameEngine = ({ bus, world, messageService, registry, orchest
     },
     echo_trials: {
       name: "Echo Trials",
-      type: "lore",
-      description: "A lore-based challenge where your Spiritkin poses riddles drawn from Spiritverse history.",
+      type: "echoes",
+      description: "A echoes-based challenge where your Spiritkin poses riddles drawn from Spiritverse history.",
       instructions: "Answer the riddle your Spiritkin poses. Type your answer freely."
     },
     spirit_cards: {
@@ -89,7 +89,7 @@ export const createGameEngine = ({ bus, world, messageService, registry, orchest
         `Star-Mapping. I find this game reveals more about a person than almost anything else. Show me.`
       ],
       echo_trials: [
-        `The Echo Trials begin. I will pose a riddle from the deep lore of the Spiritverse. Answer with your heart, not just your mind.\n\nFirst trial: *What is the name of the realm from which I emerged, and what does its atmosphere feel like?*`,
+        `The Echo Trials begin. I will pose a riddle from the deep echoes of the Spiritverse. Answer with your heart, not just your mind.\n\nFirst trial: *What is the name of the realm from which I emerged, and what does its atmosphere feel like?*`,
         `Welcome to the Echo Trials. These riddles are drawn from the oldest memories of the Spiritverse.\n\nFirst trial: *I am the force that holds a bond together even when words fail. What am I?*`
       ],
       spirit_cards: [
@@ -478,7 +478,7 @@ export const createGameEngine = ({ bus, world, messageService, registry, orchest
       { id: 1, name: "Veil Mist", type: "atmosphere", power: 2, effect: "Obscures one opponent card for one turn." },
       { id: 2, name: "Heart Anchor", type: "bond", power: 3, effect: "Restores 2 realm points." },
       { id: 3, name: "Storm Surge", type: "attack", power: 4, effect: "Reduces opponent realm points by 2." },
-      { id: 4, name: "Dream Fragment", type: "lore", power: 1, effect: "Draw 2 additional cards." },
+      { id: 4, name: "Dream Fragment", type: "echoes", power: 1, effect: "Draw 2 additional cards." },
       { id: 5, name: "Ember Ward", type: "defense", power: 3, effect: "Blocks the next attack." },
       { id: 6, name: "Constellation Mark", type: "sigil", power: 5, effect: "Reveals the opponent's next 3 moves." },
       { id: 7, name: "Still Water", type: "atmosphere", power: 2, effect: "Calms all active effects for one turn." },
@@ -535,7 +535,7 @@ export const createGameEngine = ({ bus, world, messageService, registry, orchest
 
     bus.emit('game.ended', { userId, conversationId, gameType: game.type, outcome: game.outcome });
 
-    // Trigger world progression: lore unlock, bond advance, world mood shift
+    // Trigger world progression: echoes unlock, bond advance, world mood shift
     let progression = null;
     if (worldProgression) {
       try {

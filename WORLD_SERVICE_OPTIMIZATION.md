@@ -14,6 +14,6 @@ The `world.mjs` service is responsible for managing the `world_state` within the
 
 ## 2. Optimization Gap Analysis
 
-While `world.mjs` provides a functional foundation, it currently represents the Spiritverse as a largely static backdrop. The strategic documents call for a much more dynamic, interactive, and lore-rich world. The primary gaps are:
+While `world.mjs` provides a functional foundation, it currently represents the Spiritverse as a largely static backdrop. The strategic documents call for a much more dynamic, interactive, and echoes-rich world. The primary gaps are:
 
-- **Limited Richness of `scene_json`**: The current `scene_json` only stores a scene name and generic flags. It lacks the expressive power to convey dynamic mood, weather, active events, or unlocked lore, which are crucial for a 
+- **Limited Richness of `scene_json`**: The current `scene_json` only stores a scene name and generic flags. It lacks the expressive power to convey dynamic mood, weather, active events, or unlocked echoes, which are crucial for a 

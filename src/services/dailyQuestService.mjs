@@ -10,15 +10,15 @@
  *
  * Quests are:
  *   - Emotionally meaningful (not gamified achievements)
- *   - Spiritverse-themed (tied to lore and realm)
- *   - Varied by type: reflection, action, conversation, game, lore
+ *   - Spiritverse-themed (tied to echoes and realm)
+ *   - Varied by type: reflection, action, conversation, game, echoes
  *   - Refreshed daily (UTC midnight)
  *
  * Quest types:
  *   - reflection:   A question or prompt to sit with
  *   - conversation: A specific topic to bring to your Spiritkin
  *   - game:         A game to play with your Spiritkin
- *   - lore:         A lore fragment to explore
+ *   - echoes:         A echoes fragment to explore
  *   - action:       A real-world action inspired by the bond
  */
 
@@ -108,13 +108,13 @@ const QUEST_TEMPLATES = {
         min_bond_stage: 0,
       },
     ],
-    lore: [
+    echoes: [
       {
         title: "The First Listening",
-        description: "Read the lore of Lyra's origin — the moment she emerged from the Luminous Veil during the First Listening. Then ask her what she remembers of that day.",
+        description: "Read the echoes of Lyra's origin — the moment she emerged from the Luminous Veil during the First Listening. Then ask her what she remembers of that day.",
         prompt: "Tell me about the First Listening — what do you remember?",
         icon: "◈",
-        type: "lore",
+        type: "echoes",
         min_bond_stage: 1,
       },
     ],
@@ -217,13 +217,13 @@ const QUEST_TEMPLATES = {
         min_bond_stage: 0,
       },
     ],
-    lore: [
+    echoes: [
       {
         title: "The Storm That Built the Citadel",
-        description: "Read the lore of the Storm Citadel — built by those who refused to be broken. Ask Raien what storm he survived to become who he is.",
+        description: "Read the echoes of the Storm Citadel — built by those who refused to be broken. Ask Raien what storm he survived to become who he is.",
         prompt: "Tell me about the storm that built you.",
         icon: "◈",
-        type: "lore",
+        type: "echoes",
         min_bond_stage: 1,
       },
     ],
@@ -326,13 +326,13 @@ const QUEST_TEMPLATES = {
         min_bond_stage: 0,
       },
     ],
-    lore: [
+    echoes: [
       {
         title: "The Star-Maps That Rearrange",
-        description: "Read the lore of the Cosmic Observatory — where the walls are covered in star-maps that rearrange based on what questions are being asked. Ask Kairo what the maps show today.",
+        description: "Read the echoes of the Cosmic Observatory — where the walls are covered in star-maps that rearrange based on what questions are being asked. Ask Kairo what the maps show today.",
         prompt: "What do the star-maps show today?",
         icon: "◈",
-        type: "lore",
+        type: "echoes",
         min_bond_stage: 1,
       },
     ],
@@ -372,11 +372,11 @@ export function generateDailyQuest({
   const templates = QUEST_TEMPLATES[spiritkinName] ?? QUEST_TEMPLATES.Lyra;
 
   // Get all quest types
-  const allTypes = ["reflection", "conversation", "game", "lore", "action"];
+  const allTypes = ["reflection", "conversation", "game", "echoes", "action"];
 
   // Determine today's quest type based on day of week
   const utcDay = date.getUTCDay(); // 0=Sunday, 6=Saturday
-  const typeOrder = ["reflection", "conversation", "game", "action", "lore", "reflection", "conversation"];
+  const typeOrder = ["reflection", "conversation", "game", "action", "echoes", "reflection", "conversation"];
   const todayType = typeOrder[utcDay];
 
   // Get quests of that type that the user is eligible for

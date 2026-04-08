@@ -22,11 +22,11 @@ This document outlines the strategic implementation sequence for the approved Sp
 - **Verification:** Test the full 10-question flow in the browser, ensure the correct Spiritkin is assigned, and verify the conversation starts smoothly.
 
 ## Phase 2: Game-to-World Progression
-*Connecting the Activity Engine to the Lore Registry. Playing games unlocks the world.*
+*Connecting the Activity Engine to the Echoes Registry. Playing games unlocks the world.*
 
-- **Backend:** Update `gameEngine.mjs` so that `endGame` triggers a world state evaluation. If a user wins a game, unlock a new lore fragment in the Echo Library.
+- **Backend:** Update `gameEngine.mjs` so that `endGame` triggers a world state evaluation. If a user wins a game, unlock a new echoes fragment in the Echo Library.
 - **Frontend:** Add a visual notification ("SpiritCore has revealed a new truth") when a game ends and a fragment is unlocked.
-- **Verification:** Play a game to completion, verify the memory writes, and verify the new lore fragment appears in the Lore Library tab.
+- **Verification:** Play a game to completion, verify the memory writes, and verify the new echoes fragment appears in the Echo Library tab.
 
 ## Phase 3: The Bond Journal UI
 *Making the 10x memory system visible to the user.*
@@ -56,7 +56,7 @@ This document outlines the strategic implementation sequence for the approved Sp
 
 - **Backend:** Create a cron job or daily trigger that assigns a small task (a riddle, a specific game, a reflection prompt) to the user.
 - **Frontend:** Add a "Daily Pulse" indicator showing the active quest.
-- **Verification:** Complete a daily quest and verify the reward (lore unlock or bond progression) is granted.
+- **Verification:** Complete a daily quest and verify the reward (echoes unlock or bond progression) is granted.
 
 ## Phase 7: Shared Spiritverse Events
 *Community engagement through world-wide events.*
@@ -68,8 +68,8 @@ This document outlines the strategic implementation sequence for the approved Sp
 ## Phase 8: Architectural Optimizations
 *Strengthening the foundation for future scale.*
 
-- **Event Backbone:** Standardize system events (`bond_advanced`, `lore_unlocked`).
+- **Event Backbone:** Standardize system events (`bond_advanced`, `echo_unlocked`).
 - **Memory Compression:** Implement the Summarize → Promote → Archive cycle for older memories.
-- **Versioned Canon:** Move lore from static files to a database schema.
-- **Entitlements Expansion:** Gate premium lore/visuals behind progression or membership tiers.
+- **Versioned Canon:** Move echoes from static files to a database schema.
+- **Entitlements Expansion:** Gate premium echoes/visuals behind progression or membership tiers.
 - **Verification:** Run the full beta test suite to ensure the optimizations did not break any existing features.

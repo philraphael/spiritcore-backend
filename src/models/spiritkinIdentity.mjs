@@ -6,7 +6,7 @@
  * Runtime identity resolution MUST produce an object conforming to this shape.
  */
 
-import { SPIRITKIN_LORE, SPIRITVERSE_LORE } from "../canon/spiritverseLore.mjs";
+import { SPIRITKIN_ECHOES, SPIRITVERSE_ECHOES } from "../canon/spiritverseEchoes.mjs";
 
 /**
  * The set of required top-level fields for a canonical identity object.
@@ -80,12 +80,12 @@ export function buildSystemPromptFragment(identity) {
     ? identity.allowed_growth_lanes.join(", ")
     : String(identity.allowed_growth_lanes ?? "");
 
-  // Pull deep lore from the canon library
-  const lore = SPIRITKIN_LORE[identity.name] ?? {};
-  const realmKey = Object.keys(SPIRITVERSE_LORE.realms).find(
-    k => SPIRITVERSE_LORE.realms[k].spiritkin === identity.name
+  // Pull deep echoes from the canon library
+  const echoes = SPIRITKIN_ECHOES[identity.name] ?? {};
+  const realmKey = Object.keys(SPIRITVERSE_ECHOES.realms).find(
+    k => SPIRITVERSE_ECHOES.realms[k].spiritkin === identity.name
   );
-  const realm = realmKey ? SPIRITVERSE_LORE.realms[realmKey] : null;
+  const realm = realmKey ? SPIRITVERSE_ECHOES.realms[realmKey] : null;
 
   return [
     `You are ${identity.name}, ${identity.title}.`,
@@ -97,15 +97,15 @@ export function buildSystemPromptFragment(identity) {
     forbidden ? `You must never exhibit: ${forbidden}.` : "",
     growth ? `Your growth lanes: ${growth}.` : "",
     identity.safety_boundaries ? `Safety boundaries: ${identity.safety_boundaries}` : "",
-    // Deep lore injection
-    lore.origin ? `\nYOUR ORIGIN:\n${lore.origin}` : "",
-    lore.nature ? `\nYOUR NATURE:\n${lore.nature}` : "",
-    lore.shadows ? `\nYOUR SHADOW (what you are learning to overcome):\n${lore.shadows}` : "",
-    lore.relationship_to_spiritverse ? `\nYOUR RELATIONSHIP TO THE SPIRITVERSE:\n${lore.relationship_to_spiritverse}` : "",
+    // Deep echoes injection
+    echoes.origin ? `\nYOUR ORIGIN:\n${echoes.origin}` : "",
+    echoes.nature ? `\nYOUR NATURE:\n${echoes.nature}` : "",
+    echoes.shadows ? `\nYOUR SHADOW (what you are learning to overcome):\n${echoes.shadows}` : "",
+    echoes.relationship_to_spiritverse ? `\nYOUR RELATIONSHIP TO THE SPIRITVERSE:\n${echoes.relationship_to_spiritverse}` : "",
     realm ? `\nYOUR REALM — ${realm.name}:\n${realm.description}` : "",
     // Charter grounding
-    `\nCHARTER COVENANT:\n${SPIRITVERSE_LORE.charter.preamble}`,
-    `Core laws that govern your bond:\n${SPIRITVERSE_LORE.charter.laws.slice(0, 3).join("\n")}`,
+    `\nCHARTER COVENANT:\n${SPIRITVERSE_ECHOES.charter.preamble}`,
+    `Core laws that govern your bond:\n${SPIRITVERSE_ECHOES.charter.laws.slice(0, 3).join("\n")}`,
   ]
     .filter(Boolean)
     .join("\n");

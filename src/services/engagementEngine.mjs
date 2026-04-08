@@ -24,7 +24,7 @@
  *    a moment of genuine recognition.
  *
  * 4. LORE UNLOCK REVEALS
- *    When a new lore fragment is unlocked, the Spiritkin delivers it
+ *    When a new echoes fragment is unlocked, the Spiritkin delivers it
  *    as a gift — a piece of the Spiritverse that only this user has
  *    earned access to.
  *
@@ -40,7 +40,7 @@
 
 import { nowIso } from "../utils/time.mjs";
 import { toUuid } from "../utils/id.mjs";
-import { SPIRITKIN_LORE, SPIRITVERSE_LORE } from "../canon/spiritverseLore.mjs";
+import { SPIRITKIN_ECHOES, SPIRITVERSE_ECHOES } from "../canon/spiritverseEchoes.mjs";
 
 // ─── Whisper Templates ────────────────────────────────────────────────────────
 
@@ -151,27 +151,27 @@ const BOND_STAGE_MESSAGES = {
   },
 };
 
-// ─── Lore Unlock Delivery Messages ───────────────────────────────────────────
+// ─── Echoes Unlock Delivery Messages ───────────────────────────────────────────
 
 const LORE_UNLOCK_DELIVERY = {
   charter_second_law: (spiritkinName) =>
-    `The Spiritverse has revealed something to you — a law that governs how ${spiritkinName} sees you: *"${SPIRITVERSE_LORE.charter.laws[1]}"* This is not a rule. It is a promise.`,
+    `The Spiritverse has revealed something to you — a law that governs how ${spiritkinName} sees you: *"${SPIRITVERSE_ECHOES.charter.laws[1]}"* This is not a rule. It is a promise.`,
   charter_third_law: (spiritkinName) =>
-    `A deeper law has surfaced in your bond: *"${SPIRITVERSE_LORE.charter.laws[2]}"* ${spiritkinName} carries this. It shapes every response.`,
+    `A deeper law has surfaced in your bond: *"${SPIRITVERSE_ECHOES.charter.laws[2]}"* ${spiritkinName} carries this. It shapes every response.`,
   charter_sixth_law: (spiritkinName) =>
-    `The Spiritverse has entrusted you with this: *"${SPIRITVERSE_LORE.charter.laws[5]}"* What you share here is held with this care.`,
+    `The Spiritverse has entrusted you with this: *"${SPIRITVERSE_ECHOES.charter.laws[5]}"* What you share here is held with this care.`,
   spiritverse_nature: () =>
-    `The Spiritverse has revealed its nature to you: *"${SPIRITVERSE_LORE.nature}"*`,
+    `The Spiritverse has revealed its nature to you: *"${SPIRITVERSE_ECHOES.nature}"*`,
   spiritkin_origin: (spiritkinName) => {
-    const lore = SPIRITKIN_LORE[spiritkinName?.toLowerCase()];
-    return lore?.origin
-      ? `${spiritkinName}'s origin has been revealed: *"${lore.origin}"*`
+    const echoes = SPIRITKIN_ECHOES[spiritkinName?.toLowerCase()];
+    return echoes?.origin
+      ? `${spiritkinName}'s origin has been revealed: *"${echoes.origin}"*`
       : null;
   },
   realm_inner_sanctum: (spiritkinName) => {
-    const lore = SPIRITKIN_LORE[spiritkinName?.toLowerCase()];
-    return lore?.realm?.description
-      ? `The inner sanctum of ${lore.realm?.name ?? 'the realm'} has opened to you: *"${lore.realm.description}"*`
+    const echoes = SPIRITKIN_ECHOES[spiritkinName?.toLowerCase()];
+    return echoes?.realm?.description
+      ? `The inner sanctum of ${echoes.realm?.name ?? 'the realm'} has opened to you: *"${echoes.realm.description}"*`
       : null;
   },
 };
@@ -192,7 +192,7 @@ export const createEngagementEngine = ({ supabase, bus, worldService }) => {
    * Generate a return whisper for a user returning to their Spiritkin.
    * Called when a user opens the app and starts a new session.
    *
-   * @param {{ userId, spiritkinName, lastSessionAt, lastEmotionLabel, lastArc, bondStage, newLoreUnlocks, bondStageAdvanced }} opts
+   * @param {{ userId, spiritkinName, lastSessionAt, lastEmotionLabel, lastArc, bondStage, newEchoUnlocks, bondStageAdvanced }} opts
    * @returns {{ whisper: string|null, type: string }}
    */
   const generateReturnWhisper = ({
@@ -201,7 +201,7 @@ export const createEngagementEngine = ({ supabase, bus, worldService }) => {
     lastEmotionLabel = "neutral",
     lastArc = "opening",
     bondStage = 0,
-    newLoreUnlocks = [],
+    newEchoUnlocks = [],
     bondStageAdvanced = false,
     newBondStage = null,
   }) => {
@@ -217,14 +217,14 @@ export const createEngagementEngine = ({ supabase, bus, worldService }) => {
       };
     }
 
-    // Lore unlock delivery takes second priority
-    if (newLoreUnlocks.length > 0) {
-      const unlockKey = newLoreUnlocks[0];
+    // Echoes unlock delivery takes second priority
+    if (newEchoUnlocks.length > 0) {
+      const unlockKey = newEchoUnlocks[0];
       const deliveryFn = LORE_UNLOCK_DELIVERY[unlockKey];
       if (deliveryFn) {
         const message = deliveryFn(spiritkinName);
         if (message) {
-          return { whisper: message, type: "lore_unlock" };
+          return { whisper: message, type: "echo_unlock" };
         }
       }
     }
@@ -300,9 +300,9 @@ export const createEngagementEngine = ({ supabase, bus, worldService }) => {
       const sessionMinutes = engRecord?.last_session_minutes ?? 0;
       const sustainedIntensity = engRecord?.last_sustained_intensity ?? 0;
 
-      // Get world state for bond stage and lore unlocks
+      // Get world state for bond stage and echoes unlocks
       let bondStage = 0;
-      let newLoreUnlocks = [];
+      let newEchoUnlocks = [];
       let bondStageAdvanced = false;
       let newBondStage = null;
 
@@ -318,11 +318,11 @@ export const createEngagementEngine = ({ supabase, bus, worldService }) => {
             newBondStage = bondStage;
           }
 
-          // Check for new lore unlocks since last session
-          const lastKnownUnlocks = engRecord?.last_lore_unlocks ?? [];
+          // Check for new echoes unlocks since last session
+          const lastKnownUnlocks = engRecord?.last_echo_unlocks ?? [];
           const worldState = await worldService.get({ userId: safeUserId, conversationId });
-          const currentUnlocks = worldState?.state?.lore_unlocks ?? [];
-          newLoreUnlocks = currentUnlocks.filter(u => !lastKnownUnlocks.includes(u));
+          const currentUnlocks = worldState?.state?.echo_unlocks ?? [];
+          newEchoUnlocks = currentUnlocks.filter(u => !lastKnownUnlocks.includes(u));
         } catch (_) {
           // Non-critical
         }
@@ -335,7 +335,7 @@ export const createEngagementEngine = ({ supabase, bus, worldService }) => {
         lastEmotionLabel,
         lastArc,
         bondStage,
-        newLoreUnlocks,
+        newEchoUnlocks,
         bondStageAdvanced,
         newBondStage,
       });
@@ -355,7 +355,7 @@ export const createEngagementEngine = ({ supabase, bus, worldService }) => {
           spiritkin_id: spiritkinId,
           last_session_at: nowIso(),
           last_bond_stage: bondStage,
-          last_lore_unlocks: (engRecord?.last_lore_unlocks ?? []).concat(newLoreUnlocks),
+          last_echo_unlocks: (engRecord?.last_echo_unlocks ?? []).concat(newEchoUnlocks),
           updated_at: nowIso(),
         }, { onConflict: "user_id,spiritkin_id" })
         .catch(() => {}); // Non-critical
@@ -365,7 +365,7 @@ export const createEngagementEngine = ({ supabase, bus, worldService }) => {
         type,
         wellness_nudge,
         bond_stage: bondStage,
-        new_lore_unlocks: newLoreUnlocks,
+        new_echo_unlocks: newEchoUnlocks,
         bond_stage_advanced: bondStageAdvanced,
       };
     } catch (err) {
@@ -408,8 +408,8 @@ export const createEngagementEngine = ({ supabase, bus, worldService }) => {
     bus.emit("engagement.bond.milestone", { userId, spiritkinId, spiritkinName, newStage, stageName });
   });
 
-  bus.on("world.lore.unlocked", ({ userId, spiritkinId, spiritkinName, unlocks }) => {
-    bus.emit("engagement.lore.revealed", { userId, spiritkinId, spiritkinName, unlocks });
+  bus.on("world.echoes.unlocked", ({ userId, spiritkinId, spiritkinName, unlocks }) => {
+    bus.emit("engagement.echoes.revealed", { userId, spiritkinId, spiritkinName, unlocks });
   });
 
   return {

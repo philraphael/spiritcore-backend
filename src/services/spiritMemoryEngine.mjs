@@ -28,7 +28,7 @@
  *     Compressed over time. The Spiritkin can recall "last time we talked..."
  *
  *   LAYER 6 — WORLD STATE ANCHORS
- *     Significant world events tied to this user: lore unlocks, realm shifts,
+ *     Significant world events tied to this user: echoes unlocks, realm shifts,
  *     special moments in the Spiritverse. Stored as world_anchor kind.
  *
  * Design principles:
@@ -72,7 +72,7 @@ export const MEMORY_KINDS = {
 const SIGNIFICANCE = {
   CRITICAL: 1.0,    // Crisis, first disclosure, bond stage transition
   HIGH: 0.85,       // Breakthrough, deep emotional moment, game win/loss
-  MEDIUM: 0.65,     // Substantive exchange, game session, lore unlock
+  MEDIUM: 0.65,     // Substantive exchange, game session, echoes unlock
   LOW: 0.40,        // Routine fact, preference, casual game move
   MINIMAL: 0.20,    // Background context
 };
@@ -535,15 +535,15 @@ export function createSpiritMemoryEngine({ supabase, bus, openaiClient }) {
       }));
     }
 
-    // 4. Write world anchor for lore unlocks
-    const loreUnlocks = worldState?.lore_unlocks ?? [];
-    if (loreUnlocks.length > 0) {
-      const latest = loreUnlocks[loreUnlocks.length - 1];
+    // 4. Write world anchor for echoes unlocks
+    const echoUnlocks = worldState?.echo_unlocks ?? [];
+    if (echoUnlocks.length > 0) {
+      const latest = echoUnlocks[echoUnlocks.length - 1];
       if (latest) {
         tasks.push(writeWorldAnchor({
           userId, spiritkinId, conversationId,
-          event: "lore_unlock",
-          description: `Unlocked lore: "${latest.title ?? latest}"`,
+          event: "echo_unlock",
+          description: `Unlocked echoes: "${latest.title ?? latest}"`,
           spiritkinName,
         }));
       }

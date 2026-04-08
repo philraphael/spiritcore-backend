@@ -226,7 +226,7 @@ const CARD_TYPE_COLORS = {
   attack:     { bg: '#2a1a1a', border: '#f5a623', glow: 'rgba(245,166,35,0.3)', icon: '⚡' },
   bond:       { bg: '#1a1a2a', border: '#e8b4d8', glow: 'rgba(232,180,216,0.3)', icon: '♥' },
   defense:    { bg: '#1a2a1a', border: '#7ed321', glow: 'rgba(126,211,33,0.3)', icon: '🛡' },
-  lore:       { bg: '#2a2a1a', border: '#f2dba0', glow: 'rgba(242,219,160,0.3)', icon: '📖' },
+  echoes:       { bg: '#2a2a1a', border: '#f2dba0', glow: 'rgba(242,219,160,0.3)', icon: '📖' },
   sigil:      { bg: '#2a1a2a', border: '#b8a6ff', glow: 'rgba(184,166,255,0.3)', icon: '✦' }
 };
 
@@ -292,17 +292,17 @@ function renderSpiritCards(container, hand, played, deck, realmPoints, spiritkin
 }
 
 function renderCardHTML(card, inHand, clickable, idx) {
-  const theme = CARD_TYPE_COLORS[card.type] || CARD_TYPE_COLORS.lore;
+  const theme = CARD_TYPE_COLORS[card.type] || CARD_TYPE_COLORS.echoes;
   const actionAttr = clickable ? `data-action="cards-play-card" data-card-idx="${idx}"` : '';
   // Art area gradient backgrounds per element type
   const artGradients = {
     spirit:  'linear-gradient(160deg, rgba(78,205,196,0.4) 0%, rgba(20,80,80,0.6) 100%)',
     realm:   'linear-gradient(160deg, rgba(184,166,255,0.4) 0%, rgba(60,30,100,0.6) 100%)',
     echo:    'linear-gradient(160deg, rgba(242,219,160,0.4) 0%, rgba(100,70,20,0.6) 100%)',
-    lore:    'linear-gradient(160deg, rgba(255,200,100,0.3) 0%, rgba(80,50,10,0.6) 100%)',
+    echoes:    'linear-gradient(160deg, rgba(255,200,100,0.3) 0%, rgba(80,50,10,0.6) 100%)',
     bond:    'linear-gradient(160deg, rgba(255,150,200,0.3) 0%, rgba(80,20,50,0.6) 100%)',
   };
-  const artBg = artGradients[card.type] || artGradients.lore;
+  const artBg = artGradients[card.type] || artGradients.echoes;
   return `<div class="spirit-card ${inHand ? 'card-in-hand' : 'card-played'} ${clickable ? 'card-clickable' : ''}" 
     ${actionAttr}
     style="--card-border: ${theme.border}; --card-glow: ${theme.glow};">

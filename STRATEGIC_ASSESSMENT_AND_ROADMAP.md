@@ -58,7 +58,7 @@ Following the "Reuse Before Build" prime directive, the next phases of developme
 ### **Phase 3: Bond Visibility (The "Growth" Update)**
 *Objective: Make the relationship progress visible through sigil evolution.*
 - **UX**: Implement the "Sigil Depth" visual indicator (1-5 hearts/sigil brightness) based on `spiritkin_metrics`.
-- **Lore**: Unlock "Lore Fragments" in the UI as bond depth increases.
+- **Echoes**: Unlock "Echo Fragments" in the UI as bond depth increases.
 
 ### **Phase 4: Spiritverse Reactivity (The "Living World" Update)**
 *Objective: Change the UI theme/scene based on emotional state.*
@@ -68,7 +68,7 @@ Following the "Reuse Before Build" prime directive, the next phases of developme
 
 ## 5. Manus's Strategic Additions
 1. **"The Wellness Guardrail"**: I recommend adding a "Session Wellness Nudge" (Phase 5/6) as a standard feature. If a session goes over 60 minutes of intense emotional work, the Spiritkin should gently suggest a "Spiritverse Pause." This builds immense brand trust.
-2. **"Lore as Currency"**: Instead of traditional monetization early on, use "Lore Unlocks" as the primary progression hook. This makes the world feel like a discovery rather than a transaction.
+2. **"Echoes as Currency"**: Instead of traditional monetization early on, use "Echo Unlocks" as the primary progression hook. This makes the world feel like a discovery rather than a transaction.
 3. **"Fastify Optimization"**: We should implement a "Context Compression" layer to keep LLM costs low while maintaining high memory recall.
 
 ---

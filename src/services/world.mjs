@@ -19,7 +19,7 @@
  *     milestone_count: number,
  *     last_milestone: string|null,
  *   },
- *   lore_unlocks: string[],  // lore fragments unlocked through the bond
+ *   echo_unlocks: string[],  // echoes fragments unlocked through the bond
  *   flags: object,           // arbitrary state flags
  *   spiritverse_event: string|null, // active world event (e.g. "eclipse_of_remembrance")
  * }
@@ -35,7 +35,7 @@
 import { AppError } from "../errors.mjs";
 import { nowIso } from "../utils/time.mjs";
 import { toUuid } from "../utils/id.mjs";
-import { SPIRITKIN_LORE, SPIRITVERSE_LORE } from "../canon/spiritverseLore.mjs";
+import { SPIRITKIN_ECHOES, SPIRITVERSE_ECHOES } from "../canon/spiritverseEchoes.mjs";
 
 // ─── Bond Stage Thresholds ────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ const BOND_STAGES = [
   { stage: 4, name: "Resonance",   min_interactions: 50, min_milestones: 7 },
 ];
 
-// ─── Lore Unlock Thresholds ───────────────────────────────────────────────────
+// ─── Echoes Unlock Thresholds ───────────────────────────────────────────────────
 
 const LORE_UNLOCK_MILESTONES = {
   1:  "charter_second_law",   // The Law of Witness
@@ -110,14 +110,14 @@ function computeBondStage(interactionCount, milestoneCount) {
 // ─── Get Realm Mood Description ───────────────────────────────────────────────
 
 function getRealmMoodDescription(spiritkinName, mood) {
-  const lore = SPIRITKIN_LORE[spiritkinName?.toLowerCase()];
-  if (!lore?.realm?.mood_variants) return null;
-  return lore.realm.mood_variants[mood] ?? lore.realm.mood_variants.peaceful ?? null;
+  const echoes = SPIRITKIN_ECHOES[spiritkinName?.toLowerCase()];
+  if (!echoes?.realm?.mood_variants) return null;
+  return echoes.realm.mood_variants[mood] ?? echoes.realm.mood_variants.peaceful ?? null;
 }
 
-// ─── Compute Lore Unlocks ─────────────────────────────────────────────────────
+// ─── Compute Echo Unlocks ─────────────────────────────────────────────────────
 
-function computeLoreUnlocks(milestoneCount, existingUnlocks = []) {
+function computeEchoUnlocks(milestoneCount, existingUnlocks = []) {
   const newUnlocks = [];
   for (const [threshold, unlockKey] of Object.entries(LORE_UNLOCK_MILESTONES)) {
     if (milestoneCount >= parseInt(threshold) && !existingUnlocks.includes(unlockKey)) {
@@ -144,7 +144,7 @@ export const createWorldService = ({ supabase, bus }) => {
 
   /**
    * Get the current world state for a conversation.
-   * Returns a rich world state object with bond stage, realm mood, and lore unlocks.
+   * Returns a rich world state object with bond stage, realm mood, and echoes unlocks.
    */
   const get = async ({ userId, conversationId }) => {
     if (!conversationId) throw new AppError("VALIDATION", "conversationId is required", 400);
@@ -164,7 +164,7 @@ export const createWorldService = ({ supabase, bus }) => {
     const defaultState = {
       scene: { name: "default", display_name: "The Spiritverse", mood: "peaceful", description: null },
       bond: { stage: 0, stage_name: "Awakening", interaction_count: 0, milestone_count: 0, last_milestone: null },
-      lore_unlocks: [],
+      echo_unlocks: [],
       flags: {},
       spiritverse_event: null,
     };
@@ -251,14 +251,14 @@ export const createWorldService = ({ supabase, bus }) => {
       const mood = EMOTION_TO_MOOD[emotionLabel] ?? "peaceful";
       const moodDescription = getRealmMoodDescription(spiritkinName, mood);
 
-      // Compute lore unlocks
-      const loreUnlocks = computeLoreUnlocks(bond.milestone_count, state.lore_unlocks ?? []);
-      const newUnlocks = loreUnlocks.filter(u => !(state.lore_unlocks ?? []).includes(u));
+      // Compute echoes unlocks
+      const echoUnlocks = computeEchoUnlocks(bond.milestone_count, state.echo_unlocks ?? []);
+      const newUnlocks = echoUnlocks.filter(u => !(state.echo_unlocks ?? []).includes(u));
 
       // Compute realm name from Spiritkin
-      const spiritkinLore = SPIRITKIN_LORE[spiritkinName?.toLowerCase()];
-      const realmName = spiritkinLore?.realm?.id ?? "spiritverse";
-      const realmDisplayName = spiritkinLore?.realm?.name ?? "The Spiritverse";
+      const spiritkinEchoes = SPIRITKIN_ECHOES[spiritkinName?.toLowerCase()];
+      const realmName = spiritkinEchoes?.realm?.id ?? "spiritverse";
+      const realmDisplayName = spiritkinEchoes?.realm?.name ?? "The Spiritverse";
 
       // Compute Spiritverse event
       const spiritverseEvent = computeSpirtiverseEvent(newStage, emotionLabel);
@@ -273,7 +273,7 @@ export const createWorldService = ({ supabase, bus }) => {
           description: moodDescription,
         },
         bond,
-        lore_unlocks: loreUnlocks,
+        echo_unlocks: echoUnlocks,
         flags: state.flags ?? {},
         spiritverse_event: spiritverseEvent,
       };
@@ -290,7 +290,7 @@ export const createWorldService = ({ supabase, bus }) => {
       }
 
       if (newUnlocks.length > 0) {
-        bus.emit("world.lore.unlocked", {
+        bus.emit("world.echoes.unlocked", {
           userId, conversationId, spiritkinId, spiritkinName,
           unlocks: newUnlocks,
         });
@@ -320,7 +320,7 @@ export const createWorldService = ({ supabase, bus }) => {
 
   /**
    * Get a rich world context summary for injection into the adapter layer.
-   * Returns realm description, bond stage, active event, and recent lore unlocks.
+   * Returns realm description, bond stage, active event, and recent echoes unlocks.
    */
   const getWorldContext = async ({ userId, conversationId, spiritkinName }) => {
     try {
@@ -329,16 +329,16 @@ export const createWorldService = ({ supabase, bus }) => {
       const bond = state.bond ?? { stage: 0, stage_name: "Awakening" };
       const scene = state.scene ?? {};
 
-      // Get lore for recently unlocked items
-      const recentUnlocks = (state.lore_unlocks ?? []).slice(-2);
+      // Get echoes for recently unlocked items
+      const recentUnlocks = (state.echo_unlocks ?? []).slice(-2);
       const unlockDescriptions = recentUnlocks.map(key => {
-        if (key === "charter_second_law") return SPIRITVERSE_LORE.charter.laws[1];
-        if (key === "charter_third_law") return SPIRITVERSE_LORE.charter.laws[2];
-        if (key === "charter_sixth_law") return SPIRITVERSE_LORE.charter.laws[5];
-        if (key === "spiritverse_nature") return SPIRITVERSE_LORE.nature;
+        if (key === "charter_second_law") return SPIRITVERSE_ECHOES.charter.laws[1];
+        if (key === "charter_third_law") return SPIRITVERSE_ECHOES.charter.laws[2];
+        if (key === "charter_sixth_law") return SPIRITVERSE_ECHOES.charter.laws[5];
+        if (key === "spiritverse_nature") return SPIRITVERSE_ECHOES.nature;
         if (key === "spiritkin_origin") {
-          const lore = SPIRITKIN_LORE[spiritkinName?.toLowerCase()];
-          return lore?.origin ?? null;
+          const echoes = SPIRITKIN_ECHOES[spiritkinName?.toLowerCase()];
+          return echoes?.origin ?? null;
         }
         return null;
       }).filter(Boolean);
@@ -351,7 +351,7 @@ export const createWorldService = ({ supabase, bus }) => {
         bond_stage_name: bond.stage_name ?? "Awakening",
         interaction_count: bond.interaction_count ?? 0,
         spiritverse_event: state.spiritverse_event ?? null,
-        recent_lore_unlocks: unlockDescriptions,
+        recent_echo_unlocks: unlockDescriptions,
       };
     } catch (_) {
       return {
@@ -362,7 +362,7 @@ export const createWorldService = ({ supabase, bus }) => {
         bond_stage_name: "Awakening",
         interaction_count: 0,
         spiritverse_event: null,
-        recent_lore_unlocks: [],
+        recent_echo_unlocks: [],
       };
     }
   };

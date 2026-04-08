@@ -1,4 +1,4 @@
-# Identity Governor Optimization: Deep Lore Embedding and Canonical Expansion
+# Identity Governor Optimization: Deep Echoes Embedding and Canonical Expansion
 
 ## 1. Current State Assessment
 
@@ -16,4 +16,4 @@ The `identityGovernor.mjs` service is a cornerstone of SpiritCore, ensuring the 
 
 ## 2. Optimization Gap Analysis
 
-While the `identityGovernor` excels at preserving identity, the strategic documents emphasize a need for deeper lore embedding and a more 
+While the `identityGovernor` excels at preserving identity, the strategic documents emphasize a need for deeper echoes embedding and a more 

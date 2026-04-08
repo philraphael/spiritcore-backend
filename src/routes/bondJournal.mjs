@@ -2,7 +2,7 @@
  * SpiritCore — Bond Journal Route
  *
  * Returns the user's bond journal: memories, progression stats,
- * game-unlocked lore, and bond stage data.
+ * game-unlocked echoes, and bond stage data.
  *
  * GET /v1/bond-journal?userId=&conversationId=
  */
@@ -25,7 +25,7 @@ export async function bondJournalRoutes(fastify) {
     const { userId, conversationId } = req.query;
 
     // Get progression stats (games completed, bond stage, world mood)
-    let stats = { gamesCompleted: 0, bondStage: 0, bondStageName: "First Contact", worldMood: "peaceful", unlockedLoreCount: 0 };
+    let stats = { gamesCompleted: 0, bondStage: 0, bondStageName: "First Contact", worldMood: "peaceful", unlockedEchoCount: 0 };
     if (worldProgression) {
       try {
         stats = await worldProgression.getProgressionStats({ userId, conversationId });
@@ -34,13 +34,13 @@ export async function bondJournalRoutes(fastify) {
       }
     }
 
-    // Get unlocked lore from games
+    // Get unlocked echoes from games
     let gameUnlocks = [];
     if (worldProgression) {
       try {
-        gameUnlocks = await worldProgression.getUnlockedLore({ userId, conversationId });
+        gameUnlocks = await worldProgression.getUnlockedEchoes({ userId, conversationId });
       } catch (err) {
-        fastify.log.warn({ err }, "bondJournal: getUnlockedLore failed");
+        fastify.log.warn({ err }, "bondJournal: getUnlockedEchoes failed");
       }
     }
 

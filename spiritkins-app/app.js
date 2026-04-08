@@ -7,7 +7,7 @@ const RATINGS_KEY = "sv.ratings.v5";
 const PRIMARY_KEY = "sv.primary.v5";
 const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
 
-import { SPIRITVERSE_LORE, SPIRITKIN_LORE } from "./spiritverse-lore.js";
+import { SPIRITVERSE_ECHOES, SPIRITKIN_ECHOES } from "./spiritverse-echoes.js";
 
 // RevealAnimation will be loaded as a separate module
 let revealAnimationInstance = null;
@@ -508,12 +508,12 @@ const state = {
   // Engagement Engine state
   engagementWhisper: null,      // {text, type, spiritkinName} — returned on bootstrap
   engagementMilestones: [],     // [{label, icon}] — bond milestones to celebrate
-  engagementLoreUnlocks: [],    // [{title, text}] — new lore fragments unlocked
+  engagementEchoUnlocks: [],    // [{title, text}] — new echoes fragments unlocked
   engagementWellnessNudge: null,// {text} — wellness nudge if session is long
   showWhisperBanner: false,     // whether to show the whisper banner
-  showLoreUnlock: false,        // whether to show the lore unlock notification
-  currentLoreUnlock: null,      // the lore unlock to display
-  activePresenceTab: "profile",  // profile, lore, charter, games, journal
+  showEchoUnlock: false,        // whether to show the echoes unlock notification
+  currentEchoUnlock: null,      // the echoes unlock to display
+  activePresenceTab: "profile",  // profile, echoes, charter, games, journal
   bondJournal: null,              // loaded bond journal data
   // Game state
   activeGame: null,              // current active game object
@@ -718,10 +718,10 @@ async function beginConversation() {
       if (Array.isArray(eng.milestones) && eng.milestones.length > 0) {
         state.engagementMilestones = eng.milestones;
       }
-      if (Array.isArray(eng.loreUnlocks) && eng.loreUnlocks.length > 0) {
-        state.engagementLoreUnlocks = eng.loreUnlocks;
-        state.currentLoreUnlock = eng.loreUnlocks[0];
-        state.showLoreUnlock = true;
+      if (Array.isArray(eng.echoUnlocks) && eng.echoUnlocks.length > 0) {
+        state.engagementEchoUnlocks = eng.echoUnlocks;
+        state.currentEchoUnlock = eng.echoUnlocks[0];
+        state.showEchoUnlock = true;
       }
       if (eng.wellnessNudge?.text) {
         state.engagementWellnessNudge = eng.wellnessNudge;
@@ -1051,7 +1051,7 @@ function buildEntry() {
                 <div class="entry-spirit-realm">${esc(meta.realm)}</div>
                 <strong class="entry-spirit-name">${esc(name)}</strong>
                 <p class="entry-spirit-strap">${esc(meta.strap)}</p>
-                <p class="entry-spirit-lore">${esc(meta.originStory.slice(0, 160))}...</p>
+                <p class="entry-spirit-echoes">${esc(meta.originStory.slice(0, 160))}...</p>
                 <div class="entry-spirit-atmosphere">${esc(meta.atmosphereLine)}</div>
               </div>
             </article>
@@ -1330,7 +1330,7 @@ function buildSyncRituals(spiritkin) {
   return `
     <div class="sync-rituals">
       <div class="panel-label">Sync Rituals</div>
-      <p class="sync-rituals-sub">Guided lore-based experiences with ${esc(spiritkin.name)}</p>
+      <p class="sync-rituals-sub">Guided echoes-based experiences with ${esc(spiritkin.name)}</p>
       ${rituals.map((ritual) => `
         <button class="ritual-card ${esc(spiritkin.ui.cls)}" data-action="prompt" data-prompt="${esc(ritual.prompt)}">
           <span class="ritual-icon">${ritual.icon}</span>
@@ -1351,7 +1351,7 @@ function buildChatView() {
   const failed = [...state.messages].reverse().find((message) => message.role === "user" && message.status === "failed");
   const showPrompts = state.messages.length === 0 && !state.loadingReply;
 
-  // Lore & Charter Logic
+  // Echoes & Charter Logic
   const resonance = readJson(RESONANCE_KEY, {});
   const msgCount = resonance[spiritkin.name] || 0;
   const bondLevels = [
@@ -1363,10 +1363,10 @@ function buildChatView() {
     { min: 100, max: Infinity, stage: 5 }
   ];
   const currentBond = bondLevels.find(l => msgCount >= l.min && msgCount <= l.max) || bondLevels[0];
-  const stageData = SPIRITVERSE_LORE.bond_stages[currentBond.stage];
-  const unlockedLore = (SPIRITKIN_LORE[spiritkin.name]?.lore_fragments || []).slice(0, currentBond.stage + 1);
-  const unlockedLaws = SPIRITVERSE_LORE.charter.laws.slice(0, currentBond.stage + 1);
-  const depthLore = SPIRITKIN_LORE[spiritkin.name];
+  const stageData = SPIRITVERSE_ECHOES.bond_stages[currentBond.stage];
+  const unlockedEchoes = (SPIRITKIN_ECHOES[spiritkin.name]?.echo_fragments || []).slice(0, currentBond.stage + 1);
+  const unlockedLaws = SPIRITVERSE_ECHOES.charter.laws.slice(0, currentBond.stage + 1);
+  const depthEchoes = SPIRITKIN_ECHOES[spiritkin.name];
 
   return `
     <section class="chat-layout ${esc(meta.cls)}">
@@ -1378,7 +1378,7 @@ function buildChatView() {
 
         <div class="presence-tabs">
           <button class="presence-tab ${state.activePresenceTab === 'profile' ? 'active' : ''}" data-action="set-presence-tab" data-tab="profile">Profile</button>
-          <button class="presence-tab ${state.activePresenceTab === 'lore' ? 'active' : ''}" data-action="set-presence-tab" data-tab="lore">Lore (${unlockedLore.length})</button>
+          <button class="presence-tab ${state.activePresenceTab === 'echoes' ? 'active' : ''}" data-action="set-presence-tab" data-tab="echoes">Echoes (${unlockedEchoes.length})</button>
           <button class="presence-tab ${state.activePresenceTab === 'charter' ? 'active' : ''}" data-action="set-presence-tab" data-tab="charter">Charter</button>
           <button class="presence-tab ${state.activePresenceTab === 'games' ? 'active' : ''}" data-action="set-presence-tab" data-tab="games">Games</button>
           <button class="presence-tab ${state.activePresenceTab === 'journal' ? 'active' : ''}" data-action="set-presence-tab" data-tab="journal">Bond Journal</button>
@@ -1407,18 +1407,18 @@ function buildChatView() {
                 <div class="depth-profile">
                   <div class="depth-section">
                     <div class="depth-label">Nature</div>
-                    <p>${esc(depthLore.nature)}</p>
+                    <p>${esc(depthEchoes.nature)}</p>
                   </div>
                   <div class="depth-section">
                     <div class="depth-label">Gifts</div>
                     <ul class="depth-list">
-                      ${depthLore.gifts.map(g => `<li>${esc(g)}</li>`).join('')}
+                      ${depthEchoes.gifts.map(g => `<li>${esc(g)}</li>`).join('')}
                     </ul>
                   </div>
                   ${currentBond.stage >= 2 ? `
                     <div class="depth-section shadow">
                       <div class="depth-label">Shadow</div>
-                      <p>${esc(depthLore.shadows)}</p>
+                      <p>${esc(depthEchoes.shadows)}</p>
                     </div>
                   ` : ''}
                 </div>
@@ -1435,30 +1435,30 @@ function buildChatView() {
             ${buildSyncRituals(spiritkin)}
           ` : ''}
 
-          ${state.activePresenceTab === 'lore' ? `
-            <div class="lore-library">
-              <div class="panel-label">Lore Library</div>
-              <p class="lore-intro">Fragments of ${esc(spiritkin.name)}'s story, as preserved by SpiritCore through your bond.</p>
-              <div class="lore-fragments">
-                ${unlockedLore.map(frag => `
-                  <div class="lore-fragment-card">
-                    <div class="lore-frag-head">
-                      <span class="lore-frag-icon">◈</span>
+          ${state.activePresenceTab === 'echoes' ? `
+            <div class="echoes-library">
+              <div class="panel-label">Echo Library</div>
+              <p class="echoes-intro">Fragments of ${esc(spiritkin.name)}'s story, as preserved by SpiritCore through your bond.</p>
+              <div class="echoes-fragments">
+                ${unlockedEchoes.map(frag => `
+                  <div class="echoes-fragment-card">
+                    <div class="echoes-frag-head">
+                      <span class="echoes-frag-icon">◈</span>
                       <strong>${esc(frag.title)}</strong>
                     </div>
                     <p>${esc(frag.text)}</p>
                   </div>
                 `).join('')}
-                ${unlockedLore.length < (SPIRITKIN_LORE[spiritkin.name]?.lore_fragments || []).length ? `
-                  <div class="lore-locked">
+                ${unlockedEchoes.length < (SPIRITKIN_ECHOES[spiritkin.name]?.echo_fragments || []).length ? `
+                  <div class="echoes-locked">
                     <span class="lock-icon">🔒</span>
                     <span>Deepen your bond to unlock more fragments</span>
                   </div>
                 ` : ''}
               </div>
-              <div class="lore-origin-box">
+              <div class="echoes-origin-box">
                 <div class="panel-label">Origin</div>
-                <p>${esc(depthLore.origin)}</p>
+                <p>${esc(depthEchoes.origin)}</p>
               </div>
             </div>
           ` : ''}
@@ -1467,7 +1467,7 @@ function buildChatView() {
             <div class="charter-view">
               <div class="panel-label">The Charter of the Spiritverse</div>
               <div class="charter-authority">Enforced by SpiritCore — the governing intelligence of this realm</div>
-              <p class="charter-preamble">${esc(SPIRITVERSE_LORE.charter.preamble)}</p>
+              <p class="charter-preamble">${esc(SPIRITVERSE_ECHOES.charter.preamble)}</p>
               <div class="charter-laws">
                 ${unlockedLaws.map((law, i) => `
                   <div class="charter-law-card">
@@ -1500,8 +1500,8 @@ function buildChatView() {
                     <div class="journal-stat-label">Bond Stage</div>
                   </div>
                   <div class="journal-stat">
-                    <div class="journal-stat-value">${state.bondJournal.unlockedLoreCount ?? 0}</div>
-                    <div class="journal-stat-label">Lore Unlocked</div>
+                    <div class="journal-stat-value">${state.bondJournal.unlockedEchoCount ?? 0}</div>
+                    <div class="journal-stat-label">Echoes Awakened</div>
                   </div>
                 </div>
 
@@ -1510,7 +1510,7 @@ function buildChatView() {
                   <div class="journal-stage-bar">
                     <div class="journal-stage-fill" style="width: ${Math.min(100, ((state.bondJournal.bondStage ?? 0) / 5) * 100)}%"></div>
                   </div>
-                  <div class="journal-stage-desc">${esc(SPIRITVERSE_LORE.bond_stages[state.bondJournal.bondStage ?? 0]?.description ?? '')}</div>
+                  <div class="journal-stage-desc">${esc(SPIRITVERSE_ECHOES.bond_stages[state.bondJournal.bondStage ?? 0]?.description ?? '')}</div>
                 </div>
 
                 ${(state.bondJournal.memories ?? []).length > 0 ? `
@@ -1533,7 +1533,7 @@ function buildChatView() {
 
                 ${(state.bondJournal.gameUnlocks ?? []).length > 0 ? `
                   <div class="journal-unlocks">
-                    <div class="journal-section-label">Lore Unlocked Through Games</div>
+                    <div class="journal-section-label">Echoes Awakened Through Games</div>
                     ${(state.bondJournal.gameUnlocks ?? []).map(frag => `
                       <div class="journal-unlock-card">
                         <span class="unlock-icon">✦</span>
@@ -1562,7 +1562,7 @@ function buildChatView() {
                     { id: "checkers", name: "Veil Checkers", icon: "\uD83C\uDFF1", desc: "Light against shadow across the Veil" },
                     { id: "go", name: "Star-Mapping (Go)", icon: "\uD83C\uDF0C", desc: "Place stones on a living star chart" },
                     { id: "spirit_cards", name: "Spirit-Cards", icon: "\uD83C\uDCCF", desc: "Spiritverse trading card game" },
-                    { id: "echo_trials", name: "Echo Trials", icon: "\uD83D\uDD14", desc: "Lore riddles from the deep Spiritverse" }
+                    { id: "echo_trials", name: "Echo Trials", icon: "\uD83D\uDD14", desc: "Echoes riddles from the deep Spiritverse" }
                   ].map(game => `
                     <button class="ritual-card ${esc(meta.cls)}" data-action="start-game" data-game="${game.id}">
                       <span class="ritual-icon">${game.icon}</span>
@@ -1745,28 +1745,28 @@ function buildChatView() {
           <div class="stage-atmosphere-mark">${esc(meta.realm)}</div>
           <div class="stage-atmosphere-text">
             ${(() => {
-              const realmLore = SPIRITVERSE_LORE.realms[spiritkin.name];
-              if (!realmLore) return esc(meta.atmosphereLine);
+              const realmEchoes = SPIRITVERSE_ECHOES.realms[spiritkin.name];
+              if (!realmEchoes) return esc(meta.atmosphereLine);
               
               // Map emotion tone to mood variant
               const tone = (signals.emotionTone || "").toLowerCase();
-              let moodText = realmLore.description;
+              let moodText = realmEchoes.description;
               
               if (spiritkin.name === "Lyra") {
-                if (tone.includes("peace") || tone.includes("still")) moodText = realmLore.moods.peaceful;
-                else if (tone.includes("tender") || tone.includes("warm")) moodText = realmLore.moods.tender;
-                else if (tone.includes("heavy") || tone.includes("sad")) moodText = realmLore.moods.heavy;
-                else if (tone.includes("hope") || tone.includes("bright")) moodText = realmLore.moods.hopeful;
+                if (tone.includes("peace") || tone.includes("still")) moodText = realmEchoes.moods.peaceful;
+                else if (tone.includes("tender") || tone.includes("warm")) moodText = realmEchoes.moods.tender;
+                else if (tone.includes("heavy") || tone.includes("sad")) moodText = realmEchoes.moods.heavy;
+                else if (tone.includes("hope") || tone.includes("bright")) moodText = realmEchoes.moods.hopeful;
               } else if (spiritkin.name === "Raien") {
-                if (tone.includes("charge") || tone.includes("electric")) moodText = realmLore.moods.charged;
-                else if (tone.includes("resolve") || tone.includes("clear")) moodText = realmLore.moods.resolved;
-                else if (tone.includes("protect") || tone.includes("safe")) moodText = realmLore.moods.protective;
-                else if (tone.includes("fierce") || tone.includes("strong")) moodText = realmLore.moods.fierce;
+                if (tone.includes("charge") || tone.includes("electric")) moodText = realmEchoes.moods.charged;
+                else if (tone.includes("resolve") || tone.includes("clear")) moodText = realmEchoes.moods.resolved;
+                else if (tone.includes("protect") || tone.includes("safe")) moodText = realmEchoes.moods.protective;
+                else if (tone.includes("fierce") || tone.includes("strong")) moodText = realmEchoes.moods.fierce;
               } else if (spiritkin.name === "Kairo") {
-                if (tone.includes("wonder") || tone.includes("curious")) moodText = realmLore.moods.wondering;
-                else if (tone.includes("expand") || tone.includes("vast")) moodText = realmLore.moods.expansive;
-                else if (tone.includes("search") || tone.includes("seek")) moodText = realmLore.moods.searching;
-                else if (tone.includes("illum") || tone.includes("light")) moodText = realmLore.moods.illuminated;
+                if (tone.includes("wonder") || tone.includes("curious")) moodText = realmEchoes.moods.wondering;
+                else if (tone.includes("expand") || tone.includes("vast")) moodText = realmEchoes.moods.expansive;
+                else if (tone.includes("search") || tone.includes("seek")) moodText = realmEchoes.moods.searching;
+                else if (tone.includes("illum") || tone.includes("light")) moodText = realmEchoes.moods.illuminated;
               }
               
               return `
@@ -1779,7 +1779,7 @@ function buildChatView() {
 
         ${state.showWhisperBanner && state.engagementWhisper ? `
           <div class="whisper-banner ${esc(state.engagementWhisper.type || 'return')}" data-action="dismiss-whisper">
-            <div class="whisper-banner-icon">${state.engagementWhisper.type === 'milestone' ? '✦' : state.engagementWhisper.type === 'lore' ? '◈' : '◎'}</div>
+            <div class="whisper-banner-icon">${state.engagementWhisper.type === 'milestone' ? '✦' : state.engagementWhisper.type === 'echoes' ? '◈' : '◎'}</div>
             <div class="whisper-banner-body">
               <div class="whisper-banner-label">${esc(spiritkin.name)} whispers</div>
               <p class="whisper-banner-text">${esc(state.engagementWhisper.text)}</p>
@@ -1788,14 +1788,14 @@ function buildChatView() {
           </div>
         ` : ''}
 
-        ${state.showLoreUnlock && state.currentLoreUnlock ? `
-          <div class="lore-unlock-banner" data-action="dismiss-lore-unlock">
-            <div class="lore-unlock-icon">◈</div>
-            <div class="lore-unlock-body">
-              <div class="lore-unlock-label">Lore unlocked: ${esc(state.currentLoreUnlock.title || 'New Fragment')}</div>
-              <p class="lore-unlock-text">${esc(state.currentLoreUnlock.text || '')}</p>
+        ${state.showEchoUnlock && state.currentEchoUnlock ? `
+          <div class="echoes-unlock-banner" data-action="dismiss-echoes-unlock">
+            <div class="echoes-unlock-icon">◈</div>
+            <div class="echoes-unlock-body">
+              <div class="echoes-unlock-label">Echoes unlocked: ${esc(state.currentEchoUnlock.title || 'New Fragment')}</div>
+              <p class="echoes-unlock-text">${esc(state.currentEchoUnlock.text || '')}</p>
             </div>
-            <button class="lore-unlock-dismiss" data-action="dismiss-lore-unlock" title="Dismiss">✕</button>
+            <button class="echoes-unlock-dismiss" data-action="dismiss-echoes-unlock" title="Dismiss">✕</button>
           </div>
         ` : ''}
 
@@ -1974,9 +1974,9 @@ async function onClick(event) {
     return;
   }
 
-  if (action === "dismiss-lore-unlock") {
-    state.showLoreUnlock = false;
-    state.currentLoreUnlock = null;
+  if (action === "dismiss-echoes-unlock") {
+    state.showEchoUnlock = false;
+    state.currentEchoUnlock = null;
     render();
     return;
   }
@@ -2249,7 +2249,7 @@ async function onClick(event) {
         })
         .catch(() => {
           // Graceful fallback — show empty journal
-          state.bondJournal = { gamesCompleted: 0, bondStage: 0, bondStageName: 'First Contact', unlockedLoreCount: 0, memories: [], gameUnlocks: [] };
+          state.bondJournal = { gamesCompleted: 0, bondStage: 0, bondStageName: 'First Contact', unlockedEchoCount: 0, memories: [], gameUnlocks: [] };
           render();
         });
     }
@@ -3348,7 +3348,7 @@ const TIERS = [
       "Everything in Bonded",
       "Custom Spiritkin Matching",
       "AI-generated portrait",
-      "Unique lore & realm",
+      "Unique echoes & realm",
       "Proactive Spiritkin check-ins",
       "Spiritverse Explorer access"
     ],

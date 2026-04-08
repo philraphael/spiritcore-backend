@@ -195,10 +195,10 @@ function buildWorldLayer(ctx) {
     const desc = eventDescriptions[world.spiritverse_event] ?? `A Spiritverse event is active: ${world.spiritverse_event}`;
     parts.push(`Spiritverse event: ${desc}`);
   }
-  if (world.recent_lore_unlocks?.length > 0) {
-    parts.push(`Recently revealed lore (weave in naturally if relevant):`);
-    world.recent_lore_unlocks.slice(0, 2).forEach(lore => {
-      if (lore) parts.push(`  "${sanitizeText(lore).slice(0, 200)}"`);
+  if (world.recent_echo_unlocks?.length > 0) {
+    parts.push(`Recently revealed echoes (weave in naturally if relevant):`);
+    world.recent_echo_unlocks.slice(0, 2).forEach(echoes => {
+      if (echoes) parts.push(`  "${sanitizeText(echoes).slice(0, 200)}"`);
     });
   }
 

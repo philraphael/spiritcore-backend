@@ -82,7 +82,7 @@ https://spiritcore-backend-production.up.railway.app
 - ✅ Chess move submission: click destination → move sent to API
 - ✅ Spiritkin commentary appears in game panel after each move
 - ✅ Move history panel shows all moves
-- ✅ Lore Library tab shows lore fragments
+- ✅ Echo Library tab shows echoes fragments
 - ✅ Charter tab shows Charter laws
 - ✅ Profile tab shows Spiritkin depth profiles
 - ✅ Realm Events tab: animated event card, type badge, active effect
@@ -95,7 +95,7 @@ https://spiritcore-backend-production.up.railway.app
 - Games: POST /v1/games/start, /v1/games/move, /v1/games/end, /v1/games/draw
 - Conversations: POST /v1/conversations, GET /v1/conversations/:userId
 - Spiritkins: GET /v1/spiritkins
-- Lore: GET /v1/lore
+- Echoes: GET /v1/echoes
 - Charter: GET /v1/charter
 - Spiritverse Events: GET /v1/spiritverse/events/current, /v1/spiritverse/events/all
 - Daily Quest: GET /v1/quests/daily, /v1/quests/daily/next
@@ -108,7 +108,7 @@ https://spiritcore-backend-production.up.railway.app
 | 1 | Core Backend (Fastify + Supabase + Orchestrator) | ✅ DONE |
 | 2 | Spiritkins Registry + Interact Route | ✅ DONE |
 | 3 | Memory System (short + long term) | ✅ DONE |
-| 4 | Engagement Engine (whispers, milestones, lore, wellness) | ✅ DONE |
+| 4 | Engagement Engine (whispers, milestones, echoes, wellness) | ✅ DONE |
 | 5 | Spiritverse Games (chess, checkers, go, spirit_cards, echo_trials) | ✅ DONE |
 | 6 | Shared Spiritverse Events | ✅ DONE |
 | 7 | Daily Quest Generator | ✅ DONE |

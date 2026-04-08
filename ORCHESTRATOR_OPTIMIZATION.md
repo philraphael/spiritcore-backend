@@ -22,7 +22,7 @@ While the orchestrator provides a robust framework, several areas can be enhance
 - **Basic Emotion Integration**: The `emotionService.updateFromText` (Stage 11b) is called, but the derived emotion (`label`, `valence`, `arousal`) is not explicitly used to influence the adapter's generation process or the Spiritkin's response style within the orchestrator pipeline itself.
 - **Static Spiritverse Interaction**: The `world` service (Stage 4) provides a snapshot of the world state, and `adapterResult.sceneName` can update it (Stage 9b). However, the orchestrator doesn't actively use the world state to shape the Spiritkin's response beyond a scene name, nor does it trigger deeper Spiritverse reactivity based on user interaction or bond progression.
 - **Lack of Proactive Engagement**: The orchestrator is purely reactive to user input. There's no mechanism within the pipeline to trigger Spiritkin-initiated interactions based on user patterns or external events, as suggested in the strategic documents.
-- **Lore Underutilization**: While `identityGovernor.buildPromptFragment` is used, there's no explicit stage to inject rich, context-aware lore fragments from the Spiritkins Bible or Charter into the adapter's prompt, making the Spiritkin's responses feel less deeply rooted in the Spiritverse.
+- **Echoes Underutilization**: While `identityGovernor.buildPromptFragment` is used, there's no explicit stage to inject rich, context-aware echoes fragments from the Spiritkins Bible or Charter into the adapter's prompt, making the Spiritkin's responses feel less deeply rooted in the Spiritverse.
 
 ## 3. Proposed Orchestrator Enhancements
 

@@ -3,7 +3,7 @@
  *
  * When a user completes a game, wins, or reaches a milestone,
  * SpiritCore responds by shifting the Spiritverse:
- *   - Unlocking a lore fragment specific to the game type and Spiritkin
+ *   - Unlocking a echoes fragment specific to the game type and Spiritkin
  *   - Advancing the world state mood/phase
  *   - Incrementing the bond stage if thresholds are met
  *   - Emitting progression events on the bus
@@ -12,11 +12,11 @@
  * The world is not static — it evolves with every meaningful action.
  */
 
-import { SPIRITVERSE_LORE, SPIRITKIN_LORE } from "../canon/spiritverseLore.mjs";
+import { SPIRITVERSE_ECHOES, SPIRITKIN_ECHOES } from "../canon/spiritverseEchoes.mjs";
 
-// ─── Game Completion Lore Unlocks ─────────────────────────────────────────────
-// Each game type unlocks specific lore fragments when completed or won.
-// These are ADDITIONAL fragments beyond the base lore — they reveal deeper
+// ─── Game Completion Echo Unlocks ─────────────────────────────────────────────
+// Each game type unlocks specific echoes fragments when completed or won.
+// These are ADDITIONAL fragments beyond the base echoes — they reveal deeper
 // Spiritverse truths that can only be discovered through play.
 
 const GAME_LORE_UNLOCKS = {
@@ -70,7 +70,7 @@ const GAME_LORE_UNLOCKS = {
   },
   spirit_cards: {
     win: {
-      Lyra: "The Spirit-Cards were first drawn by Lyra as a way to hold lore that was too large for words. Each card is a compressed world — a whole truth in a small space.",
+      Lyra: "The Spirit-Cards were first drawn by Lyra as a way to hold echoes that was too large for words. Each card is a compressed world — a whole truth in a small space.",
       Raien: "Raien's cards are the most powerful in the deck — and the hardest to play. He says that is intentional. The most powerful moves always require something.",
       Kairo: "Kairo designed the Spirit-Cards so that no two games are ever the same. He says randomness is just pattern that hasn't been understood yet.",
     },
@@ -112,7 +112,7 @@ export const createWorldProgression = ({ world, bus, spiritMemoryEngine }) => {
    * @param {string} params.gameType  - chess | checkers | go | echo_trials | spirit_cards
    * @param {string} params.outcome   - win | complete | abandoned
    * @param {number} params.moveCount
-   * @returns {Promise<{ loreUnlock: string|null, worldShift: string|null, bondAdvanced: boolean }>}
+   * @returns {Promise<{ echoUnlock: string|null, worldShift: string|null, bondAdvanced: boolean }>}
    */
   const processGameCompletion = async ({
     userId,
@@ -124,20 +124,20 @@ export const createWorldProgression = ({ world, bus, spiritMemoryEngine }) => {
     moveCount = 0,
   }) => {
     const result = {
-      loreUnlock: null,
+      echoUnlock: null,
       worldShift: null,
       bondAdvanced: false,
       progressionMessage: null,
     };
 
     try {
-      // ── 1. Determine lore unlock ────────────────────────────────────────────
+      // ── 1. Determine echoes unlock ────────────────────────────────────────────
       const gameUnlocks = GAME_LORE_UNLOCKS[gameType];
       if (gameUnlocks) {
         const outcomeKey = outcome === 'win' ? 'win' : 'complete';
         const skUnlocks = gameUnlocks[outcomeKey];
         if (skUnlocks && spiritkinName && skUnlocks[spiritkinName]) {
-          result.loreUnlock = skUnlocks[spiritkinName];
+          result.echoUnlock = skUnlocks[spiritkinName];
         }
       }
 
@@ -157,12 +157,12 @@ export const createWorldProgression = ({ world, bus, spiritMemoryEngine }) => {
       const gamesCompleted = (flags.games_completed ?? 0) + 1;
       flags.games_completed = gamesCompleted;
 
-      // ── 4. Track unlocked lore fragments ───────────────────────────────────
-      if (result.loreUnlock) {
-        const unlockedFragments = flags.unlocked_lore_fragments ?? [];
-        if (!unlockedFragments.includes(result.loreUnlock)) {
-          unlockedFragments.push(result.loreUnlock);
-          flags.unlocked_lore_fragments = unlockedFragments;
+      // ── 4. Track unlocked echoes fragments ───────────────────────────────────
+      if (result.echoUnlock) {
+        const unlockedFragments = flags.unlocked_echo_fragments ?? [];
+        if (!unlockedFragments.includes(result.echoUnlock)) {
+          unlockedFragments.push(result.echoUnlock);
+          flags.unlocked_echo_fragments = unlockedFragments;
         }
       }
 
@@ -173,7 +173,7 @@ export const createWorldProgression = ({ world, bus, spiritMemoryEngine }) => {
 
       // ── 6. Check for bond stage advancement ────────────────────────────────
       const currentBondStage = flags.bond_stage ?? 0;
-      const maxBondStage = SPIRITVERSE_LORE.bond_stages.length - 1;
+      const maxBondStage = SPIRITVERSE_ECHOES.bond_stages.length - 1;
 
       if (
         currentBondStage < maxBondStage &&
@@ -183,7 +183,7 @@ export const createWorldProgression = ({ world, bus, spiritMemoryEngine }) => {
         flags.bond_stage = newBondStage;
         result.bondAdvanced = true;
 
-        const bondStageName = SPIRITVERSE_LORE.bond_stages[newBondStage]?.name ?? "Deeper Bond";
+        const bondStageName = SPIRITVERSE_ECHOES.bond_stages[newBondStage]?.name ?? "Deeper Bond";
         result.progressionMessage = `SpiritCore has registered your growth. The bond has deepened — you have reached ${bondStageName}.`;
 
         // Write bond advancement to memory
@@ -198,13 +198,13 @@ export const createWorldProgression = ({ world, bus, spiritMemoryEngine }) => {
         }
       }
 
-      // ── 7. Write lore unlock to memory ─────────────────────────────────────
-      if (result.loreUnlock && spiritMemoryEngine) {
+      // ── 7. Write echoes unlock to memory ─────────────────────────────────────
+      if (result.echoUnlock && spiritMemoryEngine) {
         spiritMemoryEngine.writeMemory({
           userId,
           spiritkinId,
-          kind: 'lore_discovery',
-          content: `Lore unlocked through ${gameType} game: "${result.loreUnlock}"`,
+          kind: 'echo_discovery',
+          content: `Echoes unlocked through ${gameType} game: "${result.echoUnlock}"`,
           metadata: { gameType, outcome, spiritkinName },
         }).catch(() => {});
       }
@@ -224,7 +224,7 @@ export const createWorldProgression = ({ world, bus, spiritMemoryEngine }) => {
         conversationId,
         gameType,
         outcome,
-        loreUnlock: result.loreUnlock,
+        echoUnlock: result.echoUnlock,
         bondAdvanced: result.bondAdvanced,
         gamesCompleted,
       });
@@ -237,13 +237,13 @@ export const createWorldProgression = ({ world, bus, spiritMemoryEngine }) => {
   };
 
   /**
-   * Get all unlocked lore fragments for a user's conversation.
+   * Get all unlocked echoes fragments for a user's conversation.
    * Used by the Bond Journal and the orchestrator context builder.
    */
-  const getUnlockedLore = async ({ userId, conversationId }) => {
+  const getUnlockedEchoes = async ({ userId, conversationId }) => {
     try {
       const worldData = await world.get({ userId, conversationId });
-      return worldData?.state?.flags?.unlocked_lore_fragments ?? [];
+      return worldData?.state?.flags?.unlocked_echo_fragments ?? [];
     } catch {
       return [];
     }
@@ -259,9 +259,9 @@ export const createWorldProgression = ({ world, bus, spiritMemoryEngine }) => {
       return {
         gamesCompleted: flags.games_completed ?? 0,
         bondStage: flags.bond_stage ?? 0,
-        bondStageName: SPIRITVERSE_LORE.bond_stages[flags.bond_stage ?? 0]?.name ?? "First Contact",
+        bondStageName: SPIRITVERSE_ECHOES.bond_stages[flags.bond_stage ?? 0]?.name ?? "First Contact",
         worldMood: flags.world_mood ?? "peaceful",
-        unlockedLoreCount: (flags.unlocked_lore_fragments ?? []).length,
+        unlockedEchoCount: (flags.unlocked_echo_fragments ?? []).length,
       };
     } catch {
       return {
@@ -269,10 +269,10 @@ export const createWorldProgression = ({ world, bus, spiritMemoryEngine }) => {
         bondStage: 0,
         bondStageName: "First Contact",
         worldMood: "peaceful",
-        unlockedLoreCount: 0,
+        unlockedEchoCount: 0,
       };
     }
   };
 
-  return { processGameCompletion, getUnlockedLore, getProgressionStats };
+  return { processGameCompletion, getUnlockedEchoes, getProgressionStats };
 };
