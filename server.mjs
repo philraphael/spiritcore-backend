@@ -572,6 +572,7 @@ await app.register(gameRoutes, {
   prefix: "/",
   gameEngine: container.gameEngine,
   world: container.worldService,
+  worldProgression: container.worldProgression,
 });
 
 await app.register(veilCrossingRoutes, {

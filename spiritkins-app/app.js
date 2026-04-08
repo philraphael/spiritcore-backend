@@ -2444,19 +2444,36 @@ async function onClick(event) {
   if (action === "end-game") {
     if (!state.conversationId) return;
     try {
-      await fetch(`${API}/v1/games/end`, {
+      const endRes = await fetch(`${API}/v1/games/end`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: state.userId,
           conversationId: state.conversationId,
-          spiritkinName: state.selectedSpiritkin.name
+          spiritkinName: state.selectedSpiritkin?.name,
+          outcome: 'completed'
         })
       });
+      const endData = endRes.ok ? await endRes.json().catch(() => null) : null;
       state.activeGame = null;
       state.gameSpiritkinMessage = null;
       state.gameInstructions = null;
       state.gameEchoGuide = null;
+      // Phase 2: Game-to-World Progression — show echo unlock notification
+      if (endData?.progression?.echoUnlock) {
+        state.currentEchoUnlock = {
+          title: endData.progression.echoUnlock,
+          text: endData.progression.progressionMessage ||
+            'SpiritCore has revealed a new truth. A new Echo Fragment has been added to your library.'
+        };
+        state.showEchoUnlock = true;
+      }
+      // Show bond advancement as a milestone chip
+      if (endData?.progression?.bondAdvanced && endData.progression.progressionMessage) {
+        state.engagementMilestones = [
+          { icon: '\u25c8', label: endData.progression.progressionMessage }
+        ];
+      }
       render();
     } catch (err) {
       console.error("End game failed", err);

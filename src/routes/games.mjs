@@ -10,7 +10,7 @@
  */
 
 export async function gameRoutes(fastify, opts) {
-  const { gameEngine, world } = opts;
+  const { gameEngine, world, worldProgression } = opts;
 
   /**
    * GET /v1/games/list
@@ -147,7 +147,38 @@ export async function gameRoutes(fastify, opts) {
 
     try {
       const result = await gameEngine.endGame({ userId, conversationId, spiritkinName, outcome });
-      return { ok: true, game: result.game, message: result.message };
+
+      // ── Phase 2: Game-to-World Progression ──────────────────────────────────
+      // Trigger world progression: unlock echo fragments, advance bond stage, shift world mood
+      let progression = null;
+      if (worldProgression) {
+        try {
+          // Get the active game type from world state before it's cleared
+          const worldData = await world.get({ userId, conversationId }).catch(() => null);
+          const gameType = worldData?.state?.flags?.active_game?.type ?? 'chess';
+          progression = await worldProgression.processGameCompletion({
+            userId,
+            conversationId,
+            gameType,
+            outcome: outcome ?? 'completed',
+            spiritkinName,
+          });
+        } catch (progErr) {
+          req.log.warn({ progErr }, '[games] worldProgression.processGameCompletion failed (non-fatal)');
+        }
+      }
+
+      return {
+        ok: true,
+        game: result.game,
+        message: result.message,
+        progression: progression ? {
+          echoUnlock: progression.echoUnlock ?? null,
+          bondAdvanced: progression.bondAdvanced ?? false,
+          progressionMessage: progression.progressionMessage ?? null,
+          worldShift: progression.worldShift ?? null,
+        } : null,
+      };
     } catch (err) {
       req.log.error(err, `[games] endGame failed for conversation ${conversationId}`);
       const code = err.statusCode || err.httpCode || 500;
