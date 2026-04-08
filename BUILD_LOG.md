@@ -5,7 +5,7 @@ Last updated: 2026-04-08
 https://spiritcore-backend-production.up.railway.app
 
 ## CURRENT ACTIVE COMMIT
-0abbd8f — Phase 6 & 7: Shared Spiritverse Events + Daily Quest Generator
+e1b3b99 — Refactor: Rename all 'Lore' references to 'Echoes' throughout the platform
 
 ---
 
@@ -82,7 +82,7 @@ https://spiritcore-backend-production.up.railway.app
 - ✅ Chess move submission: click destination → move sent to API
 - ✅ Spiritkin commentary appears in game panel after each move
 - ✅ Move history panel shows all moves
-- ✅ Echo Library tab shows echoes fragments
+- ✅ Echo Library tab shows echo fragments (Renamed from Lore)
 - ✅ Charter tab shows Charter laws
 - ✅ Profile tab shows Spiritkin depth profiles
 - ✅ Realm Events tab: animated event card, type badge, active effect
@@ -95,7 +95,7 @@ https://spiritcore-backend-production.up.railway.app
 - Games: POST /v1/games/start, /v1/games/move, /v1/games/end, /v1/games/draw
 - Conversations: POST /v1/conversations, GET /v1/conversations/:userId
 - Spiritkins: GET /v1/spiritkins
-- Echoes: GET /v1/echoes
+- Echoes: GET /v1/echoes (Updated from Lore)
 - Charter: GET /v1/charter
 - Spiritverse Events: GET /v1/spiritverse/events/current, /v1/spiritverse/events/all
 - Daily Quest: GET /v1/quests/daily, /v1/quests/daily/next
