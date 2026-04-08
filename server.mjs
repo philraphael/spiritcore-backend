@@ -52,6 +52,20 @@ const app = Fastify({
 });
 
 await app.register(cors, { origin: true });
+
+// ── EARLY HEALTH PROBE ─────────────────────────────────────────────────────
+// Registered FIRST so Railway's healthcheck probe gets an instant 200 during
+// startup, before any other route or service initialization completes.
+app.get("/health", async (_req, reply) => {
+  return reply.code(200).send({
+    ok:      true,
+    service: "spiritcore",
+    version: "1.0.0-phase-f",
+    env:     process.env.NODE_ENV || "production",
+    ts:      new Date().toISOString(),
+  });
+});
+
 // Rate limiter registered via Phase F module (replaces inline registration)
 await registerRateLimiter(app);
 
