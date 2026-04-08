@@ -57,7 +57,18 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
   const board = parseFEN(fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
   const files = ['a','b','c','d','e','f','g','h'];
 
-  let html = `<div class="chess-board" id="chess-board">`;
+  // Board controls row
+  let html = `<div class="game-board-controls" style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:340px;margin-bottom:6px;">`;
+  html += `<div class="piece-theme-selector">
+    <span class="piece-theme-label">Theme</span>
+    <button class="piece-theme-btn active" data-action="chess-theme" data-theme="celestial">Celestial</button>
+    <button class="piece-theme-btn" data-action="chess-theme" data-theme="shadow">Shadow</button>
+    <button class="piece-theme-btn" data-action="chess-theme" data-theme="ember">Ember</button>
+  </div>`;
+  html += `<button class="game-expand-btn" data-action="chess-expand">&#x26F6; Expand</button>`;
+  html += `</div>`;
+
+  html += `<div class="chess-board" id="chess-board">`;
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
       const sq = files[file] + (8 - rank);
@@ -96,6 +107,37 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
   html += `</div>`;
 
   container.innerHTML = html;
+
+  // Handle expand button — create fullscreen overlay
+  const expandBtn = container.querySelector('[data-action="chess-expand"]');
+  if (expandBtn) {
+    expandBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const overlay = document.createElement('div');
+      overlay.className = 'game-fullscreen-overlay';
+      overlay.innerHTML = `
+        <div class="game-fullscreen-header">
+          <div class="game-fullscreen-title">♟ Celestial Chess</div>
+          <button class="game-fullscreen-close" id="fs-close">✕ Close</button>
+        </div>
+        <div class="game-fullscreen-board-wrap" id="fs-board-wrap"></div>
+      `;
+      document.body.appendChild(overlay);
+      // Render board inside fullscreen
+      const wrap = overlay.querySelector('#fs-board-wrap');
+      renderChessBoard(wrap, fen, selectedSquare, validMoves, lastMove, onSquareClick);
+      // Remove expand btn from fullscreen version
+      const innerExpand = wrap.querySelector('[data-action="chess-expand"]');
+      if (innerExpand) innerExpand.style.display = 'none';
+      // Close handler
+      overlay.querySelector('#fs-close').addEventListener('click', () => {
+        document.body.removeChild(overlay);
+      });
+      overlay.addEventListener('click', (ev) => {
+        if (ev.target === overlay) document.body.removeChild(overlay);
+      });
+    });
+  }
 }
 
 // ============================================================
@@ -252,16 +294,30 @@ function renderSpiritCards(container, hand, played, deck, realmPoints, spiritkin
 function renderCardHTML(card, inHand, clickable, idx) {
   const theme = CARD_TYPE_COLORS[card.type] || CARD_TYPE_COLORS.lore;
   const actionAttr = clickable ? `data-action="cards-play-card" data-card-idx="${idx}"` : '';
+  // Art area gradient backgrounds per element type
+  const artGradients = {
+    spirit:  'linear-gradient(160deg, rgba(78,205,196,0.4) 0%, rgba(20,80,80,0.6) 100%)',
+    realm:   'linear-gradient(160deg, rgba(184,166,255,0.4) 0%, rgba(60,30,100,0.6) 100%)',
+    echo:    'linear-gradient(160deg, rgba(242,219,160,0.4) 0%, rgba(100,70,20,0.6) 100%)',
+    lore:    'linear-gradient(160deg, rgba(255,200,100,0.3) 0%, rgba(80,50,10,0.6) 100%)',
+    bond:    'linear-gradient(160deg, rgba(255,150,200,0.3) 0%, rgba(80,20,50,0.6) 100%)',
+  };
+  const artBg = artGradients[card.type] || artGradients.lore;
   return `<div class="spirit-card ${inHand ? 'card-in-hand' : 'card-played'} ${clickable ? 'card-clickable' : ''}" 
     ${actionAttr}
-    style="--card-border: ${theme.border}; --card-glow: ${theme.glow}; background: ${theme.bg};">
-    <div class="card-header">
-      <span class="card-icon">${theme.icon}</span>
-      <span class="card-power">${card.power}</span>
+    style="--card-border: ${theme.border}; --card-glow: ${theme.glow};">
+    <div class="card-art-area">
+      <div class="card-art-bg" style="background: ${artBg};"></div>
+      <span class="card-art-symbol" style="color: ${theme.border};">${theme.icon}</span>
     </div>
-    <div class="card-name">${card.name}</div>
-    <div class="card-type">${card.type}</div>
-    <div class="card-effect">${card.effect}</div>
+    <div class="card-body">
+      <div class="card-header">
+        <span class="card-name">${card.name}</span>
+        <span class="card-power">${card.power}</span>
+      </div>
+      <div class="card-type">${card.type}</div>
+      <div class="card-effect">${card.effect}</div>
+    </div>
   </div>`;
 }
 
