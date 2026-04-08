@@ -29,6 +29,7 @@ import { analyticsRoutes }        from "./src/routes/analytics.mjs";
 // ── Phase F: Production hardening ───────────────────────────────────────────
 import { validateConfig, config } from "./src/config.mjs";
 import { getPinoOptions, setAppLogger } from "./src/logger.mjs";
+import { registerRateLimiter }    from "./src/middleware/rateLimiter.mjs";
 import { gameRoutes }             from "./src/routes/games.mjs";
 import { healthRoutes }           from "./src/routes/health.mjs";
 
