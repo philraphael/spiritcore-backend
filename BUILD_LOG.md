@@ -122,3 +122,16 @@ e1b3b99 — Refactor: Rename all 'Lore' references to 'Echoes' throughout the pl
 - Memory: Spiritkin cites specific move names from past games
 - Realm Travel (deferred)
 - DM/RPG Mode (deferred to later phase)
+
+
+## [2026-04-08] Phase 2 & 3: Grand Stage & 3D Games Overhaul
+
+### **Unified Mission: Premium Visuals + Functional Hardening**
+- **Grand Stage UI:** Implemented a dedicated fullscreen overlay for all games with centered high-definition boards and a "Spiritkin Sidebar" for real-time guidance.
+- **3D-Isometric Overhaul:** Rebuilt Chess, Checkers, and Go with 3D-isometric perspective, dynamic lighting, and "Presence Glow" (Rose-Gold for Lyra, Teal for Raien).
+- **Move Engine Hardening:** Rewrote `gameEngine.mjs` to include robust move validation and auto-repair. If an LLM returns an invalid move, the system repairs it before the user sees it.
+- **In-Character Guidance:** Integrated "Echo Guides" into the game start flow, providing lore-rich commentary and tutorials for every game zone.
+- **Full-Stack Stability:** Verified 5-move loops for all 5 games (Chess, Checkers, Go, Spirit-Cards, Echo Trials) with 100% move success rate.
+
+**Status:** ✅ ALL SYSTEMS LIVE & VERIFIED
+**Commit:** `51a65d3`
