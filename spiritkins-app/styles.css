@@ -3787,3 +3787,238 @@ button:disabled {
   background: linear-gradient(135deg, rgba(180,120,255,0.9), rgba(120,160,255,0.8)) !important;
   transform: translateY(-2px);
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   BOND JOURNAL — Premium Memory Constellation UI
+   ═══════════════════════════════════════════════════════════════ */
+
+.bond-journal-view {
+  padding: 0.5rem 0;
+}
+
+.journal-intro {
+  font-size: 0.82rem;
+  color: rgba(224, 213, 240, 0.65);
+  line-height: 1.6;
+  margin-bottom: 1.25rem;
+  font-style: italic;
+}
+
+/* Stats Row */
+.journal-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.journal-stat {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+}
+
+.journal-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #c9b8ff;
+  font-family: 'Cormorant Garamond', serif;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.journal-stat-label {
+  font-size: 0.68rem;
+  color: rgba(224, 213, 240, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Bond Stage Display */
+.journal-bond-stage-display {
+  background: linear-gradient(135deg, rgba(124, 77, 255, 0.1), rgba(0,0,0,0));
+  border: 1px solid rgba(124, 77, 255, 0.2);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.journal-stage-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem;
+  color: #e0d5f0;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.journal-stage-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.journal-stage-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c4dff, #c9b8ff);
+  border-radius: 2px;
+  transition: width 0.8s ease;
+}
+
+.journal-stage-desc {
+  font-size: 0.78rem;
+  color: rgba(224, 213, 240, 0.6);
+  line-height: 1.5;
+  font-style: italic;
+}
+
+/* Section Labels */
+.journal-section-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(224, 213, 240, 0.4);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Memory Cards */
+.journal-memories {
+  margin-bottom: 1.25rem;
+}
+
+.journal-memory-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  transition: border-color 0.2s;
+}
+
+.journal-memory-card:hover {
+  border-color: rgba(201, 184, 255, 0.2);
+}
+
+.journal-memory-kind {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #c9b8ff;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+.journal-memory-text {
+  font-size: 0.82rem;
+  color: rgba(224, 213, 240, 0.8);
+  line-height: 1.55;
+  margin: 0 0 0.35rem 0;
+}
+
+.journal-memory-time {
+  font-size: 0.65rem;
+  color: rgba(224, 213, 240, 0.35);
+}
+
+/* Game Unlocks */
+.journal-unlocks {
+  margin-bottom: 1.25rem;
+}
+
+.journal-unlock-card {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.journal-unlock-card:last-child {
+  border-bottom: none;
+}
+
+.unlock-icon {
+  color: #f0c040;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.journal-unlock-card p {
+  font-size: 0.8rem;
+  color: rgba(224, 213, 240, 0.75);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Empty / Loading States */
+.journal-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: rgba(224, 213, 240, 0.4);
+}
+
+.journal-empty-icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  opacity: 0.4;
+}
+
+.journal-empty p {
+  font-size: 0.82rem;
+  line-height: 1.6;
+  font-style: italic;
+}
+
+.journal-loading {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: rgba(224, 213, 240, 0.4);
+}
+
+.journal-loading-glyph {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.journal-loading p {
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+/* World Progression Notification Banner */
+.world-progression-banner {
+  background: linear-gradient(135deg, rgba(124, 77, 255, 0.15), rgba(240, 192, 64, 0.08));
+  border: 1px solid rgba(124, 77, 255, 0.3);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+  animation: slideDown 0.4s ease;
+}
+
+.progression-banner-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #c9b8ff;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+
+.progression-banner-text {
+  font-size: 0.82rem;
+  color: rgba(224, 213, 240, 0.85);
+  line-height: 1.5;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

@@ -44,6 +44,7 @@ import { createHierarchicalMemoryService } from "./services/hierarchicalMemory.m
 import { createEngagementEngine }         from "./services/engagementEngine.mjs";
 import { createGameEngine }             from "./services/gameEngine.mjs";
 import { createSpiritMemoryEngine }     from "./services/spiritMemoryEngine.mjs";
+import { createWorldProgression }       from "./services/worldProgression.mjs";
 
 /**
  * Build and return the fully wired service container.
@@ -125,9 +126,12 @@ export function buildContainer() {
     spiritMemoryEngine,          // Phase K: 10x unified memory
   });
 
+  // --- Phase M: World Progression Engine ---
+  const worldProgression = createWorldProgression({ world: worldService, bus, spiritMemoryEngine });
+
   // --- Phase J: Interactive Game Engine ---
   // Initialized after orchestrator so it can call back for Spiritkin commentary
-  const gameEngine = createGameEngine({ bus, world: worldService, messageService, registry, orchestrator, memory: memoryService, spiritMemoryEngine });
+  const gameEngine = createGameEngine({ bus, world: worldService, messageService, registry, orchestrator, memory: memoryService, spiritMemoryEngine, worldProgression });
 
   return {
     supabase,
@@ -148,6 +152,7 @@ export function buildContainer() {
     engagementEngine,
     gameEngine,                  // Phase J
     spiritMemoryEngine,          // Phase K
+    worldProgression,            // Phase M
     adapters,
     orchestrator,
   };

@@ -513,7 +513,8 @@ const state = {
   showWhisperBanner: false,     // whether to show the whisper banner
   showLoreUnlock: false,        // whether to show the lore unlock notification
   currentLoreUnlock: null,      // the lore unlock to display
-  activePresenceTab: "profile",  // profile, lore, charter, games
+  activePresenceTab: "profile",  // profile, lore, charter, games, journal
+  bondJournal: null,              // loaded bond journal data
   // Game state
   activeGame: null,              // current active game object
   gameInput: "",                 // move input field value
@@ -1284,6 +1285,7 @@ function buildChatView() {
           <button class="presence-tab ${state.activePresenceTab === 'lore' ? 'active' : ''}" data-action="set-presence-tab" data-tab="lore">Lore (${unlockedLore.length})</button>
           <button class="presence-tab ${state.activePresenceTab === 'charter' ? 'active' : ''}" data-action="set-presence-tab" data-tab="charter">Charter</button>
           <button class="presence-tab ${state.activePresenceTab === 'games' ? 'active' : ''}" data-action="set-presence-tab" data-tab="games">Games</button>
+          <button class="presence-tab ${state.activePresenceTab === 'journal' ? 'active' : ''}" data-action="set-presence-tab" data-tab="journal">Bond Journal</button>
         </div>
 
         <div class="presence-tab-content">
@@ -1384,6 +1386,73 @@ function buildChatView() {
               </div>
             </div>
           ` : ''}
+          ${state.activePresenceTab === 'journal' ? `
+            <div class="bond-journal-view">
+              <div class="panel-label">Bond Journal</div>
+              <p class="journal-intro">SpiritCore preserves every meaningful moment of your bond. This is what has been witnessed.</p>
+              
+              ${state.bondJournal ? `
+                <div class="journal-stats-row">
+                  <div class="journal-stat">
+                    <div class="journal-stat-value">${state.bondJournal.gamesCompleted ?? 0}</div>
+                    <div class="journal-stat-label">Games Played</div>
+                  </div>
+                  <div class="journal-stat">
+                    <div class="journal-stat-value">${state.bondJournal.bondStage ?? 0}</div>
+                    <div class="journal-stat-label">Bond Stage</div>
+                  </div>
+                  <div class="journal-stat">
+                    <div class="journal-stat-value">${state.bondJournal.unlockedLoreCount ?? 0}</div>
+                    <div class="journal-stat-label">Lore Unlocked</div>
+                  </div>
+                </div>
+
+                <div class="journal-bond-stage-display">
+                  <div class="journal-stage-name">${esc(state.bondJournal.bondStageName ?? 'First Contact')}</div>
+                  <div class="journal-stage-bar">
+                    <div class="journal-stage-fill" style="width: ${Math.min(100, ((state.bondJournal.bondStage ?? 0) / 5) * 100)}%"></div>
+                  </div>
+                  <div class="journal-stage-desc">${esc(SPIRITVERSE_LORE.bond_stages[state.bondJournal.bondStage ?? 0]?.description ?? '')}</div>
+                </div>
+
+                ${(state.bondJournal.memories ?? []).length > 0 ? `
+                  <div class="journal-memories">
+                    <div class="journal-section-label">Preserved Memories</div>
+                    ${(state.bondJournal.memories ?? []).slice(0, 10).map(mem => `
+                      <div class="journal-memory-card">
+                        <div class="journal-memory-kind">${esc(mem.kind?.replace(/_/g, ' ') ?? 'memory')}</div>
+                        <p class="journal-memory-text">${esc(mem.content ?? '')}</p>
+                        <div class="journal-memory-time">${mem.created_at ? new Date(mem.created_at).toLocaleDateString() : ''}</div>
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : `
+                  <div class="journal-empty">
+                    <div class="journal-empty-icon">◈</div>
+                    <p>Your bond is just beginning. SpiritCore is watching, listening, and preserving. Return here as your story grows.</p>
+                  </div>
+                `}
+
+                ${(state.bondJournal.gameUnlocks ?? []).length > 0 ? `
+                  <div class="journal-unlocks">
+                    <div class="journal-section-label">Lore Unlocked Through Games</div>
+                    ${(state.bondJournal.gameUnlocks ?? []).map(frag => `
+                      <div class="journal-unlock-card">
+                        <span class="unlock-icon">✦</span>
+                        <p>${esc(frag)}</p>
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              ` : `
+                <div class="journal-loading">
+                  <div class="journal-loading-glyph">◈</div>
+                  <p>SpiritCore is retrieving your bond record...</p>
+                </div>
+              `}
+            </div>
+          ` : ''}
+
           ${state.activePresenceTab === 'games' ? `
             <div class="games-view">
               ${!state.activeGame || state.activeGame.status !== 'active' ? `
@@ -1955,8 +2024,25 @@ async function onClick(event) {
   }
 
   if (action === "set-presence-tab") {
-    state.activePresenceTab = element.dataset.tab;
+    const tab = element.dataset.tab;
+    state.activePresenceTab = tab;
     render();
+    // Load bond journal data when journal tab is opened
+    if (tab === 'journal' && state.conversationId && state.userId) {
+      fetch(`${API}/v1/bond-journal?userId=${encodeURIComponent(state.userId)}&conversationId=${encodeURIComponent(state.conversationId)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            state.bondJournal = data.journal;
+            render();
+          }
+        })
+        .catch(() => {
+          // Graceful fallback — show empty journal
+          state.bondJournal = { gamesCompleted: 0, bondStage: 0, bondStageName: 'First Contact', unlockedLoreCount: 0, memories: [], gameUnlocks: [] };
+          render();
+        });
+    }
     return;
   }
 

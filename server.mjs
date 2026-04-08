@@ -32,6 +32,7 @@ import { getPinoOptions, setAppLogger } from "./src/logger.mjs";
 import { registerRateLimiter }    from "./src/middleware/rateLimiter.mjs";
 import { gameRoutes }             from "./src/routes/games.mjs";
 import { veilCrossingRoutes }     from "./src/routes/veilCrossing.mjs";
+import { bondJournalRoutes }      from "./src/routes/bondJournal.mjs";
 import { healthRoutes }           from "./src/routes/health.mjs";
 
 // Fail fast on missing required env vars
@@ -573,6 +574,13 @@ await app.register(gameRoutes, {
 
 await app.register(veilCrossingRoutes, {
   prefix: "/v1/veil-crossing",
+});
+
+// Bond Journal route — decorated with spiritMemoryEngine and worldProgression
+await app.register(async (instance) => {
+  instance.decorate("spiritMemoryEngine", container.spiritMemoryEngine ?? null);
+  instance.decorate("worldProgression",   container.worldProgression ?? null);
+  await bondJournalRoutes(instance);
 });
 
 // TTS endpoint

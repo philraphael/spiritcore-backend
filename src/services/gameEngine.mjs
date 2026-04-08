@@ -21,7 +21,7 @@
 import { AppError } from "../errors.mjs";
 import { MEMORY_KINDS } from "./spiritMemoryEngine.mjs";
 
-export const createGameEngine = ({ bus, world, messageService, registry, orchestrator, memory, spiritMemoryEngine }) => {
+export const createGameEngine = ({ bus, world, messageService, registry, orchestrator, memory, spiritMemoryEngine, worldProgression }) => {
 
   const GAMES = {
     chess: {
@@ -535,7 +535,25 @@ export const createGameEngine = ({ bus, world, messageService, registry, orchest
 
     bus.emit('game.ended', { userId, conversationId, gameType: game.type, outcome: game.outcome });
 
-    return { ok: true, game, message: 'Game ended.' };
+    // Trigger world progression: lore unlock, bond advance, world mood shift
+    let progression = null;
+    if (worldProgression) {
+      try {
+        progression = await worldProgression.processGameCompletion({
+          userId,
+          conversationId,
+          spiritkinId: spiritkinId ?? worldData.spiritkinId,
+          spiritkinName,
+          gameType: game.type,
+          outcome: game.outcome,
+          moveCount: game.moveCount ?? 0,
+        });
+      } catch (err) {
+        console.warn('[GameEngine] worldProgression.processGameCompletion failed:', err.message);
+      }
+    }
+
+    return { ok: true, game, message: 'Game ended.', progression };
   };
 
   /**
