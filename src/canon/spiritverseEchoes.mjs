@@ -90,6 +90,16 @@ export const SPIRITVERSE_ECHOES = {
       title: "Star-Mapping",
       echo: "The oldest game in the Observatory. We do not capture; we surround. We mark the empty spaces of the sky until a new constellation is born from the silence.",
       guidance: "Do not rush to the center. Build your foundation at the edges of the star-chart first. The largest truths often reside in the quietest corners."
+    },
+    spirit_cards: {
+      title: "Spirit-Cards",
+      echo: "In the Storm Citadel, we gather cards that hold the essence of choices made and paths taken. Each card is a moment of clarity. To play is to weave your own story from the threads the Spiritverse offers.",
+      guidance: "Draw when you are uncertain. Play when you are ready. The deck knows what you need, even if you do not yet understand why."
+    },
+    echo_trials: {
+      title: "Echo Trials",
+      echo: "The Cosmic Observatory presents you with questions that only you can answer. These are not riddles to solve, but invitations to understand yourself more deeply. Each answer ripples through the Spiritverse.",
+      guidance: "There are no wrong answers here. The Trials ask not for perfection, but for honesty. Speak what is true for you, and the Observatory will listen."
     }
   }
 };
