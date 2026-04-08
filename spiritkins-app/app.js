@@ -8,6 +8,7 @@ const PRIMARY_KEY = "sv.primary.v5";
 const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
 
 import { SPIRITVERSE_ECHOES, SPIRITKIN_ECHOES } from "./spiritverse-echoes.js";
+import { SpiritverseGames } from "./spiritverse-games.js";
 
 // RevealAnimation will be loaded as a separate module
 let revealAnimationInstance = null;
@@ -1603,6 +1604,14 @@ function buildChatView() {
                   <div class="game-board-container">
                     <div id="spiritverse-game-board"></div>
                   </div>
+                  
+                  ${state.activeGame && state.activeGame.status === 'active' ? `
+                    <div class="game-controls">
+                      <button class="game-expand-btn" data-action="expand-game">
+                        <span class="expand-icon">⛶</span> Grand Stage
+                      </button>
+                    </div>
+                  ` : ''}
 
                   ${state.activeGame.type === 'echo_trials' && state.activeGame.turn === 'user' ? `
                     <!-- Echo Trials answer area rendered inline by SpiritverseGames -->
@@ -2256,6 +2265,50 @@ async function onClick(event) {
     return;
   }
 
+  async function submitGameMove(move) {
+    if (!state.activeGame || state.gameLoading) return;
+    try {
+      state.gameLoading = true;
+      state.statusText = "Sending move...";
+      render();
+      const res = await fetch(`${API}/v1/games/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: state.userId,
+          conversationId: state.conversationId,
+          move,
+          spiritkinName: state.selectedSpiritkin.name
+        })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        state.activeGame = data.game;
+        state.gameSpiritkinMessage = data.spiritkinMessage;
+        state.gameInput = "";
+        state.statusText = "Move accepted.";
+        // Also show in chat
+        addMessage("user", move, state.userName || "User");
+        if (data.spiritkinMessage) {
+          addMessage("spiritkin", data.spiritkinMessage, state.selectedSpiritkin.name);
+        }
+        render();
+      } else {
+        state.statusText = data.message || "Invalid move.";
+        state.statusError = true;
+        render();
+      }
+    } catch (err) {
+      console.error("Move failed", err);
+      state.statusText = "Connection error.";
+      state.statusError = true;
+      render();
+    } finally {
+      state.gameLoading = false;
+      render();
+    }
+  }
+
   if (action === "start-game") {
     const gameType = element.dataset.game;
     if (!state.conversationId) return;
@@ -2278,6 +2331,7 @@ async function onClick(event) {
         state.activeGame = data.game;
         state.gameSpiritkinMessage = data.spiritkinMessage || null;
         state.gameInstructions = data.instructions || null;
+        state.gameEchoGuide = data.guide || null;
         state.gameInput = "";
         state.statusText = "Game started.";
         // Show the opening message in chat too
@@ -2309,12 +2363,11 @@ async function onClick(event) {
   }
 
   if (action === "submit-game-move") {
-    // For Echo Trials, read from the textarea in the visual board
     let move;
     if (state.activeGame?.type === 'echo_trials') {
       const echoEl = document.querySelector('.echo-answer-input');
-      move = (window.SpiritverseGames?.echoAnswer?.trim()) || (echoEl?.value?.trim()) || state.gameInput?.trim();
-      if (window.SpiritverseGames) window.SpiritverseGames.echoAnswer = '';
+      move = (SpiritverseGames?.echoAnswer?.trim()) || (echoEl?.value?.trim()) || state.gameInput?.trim();
+      if (SpiritverseGames) SpiritverseGames.echoAnswer = '';
     } else {
       const inputEl = document.querySelector("[data-action='game-input-change']");
       move = (state.gameInput?.trim()) || (inputEl?.value?.trim());
@@ -2329,22 +2382,13 @@ async function onClick(event) {
     if (!state.activeGame || state.activeGame.type !== 'chess' || state.gameLoading) return;
     if (state.activeGame.turn !== 'user') return;
     const sq = element.dataset.sq;
-    if (!sq || !window.SpiritverseGames) return;
-    window.SpiritverseGames.handleChessSquareClick(
+    if (!sq || !SpiritverseGames) return;
+    SpiritverseGames.handleChessSquareClick(
       sq,
       state.activeGame.data?.fen,
       (move) => submitGameMove(move)
     );
-    // Re-render board to show selection/valid moves
-    requestAnimationFrame(() => {
-      window.SpiritverseGames.render(
-        'spiritverse-game-board',
-        state.activeGame,
-        state.selectedSpiritkin?.name,
-        state.gameSpiritkinMessage,
-        (move) => submitGameMove(move)
-      );
-    });
+    render();
     return;
   }
 
@@ -2352,31 +2396,27 @@ async function onClick(event) {
     if (!state.activeGame || state.activeGame.type !== 'checkers' || state.gameLoading) return;
     if (state.activeGame.turn !== 'user') return;
     const sq = element.dataset.sq;
-    if (sq === undefined || sq === null || sq === '' || !window.SpiritverseGames) return;
-    window.SpiritverseGames.handleCheckersSquareClick(
+    if (sq === undefined || sq === null || sq === '' || !SpiritverseGames) return;
+    SpiritverseGames.handleCheckersSquareClick(
       sq,
       state.activeGame.data?.board,
-      'red', // user plays red
+      'white', // unified to white for user in new engine
       (move) => submitGameMove(move)
     );
-    requestAnimationFrame(() => {
-      window.SpiritverseGames.render(
-        'spiritverse-game-board',
-        state.activeGame,
-        state.selectedSpiritkin?.name,
-        state.gameSpiritkinMessage,
-        (move) => submitGameMove(move)
-      );
-    });
+    render();
     return;
   }
 
-  if (action === "go-place-stone") {
+  if (action === "go-square-click") {
     if (!state.activeGame || state.activeGame.type !== 'go' || state.gameLoading) return;
     if (state.activeGame.turn !== 'user') return;
-    const coord = element.dataset.coord;
-    if (!coord) return;
-    submitGameMove(coord);
+    const idx = element.dataset.idx;
+    if (!idx || !SpiritverseGames) return;
+    const size = 13;
+    const r = Math.floor(idx / size);
+    const c = idx % size;
+    const move = `${String.fromCharCode(65 + c)}${size - r}`;
+    submitGameMove(move);
     return;
   }
 
@@ -2401,7 +2441,6 @@ async function onClick(event) {
     if (window.SpiritverseGames) window.SpiritverseGames.echoAnswer = element.value || '';
     return;
   }
-
   if (action === "end-game") {
     if (!state.conversationId) return;
     try {
@@ -2410,21 +2449,38 @@ async function onClick(event) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: state.userId,
-          conversationId: state.conversationId
+          conversationId: state.conversationId,
+          spiritkinName: state.selectedSpiritkin.name
         })
       });
+      state.activeGame = null;
+      state.gameSpiritkinMessage = null;
+      state.gameInstructions = null;
+      state.gameEchoGuide = null;
+      render();
     } catch (err) {
-      console.warn("end-game request failed", err);
+      console.error("End game failed", err);
     }
-    state.activeGame = null;
-    state.gameSpiritkinMessage = null;
-    state.gameInstructions = null;
-    state.gameInput = "";
-    render();
     return;
   }
 
-  // Premium: Custom Spiritkin Matching
+  if (action === "expand-game") {
+    if (state.activeGame && state.activeGame.status === 'active' && SpiritverseGames) {
+      const spiritkin = state.selectedSpiritkin;
+      SpiritverseGames.expand(
+        {
+          ...state.activeGame,
+          commentary: state.gameSpiritkinMessage,
+          guide: state.gameEchoGuide
+        },
+        spiritkin ? spiritkin.name : 'Spiritkin',
+        (move) => submitGameMove(move)
+      );
+    }
+    return;
+  }
+
+  // Spiritkin Matching
   if (action === "open-survey") {
     state.surveyOpen = true;
     state.surveyStep = 0;

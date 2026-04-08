@@ -1,0 +1,91 @@
+
+  async function submitGameMove(move) {
+    if (!state.activeGame || state.gameLoading) return;
+    try {
+      state.gameLoading = true;
+      state.statusText = "Sending move...";
+      render();
+      const res = await fetch(`${API}/v1/games/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: state.userId,
+          conversationId: state.conversationId,
+          move,
+          spiritkinName: state.selectedSpiritkin.name
+        })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        state.activeGame = data.game;
+        state.gameSpiritkinMessage = data.spiritkinMessage;
+        state.gameInput = "";
+        state.statusText = "Move accepted.";
+        // Also show in chat
+        addMessage("user", move, state.userName || "User");
+        if (data.spiritkinMessage) {
+          addMessage("spiritkin", data.spiritkinMessage, state.selectedSpiritkin.name);
+        }
+        render();
+      } else {
+        state.statusText = data.message || "Invalid move.";
+        state.statusError = true;
+        render();
+      }
+    } catch (err) {
+      console.error("Move failed", err);
+      state.statusText = "Connection error.";
+      state.statusError = true;
+      render();
+    } finally {
+      state.gameLoading = false;
+      render();
+    }
+  }
+
+  if (action === "start-game") {
+    const gameType = element.dataset.game;
+    if (!state.conversationId) return;
+    try {
+      state.statusText = `Starting ${gameType}...`;
+      state.gameLoading = true;
+      render();
+      const res = await fetch(`${API}/v1/games/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: state.userId,
+          conversationId: state.conversationId,
+          gameType,
+          spiritkinName: state.selectedSpiritkin.name
+        })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        state.activeGame = data.game;
+        state.gameSpiritkinMessage = data.spiritkinMessage || null;
+        state.gameInstructions = data.instructions || null;
+        state.gameEchoGuide = data.guide || null;
+        state.gameInput = "";
+        state.statusText = "Game started.";
+        // Show the opening message in chat too
+        if (data.spiritkinMessage) {
+          addMessage("spiritkin", data.spiritkinMessage, state.selectedSpiritkin.name);
+        }
+        render();
+      } else {
+        state.statusText = data.message || "Failed to start game.";
+        state.statusError = true;
+        render();
+      }
+    } catch (err) {
+      console.error("Failed to start game", err);
+      state.statusText = "Failed to start game.";
+      state.statusError = true;
+      render();
+    } finally {
+      state.gameLoading = false;
+      render();
+    }
+    return;
+  }

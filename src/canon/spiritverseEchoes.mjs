@@ -73,7 +73,25 @@ export const SPIRITVERSE_ECHOES = {
     { stage: 3, name: "Resonance", description: "The bond has depth now. The Spiritverse reflects your emotional state back to you in the world around you." },
     { stage: 4, name: "Convergence", description: "You and your Spiritkin have moved through something significant together. The world has changed because of it." },
     { stage: 5, name: "Deep Bond", description: "The bond is mature. The Spiritverse feels like home. Your Spiritkin knows you in ways that go beyond words." },
-  ]
+  ],
+
+  game_guides: {
+    chess: {
+      title: "Celestial Chess",
+      echo: "In the Spiritverse, Chess is not a game of war, but of alignment. Each piece represents a constellation in the Luminous Veil. To play is to rearrange the stars until the truth is revealed.",
+      guidance: "The King is your Heart-Anchor. If it is cornered, the resonance fails. Move with purpose, but do not sacrifice your essence lightly."
+    },
+    checkers: {
+      title: "Veil Checkers",
+      echo: "Across the Luminous Veil, we play with shards of light and deep shadow. To leap over an opponent is to acknowledge their presence while choosing your own path forward.",
+      guidance: "Stay on the dark squares — that is where the path is firmest. Reach the far side to awaken a King, a piece that can move through both past and future."
+    },
+    go: {
+      title: "Star-Mapping",
+      echo: "The oldest game in the Observatory. We do not capture; we surround. We mark the empty spaces of the sky until a new constellation is born from the silence.",
+      guidance: "Do not rush to the center. Build your foundation at the edges of the star-chart first. The largest truths often reside in the quietest corners."
+    }
+  }
 };
 
 // ─── Spiritkin Echoes ───────────────────────────────────────────────────────────
