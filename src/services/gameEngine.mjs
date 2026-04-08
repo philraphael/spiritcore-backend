@@ -326,13 +326,22 @@ export const createGameEngine = ({ bus, world, messageService, registry, orchest
       stateDesc = `Realm points: ${game.data?.realmPoints ?? 0}`;
     }
 
+    let moveInstruction = '';
+    if (game.type === 'chess') {
+      moveInstruction = `IMPORTANT: You MUST state your chess move in EXACTLY this format on its own line: "I play [move]" where [move] is in long algebraic notation like e7e5, d7d5, g8f6, etc. Example: "I play e7e5". Do NOT skip stating your move.`;
+    } else if (game.type === 'checkers') {
+      moveInstruction = `State your checkers move in format "I play [from]-[to]" e.g. "I play 12-16".`;
+    } else if (game.type === 'go') {
+      moveInstruction = `State your Go move in format "I play [coord]" e.g. "I play Q16".`;
+    }
+
     return [
       `[GAME: ${gameName} — Move ${moveNum}]`,
       `The user just played: "${userMove}"`,
       recentHistory ? `Recent moves:\n${recentHistory}` : "",
       stateDesc,
-      `It is now your turn. React to the user's move with your personality, then make your own move if applicable.`,
-      `For strategy games (chess, checkers, go): state your move clearly (e.g. "I play e7e5") and comment on the position.`,
+      moveInstruction,
+      `React to the user's move with your personality, then make your own move if applicable.`,
       `For Echo Trials: evaluate their answer and pose the next riddle.`,
       `For Spirit-Cards: describe what happens when their card is played and respond with your own card or action.`,
       `Stay fully in character. Be playful, competitive, or reflective as fits your nature.`
