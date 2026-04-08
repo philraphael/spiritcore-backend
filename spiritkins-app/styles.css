@@ -3123,20 +3123,27 @@ button:disabled {
 
 .presence-tabs {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   padding: 0 16px;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-
+.presence-tabs::-webkit-scrollbar {
+  display: none;
+}
 .presence-tab {
-  padding: 8px 12px;
-  font-size: 0.8rem;
+  padding: 7px 9px;
+  font-size: 0.71rem;
   font-weight: 600;
   color: var(--muted);
   background: transparent;
   border-bottom: 2px solid transparent;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .presence-tab:hover {

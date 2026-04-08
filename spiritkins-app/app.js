@@ -2679,6 +2679,10 @@ document.addEventListener("DOMContentLoaded", () => {
     fetchSpiritverseEvent();
     fetchDailyQuest();
   }, 800);
+  // Restore voice mode if previously enabled (requires prior user gesture)
+  if (state.voiceMode && state.onboardingComplete) {
+    setTimeout(() => { try { startListening(); } catch(e) {} }, 1500);
+  }
   const root = document.getElementById("root");
   root.addEventListener("input", onInput);
   root.addEventListener("click", onClick);
