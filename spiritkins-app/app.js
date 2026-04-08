@@ -1395,7 +1395,7 @@ function buildChatView() {
                       <button
                         class="btn btn-primary btn-sm game-submit-btn"
                         data-action="submit-game-move"
-                        ${state.gameLoading || !state.gameInput?.trim() ? 'disabled' : ''}
+                        ${state.gameLoading ? 'disabled' : ''}
                       >
                         ${state.gameLoading ? 'Waiting...' : 'Play'}
                       </button>
@@ -1976,7 +1976,9 @@ async function onClick(event) {
   }
 
   if (action === "submit-game-move") {
-    const move = state.gameInput?.trim();
+    // Read from DOM input as fallback since onInput may not have fired
+    const inputEl = document.querySelector("[data-action='game-input-change']");
+    const move = (state.gameInput?.trim()) || (inputEl?.value?.trim());
     if (!move || !state.conversationId || !state.activeGame) return;
     try {
       state.gameLoading = true;
