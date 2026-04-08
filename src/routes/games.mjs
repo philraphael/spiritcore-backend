@@ -45,7 +45,8 @@ export async function gameRoutes(fastify, opts) {
         ok: true,
         game: result.game,
         spiritkinMessage: result.spiritkinMessage,
-        instructions: result.instructions
+        instructions: result.instructions,
+        guide: result.guide || null
       };
     } catch (err) {
       req.log.error(err, `[games] startGame failed for ${gameType}`);
