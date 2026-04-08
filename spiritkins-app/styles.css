@@ -3634,3 +3634,156 @@ button:disabled {
   color: var(--realm-accent, #a78bfa);
   opacity: 0.9;
 }
+
+
+/* VEIL CROSSING - Premium Atmospheric Onboarding */
+.veil-crossing-screen {
+  position: fixed; inset: 0; z-index: 1000;
+  background: radial-gradient(ellipse at 50% 30%, #0d0a1a 0%, #060410 60%, #020208 100%);
+  display: flex; align-items: center; justify-content: center;
+  overflow-y: auto; animation: veilFadeIn 0.8s ease;
+}
+@keyframes veilFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.veil-crossing-screen.veil-bg-lyra { background: radial-gradient(ellipse at 50% 20%, #1a1030 0%, #0d0820 60%, #020208 100%); }
+.veil-crossing-screen.veil-bg-raien { background: radial-gradient(ellipse at 50% 20%, #1a0a10 0%, #100610 60%, #020208 100%); }
+.veil-crossing-screen.veil-bg-kairo { background: radial-gradient(ellipse at 50% 20%, #0a1020 0%, #060c18 60%, #020208 100%); }
+.veil-crossing-screen.veil-reveal { background: radial-gradient(ellipse at 50% 20%, #1a0d2e 0%, #0a0618 60%, #020208 100%); }
+.veil-stars {
+  position: fixed; inset: 0; pointer-events: none;
+  background-image: radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,0.6) 0%, transparent 100%),
+    radial-gradient(1px 1px at 25% 40%, rgba(255,255,255,0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 40% 10%, rgba(255,255,255,0.5) 0%, transparent 100%),
+    radial-gradient(1px 1px at 60% 25%, rgba(255,255,255,0.3) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 70% 45%, rgba(200,180,255,0.5) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 20% 55%, rgba(180,200,255,0.4) 0%, transparent 100%);
+  animation: veilStarPulse 8s ease-in-out infinite alternate;
+}
+@keyframes veilStarPulse { from { opacity: 0.6; } to { opacity: 1; } }
+.veil-crossing-inner, .veil-reveal-inner {
+  position: relative; z-index: 1; width: 100%; max-width: 640px;
+  margin: 0 auto; padding: 3rem 2rem 4rem;
+  display: flex; flex-direction: column; align-items: center; gap: 1.5rem;
+}
+.veil-sc-glyph {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: linear-gradient(135deg, rgba(160,100,255,0.3), rgba(80,180,255,0.2));
+  border: 1.5px solid rgba(160,100,255,0.5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
+  color: rgba(200,160,255,0.9); margin: 0 auto 0.5rem;
+  animation: veilGlyphPulse 3s ease-in-out infinite;
+}
+@keyframes veilGlyphPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(160,100,255,0.3); }
+  50% { box-shadow: 0 0 30px rgba(160,100,255,0.5), 0 0 60px rgba(160,100,255,0.2); }
+}
+.veil-crossing-header, .veil-reveal-header { text-align: center; width: 100%; }
+.veil-eyebrow {
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.15em;
+  text-transform: uppercase; color: rgba(160,100,255,0.7); margin: 0.5rem 0 1rem;
+}
+.veil-progress-bar {
+  width: 100%; max-width: 320px; height: 2px;
+  background: rgba(255,255,255,0.08); border-radius: 2px; margin: 0.5rem auto; overflow: hidden;
+}
+.veil-progress-fill {
+  height: 100%; background: linear-gradient(90deg, rgba(160,100,255,0.8), rgba(100,180,255,0.8));
+  border-radius: 2px; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.veil-realm-hint {
+  font-size: 0.72rem; color: rgba(180,160,220,0.5); font-style: italic;
+  text-align: center; margin: 0.25rem 0 0;
+}
+.veil-question-block { width: 100%; text-align: center; }
+.veil-question {
+  font-size: clamp(1.1rem, 3vw, 1.45rem); font-weight: 400;
+  color: rgba(240,230,255,0.95); line-height: 1.55; margin: 0 0 2rem;
+}
+.veil-options { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; }
+.veil-option {
+  display: flex; align-items: flex-start; gap: 0.9rem; padding: 1rem 1.25rem;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; cursor: pointer; text-align: left; transition: all 0.2s ease;
+  color: rgba(220,210,240,0.8); font-size: 0.9rem; line-height: 1.45; width: 100%;
+}
+.veil-option:hover {
+  background: rgba(160,100,255,0.08); border-color: rgba(160,100,255,0.3);
+  color: rgba(240,230,255,0.95); transform: translateX(3px);
+}
+.veil-option.veil-option-selected {
+  background: rgba(160,100,255,0.15); border-color: rgba(160,100,255,0.6);
+  color: rgba(240,230,255,1); box-shadow: 0 0 16px rgba(160,100,255,0.15);
+}
+.veil-option-dot {
+  flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid rgba(160,100,255,0.5); margin-top: 0.35rem; transition: all 0.2s ease;
+}
+.veil-option.veil-option-selected .veil-option-dot {
+  background: rgba(160,100,255,0.9); border-color: rgba(160,100,255,0.9);
+}
+.veil-option-text { flex: 1; }
+.veil-crossing-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  width: 100%; padding-top: 0.5rem;
+}
+.veil-reveal-portrait { position: relative; margin: 0.5rem 0; }
+.veil-reveal-glow {
+  position: absolute; inset: -20px; border-radius: 50%;
+  pointer-events: none; animation: veilRevealGlow 3s ease-in-out infinite;
+}
+.veil-reveal-glow.lyra-cls { background: radial-gradient(circle, rgba(232,150,200,0.3) 0%, transparent 70%); }
+.veil-reveal-glow.raien-cls { background: radial-gradient(circle, rgba(255,120,80,0.3) 0%, transparent 70%); }
+.veil-reveal-glow.kairo-cls { background: radial-gradient(circle, rgba(80,180,255,0.3) 0%, transparent 70%); }
+@keyframes veilRevealGlow {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+.veil-reveal-realm {
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.2em;
+  text-transform: uppercase; color: rgba(160,100,255,0.7);
+}
+.veil-reveal-name {
+  font-size: clamp(2rem, 6vw, 3rem); font-weight: 300; letter-spacing: 0.08em;
+  color: rgba(240,230,255,1); margin: 0; text-shadow: 0 0 30px rgba(160,100,255,0.4);
+}
+.veil-reveal-strap { font-size: 0.85rem; color: rgba(200,180,240,0.7); font-style: italic; margin: 0; }
+.veil-reveal-reason {
+  font-size: 0.95rem; color: rgba(220,210,240,0.85); line-height: 1.65;
+  text-align: center; max-width: 520px; margin: 0;
+}
+.veil-reveal-atmosphere {
+  font-size: 0.78rem; color: rgba(160,140,200,0.6); font-style: italic;
+  text-align: center; border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 0.75rem; width: 100%;
+}
+.veil-resonance-scores {
+  width: 100%; max-width: 360px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px; padding: 1rem 1.25rem;
+}
+.veil-scores-label {
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.15em;
+  text-transform: uppercase; color: rgba(160,100,255,0.6); margin-bottom: 0.75rem;
+}
+.veil-score-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+.veil-score-label { font-size: 0.75rem; color: rgba(200,180,240,0.7); width: 44px; flex-shrink: 0; }
+.veil-score-track { flex: 1; height: 4px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+.veil-score-fill { height: 100%; border-radius: 4px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+.veil-score-fill.lyra { background: linear-gradient(90deg, #e896c8, #c87ab0); }
+.veil-score-fill.raien { background: linear-gradient(90deg, #ff7850, #e05030); }
+.veil-score-fill.kairo { background: linear-gradient(90deg, #50b4ff, #3090e0); }
+.veil-score-pct { font-size: 0.7rem; color: rgba(180,160,220,0.6); width: 32px; text-align: right; flex-shrink: 0; }
+.veil-reveal-actions {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 0.75rem; width: 100%; max-width: 360px;
+}
+.veil-bond-btn {
+  background: linear-gradient(135deg, rgba(160,100,255,0.8), rgba(100,140,255,0.7)) !important;
+  border: 1px solid rgba(160,100,255,0.5) !important;
+  box-shadow: 0 4px 24px rgba(160,100,255,0.3) !important;
+  font-size: 1rem !important; padding: 0.9rem 2rem !important;
+}
+.veil-bond-btn:hover {
+  background: linear-gradient(135deg, rgba(180,120,255,0.9), rgba(120,160,255,0.8)) !important;
+  transform: translateY(-2px);
+}

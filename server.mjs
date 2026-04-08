@@ -31,6 +31,7 @@ import { validateConfig, config } from "./src/config.mjs";
 import { getPinoOptions, setAppLogger } from "./src/logger.mjs";
 import { registerRateLimiter }    from "./src/middleware/rateLimiter.mjs";
 import { gameRoutes }             from "./src/routes/games.mjs";
+import { veilCrossingRoutes }     from "./src/routes/veilCrossing.mjs";
 import { healthRoutes }           from "./src/routes/health.mjs";
 
 // Fail fast on missing required env vars
@@ -568,6 +569,10 @@ await app.register(gameRoutes, {
   prefix: "/",
   gameEngine: container.gameEngine,
   world: container.worldService,
+});
+
+await app.register(veilCrossingRoutes, {
+  prefix: "/v1/veil-crossing",
 });
 
 // TTS endpoint

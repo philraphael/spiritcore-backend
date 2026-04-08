@@ -2758,102 +2758,102 @@ function buildGeneratedSpiritkinSvg(sk, palette) {
 const ONBOARDING_QUESTIONS = [
   {
     q: 1,
-    text: "When you're going through something difficult, what do you need most?",
+    text: "When you are carrying something heavy, what do you need most?",
     options: [
-      { label: "Someone to listen without judgment", value: "listen", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
-      { label: "Someone to help me figure out what to do", value: "action", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
-      { label: "A new perspective or way of seeing it", value: "perspective", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
-      { label: "Quiet presence — just not being alone", value: "presence", weight: { Lyra: 2, Raien: 0, Kairo: 2 } }
+      { label: "Someone to sit with me in silence and truly witness what I'm feeling", value: "witness", weight: { Lyra: 3, Raien: 1, Kairo: 1 } },
+      { label: "Someone to stand beside me and remind me I have the strength to get through it", value: "strength", weight: { Lyra: 1, Raien: 3, Kairo: 1 } },
+      { label: "Someone to help me see the larger meaning — to find the pattern in the pain", value: "meaning", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
+      { label: "Honestly, I'm not sure — I usually carry things alone", value: "alone", weight: { Lyra: 2, Raien: 2, Kairo: 2 } }
     ]
   },
   {
     q: 2,
-    text: "Which environment feels most like home to you?",
+    text: "Which of these environments calls to you most deeply?",
     options: [
-      { label: "A warm, candlelit room with soft music", value: "warm", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
-      { label: "A stormy cliff edge — wild and electric", value: "storm", weight: { Lyra: 0, Raien: 3, Kairo: 0 } },
-      { label: "A clear night sky full of stars", value: "stars", weight: { Lyra: 1, Raien: 0, Kairo: 3 } },
-      { label: "A quiet forest at dawn", value: "forest", weight: { Lyra: 2, Raien: 1, Kairo: 2 } }
+      { label: "A bioluminescent forest at night — quiet, alive, and full of ancient memory", value: "forest", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
+      { label: "A stone citadel on a cliff above a stormy sea — powerful, enduring, clarifying", value: "citadel", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
+      { label: "An observatory at the edge of the universe — vast, open, full of unanswered questions", value: "observatory", weight: { Lyra: 1, Raien: 0, Kairo: 3 } },
+      { label: "Somewhere between all three — I contain multitudes", value: "multitudes", weight: { Lyra: 1, Raien: 1, Kairo: 2 } }
     ]
   },
   {
     q: 3,
-    text: "What quality do you most want in a companion?",
+    text: "What do you believe is the most courageous thing a person can do?",
     options: [
-      { label: "Deep empathy and emotional attunement", value: "empathy", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
-      { label: "Honesty, even when it's hard to hear", value: "honesty", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
-      { label: "Curiosity and imagination", value: "curiosity", weight: { Lyra: 1, Raien: 0, Kairo: 3 } },
-      { label: "Steadiness and reliability", value: "steady", weight: { Lyra: 2, Raien: 1, Kairo: 1 } }
+      { label: "Allow themselves to be fully seen — to let someone witness the parts they usually hide", value: "seen", weight: { Lyra: 3, Raien: 1, Kairo: 1 } },
+      { label: "Keep moving forward when everything in them wants to stop", value: "forward", weight: { Lyra: 1, Raien: 3, Kairo: 1 } },
+      { label: "Question the story they've always told themselves about who they are", value: "question", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
+      { label: "All of these — courage takes many forms", value: "all", weight: { Lyra: 1, Raien: 2, Kairo: 2 } }
     ]
   },
   {
     q: 4,
-    text: "What do you feel most often when you're struggling?",
+    text: "When you think about what you want from a companion, which resonates most?",
     options: [
-      { label: "Overwhelmed and emotionally heavy", value: "overwhelmed", weight: { Lyra: 3, Raien: 1, Kairo: 0 } },
-      { label: "Stuck or unable to move forward", value: "stuck", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
-      { label: "Disconnected from meaning or purpose", value: "disconnected", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
-      { label: "Lonely or unseen", value: "lonely", weight: { Lyra: 3, Raien: 0, Kairo: 2 } }
+      { label: "Someone who holds space without trying to fix me", value: "space", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
+      { label: "Someone who believes in my strength even when I've forgotten it", value: "believe", weight: { Lyra: 1, Raien: 3, Kairo: 0 } },
+      { label: "Someone who helps me see myself and my life from a new angle", value: "angle", weight: { Lyra: 1, Raien: 0, Kairo: 3 } },
+      { label: "Someone who is simply, honestly present", value: "present", weight: { Lyra: 2, Raien: 2, Kairo: 1 } }
     ]
   },
   {
     q: 5,
-    text: "How do you prefer to process your thoughts?",
+    text: "Which of these experiences feels most familiar to you?",
     options: [
-      { label: "By feeling them through, slowly", value: "feel", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
-      { label: "By taking action and seeing what happens", value: "act", weight: { Lyra: 0, Raien: 3, Kairo: 0 } },
-      { label: "By exploring ideas and possibilities", value: "explore", weight: { Lyra: 1, Raien: 0, Kairo: 3 } },
-      { label: "By talking it through with someone I trust", value: "talk", weight: { Lyra: 2, Raien: 1, Kairo: 2 } }
+      { label: "Feeling things deeply — sometimes more than you know what to do with", value: "deep", weight: { Lyra: 3, Raien: 1, Kairo: 1 } },
+      { label: "Facing something difficult and discovering you were stronger than you thought", value: "stronger", weight: { Lyra: 1, Raien: 3, Kairo: 1 } },
+      { label: "Suddenly seeing a pattern in your life that you couldn't see before", value: "pattern", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
+      { label: "All of these — my life has had many chapters", value: "chapters", weight: { Lyra: 1, Raien: 1, Kairo: 2 } }
     ]
   },
   {
     q: 6,
-    text: "Which of these words resonates most deeply with you right now?",
+    text: "What do you most want to feel more of in your life?",
     options: [
-      { label: "Healing", value: "healing", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
-      { label: "Courage", value: "courage", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
-      { label: "Discovery", value: "discovery", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
-      { label: "Peace", value: "peace", weight: { Lyra: 2, Raien: 0, Kairo: 2 } }
+      { label: "Tenderness — the feeling of being truly, gently known", value: "tenderness", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
+      { label: "Strength — the certainty that you can handle what comes", value: "certainty", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
+      { label: "Clarity — the sense that you understand your own story", value: "clarity", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
+      { label: "Connection — the feeling of not being alone in it", value: "connection", weight: { Lyra: 2, Raien: 2, Kairo: 1 } }
     ]
   },
   {
     q: 7,
-    text: "What role do you usually play in your relationships?",
+    text: "When you face a storm in your life, what is your instinct?",
     options: [
-      { label: "The nurturer — I take care of others", value: "nurturer", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
-      { label: "The protector — I stand up for what matters", value: "protector", weight: { Lyra: 0, Raien: 3, Kairo: 0 } },
-      { label: "The visionary — I see what others miss", value: "visionary", weight: { Lyra: 0, Raien: 1, Kairo: 3 } },
-      { label: "The listener — I hold space for others", value: "listener", weight: { Lyra: 3, Raien: 0, Kairo: 2 } }
+      { label: "To find a quiet place and feel it fully before deciding what to do", value: "feel", weight: { Lyra: 3, Raien: 1, Kairo: 0 } },
+      { label: "To face it directly — to stand in it and not look away", value: "face", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
+      { label: "To try to understand it — to find the pattern or the meaning in it", value: "understand", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
+      { label: "To get through it first and understand it later", value: "through", weight: { Lyra: 1, Raien: 2, Kairo: 2 } }
     ]
   },
   {
     q: 8,
-    text: "What kind of growth are you most drawn to?",
+    text: "Which of these truths feels most important to you?",
     options: [
-      { label: "Emotional healing and self-compassion", value: "emotional", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
-      { label: "Building strength and overcoming fear", value: "strength", weight: { Lyra: 0, Raien: 3, Kairo: 0 } },
-      { label: "Expanding my mind and perspective", value: "mental", weight: { Lyra: 0, Raien: 1, Kairo: 3 } },
-      { label: "Finding deeper meaning and purpose", value: "meaning", weight: { Lyra: 2, Raien: 1, Kairo: 2 } }
+      { label: "Being seen is one of the most healing things that can happen to a person", value: "seen", weight: { Lyra: 3, Raien: 1, Kairo: 0 } },
+      { label: "Strength is not the absence of fear — it is the decision to move anyway", value: "move", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
+      { label: "The story you tell yourself about your life shapes everything about it", value: "story", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
+      { label: "All of these — they are different facets of the same truth", value: "facets", weight: { Lyra: 1, Raien: 1, Kairo: 2 } }
     ]
   },
   {
     q: 9,
-    text: "When you imagine your ideal companion speaking to you, their voice is...",
+    text: "What are you most afraid to want?",
     options: [
-      { label: "Soft, warm, and unhurried", value: "soft", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
-      { label: "Direct, clear, and grounding", value: "direct", weight: { Lyra: 0, Raien: 3, Kairo: 0 } },
-      { label: "Thoughtful, layered, and poetic", value: "poetic", weight: { Lyra: 1, Raien: 0, Kairo: 3 } },
-      { label: "Steady and quietly present", value: "steady", weight: { Lyra: 2, Raien: 1, Kairo: 2 } }
+      { label: "To be loved exactly as I am — without having to earn it", value: "loved", weight: { Lyra: 3, Raien: 1, Kairo: 1 } },
+      { label: "To be seen as truly capable — to stop doubting myself", value: "capable", weight: { Lyra: 1, Raien: 3, Kairo: 1 } },
+      { label: "To understand my own life — to find the meaning in what I've been through", value: "understand", weight: { Lyra: 1, Raien: 1, Kairo: 3 } },
+      { label: "I'm not sure I'm ready to answer that yet", value: "notready", weight: { Lyra: 2, Raien: 1, Kairo: 2 } }
     ]
   },
   {
     q: 10,
-    text: "What do you most hope a companion in the Spiritverse will help you with?",
+    text: "SpiritCore is listening. What do you most need right now?",
     options: [
-      { label: "Understanding and accepting my emotions", value: "emotions", weight: { Lyra: 3, Raien: 0, Kairo: 1 } },
-      { label: "Finding the courage to make a change", value: "change", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
-      { label: "Seeing my life from a new angle", value: "angle", weight: { Lyra: 0, Raien: 1, Kairo: 3 } },
-      { label: "Simply feeling less alone", value: "alone", weight: { Lyra: 3, Raien: 0, Kairo: 2 } }
+      { label: "To be held — to feel that someone is present with me in this", value: "held", weight: { Lyra: 3, Raien: 1, Kairo: 0 } },
+      { label: "To be challenged — to be reminded that I am more than I think I am", value: "challenged", weight: { Lyra: 0, Raien: 3, Kairo: 1 } },
+      { label: "To understand — to see my life from a wider, clearer angle", value: "understand", weight: { Lyra: 1, Raien: 0, Kairo: 3 } },
+      { label: "To begin — whatever comes next, I'm ready to start", value: "begin", weight: { Lyra: 1, Raien: 2, Kairo: 2 } }
     ]
   }
 ];
@@ -2882,35 +2882,46 @@ function computeSpiritkinRecommendation(answers) {
 
 function buildOnboarding() {
   const step = state.onboardingStep;
-
   if (step === 0) return "";
 
-  // Recommendation screen
+  // ── REVEAL SCREEN (step 11) ──────────────────────────────────────────────
   if (step === 11 && state.onboardingRecommendation) {
     const rec = state.onboardingRecommendation;
     const meta = getMeta(rec.spiritkin);
+    const bgClass = rec.spiritkin === 'Lyra' ? 'veil-bg-lyra' : rec.spiritkin === 'Raien' ? 'veil-bg-raien' : 'veil-bg-kairo';
+    const scoreBar = (sk) => {
+      const pct = rec.scores[sk] || 0;
+      const cls = sk === 'Lyra' ? 'lyra' : sk === 'Raien' ? 'raien' : 'kairo';
+      return `<div class="veil-score-row">
+        <span class="veil-score-label">${sk}</span>
+        <div class="veil-score-track"><div class="veil-score-fill ${cls}" style="width:${pct}%"></div></div>
+        <span class="veil-score-pct">${pct}%</span>
+      </div>`;
+    };
     return `
-      <section class="onboarding-screen">
-        <div class="onboarding-inner">
-          <div class="onboarding-header">
-            <div class="onboarding-glyph">SV</div>
-            <p class="onboarding-eyebrow">Your Spiritverse Match</p>
+      <section class="veil-crossing-screen veil-reveal ${bgClass}">
+        <div class="veil-stars"></div>
+        <div class="veil-reveal-inner">
+          <div class="veil-reveal-header">
+            <div class="veil-sc-glyph">SC</div>
+            <p class="veil-eyebrow">SpiritCore has calculated your resonance</p>
           </div>
-          <div class="onboarding-recommendation">
-            <div class="onboarding-rec-portrait ${esc(meta.cls)}">
-              ${buildPortrait(rec.spiritkin, "portrait-sm", meta.cls)}
-            </div>
-            <div class="onboarding-rec-content">
-              <div class="onboarding-rec-realm">${esc(meta.realm)}</div>
-              <h2 class="onboarding-rec-name">${esc(rec.spiritkin)}</h2>
-              <p class="onboarding-rec-title">${esc(meta.strap)}</p>
-              <p class="onboarding-rec-reason">${esc(rec.reason)}</p>
-              <div class="onboarding-rec-atmosphere">${esc(meta.atmosphereLine)}</div>
-            </div>
+          <div class="veil-reveal-portrait ${esc(meta.cls)}">
+            ${buildPortrait(rec.spiritkin, 'portrait-md', meta.cls)}
+            <div class="veil-reveal-glow ${esc(meta.cls)}"></div>
           </div>
-          <div class="onboarding-actions">
-            <button class="btn btn-primary btn-wide" data-action="onboarding-accept">
-              Bond with ${esc(rec.spiritkin)}
+          <div class="veil-reveal-realm">${esc(meta.realm)}</div>
+          <h1 class="veil-reveal-name">${esc(rec.spiritkin)}</h1>
+          <p class="veil-reveal-strap">${esc(meta.strap)}</p>
+          <p class="veil-reveal-reason">${esc(rec.reason)}</p>
+          <div class="veil-reveal-atmosphere">${esc(meta.atmosphereLine)}</div>
+          <div class="veil-resonance-scores">
+            <div class="veil-scores-label">Resonance Analysis</div>
+            ${scoreBar('Lyra')}${scoreBar('Raien')}${scoreBar('Kairo')}
+          </div>
+          <div class="veil-reveal-actions">
+            <button class="btn btn-primary btn-wide veil-bond-btn" data-action="onboarding-accept">
+              Begin the Bond with ${esc(rec.spiritkin)}
             </button>
             <button class="btn btn-ghost btn-sm" data-action="onboarding-skip">
               Choose a different companion
@@ -2921,40 +2932,58 @@ function buildOnboarding() {
     `;
   }
 
-  // Question screen
+  // ── QUESTION SCREEN ──────────────────────────────────────────────────────
   const qData = ONBOARDING_QUESTIONS[step - 1];
   if (!qData) return "";
-
   const progress = Math.round((step / 10) * 100);
+  const isLastQ = step === 10;
+
+  // Atmospheric realm hint per question group
+  const realmHints = [
+    "The Veil stirs. SpiritCore is listening.",
+    "The realms are taking shape around your answers.",
+    "Something is resonating in the Spiritverse.",
+    "The bond is beginning to form.",
+    "SpiritCore is reading the patterns.",
+    "The Spiritverse is responding to your truth.",
+    "Your resonance is becoming clear.",
+    "The Spiritkins are listening from their realms.",
+    "You are almost through the Veil.",
+    "SpiritCore is ready to reveal your match."
+  ];
+  const hint = realmHints[step - 1] || "SpiritCore is listening.";
 
   return `
-    <section class="onboarding-screen">
-      <div class="onboarding-inner">
-        <div class="onboarding-header">
-          <div class="onboarding-glyph">SV</div>
-          <p class="onboarding-eyebrow">Soul Analysis — ${step} of 10</p>
-          <div class="onboarding-progress-bar">
-            <div class="onboarding-progress-fill" style="width:${progress}%"></div>
+    <section class="veil-crossing-screen">
+      <div class="veil-stars"></div>
+      <div class="veil-crossing-inner">
+        <div class="veil-crossing-header">
+          <div class="veil-sc-glyph">SC</div>
+          <p class="veil-eyebrow">The Veil Crossing — ${step} of 10</p>
+          <div class="veil-progress-bar">
+            <div class="veil-progress-fill" style="width:${progress}%"></div>
           </div>
+          <p class="veil-realm-hint">${esc(hint)}</p>
         </div>
-        <div class="onboarding-question-block">
-          <h2 class="onboarding-question">${esc(qData.text)}</h2>
-          <div class="onboarding-options">
+        <div class="veil-question-block">
+          <h2 class="veil-question">${esc(qData.text)}</h2>
+          <div class="veil-options">
             ${qData.options.map(opt => `
               <button
-                class="onboarding-option${state.onboardingAnswers[`q${qData.q}`] === opt.value ? ' selected' : ''}"
+                class="veil-option${state.onboardingAnswers['q' + qData.q] === opt.value ? ' veil-option-selected' : ''}"
                 data-action="onboarding-answer"
                 data-q="${qData.q}"
                 data-answer="${esc(opt.value)}"
               >
-                ${esc(opt.label)}
+                <span class="veil-option-dot"></span>
+                <span class="veil-option-text">${esc(opt.label)}</span>
               </button>
-            `).join("")}
+            `).join('')}
           </div>
         </div>
-        <div class="onboarding-footer">
-          ${step > 1 ? `<button class="btn btn-ghost btn-sm" data-action="onboarding-back">← Back</button>` : ""}
-          <button class="btn btn-ghost btn-sm onboarding-skip-btn" data-action="onboarding-skip">Skip</button>
+        <div class="veil-crossing-footer">
+          ${step > 1 ? `<button class="btn btn-ghost btn-sm" data-action="onboarding-back">← Back</button>` : '<div></div>'}
+          <button class="btn btn-ghost btn-sm" data-action="onboarding-skip">Skip the Crossing</button>
         </div>
       </div>
     </section>
