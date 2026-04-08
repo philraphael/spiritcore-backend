@@ -1,6 +1,4 @@
 # SpiritCore — Railway Deployment Configuration
-# https://docs.railway.app/reference/config-as-code
-
 [build]
 builder = "NIXPACKS"
 buildCommand = "npm install --omit=dev"
@@ -9,6 +7,3 @@ buildCommand = "npm install --omit=dev"
 startCommand = "node server.mjs"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
-
-[[services]]
-name = "spiritcore-backend"
