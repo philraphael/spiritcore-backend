@@ -206,6 +206,46 @@ function buildWorldLayer(ctx) {
   return ['SPIRITVERSE / LIVING WORLD', ...parts].join('\n');
 }
 
+function buildGameLayer(ctx) {
+  // Game state lives in world_state flags
+  const worldState = ctx?.context?.world ?? null;
+  const game = worldState?.flags?.active_game ?? null;
+  if (!game || game.status !== 'active') return null;
+
+  const parts = [];
+  const gameName = game.name ?? game.type ?? 'game';
+  parts.push(`ACTIVE GAME: ${gameName}`);
+  parts.push(`Status: ${game.status}, Turn: ${game.turn === 'user' ? 'user just moved — it is YOUR turn now' : 'waiting for user'}`);
+  parts.push(`Move count: ${game.moveCount ?? 0}`);
+
+  if (game.type === 'chess' && game.data?.fen) {
+    parts.push(`Current FEN position: ${game.data.fen}`);
+    parts.push('When it is your turn, choose a legal chess move and state it clearly (e.g. "I play e7e5").');
+  } else if (game.type === 'checkers') {
+    parts.push('When it is your turn, choose a valid checkers move (e.g. "I move 18-22").');
+  } else if (game.type === 'go') {
+    parts.push('When it is your turn, choose a valid Go intersection (e.g. "I place at D4").');
+  } else if (game.type === 'echo_trials') {
+    parts.push(`Trial number: ${game.data?.trialNumber ?? 1}, Score: ${game.data?.score ?? 0}`);
+    parts.push('Evaluate the user\'s answer, give feedback, then pose the next riddle.');
+  } else if (game.type === 'spirit_cards') {
+    parts.push(`Realm points: ${game.data?.realmPoints ?? 0}`);
+    parts.push('Respond to the card played and take your own action.');
+  }
+
+  const recentHistory = (game.history ?? []).slice(-4);
+  if (recentHistory.length > 0) {
+    parts.push('Recent moves:');
+    recentHistory.forEach(h => {
+      parts.push(`  ${h.player === 'user' ? 'User' : 'You'}: ${h.move}`);
+    });
+  }
+
+  parts.push('React to the user\'s move with your personality. Be playful, competitive, or reflective as fits your nature. Stay in character.');
+
+  return parts.join('\n');
+}
+
 function buildHierarchicalMemoryLayer(ctx) {
   const hm = ctx?.context?.hierarchical_memory ?? null;
   if (!hm) return null;

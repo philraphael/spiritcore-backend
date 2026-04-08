@@ -101,9 +101,6 @@ export function buildContainer() {
   // --- Phase I: Proactive Engagement Engine ---
   const engagementEngine = createEngagementEngine({ supabase, bus, worldService });
 
-  // --- Phase J: Interactive Game Engine ---
-  const gameEngine = createGameEngine({ bus, world: worldService, messageService });
-
   // --- Orchestrator ---
   const orchestrator = createOrchestrator({
     bus,
@@ -122,6 +119,10 @@ export function buildContainer() {
     hierarchicalMemoryService,  // Phase H: hierarchical memory
     engagementEngine,            // Phase I: proactive engagement
   });
+
+  // --- Phase J: Interactive Game Engine ---
+  // Initialized after orchestrator so it can call back for Spiritkin commentary
+  const gameEngine = createGameEngine({ bus, world: worldService, messageService, registry, orchestrator });
 
   return {
     supabase,

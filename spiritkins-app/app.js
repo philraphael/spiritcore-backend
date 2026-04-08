@@ -513,7 +513,13 @@ const state = {
   showWhisperBanner: false,     // whether to show the whisper banner
   showLoreUnlock: false,        // whether to show the lore unlock notification
   currentLoreUnlock: null,      // the lore unlock to display
-  activePresenceTab: "profile"  // profile, lore, charter
+  activePresenceTab: "profile",  // profile, lore, charter, games
+  // Game state
+  activeGame: null,              // current active game object
+  gameInput: "",                 // move input field value
+  gameSpiritkinMessage: null,    // last Spiritkin commentary on a game move
+  gameInstructions: null,        // instructions for the current game type
+  gameLoading: false             // loading state for game moves
 };
 
 (function hydrateSession() {
@@ -1324,35 +1330,95 @@ function buildChatView() {
           ` : ''}
           ${state.activePresenceTab === 'games' ? `
             <div class="games-view">
-              <div class="panel-label">Spiritverse Games</div>
-              <p class="games-intro">Engage in strategy and collaborative play with ${esc(spiritkin.name)}.</p>
-              <div class="games-list">
-                ${[
-                  { id: "chess", name: "Celestial Chess", icon: "♟️" },
-                  { id: "checkers", name: "Veil Checkers", icon: "🏁" },
-                  { id: "go", name: "Star-Mapping (Go)", icon: "🌌" },
-                  { id: "spirit_cards", name: "Spirit-Cards", icon: "🃏" },
-                  { id: "echo_trials", name: "Echo Trials", icon: "🔔" }
-                ].map(game => `
-                  <button class="ritual-card ${esc(meta.cls)}" data-action="start-game" data-game="${game.id}">
-                    <span class="ritual-icon">${game.icon}</span>
-                    <div class="ritual-copy">
-                      <strong>${esc(game.name)}</strong>
-                      <span>Play with ${esc(spiritkin.name)}</span>
-                    </div>
-                  </button>
-                `).join('')}
-              </div>
-              ${state.activeGame ? `
-                <div class="game-status-box">
-                  <div class="panel-label">Active Game</div>
-                  <div class="active-game-card">
-                    <strong>${esc(state.activeGame.type)}</strong>
-                    <p>Turn: ${state.activeGame.turn === 'user' ? 'Your turn' : `${esc(spiritkin.name)}'s turn`}</p>
-                    <button class="btn btn-ghost btn-sm" data-action="prompt" data-prompt="What is the current state of our game?">Status</button>
-                  </div>
+              ${!state.activeGame || state.activeGame.status !== 'active' ? `
+                <div class="panel-label">Spiritverse Games</div>
+                <p class="games-intro">Choose a game to play with ${esc(spiritkin.name)}.</p>
+                <div class="games-list">
+                  ${[
+                    { id: "chess", name: "Celestial Chess", icon: "\u265F", desc: "Classic strategy on a celestial board" },
+                    { id: "checkers", name: "Veil Checkers", icon: "\uD83C\uDFF1", desc: "Light against shadow across the Veil" },
+                    { id: "go", name: "Star-Mapping (Go)", icon: "\uD83C\uDF0C", desc: "Place stones on a living star chart" },
+                    { id: "spirit_cards", name: "Spirit-Cards", icon: "\uD83C\uDCCF", desc: "Spiritverse trading card game" },
+                    { id: "echo_trials", name: "Echo Trials", icon: "\uD83D\uDD14", desc: "Lore riddles from the deep Spiritverse" }
+                  ].map(game => `
+                    <button class="ritual-card ${esc(meta.cls)}" data-action="start-game" data-game="${game.id}">
+                      <span class="ritual-icon">${game.icon}</span>
+                      <div class="ritual-copy">
+                        <strong>${esc(game.name)}</strong>
+                        <span>${esc(game.desc)}</span>
+                      </div>
+                    </button>
+                  `).join('')}
                 </div>
-              ` : ''}
+              ` : `
+                <div class="active-game-panel">
+                  <div class="game-panel-header">
+                    <div class="game-panel-title">
+                      <span class="game-panel-icon">${
+                        state.activeGame.type === 'chess' ? '\u265F' :
+                        state.activeGame.type === 'checkers' ? '\uD83C\uDFF1' :
+                        state.activeGame.type === 'go' ? '\uD83C\uDF0C' :
+                        state.activeGame.type === 'spirit_cards' ? '\uD83C\uDCCF' : '\uD83D\uDD14'
+                      }</span>
+                      <strong>${esc(state.activeGame.name || state.activeGame.type)}</strong>
+                    </div>
+                    <button class="btn btn-ghost btn-xs game-end-btn" data-action="end-game">End game</button>
+                  </div>
+
+                  <div class="game-turn-badge ${state.activeGame.turn === 'user' ? 'turn-user' : 'turn-spiritkin'}">
+                    ${state.activeGame.turn === 'user' ? 'Your turn' : `${esc(spiritkin.name)} is thinking...`}
+                  </div>
+
+                  ${state.gameSpiritkinMessage ? `
+                    <div class="game-spiritkin-commentary">
+                      <div class="game-commentary-label">${esc(spiritkin.name)}</div>
+                      <p class="game-commentary-text">${esc(state.gameSpiritkinMessage)}</p>
+                    </div>
+                  ` : ''}
+
+                  ${state.gameInstructions ? `
+                    <div class="game-instructions">
+                      <span class="game-instructions-label">How to play:</span> ${esc(state.gameInstructions)}
+                    </div>
+                  ` : ''}
+
+                  ${state.activeGame.turn === 'user' ? `
+                    <div class="game-move-input-row">
+                      <input
+                        class="game-move-input"
+                        type="text"
+                        placeholder="Enter your move..."
+                        value="${esc(state.gameInput || '')}"
+                        data-action="game-input-change"
+                        ${state.gameLoading ? 'disabled' : ''}
+                      />
+                      <button
+                        class="btn btn-primary btn-sm game-submit-btn"
+                        data-action="submit-game-move"
+                        ${state.gameLoading || !state.gameInput?.trim() ? 'disabled' : ''}
+                      >
+                        ${state.gameLoading ? 'Waiting...' : 'Play'}
+                      </button>
+                    </div>
+                  ` : `
+                    <div class="game-waiting">${esc(spiritkin.name)} is taking their turn...</div>
+                  `}
+
+                  ${(state.activeGame.history || []).length > 0 ? `
+                    <div class="game-history">
+                      <div class="game-history-label">Move history</div>
+                      <div class="game-history-list">
+                        ${(state.activeGame.history || []).slice(-8).reverse().map(h => `
+                          <div class="game-history-entry ${h.player === 'user' ? 'move-user' : 'move-spiritkin'}">
+                            <span class="move-player">${h.player === 'user' ? 'You' : esc(spiritkin.name)}</span>
+                            <span class="move-value">${esc(h.move)}</span>
+                          </div>
+                        `).join('')}
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+              `}
             </div>
           ` : ''}
         </div>
@@ -1600,6 +1666,13 @@ function buildSvStrip() {
 
 function onInput(event) {
   const field = event.target.dataset.field;
+  const action = event.target.dataset.action;
+  // Handle game move input via data-action
+  if (action === "game-input-change") {
+    state.gameInput = event.target.value;
+    // No re-render needed on every keystroke — just track value
+    return;
+  }
   if (!field) return;
   if (field === "entry-name") state.userNameDraft = event.target.value;
   if (field === "chat-input") {
@@ -1854,7 +1927,8 @@ async function onClick(event) {
     const gameType = element.dataset.game;
     if (!state.conversationId) return;
     try {
-      state.statusText = `Preparing ${gameType}...`;
+      state.statusText = `Starting ${gameType}...`;
+      state.gameLoading = true;
       render();
       const res = await fetch(`${API}/v1/games/start`, {
         method: "POST",
@@ -1869,8 +1943,18 @@ async function onClick(event) {
       const data = await res.json();
       if (data.ok) {
         state.activeGame = data.game;
-        addMessage("system", `A new game of ${gameType} has begun. It is your turn.`, state.selectedSpiritkin.name);
+        state.gameSpiritkinMessage = data.spiritkinMessage || null;
+        state.gameInstructions = data.instructions || null;
+        state.gameInput = "";
         state.statusText = "Game started.";
+        // Show the opening message in chat too
+        if (data.spiritkinMessage) {
+          addMessage("spiritkin", data.spiritkinMessage, state.selectedSpiritkin.name);
+        }
+        render();
+      } else {
+        state.statusText = data.message || "Failed to start game.";
+        state.statusError = true;
         render();
       }
     } catch (err) {
@@ -1878,7 +1962,79 @@ async function onClick(event) {
       state.statusText = "Failed to start game.";
       state.statusError = true;
       render();
+    } finally {
+      state.gameLoading = false;
+      render();
     }
+    return;
+  }
+
+  if (action === "game-input-change") {
+    state.gameInput = element.value;
+    render();
+    return;
+  }
+
+  if (action === "submit-game-move") {
+    const move = state.gameInput?.trim();
+    if (!move || !state.conversationId || !state.activeGame) return;
+    try {
+      state.gameLoading = true;
+      state.gameInput = "";
+      render();
+      const res = await fetch(`${API}/v1/games/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: state.userId,
+          conversationId: state.conversationId,
+          move,
+          spiritkinName: state.selectedSpiritkin.name
+        })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        state.activeGame = data.game;
+        state.gameSpiritkinMessage = data.spiritkinMessage || null;
+        // Also show Spiritkin commentary in chat
+        if (data.spiritkinMessage) {
+          addMessage("spiritkin", data.spiritkinMessage, state.selectedSpiritkin.name);
+        }
+        state.statusText = "";
+      } else {
+        state.statusText = data.message || "Move failed.";
+        state.statusError = true;
+      }
+    } catch (err) {
+      console.error("Failed to submit game move", err);
+      state.statusText = "Move failed — please try again.";
+      state.statusError = true;
+    } finally {
+      state.gameLoading = false;
+      render();
+    }
+    return;
+  }
+
+  if (action === "end-game") {
+    if (!state.conversationId) return;
+    try {
+      await fetch(`${API}/v1/games/end`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: state.userId,
+          conversationId: state.conversationId
+        })
+      });
+    } catch (err) {
+      console.warn("end-game request failed", err);
+    }
+    state.activeGame = null;
+    state.gameSpiritkinMessage = null;
+    state.gameInstructions = null;
+    state.gameInput = "";
+    render();
     return;
   }
 
@@ -2066,6 +2222,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (event.target.dataset.field === "chat-input" && event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       sendMessage();
+    }
+    // Enter key in game move input submits the move
+    if (event.target.dataset.action === "game-input-change" && event.key === "Enter") {
+      event.preventDefault();
+      const move = state.gameInput?.trim();
+      if (move && state.conversationId && state.activeGame) {
+        // Trigger submit-game-move by simulating a click on the submit button
+        const submitBtn = document.querySelector("[data-action='submit-game-move']");
+        if (submitBtn && !submitBtn.disabled) submitBtn.click();
+      }
     }
   });
 });
