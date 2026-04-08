@@ -308,11 +308,10 @@ export const SpiritverseGames = {
   checkers: { selectedPiece: null, validMoves: [] },
   echoAnswer: '',
 
-  render(container, gameData, spiritkinName, onMoveSubmit) {
+  render(container, gameData, spiritkinName, commentary, onMoveSubmit) {
     if (!gameData || !gameData.type) return;
-
     const type = gameData.type;
-    const commentary = gameData.commentary || "The board is yours.";
+    const gameCommentary = commentary || gameData.commentary || "The board is yours.";
     const history = gameData.history || [];
 
     const renderFn = (target, isExp) => {
@@ -339,11 +338,55 @@ export const SpiritverseGames = {
     };
 
     // Render to main container
-    renderFn(container, false);
-
+    const el = typeof container === 'string' ? document.getElementById(container) : container;
+    if (el) renderFn(el, false);
     // Update Grand Stage if open
     if (GrandStage.isOpen && GrandStage.gameType === type) {
-      GrandStage.update(renderFn, commentary, history);
+      GrandStage.update(renderFn, gameCommentary, history);
+    }
+  },
+
+  expand(gameData, spiritkinName, onMoveSubmit) {
+    if (!gameData || !gameData.type) return;
+    const type = gameData.type;
+    const commentary = gameData.commentary || "The board is set. Let us see where the resonance leads.";
+    const history = gameData.history || [];
+    const renderFn = (target, isExp) => {
+      switch (type) {
+        case 'chess':
+          renderChessBoard(target, gameData.fen, this.chess.selectedSquare, this.chess.validMoves, this.chess.lastMove, (sq) => {
+            this.handleChessSquareClick(sq, gameData.fen, onMoveSubmit);
+          }, isExp);
+          break;
+        case 'checkers':
+          renderCheckersBoard(target, gameData.board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
+            this.handleCheckersSquareClick(sq, gameData.board, 'white', onMoveSubmit);
+          }, isExp);
+          break;
+        case 'go':
+          renderGoBoard(target, gameData.board, gameData.lastMove, (idx) => {
+            const size = 13;
+            const r = Math.floor(idx / size);
+            const c = idx % size;
+            onMoveSubmit(`${String.fromCharCode(65 + c)}${size - r}`);
+          }, isExp);
+          break;
+        default:
+          if (target) target.innerHTML = `<div style="padding:2rem;text-align:center;color:#ccc">Grand Stage not available for this game type.</div>`;
+      }
+    };
+    GrandStage.open(type, spiritkinName, renderFn);
+    // Update commentary immediately
+    const comm = document.getElementById('gs-commentary');
+    if (comm && commentary) comm.innerText = commentary;
+    const hist = document.getElementById('gs-history');
+    if (hist && history.length) {
+      hist.innerHTML = history.slice(-5).reverse().map(m => `
+        <div class="gs-history-row ${m.player}">
+          <span class="move-player">${m.player === 'user' ? 'You' : spiritkinName}</span>
+          <span class="move-value">${m.move}</span>
+        </div>
+      `).join('');
     }
   },
 

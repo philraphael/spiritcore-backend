@@ -907,10 +907,10 @@ function render() {
   }
 
   // Render visual game board after DOM update
-  if (state.activeGame && state.activeGame.status === 'active' && window.SpiritverseGames) {
+  if (state.activeGame && state.activeGame.status === 'active' && SpiritverseGames) {
     requestAnimationFrame(() => {
       const spiritkin = state.selectedSpiritkin;
-      window.SpiritverseGames.render(
+      SpiritverseGames.render(
         'spiritverse-game-board',
         state.activeGame,
         spiritkin ? spiritkin.name : 'Spiritkin',
@@ -2438,7 +2438,7 @@ async function onClick(event) {
   }
 
   if (action === "echo-input-change") {
-    if (window.SpiritverseGames) window.SpiritverseGames.echoAnswer = element.value || '';
+    if (SpiritverseGames) SpiritverseGames.echoAnswer = element.value || '';
     return;
   }
   if (action === "end-game") {
