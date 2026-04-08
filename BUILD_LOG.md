@@ -135,3 +135,56 @@ e1b3b99 — Refactor: Rename all 'Lore' references to 'Echoes' throughout the pl
 
 **Status:** ✅ ALL SYSTEMS LIVE & VERIFIED
 **Commit:** `51a65d3`
+
+---
+
+## [2026-04-08] Critical Bug Fix: Board Rendering + Grand Stage + Game-to-World Progression
+
+### Root Cause Diagnosis
+- **Board rendering was broken** because `app.js` was calling `window.SpiritverseGames.render()` (global), but the `SpiritverseGames` object was only available as an ES module import — never assigned to `window`.
+- **Root cause:** 3 references in `app.js` used `window.SpiritverseGames` instead of the imported `SpiritverseGames` (module-scoped). ES modules don't auto-populate `window`.
+
+### Fixes Applied
+- ✅ **Board Rendering Fixed:** Replaced all 3 `window.SpiritverseGames` references in `app.js` with the imported `SpiritverseGames` (already imported at line 11). Boards now render correctly.
+- ✅ **render() Signature Fixed:** Updated `SpiritverseGames.render()` to accept 5 args: `(container, gameData, spiritkinName, commentary, onMoveSubmit)`. Container can be a string ID or DOM element.
+- ✅ **Grand Stage Fixed:** Added `expand()` method to `SpiritverseGames` export. Grand Stage fullscreen 3D board view now works.
+- ✅ **Game-to-World Progression Wired:**
+  - `server.mjs`: passes `worldProgression` to `gameRoutes`
+  - `games.mjs` `/v1/games/end`: calls `worldProgression.processGameCompletion()` after game ends
+  - Returns `progression: { echoUnlock, bondAdvanced, progressionMessage, worldShift }` to frontend
+  - Frontend `end-game` handler: reads progression response, shows echo unlock banner + bond advancement milestone chip
+
+### Verified Working (Browser)
+- ✅ Chess board renders with all pieces in starting positions
+- ✅ Grand Stage opens with 3D isometric board + Lyra commentary sidebar
+- ✅ Grand Stage closes cleanly, returns to inline board view
+- ✅ Game-to-World Progression: echo unlock notification appears on game end (when triggered)
+- ✅ No regressions on existing features
+
+**Commit:** `86cee4f`
+
+---
+
+## PHASE COMPLETION STATUS (Updated)
+| Phase | Feature | Status |
+|-------|---------|--------|
+| 1 | Core Backend (Fastify + Supabase + Orchestrator) | ✅ DONE |
+| 2 | Spiritkins Registry + Interact Route | ✅ DONE |
+| 3 | Memory System (short + long term) | ✅ DONE |
+| 4 | Engagement Engine (whispers, milestones, echoes, wellness) | ✅ DONE |
+| 5 | Spiritverse Games (chess, checkers, go, spirit_cards, echo_trials) | ✅ DONE |
+| 6 | Shared Spiritverse Events | ✅ DONE |
+| 7 | Daily Quest Generator | ✅ DONE |
+| 8 | Veil Crossing Questionnaire (10-Q resonance → Spiritkin assignment) | ✅ DONE |
+| 9 | Bond Journal UI (Memory Constellation) | ✅ DONE |
+| 10 | Game-to-World Progression (game wins → echo unlocks → bond advance) | ✅ DONE |
+| 11 | Board Rendering Fix + Grand Stage Expansion | ✅ DONE |
+
+---
+
+## NEXT BUILD PUSH
+- Premium Game Visuals: Piece themes (Celestial, Ember, Astral), Spirit-Cards visual card hand rendering
+- Spiritkin Voice Profiles: TTS with per-Spiritkin voice + speed tuning (nova/alloy/shimmer)
+- Realm Travel: Unlock new realms by completing game milestones
+- DM/RPG Mode: Narrative adventure mode (deferred)
+- Custom Spiritkin Creator: User-defined companions beyond Lyra/Raien/Kairo
