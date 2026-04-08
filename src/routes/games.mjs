@@ -1,11 +1,12 @@
 /**
- * SpiritCore — Interactive Game Routes (v2)
+ * SpiritCore — Interactive Game Routes (v3)
  *
  * GET  /v1/games/list                  — list all available Spiritverse games
  * POST /v1/games/start                 — start a new game in a conversation
  * POST /v1/games/move                  — make a move; returns Spiritkin commentary
+ * POST /v1/games/draw                  — draw a card (Spirit-Cards only)
  * GET  /v1/games/state/:conversationId — fetch current game state
- * POST /v1/games/end                   — end / forfeit the active game
+ * POST /v1/games/end                   — end / forfeit the active game (writes memory)
  */
 
 export async function gameRoutes(fastify, opts) {
@@ -13,7 +14,6 @@ export async function gameRoutes(fastify, opts) {
 
   /**
    * GET /v1/games/list
-   * Returns all available Spiritverse games with descriptions and instructions.
    */
   fastify.get("/v1/games/list", async (req, reply) => {
     try {
@@ -27,7 +27,6 @@ export async function gameRoutes(fastify, opts) {
 
   /**
    * POST /v1/games/start
-   * Start a new game. Returns initial game state + Spiritkin opening message.
    */
   fastify.post("/v1/games/start", async (req, reply) => {
     const { userId, conversationId, gameType, spiritkinName } = req.body;
@@ -57,7 +56,6 @@ export async function gameRoutes(fastify, opts) {
 
   /**
    * POST /v1/games/move
-   * Submit a player move. Returns updated game state + Spiritkin commentary/move.
    */
   fastify.post("/v1/games/move", async (req, reply) => {
     const { userId, conversationId, move, spiritkinName } = req.body;
@@ -85,8 +83,36 @@ export async function gameRoutes(fastify, opts) {
   });
 
   /**
+   * POST /v1/games/draw
+   * Draw a card in an active Spirit-Cards game.
+   */
+  fastify.post("/v1/games/draw", async (req, reply) => {
+    const { userId, conversationId, spiritkinName } = req.body;
+
+    if (!userId || !conversationId) {
+      return reply.code(400).send({
+        ok: false,
+        error: "VALIDATION",
+        message: "userId and conversationId are required."
+      });
+    }
+
+    try {
+      const result = await gameEngine.drawCard({ userId, conversationId, spiritkinName });
+      return {
+        ok: true,
+        game: result.game,
+        spiritkinMessage: result.spiritkinMessage
+      };
+    } catch (err) {
+      req.log.error(err, `[games] drawCard failed for conversation ${conversationId}`);
+      const code = err.statusCode || err.httpCode || 500;
+      return reply.code(code).send({ ok: false, error: err.code || "INTERNAL", message: err.message });
+    }
+  });
+
+  /**
    * GET /v1/games/state/:conversationId
-   * Fetch current game state for a conversation.
    */
   fastify.get("/v1/games/state/:conversationId", async (req, reply) => {
     const { conversationId } = req.params;
@@ -109,34 +135,18 @@ export async function gameRoutes(fastify, opts) {
 
   /**
    * POST /v1/games/end
-   * End or forfeit the active game in a conversation.
+   * End or forfeit the active game. Writes a game session memory via spiritMemoryEngine.
    */
   fastify.post("/v1/games/end", async (req, reply) => {
-    const { userId, conversationId } = req.body;
+    const { userId, conversationId, spiritkinName, outcome } = req.body;
 
     if (!userId || !conversationId) {
       return reply.code(400).send({ ok: false, error: "VALIDATION", message: "userId and conversationId are required." });
     }
 
     try {
-      const worldData = await world.get({ userId, conversationId });
-      const state = worldData.state;
-
-      if (!state.flags?.active_game) {
-        return reply.code(400).send({ ok: false, error: "GAME_ERROR", message: "No active game to end." });
-      }
-
-      state.flags.active_game.status = "ended";
-      state.flags.active_game.endedAt = new Date().toISOString();
-
-      await world.upsert({
-        userId,
-        conversationId,
-        spiritkinId: worldData.spiritkinId,
-        state
-      });
-
-      return { ok: true, message: "Game ended." };
+      const result = await gameEngine.endGame({ userId, conversationId, spiritkinName, outcome });
+      return { ok: true, game: result.game, message: result.message };
     } catch (err) {
       req.log.error(err, `[games] endGame failed for conversation ${conversationId}`);
       const code = err.statusCode || err.httpCode || 500;

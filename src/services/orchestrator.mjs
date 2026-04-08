@@ -41,6 +41,7 @@ export const createOrchestrator = ({
   memoryExtractor,
   hierarchicalMemoryService,
   engagementEngine,
+  spiritMemoryEngine,
 }) => {
   const interact = async ({ userId, input, spiritkin, conversationId, context = {} }) => {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
@@ -98,9 +99,9 @@ export const createOrchestrator = ({
       throw new AppError("VALIDATION", "conversationId is required", 400);
     }
 
-    // Stage 4: Entitlements, context, world state
+    // Stage 4: Entitlements, context, world state, memory brief (parallel)
     logStage(log, "context_assembly");
-    const [entitlement, contextBundle, worldSnap] = await Promise.all([
+    const [entitlement, contextBundle, worldSnap, memoryBrief] = await Promise.all([
       entitlements.check({ userId }),
       contextService.buildContext({
         userId,
@@ -110,6 +111,9 @@ export const createOrchestrator = ({
         policy: {},
       }),
       world.get({ userId, conversationId: convId }),
+      spiritMemoryEngine
+        ? spiritMemoryEngine.buildMemoryBrief({ userId, spiritkinId, conversationId: convId })
+        : Promise.resolve(null),
     ]);
 
     bus.emit("orchestrator.entitlements", {
@@ -235,6 +239,12 @@ export const createOrchestrator = ({
           episodes: contextBundle?.episodes,
           emotion: contextBundle?.emotion,
           summary: contextBundle?.summary_episode,
+          // Phase K: rich memory brief for long-term recall
+          memoryBrief: memoryBrief?.brief ?? null,
+          identityFacts: memoryBrief?.identity ?? [],
+          bondMilestones: memoryBrief?.bondMilestones ?? [],
+          gameSessions: memoryBrief?.games ?? [],
+          sessionSummaries: memoryBrief?.sessions ?? [],
           ...context,
         },
       }),
@@ -367,6 +377,28 @@ export const createOrchestrator = ({
         conversationId: convId,
         userMessage: input,
       }).catch(() => {}); // non-critical, swallow all errors
+    }
+
+    // Stage 11e: SpiritMemoryEngine — process full interaction for 10x memory retention
+    if (spiritMemoryEngine && policyState.state !== "delete_due") {
+      const emotionMeta3 = adapterResult.emotion?.metadata_json ?? {};
+      spiritMemoryEngine.processInteraction({
+        userId,
+        spiritkinId,
+        conversationId: convId,
+        spiritkinName: resolvedIdentity.name,
+        userText: input,
+        spiritkinResponse: finalResponseText,
+        emotionState: {
+          tone: adapterResult.emotion?.tone,
+          label: emotionMeta3?.label ?? adapterResult.emotion?.tone,
+          arc: emotionMeta3?.arc ?? "opening",
+          intensity: emotionMeta3?.intensity ?? 0,
+        },
+        worldState: nextWorldState,
+        bondStage: nextWorldState?.bond?.stage ?? null,
+        previousBondStage: worldSnap?.state?.bond?.stage ?? null,
+      }).catch(() => {});
     }
 
     bus.emit("orchestrator.complete", { traceId });

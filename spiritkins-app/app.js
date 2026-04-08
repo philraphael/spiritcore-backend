@@ -766,6 +766,47 @@ function submitFeedback(messageId, helpful) {
   render();
 }
 
+// Standalone game move submission — called by SpiritverseGames visual boards
+async function submitGameMove(move) {
+  if (!move || !state.conversationId || !state.activeGame) return;
+  if (state.gameLoading) return;
+  try {
+    state.gameLoading = true;
+    state.gameInput = "";
+    render();
+    const res = await fetch(`${API}/v1/games/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: state.userId,
+        conversationId: state.conversationId,
+        move,
+        spiritkinName: state.selectedSpiritkin.name
+      })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      state.activeGame = data.game;
+      state.gameSpiritkinMessage = data.spiritkinMessage || null;
+      if (data.spiritkinMessage) {
+        addMessage("spiritkin", data.spiritkinMessage, state.selectedSpiritkin.name);
+      }
+      state.statusText = "";
+      state.statusError = false;
+    } else {
+      state.statusText = data.message || "Move failed.";
+      state.statusError = true;
+    }
+  } catch (err) {
+    console.error("Failed to submit game move", err);
+    state.statusText = "Move failed — please try again.";
+    state.statusError = true;
+  } finally {
+    state.gameLoading = false;
+    render();
+  }
+}
+
 function render() {
   const root = document.getElementById("root");
   if (!root) return;
@@ -785,11 +826,25 @@ function render() {
     }
   }
 
-  const textarea = root.querySelector("textarea[data-field=\'chat-input\']");
+  const textarea = root.querySelector("textarea[data-field='chat-input']");
   if (textarea) {
     textarea.value = state.input;
     textarea.style.height = "auto";
     textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+  }
+
+  // Render visual game board after DOM update
+  if (state.activeGame && state.activeGame.status === 'active' && window.SpiritverseGames) {
+    requestAnimationFrame(() => {
+      const spiritkin = state.selectedSpiritkin;
+      window.SpiritverseGames.render(
+        'spiritverse-game-board',
+        state.activeGame,
+        spiritkin ? spiritkin.name : 'Spiritkin',
+        state.gameSpiritkinMessage,
+        (move) => submitGameMove(move)
+      );
+    });
   }
 }
 
@@ -1376,33 +1431,14 @@ function buildChatView() {
                     </div>
                   ` : ''}
 
-                  ${state.gameInstructions ? `
-                    <div class="game-instructions">
-                      <span class="game-instructions-label">How to play:</span> ${esc(state.gameInstructions)}
-                    </div>
-                  ` : ''}
+                  <!-- Visual game board — rendered by SpiritverseGames after DOM update -->
+                  <div class="game-board-container">
+                    <div id="spiritverse-game-board"></div>
+                  </div>
 
-                  ${state.activeGame.turn === 'user' ? `
-                    <div class="game-move-input-row">
-                      <input
-                        class="game-move-input"
-                        type="text"
-                        placeholder="Enter your move..."
-                        value="${esc(state.gameInput || '')}"
-                        data-action="game-input-change"
-                        ${state.gameLoading ? 'disabled' : ''}
-                      />
-                      <button
-                        class="btn btn-primary btn-sm game-submit-btn"
-                        data-action="submit-game-move"
-                        ${state.gameLoading ? 'disabled' : ''}
-                      >
-                        ${state.gameLoading ? 'Waiting...' : 'Play'}
-                      </button>
-                    </div>
-                  ` : `
-                    <div class="game-waiting">${esc(spiritkin.name)} is taking their turn...</div>
-                  `}
+                  ${state.activeGame.type === 'echo_trials' && state.activeGame.turn === 'user' ? `
+                    <!-- Echo Trials answer area rendered inline by SpiritverseGames -->
+                  ` : ''}
 
                   ${(state.activeGame.history || []).length > 0 ? `
                     <div class="game-history">
@@ -1976,45 +2012,96 @@ async function onClick(event) {
   }
 
   if (action === "submit-game-move") {
-    // Read from DOM input as fallback since onInput may not have fired
-    const inputEl = document.querySelector("[data-action='game-input-change']");
-    const move = (state.gameInput?.trim()) || (inputEl?.value?.trim());
-    if (!move || !state.conversationId || !state.activeGame) return;
-    try {
-      state.gameLoading = true;
-      state.gameInput = "";
-      render();
-      const res = await fetch(`${API}/v1/games/move`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: state.userId,
-          conversationId: state.conversationId,
-          move,
-          spiritkinName: state.selectedSpiritkin.name
-        })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        state.activeGame = data.game;
-        state.gameSpiritkinMessage = data.spiritkinMessage || null;
-        // Also show Spiritkin commentary in chat
-        if (data.spiritkinMessage) {
-          addMessage("spiritkin", data.spiritkinMessage, state.selectedSpiritkin.name);
-        }
-        state.statusText = "";
-      } else {
-        state.statusText = data.message || "Move failed.";
-        state.statusError = true;
-      }
-    } catch (err) {
-      console.error("Failed to submit game move", err);
-      state.statusText = "Move failed — please try again.";
-      state.statusError = true;
-    } finally {
-      state.gameLoading = false;
-      render();
+    // For Echo Trials, read from the textarea in the visual board
+    let move;
+    if (state.activeGame?.type === 'echo_trials') {
+      const echoEl = document.querySelector('.echo-answer-input');
+      move = (window.SpiritverseGames?.echoAnswer?.trim()) || (echoEl?.value?.trim()) || state.gameInput?.trim();
+      if (window.SpiritverseGames) window.SpiritverseGames.echoAnswer = '';
+    } else {
+      const inputEl = document.querySelector("[data-action='game-input-change']");
+      move = (state.gameInput?.trim()) || (inputEl?.value?.trim());
     }
+    if (!move) return;
+    await submitGameMove(move);
+    return;
+  }
+
+  // ---- VISUAL GAME BOARD ACTIONS ----
+  if (action === "chess-square-click") {
+    if (!state.activeGame || state.activeGame.type !== 'chess' || state.gameLoading) return;
+    if (state.activeGame.turn !== 'user') return;
+    const sq = element.dataset.sq;
+    if (!sq || !window.SpiritverseGames) return;
+    window.SpiritverseGames.handleChessSquareClick(
+      sq,
+      state.activeGame.data?.fen,
+      (move) => submitGameMove(move)
+    );
+    // Re-render board to show selection/valid moves
+    requestAnimationFrame(() => {
+      window.SpiritverseGames.render(
+        'spiritverse-game-board',
+        state.activeGame,
+        state.selectedSpiritkin?.name,
+        state.gameSpiritkinMessage,
+        (move) => submitGameMove(move)
+      );
+    });
+    return;
+  }
+
+  if (action === "checkers-square-click") {
+    if (!state.activeGame || state.activeGame.type !== 'checkers' || state.gameLoading) return;
+    if (state.activeGame.turn !== 'user') return;
+    const sq = element.dataset.sq;
+    if (sq === undefined || sq === null || sq === '' || !window.SpiritverseGames) return;
+    window.SpiritverseGames.handleCheckersSquareClick(
+      sq,
+      state.activeGame.data?.board,
+      'red', // user plays red
+      (move) => submitGameMove(move)
+    );
+    requestAnimationFrame(() => {
+      window.SpiritverseGames.render(
+        'spiritverse-game-board',
+        state.activeGame,
+        state.selectedSpiritkin?.name,
+        state.gameSpiritkinMessage,
+        (move) => submitGameMove(move)
+      );
+    });
+    return;
+  }
+
+  if (action === "go-place-stone") {
+    if (!state.activeGame || state.activeGame.type !== 'go' || state.gameLoading) return;
+    if (state.activeGame.turn !== 'user') return;
+    const coord = element.dataset.coord;
+    if (!coord) return;
+    submitGameMove(coord);
+    return;
+  }
+
+  if (action === "cards-play-card") {
+    if (!state.activeGame || state.activeGame.type !== 'spirit_cards' || state.gameLoading) return;
+    if (state.activeGame.turn !== 'user') return;
+    const cardIdx = element.dataset.cardIdx;
+    const hand = state.activeGame.data?.hand || [];
+    const card = hand[parseInt(cardIdx)];
+    if (!card) return;
+    submitGameMove(`play:${card.name}`);
+    return;
+  }
+
+  if (action === "cards-draw") {
+    if (!state.activeGame || state.activeGame.type !== 'spirit_cards' || state.gameLoading) return;
+    submitGameMove('draw');
+    return;
+  }
+
+  if (action === "echo-input-change") {
+    if (window.SpiritverseGames) window.SpiritverseGames.echoAnswer = element.value || '';
     return;
   }
 

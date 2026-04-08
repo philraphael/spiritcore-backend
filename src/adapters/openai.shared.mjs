@@ -282,6 +282,12 @@ function buildHierarchicalMemoryLayer(ctx) {
   ].join('\n');
 }
 
+function buildSpiritMemoryBriefLayer(ctx) {
+  const brief = ctx?.context?.memoryBrief ?? null;
+  if (!brief || typeof brief !== 'string' || brief.trim().length === 0) return null;
+  return brief;
+}
+
 function buildContextBlock(ctx, memoryLayer) {
   const spiritkin = ctx?.spiritkin ?? {};
   const sceneName = sanitizeScene(ctx?.scene?.name);
@@ -293,6 +299,7 @@ function buildContextBlock(ctx, memoryLayer) {
   const worldLayer = buildWorldLayer(ctx);
   const gameLayer = buildGameLayer(ctx);
   const hierarchicalMemoryLayer = buildHierarchicalMemoryLayer(ctx);
+  const spiritMemoryBriefLayer = buildSpiritMemoryBriefLayer(ctx);
 
   return [
     "IDENTITY / CANON",
@@ -313,6 +320,7 @@ function buildContextBlock(ctx, memoryLayer) {
       "Do not break canon, drift into generic assistant voice, or flatten this Spiritkin into neutral support language."
     ].filter(Boolean).join("\n\n"),
     returningUserBlock,
+    spiritMemoryBriefLayer,
     hierarchicalMemoryLayer,
     worldLayer,
     gameLayer,

@@ -19,8 +19,9 @@
  */
 
 import { AppError } from "../errors.mjs";
+import { MEMORY_KINDS } from "./spiritMemoryEngine.mjs";
 
-export const createGameEngine = ({ bus, world, messageService, registry, orchestrator }) => {
+export const createGameEngine = ({ bus, world, messageService, registry, orchestrator, memory, spiritMemoryEngine }) => {
 
   const GAMES = {
     chess: {
@@ -335,5 +336,91 @@ export const createGameEngine = ({ bus, world, messageService, registry, orchest
     ].sort(() => Math.random() - 0.5);
   };
 
-  return { startGame, makeMove, listGames: () => GAMES };
+  /**
+   * End a game and write a full game session memory.
+   */
+  const endGame = async ({ userId, conversationId, spiritkinName, outcome }) => {
+    const spiritkinId = await resolveSpiritkinId(spiritkinName);
+    const worldData = await world.get({ userId, conversationId });
+    const state = worldData.state;
+    const game = state.flags?.active_game;
+
+    if (!game) return { ok: true, message: 'No active game to end.' };
+
+    const endedAt = new Date().toISOString();
+    const startedAt = game.startedAt ?? endedAt;
+    const durationMs = new Date(endedAt) - new Date(startedAt);
+
+    game.status = 'ended';
+    game.endedAt = endedAt;
+    game.outcome = outcome ?? 'ended';
+
+    await world.upsert({
+      userId,
+      conversationId,
+      spiritkinId: spiritkinId ?? worldData.spiritkinId,
+      state
+    });
+
+    // Write game session to long-term memory
+    if (spiritMemoryEngine) {
+      const userMoves = (game.history ?? []).filter(h => h.player === 'user').map(h => h.move);
+      const skCommentary = (game.history ?? []).filter(h => h.player === 'spiritkin').map(h => h.move);
+
+      spiritMemoryEngine.writeGameSession({
+        userId,
+        spiritkinId: spiritkinId ?? worldData.spiritkinId,
+        conversationId,
+        gameType: game.type,
+        gameName: game.name,
+        outcome: game.outcome,
+        moveCount: game.moveCount ?? 0,
+        userMoves,
+        spiritkinMoves: skCommentary,
+        spiritkinCommentary: skCommentary,
+        duration: Math.round(durationMs / 1000),
+        spiritkinName,
+      }).catch(err => console.warn('[GameEngine] writeGameSession failed:', err.message));
+    }
+
+    bus.emit('game.ended', { userId, conversationId, gameType: game.type, outcome: game.outcome });
+
+    return { ok: true, game, message: 'Game ended.' };
+  };
+
+  /**
+   * Draw a card for Spirit-Cards game.
+   */
+  const drawCard = async ({ userId, conversationId, spiritkinName }) => {
+    const spiritkinId = await resolveSpiritkinId(spiritkinName);
+    const worldData = await world.get({ userId, conversationId });
+    const state = worldData.state;
+    const game = state.flags?.active_game;
+
+    if (!game || game.type !== 'spirit_cards') {
+      throw new AppError('GAME_ERROR', 'No active Spirit-Cards game.', 400);
+    }
+
+    if (!game.data.deck || game.data.deck.length === 0) {
+      return { ok: true, game, spiritkinMessage: 'The deck is empty. The realm has spoken all it can.' };
+    }
+
+    const card = game.data.deck.shift();
+    game.data.hand = game.data.hand || [];
+    game.data.hand.push(card);
+
+    await world.upsert({
+      userId, conversationId,
+      spiritkinId: spiritkinId ?? worldData.spiritkinId,
+      state
+    });
+
+    return {
+      ok: true,
+      game,
+      spiritkinMessage: `You draw *${card.name}* — ${card.effect} The deck holds ${game.data.deck.length} cards remaining.`
+    };
+  };
+
+  return { startGame, makeMove, endGame, drawCard, listGames: () => GAMES };
 };
