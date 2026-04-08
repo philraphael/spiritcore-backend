@@ -470,3 +470,6 @@ function getCheckersValidMoves(sq, board, userColor) {
   }
   return moves;
 }
+
+// Make SpiritverseGames globally accessible
+window.SpiritverseGames = SpiritverseGames;
