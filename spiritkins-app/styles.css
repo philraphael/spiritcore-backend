@@ -3609,3 +3609,28 @@ button:disabled {
   font-family: "Courier New", monospace;
   font-size: 0.82rem;
 }
+
+/* ─── SpiritCore Identity Styles ─────────────────────────────────────────── */
+
+.charter-authority {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--realm-accent, #a78bfa);
+  opacity: 0.85;
+  margin-bottom: 0.75rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--realm-accent, #a78bfa) 30%, transparent);
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.world-pulse-core {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--realm-accent, #a78bfa);
+  opacity: 0.9;
+}
