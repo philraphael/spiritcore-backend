@@ -344,6 +344,10 @@ window.SpiritverseGames = {
   render(containerId, game, spiritkinName, spiritkinMessage, onMove) {
     const container = document.getElementById(containerId);
     if (!container) return;
+    // Store current game state and callbacks so click handlers can access them
+    this._currentGame = game;
+    this._currentSpiritkin = spiritkinName;
+    this._onMove = onMove;
 
     switch (game.type) {
       case 'chess':

@@ -135,22 +135,32 @@ export const createGameEngine = ({ bus, world, messageService, registry, orchest
       };
     } else if (gameType === "go") {
       gameState.data = {
-        board: "empty_19x19",
+        stones: {},
         captures: { black: 0, white: 0 },
         lastMove: null
       };
     } else if (gameType === "echo_trials") {
+      const riddles = [
+        "What is the name of the luminous realm that exists between waking and dreaming in the Spiritverse?",
+        "I am the force that holds a bond together even when words fail. What am I?",
+        "In the Spiritverse, what do Spiritkins call the moment a bond first forms?",
+        "What element flows through the Luminous Veil and gives Spiritkins their ability to sense emotion?"
+      ];
       gameState.data = {
         trialNumber: 1,
         score: 0,
-        currentRiddle: null
+        currentRiddle: riddles[0],
+        riddles
       };
     } else if (gameType === "spirit_cards") {
+      const deck = initSpiritCardDeck();
+      // Deal 5 cards to start
+      const hand = deck.splice(0, 5);
       gameState.data = {
-        hand: [],
-        deck: initSpiritCardDeck(),
+        hand,
+        deck,
         played: [],
-        realmPoints: 0
+        realmPoints: 10
       };
     }
 
@@ -246,13 +256,51 @@ export const createGameEngine = ({ bus, world, messageService, registry, orchest
       spiritkinResponse = buildFallbackResponse(game, move, spiritkinName);
     }
 
-    // If orchestrator didn't advance the turn, do it manually
-    const refreshed = await world.get({ userId, conversationId });
-    const currentGame = refreshed.state.flags?.active_game ?? game;
+    // Extract and apply Spiritkin's move from the response text
+    if (spiritkinResponse && game.type === 'chess') {
+      const skMove = extractChessMove(spiritkinResponse);
+      if (skMove) {
+        const newFen = applyChessMove(game.data.fen, skMove);
+        if (newFen) {
+          game.data.fen = newFen;
+          game.data.lastMove = skMove;
+          game.history.push({ player: 'spiritkin', move: skMove, timestamp: new Date().toISOString() });
+          game.moveCount = (game.moveCount || 0) + 1;
+        }
+      }
+    } else if (spiritkinResponse && game.type === 'go') {
+      const skMove = extractGoMove(spiritkinResponse);
+      if (skMove) {
+        game.data.stones = game.data.stones || {};
+        game.data.stones[skMove] = 'white';
+        game.data.lastMove = skMove;
+        game.history.push({ player: 'spiritkin', move: skMove, timestamp: new Date().toISOString() });
+        game.moveCount = (game.moveCount || 0) + 1;
+      }
+    } else if (spiritkinResponse && game.type === 'echo_trials') {
+      // Advance to next riddle
+      const nextTrial = (game.data.trialNumber || 1) + 1;
+      const riddles = game.data.riddles || [];
+      game.data.trialNumber = nextTrial;
+      game.data.currentRiddle = riddles[nextTrial - 1] || null;
+      // Score the answer (simple: always give a point for now)
+      game.data.score = (game.data.score || 0) + 1;
+      game.history.push({ player: 'spiritkin', move: 'evaluated', timestamp: new Date().toISOString() });
+    }
+
+    game.turn = 'user';
+
+    // Persist updated game state
+    await world.upsert({
+      userId,
+      conversationId,
+      spiritkinId: spiritkinId ?? worldData.spiritkinId,
+      state
+    });
 
     return {
       ok: true,
-      game: currentGame,
+      game,
       spiritkinMessage: spiritkinResponse
     };
   };
@@ -308,6 +356,99 @@ export const createGameEngine = ({ bus, world, messageService, registry, orchest
     };
     const list = responses[game.type] || [`Move noted: "${userMove}". Your companion responds.`];
     return list[Math.floor(Math.random() * list.length)];
+  };
+
+  /**
+   * Extract a chess move (e.g. e7e5, Nf3) from Spiritkin response text.
+   */
+  const extractChessMove = (text) => {
+    if (!text) return null;
+    // Match patterns like "I play e7e5", "e7-e5", "Nf3", "O-O"
+    const patterns = [
+      /\bI play ([a-h][1-8][a-h][1-8])\b/i,
+      /\bplaying ([a-h][1-8][a-h][1-8])\b/i,
+      /\bmove ([a-h][1-8][a-h][1-8])\b/i,
+      /\b([a-h][1-8][a-h][1-8])\b/,
+      /\b(O-O-O|O-O)\b/,
+      /\b([NBRQK][a-h]?[1-8]?x?[a-h][1-8])\b/
+    ];
+    for (const p of patterns) {
+      const m = text.match(p);
+      if (m) return m[1];
+    }
+    return null;
+  };
+
+  /**
+   * Apply a chess move to a FEN string using simple position tracking.
+   * Returns the new FEN or null if the move can't be parsed.
+   */
+  const applyChessMove = (fen, move) => {
+    if (!fen || !move) return null;
+    try {
+      // Parse the FEN board
+      const parts = fen.split(' ');
+      const boardStr = parts[0];
+      const activeColor = parts[1] || 'w';
+      const halfMove = parseInt(parts[4] || '0');
+      const fullMove = parseInt(parts[5] || '1');
+
+      // Convert FEN board to 8x8 array
+      const board = [];
+      for (const row of boardStr.split('/')) {
+        const r = [];
+        for (const ch of row) {
+          if (/\d/.test(ch)) {
+            for (let i = 0; i < parseInt(ch); i++) r.push(null);
+          } else {
+            r.push(ch);
+          }
+        }
+        board.push(r);
+      }
+
+      const colMap = { a:0, b:1, c:2, d:3, e:4, f:5, g:6, h:7 };
+
+      // Handle long algebraic notation (e.g. e7e5, e2e4)
+      const longAlg = move.match(/^([a-h])([1-8])([a-h])([1-8])$/);
+      if (longAlg) {
+        const [, fc, fr, tc, tr] = longAlg;
+        const fromCol = colMap[fc], fromRow = 8 - parseInt(fr);
+        const toCol = colMap[tc], toRow = 8 - parseInt(tr);
+        const piece = board[fromRow][fromCol];
+        if (piece) {
+          board[toRow][toCol] = piece;
+          board[fromRow][fromCol] = null;
+        }
+      }
+
+      // Convert back to FEN
+      const newBoardStr = board.map(row => {
+        let s = '', empty = 0;
+        for (const cell of row) {
+          if (!cell) { empty++; }
+          else { if (empty) { s += empty; empty = 0; } s += cell; }
+        }
+        if (empty) s += empty;
+        return s;
+      }).join('/');
+
+      const newColor = activeColor === 'w' ? 'b' : 'w';
+      const newFullMove = activeColor === 'b' ? fullMove + 1 : fullMove;
+      return `${newBoardStr} ${newColor} - - ${halfMove + 1} ${newFullMove}`;
+    } catch {
+      return null;
+    }
+  };
+
+  /**
+   * Extract a Go move (e.g. D4, Q16) from Spiritkin response text.
+   */
+  const extractGoMove = (text) => {
+    if (!text) return null;
+    const m = text.match(/\bI (?:play|place|mark) ([A-T](?:1[0-9]|[1-9]))\b/i)
+      || text.match(/\b([A-T](?:1[0-9]|[1-9]))\b/);
+    return m ? m[1].toUpperCase() : null;
   };
 
   /**
