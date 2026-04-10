@@ -1,4 +1,3 @@
-console.log('app.js loaded');
 const API = "";
 const SESSION_KEY = "sv.session.v5";
 const ENTRY_KEY = "sv.entry.v5";
@@ -882,7 +881,6 @@ async function submitGameMove(move) {
 }
 
 function render() {
-  console.log("render() called");
   const root = document.getElementById("root");
   if (!root) return;
   root.innerHTML = buildApp();
@@ -2674,7 +2672,6 @@ function stopListening() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("DOMContentLoaded fired");
   render();
   fetchSpiritkins();
   // Phase 6 & 7: Load Spiritverse events and daily quest after spiritkins load
