@@ -142,7 +142,9 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
     html += `<div class="game-board-controls" style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:340px;margin-bottom:6px;">
       <div class="piece-theme-selector">
         <span class="piece-theme-label">Theme</span>
-        <button class="piece-theme-btn active">Celestial</button>
+        <button class="piece-theme-btn active" data-action="set-piece-theme" data-theme="celestial">Celestial</button>
+        <button class="piece-theme-btn" data-action="set-piece-theme" data-theme="ember">Ember</button>
+        <button class="piece-theme-btn" data-action="set-piece-theme" data-theme="astral">Astral</button>
       </div>
       <button class="game-expand-btn" data-action="chess-expand">&#x26F6; Grand Stage</button>
     </div>`;
