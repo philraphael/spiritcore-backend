@@ -4539,3 +4539,152 @@ button:disabled {
     transform: translateY(0);
   }
 }
+
+
+/* ============================================================
+   RITUAL-CARD STYLING — Game Selection Cards (Dark Theme)
+   Fixes cream/beige backgrounds on game selection buttons
+   ============================================================ */
+
+.ritual-card {
+  background: rgba(42, 42, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: inherit;
+  font-family: inherit;
+  font-size: 1rem;
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.ritual-card:hover {
+  background: rgba(52, 52, 52, 0.95);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.ritual-card:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Spiritkin-specific accent colors for ritual cards */
+.ritual-card.lyra {
+  border-color: rgba(232, 180, 216, 0.2);
+}
+
+.ritual-card.lyra:hover {
+  border-color: rgba(232, 180, 216, 0.4);
+  background: rgba(42, 42, 42, 0.95);
+  box-shadow: 0 6px 16px rgba(232, 180, 216, 0.15);
+}
+
+.ritual-card.raien {
+  border-color: rgba(245, 166, 35, 0.2);
+}
+
+.ritual-card.raien:hover {
+  border-color: rgba(245, 166, 35, 0.4);
+  background: rgba(42, 42, 42, 0.95);
+  box-shadow: 0 6px 16px rgba(245, 166, 35, 0.15);
+}
+
+.ritual-card.kairo {
+  border-color: rgba(78, 205, 196, 0.2);
+}
+
+.ritual-card.kairo:hover {
+  border-color: rgba(78, 205, 196, 0.4);
+  background: rgba(42, 42, 42, 0.95);
+  box-shadow: 0 6px 16px rgba(78, 205, 196, 0.15);
+}
+
+/* Ritual icon styling */
+.ritual-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+/* Ritual copy (text content) styling */
+.ritual-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.ritual-copy strong {
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.ritual-copy span {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.4;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ritual-card {
+    padding: 12px;
+    gap: 10px;
+  }
+  
+  .ritual-icon {
+    font-size: 1.25rem;
+  }
+  
+  .ritual-copy strong {
+    font-size: 0.95rem;
+  }
+  
+  .ritual-copy span {
+    font-size: 0.8rem;
+  }
+}
+
+/* ============================================================
+   BEGIN-QUEST BUTTON STYLING — Daily Quest Button (Dark Theme)
+   Fixes cream/pink background on quest button
+   ============================================================ */
+
+.begin-quest-button,
+button[data-action="begin-quest"],
+.btn-quest {
+  background: rgba(124, 77, 255, 0.15);
+  border: 1px solid rgba(124, 77, 255, 0.3);
+  border-radius: 8px;
+  padding: 12px 24px;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.begin-quest-button:hover,
+button[data-action="begin-quest"]:hover,
+.btn-quest:hover {
+  background: rgba(124, 77, 255, 0.25);
+  border-color: rgba(124, 77, 255, 0.5);
+  box-shadow: 0 4px 12px rgba(124, 77, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.begin-quest-button:active,
+button[data-action="begin-quest"]:active,
+.btn-quest:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(124, 77, 255, 0.15);
+}
