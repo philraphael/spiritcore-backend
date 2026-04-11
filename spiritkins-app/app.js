@@ -621,6 +621,10 @@ const state = {
   dailyQuestRefreshesIn: null,   // time until quest refreshes
   dailyQuestLoading: false,
   dailyQuestStarted: false,      // user clicked "Begin Quest"
+  // Realm Travel
+  realmTravelOpen: false,        // whether realm travel modal is open
+  // Game UI state
+  pieceTheme: localStorage.getItem('sk_piece_theme') || 'celestial', // celestial, ember, astral
 };
 
 (function hydrateSession() {
@@ -1974,6 +1978,40 @@ function buildChatView() {
         ${state.statusText ? `<div class="status-bar ${state.statusError ? "error" : ""}">${esc(state.statusText)}</div>` : ""}
       </div>
     </section>
+
+    ${state.realmTravelOpen ? `
+      <div class="realm-travel-overlay">
+        <div class="realm-travel-modal">
+          <div class="realm-travel-header">
+            <h3>Realm Travel</h3>
+            <button class="realm-travel-close" data-action="close-realm-travel">✕</button>
+          </div>
+          <div class="realm-travel-content">
+            <div class="realms-grid">
+              <div class="realm-card-travel">
+                <div class="realm-icon">✦</div>
+                <div class="realm-name">The Luminous Veil</div>
+                <p class="realm-desc">Lyra realm of still water, rose light, and emotional clarity.</p>
+                <button class="realm-visit-btn" data-action="noop">Visit Lyras Realm</button>
+              </div>
+              <div class="realm-card-travel">
+                <div class="realm-icon">⚡</div>
+                <div class="realm-name">The Ember Citadel</div>
+                <p class="realm-desc">Raien realm of charged amber light and electric resolve.</p>
+                <button class="realm-visit-btn" data-action="noop">Visit Raiens Realm</button>
+              </div>
+              <div class="realm-card-travel">
+                <div class="realm-icon">✧</div>
+                <div class="realm-name">The Astral Observatory</div>
+                <p class="realm-desc">Kairo realm of teal starlight and shifting constellations.</p>
+                <button class="realm-visit-btn" data-action="noop">Visit Kairos Realm</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    ` : ""}
+
   `;
 }
 
@@ -2362,6 +2400,28 @@ async function onClick(event) {
           state.bondJournal = { gamesCompleted: 0, bondStage: 0, bondStageName: 'First Contact', unlockedEchoCount: 0, memories: [], gameUnlocks: [] };
           render();
         });
+    }
+    return;
+  }
+
+  if (action === "open-realm-travel") {
+    state.realmTravelOpen = true;
+    render();
+    return;
+  }
+
+  if (action === "close-realm-travel") {
+    state.realmTravelOpen = false;
+    render();
+    return;
+  }
+
+  if (action === "set-piece-theme") {
+    const theme = element.dataset.theme;
+    if (['celestial', 'ember', 'astral'].includes(theme)) {
+      state.pieceTheme = theme;
+      localStorage.setItem('sk_piece_theme', theme);
+      render();
     }
     return;
   }
