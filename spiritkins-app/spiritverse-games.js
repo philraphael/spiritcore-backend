@@ -503,16 +503,59 @@ function getCheckersValidMoves(sq, board, userColor) {
   const moves = [];
   const piece = board[sq];
   if (!piece) return moves;
+  
+  // Validate piece exists and belongs to player
+  if (!piece.includes(userColor)) return moves;
+  
   const isKing = piece.includes('king');
-  const directions = userColor === 'black' ? (isKing ? [-4, -3, 4, 5] : [4, 5]) : (isKing ? [-4, -3, 4, 5] : [-4, -3]);
-  for (const d of directions) {
-    const target = sq + d;
-    if (target >= 0 && target < 32) {
-      if (!board[target]) moves.push(target);
-      const jump = sq + d * 2;
-      if (jump >= 0 && jump < 32 && board[target] && !board[target].includes(userColor) && !board[jump]) moves.push(jump);
+  const row = Math.floor(sq / 4);
+  const col = sq % 4;
+  
+  // Valid diagonal directions for checkers on 32-square board
+  // Each row has 4 squares, so diagonal moves are ±3 or ±5
+  const directions = [];
+  
+  // Forward moves (for non-kings and appropriate direction for color)
+  if (userColor === 'white') {
+    // White moves up (decreasing row numbers)
+    if (col > 0) directions.push(-5); // up-left
+    if (col < 3) directions.push(-3); // up-right
+    if (isKing) {
+      if (col > 0) directions.push(3);  // down-left
+      if (col < 3) directions.push(5);  // down-right
+    }
+  } else {
+    // Black moves down (increasing row numbers)
+    if (col > 0) directions.push(3);   // down-left
+    if (col < 3) directions.push(5);   // down-right
+    if (isKing) {
+      if (col > 0) directions.push(-5); // up-left
+      if (col < 3) directions.push(-3); // up-right
     }
   }
+  
+  // Check each direction for valid moves
+  for (const d of directions) {
+    const target = sq + d;
+    
+    // Validate target is on board
+    if (target < 0 || target >= 32) continue;
+    
+    // Check for simple move (empty square)
+    if (!board[target]) {
+      moves.push(target);
+    } else {
+      // Check for jump (capture)
+      const jump = sq + d * 2;
+      if (jump >= 0 && jump < 32 && 
+          board[target] && 
+          !board[target].includes(userColor) && 
+          !board[jump]) {
+        moves.push(jump);
+      }
+    }
+  }
+  
   return moves;
 }
 
