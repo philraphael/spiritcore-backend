@@ -2546,7 +2546,7 @@ async function onClick(event) {
     if (!sq || !SpiritverseGames) return;
     SpiritverseGames.handleChessSquareClick(
       sq,
-      state.activeGame.data?.fen,
+      state.activeGame.data?.fen || state.activeGame.fen,
       (move) => submitGameMove(move)
     );
     render();
@@ -2560,7 +2560,7 @@ async function onClick(event) {
     if (sq === undefined || sq === null || sq === '' || !SpiritverseGames) return;
     SpiritverseGames.handleCheckersSquareClick(
       sq,
-      state.activeGame.data?.board,
+      state.activeGame.data?.board || state.activeGame.board,
       'white', // unified to white for user in new engine
       (move) => submitGameMove(move)
     );
@@ -2572,10 +2572,11 @@ async function onClick(event) {
     if (!state.activeGame || state.activeGame.type !== 'go' || state.gameLoading) return;
     if (state.activeGame.turn !== 'user') return;
     const idx = element.dataset.idx;
-    if (!idx || !SpiritverseGames) return;
+    if (idx === undefined || idx === null || idx === '' || !SpiritverseGames) return;
     const size = 13;
-    const r = Math.floor(idx / size);
-    const c = idx % size;
+    const idxNum = parseInt(idx, 10);
+    const r = Math.floor(idxNum / size);
+    const c = idxNum % size;
     const move = `${String.fromCharCode(65 + c)}${size - r}`;
     submitGameMove(move);
     return;
