@@ -313,6 +313,45 @@ function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpande
   }
 }
 
+function getGamePayload(gameData) {
+  if (gameData?.data && typeof gameData.data === 'object') {
+    return gameData.data;
+  }
+  return gameData || {};
+}
+
+function normalizeLastMove(type, lastMove) {
+  if (!lastMove) return null;
+
+  if (type === 'chess') {
+    if (typeof lastMove === 'object' && lastMove.from && lastMove.to) return lastMove;
+    if (typeof lastMove === 'string' && /^[a-h][1-8][a-h][1-8]$/i.test(lastMove)) {
+      return {
+        from: lastMove.slice(0, 2).toLowerCase(),
+        to: lastMove.slice(2, 4).toLowerCase()
+      };
+    }
+    return null;
+  }
+
+  if (type === 'go') {
+    if (typeof lastMove === 'object' && Number.isInteger(lastMove.row) && Number.isInteger(lastMove.col)) {
+      return lastMove;
+    }
+    if (typeof lastMove === 'string' && /^[A-M](?:[1-9]|1[0-3])$/i.test(lastMove)) {
+      const size = 13;
+      const col = lastMove[0].toUpperCase().charCodeAt(0) - 65;
+      const row = size - parseInt(lastMove.slice(1), 10);
+      if (row >= 0 && row < size && col >= 0 && col < size) {
+        return { row, col };
+      }
+    }
+    return null;
+  }
+
+  return lastMove;
+}
+
 // ============================================================
 // PUBLIC API — SpiritverseGames singleton
 // ============================================================
@@ -325,23 +364,27 @@ export const SpiritverseGames = {
     if (!theme) theme = 'celestial';
     if (!gameData || !gameData.type) return;
     const type = gameData.type;
+    const payload = getGamePayload(gameData);
     const gameCommentary = commentary || gameData.commentary || "The board is yours.";
     const history = gameData.history || [];
+    const chessFen = payload.fen || gameData.fen;
+    const board = payload.board || gameData.board;
+    const lastMove = normalizeLastMove(type, payload.lastMove || gameData.lastMove);
 
     const renderFn = (target, isExp) => {
       switch (type) {
         case 'chess':
-          renderChessBoard(target, gameData.fen, this.chess.selectedSquare, this.chess.validMoves, this.chess.lastMove, (sq) => {
-            this.handleChessSquareClick(sq, gameData.fen, onMoveSubmit);
+          renderChessBoard(target, chessFen, this.chess.selectedSquare, this.chess.validMoves, lastMove, (sq) => {
+            this.handleChessSquareClick(sq, chessFen, onMoveSubmit);
           }, isExp, theme);
           break;
         case 'checkers':
-          renderCheckersBoard(target, gameData.board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
-            this.handleCheckersSquareClick(sq, gameData.board, 'white', onMoveSubmit);
+          renderCheckersBoard(target, board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
+            this.handleCheckersSquareClick(sq, board, 'white', onMoveSubmit);
           }, isExp);
           break;
         case 'go':
-          renderGoBoard(target, gameData.board, gameData.lastMove, (idx) => {
+          renderGoBoard(target, board, lastMove, (idx) => {
             const size = 13;
             const r = Math.floor(idx / size);
             const c = idx % size;
@@ -349,10 +392,10 @@ export const SpiritverseGames = {
           }, isExp);
           break;
         case 'spirit_cards':
-          this.renderSpiritCards(target, gameData, onMoveSubmit, isExp);
+          this.renderSpiritCards(target, payload, onMoveSubmit, isExp);
           break;
         case 'echo_trials':
-          this.renderEchoTrials(target, gameData, onMoveSubmit, isExp);
+          this.renderEchoTrials(target, payload, onMoveSubmit, isExp);
           break;
       }
     };
@@ -370,22 +413,26 @@ export const SpiritverseGames = {
     if (!theme) theme = 'celestial';
     if (!gameData || !gameData.type) return;
     const type = gameData.type;
+    const payload = getGamePayload(gameData);
     const commentary = gameData.commentary || "The board is set. Let us see where the resonance leads.";
     const history = gameData.history || [];
+    const chessFen = payload.fen || gameData.fen;
+    const board = payload.board || gameData.board;
+    const lastMove = normalizeLastMove(type, payload.lastMove || gameData.lastMove);
     const renderFn = (target, isExp) => {
       switch (type) {
         case 'chess':
-          renderChessBoard(target, gameData.fen, this.chess.selectedSquare, this.chess.validMoves, this.chess.lastMove, (sq) => {
-            this.handleChessSquareClick(sq, gameData.fen, onMoveSubmit);
+          renderChessBoard(target, chessFen, this.chess.selectedSquare, this.chess.validMoves, lastMove, (sq) => {
+            this.handleChessSquareClick(sq, chessFen, onMoveSubmit);
           }, isExp, theme);
           break;
         case 'checkers':
-          renderCheckersBoard(target, gameData.board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
-            this.handleCheckersSquareClick(sq, gameData.board, 'white', onMoveSubmit);
+          renderCheckersBoard(target, board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
+            this.handleCheckersSquareClick(sq, board, 'white', onMoveSubmit);
           }, isExp);
           break;
         case 'go':
-          renderGoBoard(target, gameData.board, gameData.lastMove, (idx) => {
+          renderGoBoard(target, board, lastMove, (idx) => {
             const size = 13;
             const r = Math.floor(idx / size);
             const c = idx % size;
@@ -393,10 +440,10 @@ export const SpiritverseGames = {
           }, isExp);
           break;
         case 'spirit_cards':
-          this.renderSpiritCards(target, gameData, onMoveSubmit, isExp);
+          this.renderSpiritCards(target, payload, onMoveSubmit, isExp);
           break;
         case 'echo_trials':
-          this.renderEchoTrials(target, gameData, onMoveSubmit, isExp);
+          this.renderEchoTrials(target, payload, onMoveSubmit, isExp);
           break;
         default:
           if (target) target.innerHTML = `<div style="padding:2rem;text-align:center;color:#ccc">Grand Stage not available for this game type.</div>`;
@@ -555,7 +602,7 @@ export const SpiritverseGames = {
     const board = boardArray || Array(32).fill(null);
     const piece = board[sq];
 
-    if (!this.checkers.selectedPiece) {
+    if (this.checkers.selectedPiece == null) {
       if (piece && piece.includes(userColor)) {
         this.checkers.selectedPiece = sq;
         this.checkers.validMoves = getCheckersValidMoves(sq, board, userColor);
