@@ -2430,6 +2430,7 @@ async function onClick(event) {
     if (['celestial', 'ember', 'astral'].includes(theme)) {
       state.pieceTheme = theme;
       localStorage.setItem('sk_piece_theme', theme);
+      if (SpiritverseGames) SpiritverseGames.reset();
       render();
     }
     return;
