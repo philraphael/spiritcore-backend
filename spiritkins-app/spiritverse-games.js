@@ -166,7 +166,8 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
       if (isLastMove) cellClass += ' chess-last-move';
 
       const pieceKey = piece ? `${piece.color}${piece.type}` : null;
-      const pieceSvg = pieceKey && CHESS_PIECES[pieceKey] ? CHESS_PIECES[pieceKey] : '';
+      const themePieces = CHESS_PIECE_THEMES[theme] || CHESS_PIECE_THEMES.celestial;
+      const pieceSvg = pieceKey && themePieces[pieceKey] ? themePieces[pieceKey] : '';
 
       html += `<div class="${cellClass}" data-sq="${sq}" data-action="chess-square-click">`;
       if (isValidMove && !piece) html += `<div class="chess-move-dot"></div>`;
