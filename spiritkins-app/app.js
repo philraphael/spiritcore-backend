@@ -2456,6 +2456,10 @@ async function onClick(event) {
         state.gameSpiritkinMessage = data.spiritkinMessage;
         state.gameInput = "";
         state.statusText = "Move accepted.";
+        // Reset game UI state to ensure clean re-render
+        if (SpiritverseGames && SpiritverseGames.reset) {
+          SpiritverseGames.reset();
+        }
         // Also show in chat
         state.messages.push({
           id: uuid(),
