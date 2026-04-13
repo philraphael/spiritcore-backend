@@ -1017,7 +1017,8 @@ function render() {
         state.activeGame,
         spiritkin ? spiritkin.name : 'Spiritkin',
         state.gameSpiritkinMessage,
-        (move) => submitGameMove(move)
+        (move) => submitGameMove(move),
+        state.pieceTheme
       );
     });
   }

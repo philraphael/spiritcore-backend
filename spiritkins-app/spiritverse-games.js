@@ -310,7 +310,7 @@ export const SpiritverseGames = {
   checkers: { selectedPiece: null, validMoves: [] },
   echoAnswer: '',
 
-  render(container, gameData, spiritkinName, commentary, onMoveSubmit) {
+  render(container, gameData, spiritkinName, commentary, onMoveSubmit, theme = 'celestial') {
     if (!gameData || !gameData.type) return;
     const type = gameData.type;
     const gameCommentary = commentary || gameData.commentary || "The board is yours.";
@@ -321,7 +321,7 @@ export const SpiritverseGames = {
         case 'chess':
           renderChessBoard(target, gameData.fen, this.chess.selectedSquare, this.chess.validMoves, this.chess.lastMove, (sq) => {
             this.handleChessSquareClick(sq, gameData.fen, onMoveSubmit);
-          }, isExp);
+          }, isExp, theme);
           break;
         case 'checkers':
           renderCheckersBoard(target, gameData.board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
@@ -364,7 +364,7 @@ export const SpiritverseGames = {
         case 'chess':
           renderChessBoard(target, gameData.fen, this.chess.selectedSquare, this.chess.validMoves, this.chess.lastMove, (sq) => {
             this.handleChessSquareClick(sq, gameData.fen, onMoveSubmit);
-          }, isExp);
+          }, isExp, theme);
           break;
         case 'checkers':
           renderCheckersBoard(target, gameData.board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
