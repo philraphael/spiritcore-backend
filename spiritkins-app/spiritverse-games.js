@@ -142,6 +142,7 @@ function parseFEN(fen) {
 }
 
 function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, onSquareClick, isExpanded = false, theme = 'celestial') {
+  console.log('renderChessBoard called with theme:', theme);
   const board = parseFEN(fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
   const files = ['a','b','c','d','e','f','g','h'];
 
@@ -186,6 +187,7 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
   }
   html += `</div>`;
   
+  console.log('Chess board HTML generated, length:', html.length);
   if (!isExpanded) {
     html += `<div class="chess-labels-files">`;
     for (const f of files) html += `<span>${f}</span>`;
