@@ -336,6 +336,12 @@ export const SpiritverseGames = {
             onMoveSubmit(`${String.fromCharCode(65 + c)}${size - r}`);
           }, isExp);
           break;
+        case 'spirit_cards':
+          this.renderSpiritCards(target, gameData, onMoveSubmit, isExp);
+          break;
+        case 'echo_trials':
+          this.renderEchoTrials(target, gameData, onMoveSubmit, isExp);
+          break;
       }
     };
 
@@ -373,6 +379,12 @@ export const SpiritverseGames = {
             onMoveSubmit(`${String.fromCharCode(65 + c)}${size - r}`);
           }, isExp);
           break;
+        case 'spirit_cards':
+          this.renderSpiritCards(target, gameData, onMoveSubmit, isExp);
+          break;
+        case 'echo_trials':
+          this.renderEchoTrials(target, gameData, onMoveSubmit, isExp);
+          break;
         default:
           if (target) target.innerHTML = `<div style="padding:2rem;text-align:center;color:#ccc">Grand Stage not available for this game type.</div>`;
       }
@@ -390,6 +402,111 @@ export const SpiritverseGames = {
         </div>
       `).join('');
     }
+  },
+
+  renderSpiritCards(container, gameData, onMoveSubmit, isExpanded) {
+    const hand = gameData.hand || [];
+    const mana = gameData.mana || 5;
+    const board = gameData.board || [];
+    const spiritkinHand = gameData.spiritkinHand || [];
+    
+    const html = `
+      <div class="spirit-cards-container" style="display:flex;flex-direction:column;gap:1rem;padding:1rem;height:100%;">
+        <div class="spiritkin-area" style="flex:1;border:2px solid #4ecdc4;border-radius:8px;padding:1rem;background:rgba(30,60,80,0.5);">
+          <div style="font-size:0.9rem;color:#4ecdc4;margin-bottom:0.5rem;">Spiritkin's Play Area</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:0.5rem;">
+            ${spiritkinHand.map((card, i) => `
+              <div style="background:linear-gradient(135deg,#4ecdc4,#44a08d);border-radius:4px;padding:0.75rem;text-align:center;color:#fff;font-size:0.8rem;cursor:default;">
+                <div style="font-weight:bold;">${card.name}</div>
+                <div style="font-size:0.7rem;margin-top:0.25rem;">⚡ ${card.power}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        
+        <div class="mana-display" style="display:flex;justify-content:space-around;padding:0.5rem;background:rgba(100,50,150,0.3);border-radius:4px;">
+          <div style="text-align:center;">
+            <div style="color:#b19cd9;font-size:0.8rem;">Your Mana</div>
+            <div style="color:#fff;font-size:1.5rem;font-weight:bold;">${mana}/5</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="color:#4ecdc4;font-size:0.8rem;">Spiritkin Mana</div>
+            <div style="color:#fff;font-size:1.5rem;font-weight:bold;">${gameData.spiritkinMana || 5}/5</div>
+          </div>
+        </div>
+        
+        <div class="player-hand" style="flex:1;border:2px solid #b19cd9;border-radius:8px;padding:1rem;background:rgba(80,30,100,0.5);">
+          <div style="font-size:0.9rem;color:#b19cd9;margin-bottom:0.5rem;">Your Hand</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:0.5rem;">
+            ${hand.map((card, i) => `
+              <div onclick="this.style.opacity='0.7';" style="background:linear-gradient(135deg,#b19cd9,#9d6ba8);border-radius:4px;padding:0.75rem;text-align:center;color:#fff;font-size:0.8rem;cursor:pointer;transition:opacity 0.2s;" data-card-idx="${i}">
+                <div style="font-weight:bold;">${card.name}</div>
+                <div style="font-size:0.7rem;margin-top:0.25rem;">Cost: ${card.cost}</div>
+                <div style="font-size:0.7rem;">⚡ ${card.power}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        
+        <div style="text-align:center;color:#999;font-size:0.8rem;">
+          Click a card to play it
+        </div>
+      </div>
+    `;
+    
+    if (typeof container === 'string') {
+      document.getElementById(container).innerHTML = html;
+    } else {
+      container.innerHTML = html;
+    }
+    
+    // Add click handlers for cards
+    const cardElements = (typeof container === 'string' ? document.getElementById(container) : container).querySelectorAll('[data-card-idx]');
+    cardElements.forEach((el, idx) => {
+      el.onclick = () => onMoveSubmit(`play_card_${idx}`);
+    });
+  },
+  
+  renderEchoTrials(container, gameData, onMoveSubmit, isExpanded) {
+    const riddle = gameData.riddle || "A riddle awaits...";
+    const attempts = gameData.attempts || 0;
+    const maxAttempts = gameData.maxAttempts || 3;
+    
+    const html = `
+      <div class="echo-trials-container" style="display:flex;flex-direction:column;gap:2rem;padding:2rem;height:100%;justify-content:center;align-items:center;">
+        <div class="riddle-box" style="background:linear-gradient(135deg,rgba(78,205,196,0.2),rgba(177,156,217,0.2));border:2px solid #4ecdc4;border-radius:12px;padding:2rem;text-align:center;max-width:500px;">
+          <div style="font-size:0.9rem;color:#4ecdc4;margin-bottom:1rem;text-transform:uppercase;letter-spacing:2px;">🔔 Echo's Riddle</div>
+          <div style="font-size:1.3rem;color:#ecf5ff;line-height:1.6;margin-bottom:2rem;font-style:italic;">${riddle}</div>
+          
+          <div style="display:flex;gap:0.5rem;margin-bottom:1rem;justify-content:center;">
+            ${Array.from({length: maxAttempts}).map((_, i) => `
+              <div style="width:12px;height:12px;border-radius:50%;background:${i < attempts ? '#ff6b6b' : '#4ecdc4'};opacity:${i < attempts ? 0.5 : 1};"></div>
+            `).join('')}
+          </div>
+          <div style="font-size:0.8rem;color:#999;margin-bottom:1.5rem;">Attempts: ${attempts}/${maxAttempts}</div>
+          
+          <div style="display:flex;gap:0.5rem;">
+            <input type="text" id="echo-answer" placeholder="Your answer..." style="flex:1;padding:0.75rem;border:1px solid #4ecdc4;border-radius:4px;background:#1a2a3a;color:#ecf5ff;font-size:1rem;" />
+            <button onclick="const ans = document.getElementById('echo-answer').value; if(ans) { this.parentElement.parentElement.parentElement.onMoveSubmit = window.echoOnMove; window.echoOnMove(ans); }" style="padding:0.75rem 1.5rem;background:#4ecdc4;color:#1a2a3a;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">Submit</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    if (typeof container === 'string') {
+      document.getElementById(container).innerHTML = html;
+    } else {
+      container.innerHTML = html;
+    }
+    
+    // Store the onMoveSubmit for the button
+    window.echoOnMove = onMoveSubmit;
+    
+    // Focus on input
+    setTimeout(() => {
+      const input = (typeof container === 'string' ? document.getElementById(container) : container).querySelector('#echo-answer');
+      if (input) input.focus();
+    }, 100);
   },
 
   handleChessSquareClick(sq, fen, onMoveSubmit) {
