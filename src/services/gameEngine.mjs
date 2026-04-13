@@ -77,6 +77,20 @@ export const createGameEngine = ({ bus, world, registry, orchestrator, spiritMem
       gameState.data = { board: Array(32).fill(null).map((_, i) => i < 12 ? 'black' : (i >= 20 ? 'white' : null)), lastMove: null };
     } else if (gameType === "go") {
       gameState.data = { board: Array(13 * 13).fill(null), lastMove: null };
+    } else if (gameType === "spirit_cards") {
+      const deck = generateCardDeck();
+      const hand = deck.splice(0, 5);
+      gameState.data = { hand, deck, discard: [], board: [], spiritkinHand: generateCardDeck().splice(0, 5), mana: 5, spiritkinMana: 5 };
+    } else if (gameType === "echo_trials") {
+      const riddles = [
+        { question: "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?", answer: "echo" },
+        { question: "The more you take, the more you leave behind. What am I?", answer: "footsteps" },
+        { question: "I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?", answer: "map" },
+        { question: "What has a head and a tail but no body?", answer: "coin" },
+        { question: "I am always coming but never arrive. What am I?", answer: "tomorrow" }
+      ];
+      const riddle = riddles[Math.floor(Math.random() * riddles.length)];
+      gameState.data = { riddle: riddle.question, answer: riddle.answer.toLowerCase(), attempts: 0, maxAttempts: 3 };
     }
 
     state.flags = state.flags || {};
@@ -199,6 +213,23 @@ export const createGameEngine = ({ bus, world, registry, orchestrator, spiritMem
   
   const generateSimpleCheckersMove = (board) => "11-15";
   const generateSimpleGoMove = (board) => "G7";
+
+  const generateCardDeck = () => {
+    const cardTypes = ['Essence', 'Spirit', 'Realm', 'Echo', 'Bond'];
+    const deck = [];
+    for (let i = 0; i < 5; i++) {
+      for (let j = 1; j <= 10; j++) {
+        deck.push({
+          id: `${cardTypes[i]}-${j}`,
+          name: `${cardTypes[i]} ${j}`,
+          type: cardTypes[i],
+          cost: Math.ceil(j / 2),
+          power: j
+        });
+      }
+    }
+    return deck.sort(() => Math.random() - 0.5);
+  };
 
   const endGame = async ({ userId, conversationId, spiritkinName, outcome }) => {
     const worldData = await world.get({ userId, conversationId });
