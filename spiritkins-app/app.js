@@ -933,14 +933,137 @@ function submitFeedback(messageId, helpful) {
   render();
 }
 
-// Standalone game move submission — called by SpiritverseGames visual boards
-async function submitGameMove(move) {
-  if (!move || !state.conversationId || !state.activeGame) return;
-  if (state.gameLoading) return;
+function cloneGameState(game) {
+  if (!game) return game;
+  if (typeof structuredClone === "function") return structuredClone(game);
+  return JSON.parse(JSON.stringify(game));
+}
+
+function applyOptimisticChessMove(fen, move) {
+  const parts = String(fen || "").split(" ");
+  if (!parts[0]) return null;
+  const match = String(move || "").match(/^([a-h])([1-8])([a-h])([1-8])$/i);
+  if (!match) return null;
+
+  const board = parts[0]
+    .split("/")
+    .map((row) => row.replace(/\d/g, (digit) => " ".repeat(parseInt(digit, 10))).split(""));
+
+  const fromCol = match[1].toLowerCase().charCodeAt(0) - 97;
+  const fromRow = 8 - parseInt(match[2], 10);
+  const toCol = match[3].toLowerCase().charCodeAt(0) - 97;
+  const toRow = 8 - parseInt(match[4], 10);
+
+  if (!board[fromRow] || board[fromRow][fromCol] === undefined) return null;
+  board[toRow][toCol] = board[fromRow][fromCol];
+  board[fromRow][fromCol] = " ";
+
+  const nextBoard = board.map((row) => row.join("").replace(/ +/g, (spaces) => spaces.length)).join("/");
+  const nextTurn = parts[1] === "w" ? "b" : "w";
+  return `${nextBoard} ${nextTurn} - - 0 1`;
+}
+
+function applyOptimisticCheckersMove(board, move) {
+  if (!Array.isArray(board)) return null;
+  const parts = String(move || "").split("-");
+  if (parts.length !== 2) return null;
+
+  const from = parseInt(parts[0], 10);
+  const to = parseInt(parts[1], 10);
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
+  if (from < 0 || from >= board.length || to < 0 || to >= board.length) return null;
+  if (!board[from]) return null;
+
+  const nextBoard = [...board];
+  nextBoard[to] = nextBoard[from];
+  nextBoard[from] = null;
+  if (Math.abs(to - from) > 5) {
+    nextBoard[Math.floor((from + to) / 2)] = null;
+  }
+  return nextBoard;
+}
+
+function applyOptimisticGoMove(board, move) {
+  if (!Array.isArray(board)) return null;
+  const size = 13;
+  const match = String(move || "").match(/^([A-M])([1-9]|1[0-3])$/i);
+  if (!match) return null;
+
+  const col = match[1].toUpperCase().charCodeAt(0) - 65;
+  const row = size - parseInt(match[2], 10);
+  const idx = row * size + col;
+  if (idx < 0 || idx >= board.length) return null;
+
+  const nextBoard = [...board];
+  nextBoard[idx] = "black";
+  return nextBoard;
+}
+
+function buildOptimisticGameState(game, move) {
+  const nextGame = cloneGameState(game);
+  if (!nextGame || !nextGame.type || !nextGame.data) return null;
+
+  let changed = false;
+  if (nextGame.type === "chess") {
+    const nextFen = applyOptimisticChessMove(nextGame.data.fen, move);
+    if (nextFen) {
+      nextGame.data.fen = nextFen;
+      nextGame.data.lastMove = move;
+      changed = true;
+    }
+  } else if (nextGame.type === "checkers") {
+    const nextBoard = applyOptimisticCheckersMove(nextGame.data.board, move);
+    if (nextBoard) {
+      nextGame.data.board = nextBoard;
+      nextGame.data.lastMove = move;
+      changed = true;
+    }
+  } else if (nextGame.type === "go") {
+    const nextBoard = applyOptimisticGoMove(nextGame.data.board, move);
+    if (nextBoard) {
+      nextGame.data.board = nextBoard;
+      nextGame.data.lastMove = move;
+      changed = true;
+    }
+  }
+
+  if (!changed) return null;
+
+  nextGame.history = Array.isArray(nextGame.history) ? nextGame.history : [];
+  nextGame.history.push({
+    player: "user",
+    move: String(move).trim(),
+    timestamp: nowIso()
+  });
+  nextGame.moveCount = Number(nextGame.moveCount || 0) + 1;
+  nextGame.turn = "spiritkin";
+  return nextGame;
+}
+
+async function executeGameMove(move, options = {}) {
+  if (!move || !state.conversationId || !state.activeGame || state.gameLoading) return;
+
+  const { addUserMessage = false } = options;
+  const previousGame = cloneGameState(state.activeGame);
+  const previousSpiritkinMessage = state.gameSpiritkinMessage;
+  const optimisticGame = buildOptimisticGameState(previousGame, move);
+
   try {
     state.gameLoading = true;
     state.gameInput = "";
+    state.statusText = "Sending move...";
+    state.statusError = false;
+
+    if (optimisticGame) {
+      state.activeGame = optimisticGame;
+      state.gameSpiritkinMessage = `${state.selectedSpiritkin.name} is considering the board...`;
+      if (SpiritverseGames && SpiritverseGames.reset) {
+        SpiritverseGames.reset();
+      }
+    }
+
     render();
+
     const res = await fetch(`${API}/v1/games/move`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -952,9 +1075,27 @@ async function submitGameMove(move) {
       })
     });
     const data = await res.json();
+
     if (data.ok) {
       state.activeGame = data.game;
       state.gameSpiritkinMessage = data.spiritkinMessage || null;
+      state.statusText = addUserMessage ? "Move accepted." : "";
+      state.statusError = false;
+
+      if (SpiritverseGames && SpiritverseGames.reset) {
+        SpiritverseGames.reset();
+      }
+
+      if (addUserMessage) {
+        state.messages.push({
+          id: uuid(),
+          role: "user",
+          content: move,
+          time: nowIso(),
+          status: "sent"
+        });
+      }
+
       if (data.spiritkinMessage) {
         state.messages.push({
           id: uuid(),
@@ -966,20 +1107,27 @@ async function submitGameMove(move) {
           status: "sent"
         });
       }
-      state.statusText = "";
-      state.statusError = false;
     } else {
+      state.activeGame = previousGame;
+      state.gameSpiritkinMessage = previousSpiritkinMessage;
       state.statusText = data.message || "Move failed.";
       state.statusError = true;
     }
   } catch (err) {
     console.error("Failed to submit game move", err);
+    state.activeGame = previousGame;
+    state.gameSpiritkinMessage = previousSpiritkinMessage;
     state.statusText = "Move failed — please try again.";
     state.statusError = true;
   } finally {
     state.gameLoading = false;
     render();
   }
+}
+
+// Standalone game move submission — called by SpiritverseGames visual boards
+async function submitGameMove(move) {
+  return executeGameMove(move, { addUserMessage: true });
 }
 
 function render() {
@@ -2437,65 +2585,7 @@ async function onClick(event) {
   }
 
   async function submitGameMove(move) {
-    if (!state.activeGame || state.gameLoading) return;
-    try {
-      state.gameLoading = true;
-      state.statusText = "Sending move...";
-      render();
-      const res = await fetch(`${API}/v1/games/move`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: state.userId,
-          conversationId: state.conversationId,
-          move,
-          spiritkinName: state.selectedSpiritkin.name
-        })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        state.activeGame = data.game;
-        state.gameSpiritkinMessage = data.spiritkinMessage;
-        state.gameInput = "";
-        state.statusText = "Move accepted.";
-        // Reset game UI state to ensure clean re-render
-        if (SpiritverseGames && SpiritverseGames.reset) {
-          SpiritverseGames.reset();
-        }
-        // Also show in chat
-        state.messages.push({
-          id: uuid(),
-          role: "user",
-          content: move,
-          time: nowIso(),
-          status: "sent"
-        });
-        if (data.spiritkinMessage) {
-          state.messages.push({
-            id: uuid(),
-            role: "assistant",
-            content: data.spiritkinMessage,
-            spiritkinName: state.selectedSpiritkin.name,
-            spiritkinVoice: state.selectedSpiritkin?.ui?.voice || "nova",
-            time: nowIso(),
-            status: "sent"
-          });
-        }
-        render();
-      } else {
-        state.statusText = data.message || "Invalid move.";
-        state.statusError = true;
-        render();
-      }
-    } catch (err) {
-      console.error("Move failed", err);
-      state.statusText = "Connection error.";
-      state.statusError = true;
-      render();
-    } finally {
-      state.gameLoading = false;
-      render();
-    }
+    return executeGameMove(move, { addUserMessage: true });
   }
 
   if (action === "start-game") {
