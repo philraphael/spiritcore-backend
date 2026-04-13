@@ -956,7 +956,15 @@ async function submitGameMove(move) {
       state.activeGame = data.game;
       state.gameSpiritkinMessage = data.spiritkinMessage || null;
       if (data.spiritkinMessage) {
-        addMessage("spiritkin", data.spiritkinMessage, state.selectedSpiritkin.name);
+        state.messages.push({
+          id: uuid(),
+          role: "assistant",
+          content: data.spiritkinMessage,
+          spiritkinName: state.selectedSpiritkin.name,
+          spiritkinVoice: state.selectedSpiritkin?.ui?.voice || "nova",
+          time: nowIso(),
+          status: "sent"
+        });
       }
       state.statusText = "";
       state.statusError = false;
@@ -2449,9 +2457,23 @@ async function onClick(event) {
         state.gameInput = "";
         state.statusText = "Move accepted.";
         // Also show in chat
-        addMessage("user", move, state.userName || "User");
+        state.messages.push({
+          id: uuid(),
+          role: "user",
+          content: move,
+          time: nowIso(),
+          status: "sent"
+        });
         if (data.spiritkinMessage) {
-          addMessage("spiritkin", data.spiritkinMessage, state.selectedSpiritkin.name);
+          state.messages.push({
+            id: uuid(),
+            role: "assistant",
+            content: data.spiritkinMessage,
+            spiritkinName: state.selectedSpiritkin.name,
+            spiritkinVoice: state.selectedSpiritkin?.ui?.voice || "nova",
+            time: nowIso(),
+            status: "sent"
+          });
         }
         render();
       } else {
@@ -2497,7 +2519,15 @@ async function onClick(event) {
         state.statusText = "Game started.";
         // Show the opening message in chat too
         if (data.spiritkinMessage) {
-          addMessage("spiritkin", data.spiritkinMessage, state.selectedSpiritkin.name);
+          state.messages.push({
+            id: uuid(),
+            role: "assistant",
+            content: data.spiritkinMessage,
+            spiritkinName: state.selectedSpiritkin.name,
+            spiritkinVoice: state.selectedSpiritkin?.ui?.voice || "nova",
+            time: nowIso(),
+            status: "sent"
+          });
         }
         render();
       } else {
