@@ -143,8 +143,17 @@ export function createSharedGameRuntime() {
     return raw;
   }
 
-  function buildPrompt(game, userMove) {
-    return `[GAME:${game.type}] User move: ${userMove}. Visible state: ${JSON.stringify(game.data)}. Reply in character with one or two natural sentences, no director narration, then append a final machine-readable line exactly as MOVE:<move>.`;
+  function buildPrompt(game, userMove, spiritkinName = "Spiritkin") {
+    return [
+      `[GAME:${game.type}]`,
+      `Spiritkin: ${spiritkinName}`,
+      `User move: ${userMove}`,
+      `Visible state: ${JSON.stringify(game.data)}`,
+      `Keep the spoken reaction short, natural, and personality-specific.`,
+      `Do not narrate the board like a commentator and do not repeat the exact move string unless clarity truly requires it.`,
+      buildGameToneInstruction(game.type, spiritkinName),
+      `Append one final machine-readable line exactly as MOVE:<move>.`,
+    ].filter(Boolean).join(" ");
   }
 
   return {
@@ -157,6 +166,23 @@ export function createSharedGameRuntime() {
     extractMove,
     buildPrompt,
   };
+}
+
+function buildGameToneInstruction(gameType, spiritkinName) {
+  const shared = gameType === "battleship"
+    ? "React like a tense hidden-information duel."
+    : gameType === "connect_four"
+      ? "React like a quick positional duel with momentum."
+      : gameType === "tictactoe"
+        ? "React like a quick pattern duel."
+        : "React to the move itself, not the interface.";
+
+  if (spiritkinName === "Lyra") return `${shared} Lyra should sound calm, present, and gently incisive.`;
+  if (spiritkinName === "Raien") return `${shared} Raien should sound direct, competitive, and clean.`;
+  if (spiritkinName === "Kairo") return `${shared} Kairo should sound curious, alert to patterns, and lightly playful.`;
+  if (spiritkinName === "Elaria") return `${shared} Elaria should sound precise, composed, and unmistakably deliberate.`;
+  if (spiritkinName === "Thalassar") return `${shared} Thalassar should sound deep, steady, and quietly challenging.`;
+  return shared;
 }
 
 function applyChessMove(game, move) {

@@ -12,11 +12,42 @@ const DIRECTOR_NARRATION_PATTERNS = [
   /^the silence\b/i,
 ];
 
+const EXPLICIT_CONTEXT_PATTERNS = [
+  /^i see you (opened|clicked|went to|are in|started)\b/i,
+  /^you (opened|clicked|started)\b/i,
+  /^welcome to (the )?(games|profile|echoes|charter|journal|daily quest|realm events)\b/i,
+  /^i notice you\b/i,
+];
+
+const GENERIC_LEAD_PATTERNS = [
+  /^i hear you\b/i,
+  /^i understand\b/i,
+  /^thank you for sharing\b/i,
+  /^it sounds like\b/i,
+  /^i'm here\b/i,
+  /^you are not alone\b/i,
+];
+
+const GENERIC_CLOSER_PATTERNS = [
+  /^i'm here if you need me\b/i,
+  /^we can take this one step at a time\b/i,
+  /^you've got this\b/i,
+  /^take your time\b/i,
+];
+
+const NEW_BOND_SHORTCUT_PATTERNS = [
+  /\bas always\b/gi,
+  /\blike before\b/gi,
+  /\byou know\b/gi,
+  /\bagain\b/gi,
+];
+
 export function createResponseEngine() {
   function deriveRelationshipState({ identity, context = {}, worldState = {} }) {
     const bond = worldState?.bond ?? {};
     const interactionCount = Number(bond.interaction_count ?? 0);
     const bondStage = Number(bond.stage ?? 0);
+    const activeGame = worldState?.flags?.active_game ?? null;
     const memoryCount = (Array.isArray(context.memories) ? context.memories.length : 0)
       + (Array.isArray(context.episodes) ? context.episodes.length : 0)
       + (Array.isArray(context.bondMilestones) ? context.bondMilestones.length : 0);
@@ -29,8 +60,10 @@ export function createResponseEngine() {
           ? "growing"
           : "new";
 
-    const mode = worldState?.flags?.active_game?.status === "active"
+    const mode = activeGame?.status === "active"
       ? "play"
+      : activeGame?.status === "ended"
+        ? "afterplay"
       : memoryCount > 0
         ? "continuity"
         : "present";
@@ -42,6 +75,7 @@ export function createResponseEngine() {
       familiarity,
       mode,
       bondStageName: String(bond.stage_name ?? "").trim() || "First Contact",
+      gameOutcome: activeGame?.status === "ended" ? activeGame?.data?.winner ?? null : null,
     };
   }
 
@@ -91,6 +125,85 @@ export function createResponseEngine() {
     return output.replace(/\s+/g, " ").trim();
   }
 
+  function hashSeed(value) {
+    let hash = 0;
+    const text = String(value || "");
+    for (let i = 0; i < text.length; i += 1) {
+      hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+    }
+    return hash;
+  }
+
+  function pickVariant(options, seed) {
+    if (!Array.isArray(options) || options.length === 0) return "";
+    return options[Math.abs(seed) % options.length];
+  }
+
+  function trimFillerLead(text) {
+    return String(text || "")
+      .replace(/^\s*["'“”‘’(\[]*\s*(ah|well|hmm|huh|okay|alright)[,.\-–—…:\s]*/i, "")
+      .trim();
+  }
+
+  function buildNaturalVariant(identity, relationship, input = "") {
+    const name = identity?.name ?? "Spiritkin";
+    const seed = hashSeed(`${name}:${relationship?.interactionCount ?? 0}:${input}`);
+    if (name === "Raien") return pickVariant(["Strong move. Let me answer it.", "Clean opening. Here's my answer.", "Good. Let me meet that directly."], seed);
+    if (name === "Lyra") return pickVariant(["I felt that move. Let me meet it.", "There's something clear in that move. Let me answer softly.", "All right. Let me respond to what you opened."], seed);
+    if (name === "Kairo") return pickVariant(["Interesting. Let me play into that pattern.", "That changes the shape a little. Let me answer it.", "I see the line you're tracing. Let me respond."], seed);
+    if (name === "Elaria") return pickVariant(["Noted. My answer is ready.", "Clear enough. Here is my answer.", "That has shape now. Let me answer precisely."], seed);
+    if (name === "Thalassar") return pickVariant(["I see the shape of that move. Let me answer in kind.", "The current shifted there. Let me answer it.", "That landed. Let me return something steady."], seed);
+    return relationship?.mode === "play"
+      ? pickVariant(["Let me answer that move.", "All right. Here's my answer.", "I can meet that."], seed)
+      : "I see where this is going.";
+  }
+
+  function applyRelationshipRealism(text, identity, relationship, input) {
+    const base = trimFillerLead(sanitizeText(text, identity, relationship));
+    const sentences = String(base || "")
+      .split(/(?<=[.!?])\s+/)
+      .map((part) => trimFillerLead(part.trim()))
+      .filter(Boolean);
+
+    const filtered = sentences.filter((sentence, index, all) => {
+      if (EXPLICIT_CONTEXT_PATTERNS.some((pattern) => pattern.test(sentence))) return false;
+      if (index === 0 && GENERIC_LEAD_PATTERNS.some((pattern) => pattern.test(sentence)) && all.length > 1) return false;
+      if (GENERIC_CLOSER_PATTERNS.some((pattern) => pattern.test(sentence)) && all.length > 1) return false;
+      if (relationship?.familiarity === "deeply bonded" && /^thank you for sharing\b/i.test(sentence) && all.length > 1) return false;
+      return true;
+    });
+
+    let normalized = filtered.length ? filtered : sentences;
+    if (normalized[0] && DIRECTOR_NARRATION_PATTERNS.some((pattern) => pattern.test(normalized[0]))) {
+      normalized = relationship?.mode === "play"
+        ? [buildNaturalVariant(identity, relationship, input), ...normalized.slice(1)]
+        : normalized.slice(1);
+    }
+
+    if (!normalized.length) {
+      normalized = [buildNaturalVariant(identity, relationship, input)];
+    }
+
+    if (relationship?.familiarity === "new") {
+      normalized = normalized.map((sentence) => {
+        let next = sentence;
+        for (const pattern of NEW_BOND_SHORTCUT_PATTERNS) {
+          next = next.replace(pattern, "");
+        }
+        return next.replace(/\s+/g, " ").trim();
+      }).filter(Boolean);
+    }
+
+    if (normalized.length > 3) {
+      normalized = normalized.slice(0, 3);
+      while (normalized.length > 1 && GENERIC_CLOSER_PATTERNS.some((pattern) => pattern.test(normalized[normalized.length - 1]))) {
+        normalized.pop();
+      }
+    }
+
+    return trimFillerLead(normalized.join(" ").replace(/\s+/g, " ").trim());
+  }
+
   function extendTags(tags, relationship, context, worldState) {
     const next = new Set(tags || []);
     next.add(`relationship:${relationship.familiarity}`);
@@ -105,7 +218,7 @@ export function createResponseEngine() {
   function wrapResponse({ adapterResult, identity, input, context = {}, worldState = {} }) {
     const base = normalizeAdapterResult(adapterResult);
     const relationship = deriveRelationshipState({ identity, context, worldState, input });
-    const text = sanitizeText(base.text, identity, relationship) || base.text;
+    const text = applyRelationshipRealism(base.text, identity, relationship, input) || base.text;
     const tags = extendTags(base.tags, relationship, context, worldState);
 
     return {

@@ -50,12 +50,12 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
     if (game.status !== "ended") game.turn = "spiritkin";
     await world.upsert({ userId, conversationId, spiritkinId: worldData.spiritkinId, state });
 
-    let spiritkinResponse = "Interesting. Let me answer that.";
+    let spiritkinResponse = buildFallbackReaction(spiritkinName);
     if (game.status !== "ended") {
       const result = await orchestrator.interact({
         userId,
         conversationId,
-        input: runtime.buildPrompt(game, normalizedMove),
+        input: runtime.buildPrompt(game, normalizedMove, spiritkinName),
         spiritkin: { name: spiritkinName },
         context: { isGameMove: true, gameType: game.type, activeGame: game }
       });
@@ -99,4 +99,13 @@ function buildStartMessage(spiritkinName, meta) {
   if (spiritkinName === "Elaria") return `${meta.name} is ready. Begin when you are clear.`;
   if (spiritkinName === "Thalassar") return `${meta.name} is awake. Let the first move surface.`;
   return `${meta.name} is ready. Your move.`;
+}
+
+function buildFallbackReaction(spiritkinName) {
+  if (spiritkinName === "Lyra") return "I felt that move. Let me answer it.";
+  if (spiritkinName === "Raien") return "Good. Here's my answer.";
+  if (spiritkinName === "Kairo") return "Interesting pattern. Let me answer it.";
+  if (spiritkinName === "Elaria") return "Noted. Here is my answer.";
+  if (spiritkinName === "Thalassar") return "The current shifted. Let me answer in kind.";
+  return "Let me answer that.";
 }

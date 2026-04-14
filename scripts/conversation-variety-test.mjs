@@ -31,6 +31,11 @@ const context = {
   bondMilestones: [{ content: "The bond deepened after a difficult honest exchange." }],
 };
 
+const newBondWorldState = {
+  bond: { stage: 0, stage_name: "First Contact", interaction_count: 2 },
+  flags: {},
+};
+
 const outputs = [
   responseEngine.wrapResponse({
     adapterResult: {
@@ -65,11 +70,36 @@ const outputs = [
     context,
     worldState: { ...worldState, flags: { active_game: { status: "active" } } },
   }).text,
+  responseEngine.wrapResponse({
+    adapterResult: {
+      text: "I see you opened games. Thank you for sharing that. We can take this one step at a time. Let's look at the next move.",
+      tags: [],
+      emotion: { tone: "charged clarity", valence: 0.5, arousal: 0.6, confidence: 0.7 },
+    },
+    identity: { name: "Raien" },
+    input: "What should I play here?",
+    context,
+    worldState,
+  }).text,
+  responseEngine.wrapResponse({
+    adapterResult: {
+      text: "As always, you know this already. Thank you for sharing that. Start with the clearest part.",
+      tags: [],
+      emotion: { tone: "grounded warmth", valence: 0.6, arousal: 0.4, confidence: 0.7 },
+    },
+    identity: { name: "Lyra" },
+    input: "I am not sure where to begin.",
+    context: { memories: [], episodes: [], bondMilestones: [] },
+    worldState: newBondWorldState,
+  }).text,
 ];
 
 assert(!/^the air shifts/i.test(outputs[0]), "director narration was not removed");
 assert(!/^around you/i.test(outputs[1]), "director narration was not removed");
 assert(!/^\s*well\b/i.test(outputs[2]), "filler opener was not removed");
+assert(!/opened games/i.test(outputs[3]), "explicit tab acknowledgement was not removed");
+assert(!/we can take this one step at a time/i.test(outputs[3]), "generic encouragement loop was not removed");
+assert(!/\bas always\b/i.test(outputs[4]) && !/\byou know\b/i.test(outputs[4]), "new-bond shorthand was not softened");
 assert(similarity(outputs[0], outputs[1]) < 0.8, "responses are too repetitive");
 
 console.log("conversation-variety-test: ok");
