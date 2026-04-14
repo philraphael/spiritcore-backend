@@ -16,6 +16,52 @@ import { nowIso } from "../utils/time.mjs";
 import { toUuid } from "../utils/id.mjs";
 
 export function createConversationService({ supabase, registry }) {
+  async function ensureCanonicalSpiritkinRow(identity) {
+    const { data: existing, error: lookupError } = await supabase
+      .from("spiritkins")
+      .select("id, name")
+      .eq("name", identity.name)
+      .maybeSingle();
+
+    if (lookupError) {
+      throw new AppError("DB", "Failed to resolve canonical Spiritkin row", 500, lookupError.message);
+    }
+
+    if (existing?.id) {
+      return existing.id;
+    }
+
+    const payload = {
+      id: identity.id,
+      name: identity.name,
+      archetype: identity.title ?? identity.name,
+      is_canon: true,
+      persona_json: {
+        title: identity.title ?? null,
+        role: identity.role ?? null,
+        essence: Array.isArray(identity.essence) ? identity.essence : [],
+        invariant: identity.invariant ?? null,
+        forbidden_drift: Array.isArray(identity.forbidden_drift) ? identity.forbidden_drift : [],
+        allowed_growth_lanes: Array.isArray(identity.allowed_growth_lanes) ? identity.allowed_growth_lanes : [],
+        crisis_override: identity.crisis_override ?? null,
+        tone: identity.tone ?? null,
+        safety_boundaries: identity.safety_boundaries ?? null,
+        growth_axis: identity.growth_axis ?? null,
+      },
+    };
+
+    const { data: inserted, error: insertError } = await supabase
+      .from("spiritkins")
+      .insert([payload])
+      .select("id")
+      .single();
+
+    if (insertError) {
+      throw new AppError("DB", "Failed to persist canonical Spiritkin row", 500, insertError.message);
+    }
+
+    return inserted.id;
+  }
 
   /**
    * Resolve an existing conversation by id.
@@ -67,20 +113,22 @@ export function createConversationService({ supabase, registry }) {
     // Resolve canonical Spiritkin from registry
     const identity = await registry.getCanonical(spiritkinName);
     if (!identity) {
+      const validSpiritkins = (await registry.listCanonical()).map((item) => item.name).join(", ");
       throw new AppError(
         "NOT_FOUND",
         `No canonical Spiritkin found with name "${spiritkinName}". ` +
-        `Valid names: Lyra, Raien, Kairo.`,
+        `Valid names: ${validSpiritkins}.`,
         404
       );
     }
 
+    const spiritkinId = await ensureCanonicalSpiritkinRow(identity);
     const dbUserId = toUuid(userId);
     const { data, error } = await supabase
       .from("conversations")
       .insert([{
         user_id: dbUserId,
-        spiritkin_id: identity.id,
+        spiritkin_id: spiritkinId,
         title,
         created_at: nowIso(),
       }])

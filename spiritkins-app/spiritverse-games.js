@@ -28,10 +28,21 @@ const CHESS_PIECES = {
 };
 
 // THEME VARIANTS
+const CHESS_THEME_OPTIONS = [
+  { id: 'crown', label: 'Crown' },
+  { id: 'veil', label: 'Veil' },
+  { id: 'ember', label: 'Ember' },
+  { id: 'astral', label: 'Astral' },
+  { id: 'abyssal', label: 'Abyssal' }
+];
+
 const CHESS_PIECE_THEMES = {
-  celestial: CHESS_PIECES,
+  crown: CHESS_PIECES,
+  veil: CHESS_PIECES,
   ember: CHESS_PIECES,
-  astral: CHESS_PIECES
+  astral: CHESS_PIECES,
+  abyssal: CHESS_PIECES,
+  celestial: CHESS_PIECES
 };
 
 // ============================================================
@@ -141,7 +152,7 @@ function parseFEN(fen) {
   return board;
 }
 
-function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, onSquareClick, isExpanded = false, theme = 'celestial') {
+function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, onSquareClick, isExpanded = false, theme = 'crown') {
   console.log('renderChessBoard called with theme:', theme);
   const board = parseFEN(fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
   const files = ['a','b','c','d','e','f','g','h'];
@@ -151,15 +162,13 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
     html += `<div class="game-board-controls" style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:340px;margin-bottom:6px;">
       <div class="piece-theme-selector">
         <span class="piece-theme-label">Theme</span>
-        <button class="piece-theme-btn active" data-action="set-piece-theme" data-theme="celestial">Celestial</button>
-        <button class="piece-theme-btn" data-action="set-piece-theme" data-theme="ember">Ember</button>
-        <button class="piece-theme-btn" data-action="set-piece-theme" data-theme="astral">Astral</button>
+        ${CHESS_THEME_OPTIONS.map((option) => `<button class="piece-theme-btn ${theme === option.id ? 'active' : ''}" data-action="set-piece-theme" data-theme="${option.id}">${option.label}</button>`).join('')}
       </div>
       <button class="game-expand-btn" data-action="chess-expand">&#x26F6; Grand Stage</button>
     </div>`;
   }
 
-  html += `<div class="chess-board ${isExpanded ? 'board-3d' : ''}" id="chess-board" style="${isExpanded ? 'width: 560px; max-width: none;' : ''}">`;
+  html += `<div class="chess-board chess-theme-${theme} ${isExpanded ? 'board-3d' : ''}" id="chess-board" style="${isExpanded ? 'width: 560px; max-width: none;' : ''}">`;
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
       const sq = files[file] + (8 - rank);
@@ -175,7 +184,7 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
       if (isLastMove) cellClass += ' chess-last-move';
 
       const pieceKey = piece ? `${piece.color}${piece.type}` : null;
-      const themePieces = CHESS_PIECE_THEMES[theme] || CHESS_PIECE_THEMES['celestial'];
+      const themePieces = CHESS_PIECE_THEMES[theme] || CHESS_PIECE_THEMES['crown'];
       const pieceSvg = pieceKey && themePieces[pieceKey] ? themePieces[pieceKey] : '';
 
       html += `<div class="${cellClass}" data-sq="${sq}" data-action="chess-square-click">`;
@@ -361,7 +370,7 @@ export const SpiritverseGames = {
   echoAnswer: '',
 
   render(container, gameData, spiritkinName, commentary, onMoveSubmit, theme) {
-    if (!theme) theme = 'celestial';
+    if (!theme) theme = 'crown';
     if (!gameData || !gameData.type) return;
     const type = gameData.type;
     const payload = getGamePayload(gameData);
@@ -410,7 +419,7 @@ export const SpiritverseGames = {
   },
 
   expand(gameData, spiritkinName, onMoveSubmit, theme) {
-    if (!theme) theme = 'celestial';
+    if (!theme) theme = 'crown';
     if (!gameData || !gameData.type) return;
     const type = gameData.type;
     const payload = getGamePayload(gameData);

@@ -44,6 +44,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const OPERATOR_CONSOLE_DIR = path.join(__dirname, "operator-console");
 const USER_APP_DIR = path.join(__dirname, "spiritkins-app");
+const WORLD_ART_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "photos");
 
 const PORT    = config.port;
 const USE_LLM = String(process.env.USE_LLM || "false").toLowerCase() === "true";
@@ -257,6 +258,39 @@ app.get("/videos/:filename", async (req, reply) => {
   } catch (err) {
     app.log.warn(`Failed to serve video ${filename}: ${err.message}`);
     return reply.code(404).send({ ok: false, error: "Video not found" });
+  }
+});
+
+app.get("/world-art/:filename", async (req, reply) => {
+  const { filename } = req.params;
+  const allowedWorldArt = new Set([
+    "Book Covers All.png",
+    "Book Covers.png",
+    "Chess Base theme 1.jpg",
+    "Chess Base theme 2.jpg",
+    "Chess base theme 3.jpg",
+    "Elaria Left 1 Thalassar right 1.png",
+    "Elaria Left Thalassar right.png",
+    "Elaria.png",
+    "Spiritkins in spiritverse.png",
+    "Spiritverse background base theme.png",
+    "Spiritverse elder gods photo base needs edits.png",
+    "thalassar.png"
+  ]);
+
+  if (!allowedWorldArt.has(filename)) {
+    return reply.code(404).send({ ok: false, error: "Art not found" });
+  }
+
+  try {
+    const filePath = path.join(WORLD_ART_DIR, filename);
+    const content = await readFile(filePath);
+    const ext = path.extname(filename).toLowerCase();
+    const mime = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : "application/octet-stream";
+    return reply.type(mime).send(content);
+  } catch (err) {
+    app.log.warn(`Failed to serve world art ${filename}: ${err.message}`);
+    return reply.code(404).send({ ok: false, error: "Art not found" });
   }
 });
 

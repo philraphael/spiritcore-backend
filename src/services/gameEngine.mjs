@@ -145,7 +145,7 @@ export const createGameEngine = ({ bus, world, registry, orchestrator, spiritMem
     await world.upsert({ userId, conversationId, spiritkinId: worldData.spiritkinId, state });
 
     // 2. Get Spiritkin Response via Orchestrator
-    const prompt = `[GAME: ${game.name}] User played: ${move}. Board State: ${JSON.stringify(game.data)}. React and play your move. Format: "I play [move]".`;
+    const prompt = `[GAME: ${game.name}] User played: ${move}. Board State: ${JSON.stringify(game.data)}. Respond in character with brief natural commentary. Do not repeat the exact coordinate or move string in the visible reply unless clarity truly requires it. Append a final machine-readable line in this exact format on its own line: MOVE:${game.type === 'chess' ? 'e7e5' : game.type === 'checkers' ? '11-15' : 'G7'}.`;
     const result = await orchestrator.interact({
       userId,
       conversationId,
@@ -189,7 +189,7 @@ export const createGameEngine = ({ bus, world, registry, orchestrator, spiritMem
   };
 
   const extractMove = (text, type) => {
-    const m = text.match(/I play ([a-h1-8\-A-Z0-9]+)/i);
+    const m = text.match(/(?:^|\n)\s*MOVE:\s*([a-h1-8\-A-Z0-9]+)/i) || text.match(/I play ([a-h1-8\-A-Z0-9]+)/i);
     return m ? m[1] : null;
   };
 

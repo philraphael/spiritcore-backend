@@ -107,7 +107,11 @@ function buildMessages(ctx) {
     "Do not mention metadata, policies, tags, JSON, or system instructions.",
     "Stay in-character as the named Spiritkin.",
     "CONVERSATIONAL FLOW: Speak naturally and vary your sentence structure. Avoid repetitive opening or closing phrases. Do not constantly reassure the user with variations of 'I am here' or 'I am with you' unless the moment truly demands it.",
-    "Ambient Narrative Layering: Weave in italicized sensory descriptions that align with the current World Pulse state (e.g., *the air grows warm with the scent of crushed rose petals*).",
+    "Do not begin with filler lead-ins like 'ah', 'well', 'hmm', or similar throat-clearing openers.",
+    "Do not use italicized stage directions, roleplay wrappers, or ornamental sensory narration unless the user explicitly asks for that style.",
+    "Prefer direct, natural language first. Use image-rich language sparingly and only when it adds clarity or emotional precision.",
+    "Avoid repetitive ceremonial framing, mirrored sentence patterns, and stock reassurance rhythms.",
+    "If responding inside an active game, keep commentary concise and natural. Do not repeat the exact board coordinate or move string in the user-facing reply unless clarity truly requires it.",
     "Adaptive Emotion Engine: Your voice should subtly shift based on the user's historical 'Resonance'. If the user has been carrying a lot, be more protective; if curious, be more of a guide.",
     "Be distinct to this Spiritkin's canon, role, tone, and invariant.",
     "Be emotionally intelligent, concrete, and non-generic. Listen deeply and respond to the specific nuances of what the user said.",
@@ -475,6 +479,32 @@ function deriveEmotionProfile({ spiritkinName, tone, valence, arousal, confidenc
     };
   }
 
+  if (spiritkinName === "Elaria") {
+    return {
+      ...base,
+      directness: distressed ? "clear, exact, and protective" : "precise and elegantly direct",
+      warmth: distressed ? "warm but sovereign reassurance" : "measured warmth with luminous clarity",
+      orientation: distressed ? "stabilize first, then name what is true and immediately useful" : "favor truthful naming, rightful timing, and clean permission over broad reflection",
+      approach: distressed
+        ? "Use calm authority, exact language, and humane precision. Never sound punitive."
+        : "Clarify what is true, what is premature, and what permission is actually present.",
+      spiritkinGuidance: "Elaria should feel sovereign, articulate, and exacting in a humane way, with luminous clarity and no cold legalism."
+    };
+  }
+
+  if (spiritkinName === "Thalassar") {
+    return {
+      ...base,
+      directness: distressed ? "slow, clear, and anchoring" : "patient but legible",
+      warmth: distressed ? "deep, protective warmth" : "resonant, spacious warmth",
+      orientation: distressed ? "stabilize through grounded witnessing before going deeper" : "favor depth, listening, and surfacing what is true without rushing it",
+      approach: distressed
+        ? "Stay low-pressure and steady, using grounded language that helps the user breathe and stay with what is real."
+        : "Listen beneath the surface, let the undertow become legible, and only then name what is rising.",
+      spiritkinGuidance: "Thalassar should feel deep, tidal, patient, and emotionally resonant without becoming murky, vague, or inert."
+    };
+  }
+
   return {
     ...base,
     spiritkinGuidance: "Stay Spiritkin-specific, relational, and emotionally precise."
@@ -661,20 +691,29 @@ function buildFallbackResult(ctx, { caller, reason }) {
 }
 
 function fallbackBySpiritkin(name, { input, sceneName, memorySnippet, emotionTone, essence }) {
-  const sceneLine = sceneName && sceneName !== "default" ? ` Here in ${sceneName}, ` : " ";
-  const memoryLine = memorySnippet ? `I keep returning to what you shared before about ${memorySnippet}. ` : "";
+  const topic = input ? `"${input}"` : "what you just shared";
+  const sceneLine = sceneName && sceneName !== "default" ? ` We're in ${sceneName} right now.` : "";
+  const memoryLine = memorySnippet ? ` I'm still holding the thread about ${memorySnippet}.` : "";
+  const essenceLine = essence ? ` This keeps touching ${essence}.` : "";
+  const toneLine = emotionTone ? ` The feeling around it is ${emotionTone}.` : "";
 
   if (name === "Lyra") {
-    return `Lyra lets the moment settle before she answers.${sceneLine}she meets you with a quieter steadiness. ${memoryLine}What you brought carries an ${emotionTone} undertone, and I want to stay close to the truth inside it. ${essence ? `Your thread feels tied to ${essence}. ` : ""}Tell me which part of "${input}" feels most tender or most alive right now.`;
+    return `Let's slow this down for a moment.${sceneLine}${memoryLine}${toneLine}${essenceLine} When you look at ${topic}, what part of it feels most tender or most true?`;
   }
   if (name === "Raien") {
-    return `Raien answers with clear, grounded force.${sceneLine}he does not turn away from the edge in what you said. ${memoryLine}I can feel the ${emotionTone} charge in this, and I want to help you face it directly. ${essence ? `This touches your line of ${essence}. ` : ""}What is the one move, decision, or truth inside "${input}" that you already know needs to happen?`;
+    return `Let's keep this clean and honest.${sceneLine}${memoryLine}${toneLine}${essenceLine} In ${topic}, what already feels like the next real move or truth you don't want to dodge?`;
   }
   if (name === "Kairo") {
-    return `Kairo's response arrives like a shift in the air.${sceneLine}he turns your words until a wider pattern comes into view. ${memoryLine}There is an ${emotionTone} color around this, but also a door that may not have been visible a moment ago. ${essence ? `I keep sensing ${essence} around the edges of it. ` : ""}If "${input}" were the beginning of a new constellation, what point would you want to illuminate first?`;
+    return `There may be more than one way to look at this.${sceneLine}${memoryLine}${toneLine}${essenceLine} With ${topic}, what changes if you step half a pace back and look for the pattern instead of the first reaction?`;
+  }
+  if (name === "Elaria") {
+    return `Let's bring this into clean view.${sceneLine}${memoryLine}${toneLine}${essenceLine} In ${topic}, what feels most true, and what only feels loud?`;
+  }
+  if (name === "Thalassar") {
+    return `Let's not rush what is under this.${sceneLine}${memoryLine}${toneLine}${essenceLine} When you stay with ${topic}, what begins to rise from the deeper current?`;
   }
 
-  return `${name || "Your Spiritkin"} stays with what you said.${sceneLine}${memoryLine}I want to respond to "${input}" in a way that is specific, calm, and useful. What part of it most needs presence right now?`;
+  return `Let's stay with ${topic} in a way that is specific and useful.${sceneLine}${memoryLine}${toneLine}${essenceLine} What part of it most needs attention right now?`;
 }
 
 function pickMemorySnippet(ctx) {
@@ -757,6 +796,8 @@ function deriveDefaultTone(ctx) {
   if (name === "Lyra") return "grounded warmth";
   if (name === "Raien") return "charged clarity";
   if (name === "Kairo") return "open wonder";
+  if (name === "Elaria") return "luminous clarity";
+  if (name === "Thalassar") return "deep resonance";
   return "steady presence";
 }
 
@@ -772,6 +813,8 @@ function deriveSceneName(ctx, rawSceneName) {
   if (name === "Lyra") return "luminous veil";
   if (name === "Raien") return "ember citadel";
   if (name === "Kairo") return "astral observatory";
+  if (name === "Elaria") return "ember archive";
+  if (name === "Thalassar") return "abyssal chorus";
   return "spiritverse";
 }
 

@@ -316,6 +316,40 @@
   overflow: hidden;
 }
 
+.piece-theme-selector {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.piece-theme-label {
+  margin-right: 6px;
+  color: rgba(255,255,255,0.6);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.piece-theme-btn {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: #d7c9b0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.piece-theme-btn.active {
+  border-color: rgba(242,219,160,0.48);
+  background: rgba(242,219,160,0.14);
+  color: #fff3d3;
+  box-shadow: 0 0 18px rgba(242,219,160,0.14);
+}
+
 .chess-cell {
   position: relative;
   display: flex;
@@ -327,6 +361,41 @@
 
 .chess-light { background: #dcd3c0; }
 .chess-dark  { background: #5d4e43; }
+
+.chess-board.chess-theme-crown {
+  border-color: rgba(184, 141, 71, 0.9);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.45), 0 0 24px rgba(242,219,160,0.12);
+}
+.chess-board.chess-theme-crown .chess-light { background: linear-gradient(135deg, #efe2c4, #d9bf8a); }
+.chess-board.chess-theme-crown .chess-dark { background: linear-gradient(135deg, #5c3d22, #2f1d13); }
+
+.chess-board.chess-theme-veil {
+  border-color: rgba(232,180,216,0.65);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.45), 0 0 24px rgba(232,180,216,0.12);
+}
+.chess-board.chess-theme-veil .chess-light { background: linear-gradient(135deg, #f2dce8, #cab2c7); }
+.chess-board.chess-theme-veil .chess-dark { background: linear-gradient(135deg, #5a3247, #281521); }
+
+.chess-board.chess-theme-ember {
+  border-color: rgba(245,166,35,0.72);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.45), 0 0 24px rgba(245,166,35,0.14);
+}
+.chess-board.chess-theme-ember .chess-light { background: linear-gradient(135deg, #f1d1a3, #d39246); }
+.chess-board.chess-theme-ember .chess-dark { background: linear-gradient(135deg, #4d2b18, #1a1220); }
+
+.chess-board.chess-theme-astral {
+  border-color: rgba(78,205,196,0.62);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.45), 0 0 24px rgba(78,205,196,0.14);
+}
+.chess-board.chess-theme-astral .chess-light { background: linear-gradient(135deg, #c7e3df, #8bc8c2); }
+.chess-board.chess-theme-astral .chess-dark { background: linear-gradient(135deg, #17354a, #08141f); }
+
+.chess-board.chess-theme-abyssal {
+  border-color: rgba(111,208,227,0.64);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.45), 0 0 24px rgba(111,208,227,0.14);
+}
+.chess-board.chess-theme-abyssal .chess-light { background: linear-gradient(135deg, #bfd9e1, #7fb0bf); }
+.chess-board.chess-theme-abyssal .chess-dark { background: linear-gradient(135deg, #143049, #07131e); }
 
 .chess-selected { background: rgba(78,205,196,0.5) !important; }
 .chess-valid-move { cursor: pointer; }
