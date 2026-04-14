@@ -374,6 +374,7 @@ export const SpiritverseGames = {
     if (!gameData || !gameData.type) return;
     const type = gameData.type;
     const payload = getGamePayload(gameData);
+    const viewPayload = { ...payload, status: gameData.status, result: gameData.result };
     const gameCommentary = commentary || gameData.commentary || "The board is yours.";
     const history = gameData.history || [];
     const chessFen = payload.fen || gameData.fen;
@@ -401,19 +402,19 @@ export const SpiritverseGames = {
           }, isExp);
           break;
         case 'spirit_cards':
-          this.renderSpiritCards(target, payload, onMoveSubmit, isExp);
+          this.renderSpiritCards(target, viewPayload, onMoveSubmit, isExp);
           break;
         case 'echo_trials':
-          this.renderEchoTrials(target, payload, onMoveSubmit, isExp);
+          this.renderEchoTrials(target, viewPayload, onMoveSubmit, isExp);
           break;
         case 'tictactoe':
-          this.renderTicTacToe(target, payload, onMoveSubmit, isExp);
+          this.renderTicTacToe(target, viewPayload, onMoveSubmit, isExp);
           break;
         case 'connect_four':
-          this.renderConnectFour(target, payload, onMoveSubmit, isExp);
+          this.renderConnectFour(target, viewPayload, onMoveSubmit, isExp);
           break;
         case 'battleship':
-          this.renderBattleship(target, payload, onMoveSubmit, isExp);
+          this.renderBattleship(target, viewPayload, onMoveSubmit, isExp);
           break;
       }
     };
@@ -432,6 +433,7 @@ export const SpiritverseGames = {
     if (!gameData || !gameData.type) return;
     const type = gameData.type;
     const payload = getGamePayload(gameData);
+    const viewPayload = { ...payload, status: gameData.status, result: gameData.result };
     const commentary = gameData.commentary || "The board is set. Let us see where the resonance leads.";
     const history = gameData.history || [];
     const chessFen = payload.fen || gameData.fen;
@@ -458,19 +460,19 @@ export const SpiritverseGames = {
           }, isExp);
           break;
         case 'spirit_cards':
-          this.renderSpiritCards(target, payload, onMoveSubmit, isExp);
+          this.renderSpiritCards(target, viewPayload, onMoveSubmit, isExp);
           break;
         case 'echo_trials':
-          this.renderEchoTrials(target, payload, onMoveSubmit, isExp);
+          this.renderEchoTrials(target, viewPayload, onMoveSubmit, isExp);
           break;
         case 'tictactoe':
-          this.renderTicTacToe(target, payload, onMoveSubmit, isExp);
+          this.renderTicTacToe(target, viewPayload, onMoveSubmit, isExp);
           break;
         case 'connect_four':
-          this.renderConnectFour(target, payload, onMoveSubmit, isExp);
+          this.renderConnectFour(target, viewPayload, onMoveSubmit, isExp);
           break;
         case 'battleship':
-          this.renderBattleship(target, payload, onMoveSubmit, isExp);
+          this.renderBattleship(target, viewPayload, onMoveSubmit, isExp);
           break;
         default:
           if (target) target.innerHTML = `<div style="padding:2rem;text-align:center;color:#ccc">Grand Stage not available for this game type.</div>`;
@@ -599,16 +601,17 @@ export const SpiritverseGames = {
   renderTicTacToe(container, gameData) {
     const board = gameData.board || Array(9).fill(null);
     const winner = gameData.winner || null;
+    const finished = Boolean(gameData.result || winner || board.every(Boolean));
     const html = `
       <div class="sv-mini-game sv-ttt">
         <div class="sv-mini-grid sv-ttt-grid">
           ${board.map((cell, idx) => `
-            <button class="sv-mini-cell ttt-cell" data-action="ttt-cell-click" data-idx="${idx}" ${cell ? "disabled" : ""}>
+            <button class="sv-mini-cell ttt-cell" data-action="ttt-cell-click" data-idx="${idx}" ${cell || finished ? "disabled" : ""}>
               ${cell || ""}
             </button>
           `).join('')}
         </div>
-        <div class="sv-mini-caption">${winner ? `${winner === 'X' ? 'You' : 'Spiritkin'} aligned the line.` : 'Claim three in a line.'}</div>
+        <div class="sv-mini-caption">${gameData.result?.isDraw ? 'The grid resolved into a draw.' : winner ? `${winner === 'X' ? 'You' : 'Spiritkin'} aligned the line.` : 'Claim three in a line.'}</div>
       </div>
     `;
     (typeof container === 'string' ? document.getElementById(container) : container).innerHTML = html;
@@ -616,15 +619,16 @@ export const SpiritverseGames = {
 
   renderConnectFour(container, gameData) {
     const board = gameData.board || Array(42).fill(null);
+    const finished = Boolean(gameData.result || gameData.winner || !board.includes(null));
     const html = `
       <div class="sv-mini-game sv-connect4">
         <div class="sv-connect4-head">
-          ${Array.from({ length: 7 }, (_, col) => `<button class="sv-connect4-drop" data-action="connect4-column-click" data-col="${col}">Drop</button>`).join('')}
+          ${Array.from({ length: 7 }, (_, col) => `<button class="sv-connect4-drop" data-action="connect4-column-click" data-col="${col}" ${finished ? "disabled" : ""}>Drop</button>`).join('')}
         </div>
         <div class="sv-connect4-grid">
-          ${board.map((cell, idx) => `<button class="sv-mini-cell connect4-cell ${cell === 'U' ? 'user' : cell === 'S' ? 'spiritkin' : ''}" data-action="connect4-column-click" data-col="${idx % 7}">${cell === 'U' ? '●' : cell === 'S' ? '◉' : ''}</button>`).join('')}
+          ${board.map((cell, idx) => `<button class="sv-mini-cell connect4-cell ${cell === 'U' ? 'user' : cell === 'S' ? 'spiritkin' : ''}" data-action="connect4-column-click" data-col="${idx % 7}" ${finished ? "disabled" : ""}>${cell === 'U' ? '●' : cell === 'S' ? '◉' : ''}</button>`).join('')}
         </div>
-        <div class="sv-mini-caption">${gameData.winner ? `${gameData.winner === 'U' ? 'You' : 'Spiritkin'} connected four.` : 'Drop a star into any column.'}</div>
+        <div class="sv-mini-caption">${gameData.result?.isDraw ? 'The board filled into a draw.' : gameData.winner ? `${gameData.winner === 'U' ? 'You' : 'Spiritkin'} connected four.` : 'Drop a star into any column.'}</div>
       </div>
     `;
     (typeof container === 'string' ? document.getElementById(container) : container).innerHTML = html;
@@ -633,13 +637,14 @@ export const SpiritverseGames = {
   renderBattleship(container, gameData) {
     const guesses = new Set(gameData.userGuesses || []);
     const hits = new Set(gameData.hits?.user || []);
+    const finished = Boolean(gameData.result || gameData.winner);
     const html = `
       <div class="sv-mini-game sv-battleship">
         <div class="sv-battleship-grid">
           ${Array.from({ length: 25 }, (_, idx) => {
             const guessed = guesses.has(idx);
             const hit = hits.has(idx);
-            return `<button class="sv-mini-cell battleship-cell ${hit ? 'hit' : guessed ? 'miss' : ''}" data-action="battleship-cell-click" data-idx="${idx}" ${guessed ? "disabled" : ""}>${hit ? '✦' : guessed ? '•' : ''}</button>`;
+            return `<button class="sv-mini-cell battleship-cell ${hit ? 'hit' : guessed ? 'miss' : ''}" data-action="battleship-cell-click" data-idx="${idx}" ${guessed || finished ? "disabled" : ""}>${hit ? '✦' : guessed ? '•' : ''}</button>`;
           }).join('')}
         </div>
         <div class="sv-mini-caption">${gameData.winner ? `${gameData.winner === 'user' ? 'You' : 'Spiritkin'} found every hidden vessel.` : 'Search the deep grid for the hidden fleet.'}</div>

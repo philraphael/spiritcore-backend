@@ -1658,6 +1658,128 @@ function applyOptimisticGoMove(board, move) {
   return nextBoard;
 }
 
+function detectOptimisticLineWinner(board) {
+  const lines = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
+  ];
+  for (const [a, b, c] of lines) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+  }
+  return null;
+}
+
+function applyOptimisticTicTacToeMove(board, move) {
+  if (!Array.isArray(board)) return null;
+  const idx = parseInt(move, 10);
+  if (!Number.isInteger(idx) || idx < 0 || idx >= 9 || board[idx]) return null;
+  const nextBoard = [...board];
+  nextBoard[idx] = "X";
+  return nextBoard;
+}
+
+function detectOptimisticConnectFourWinner(board) {
+  const width = 7;
+  const height = 6;
+  const at = (r, c) => board[r * width + c];
+  for (let r = 0; r < height; r += 1) {
+    for (let c = 0; c < width; c += 1) {
+      const cell = at(r, c);
+      if (!cell) continue;
+      if (c <= width - 4 && cell === at(r, c + 1) && cell === at(r, c + 2) && cell === at(r, c + 3)) return cell;
+      if (r <= height - 4 && cell === at(r + 1, c) && cell === at(r + 2, c) && cell === at(r + 3, c)) return cell;
+      if (r <= height - 4 && c <= width - 4 && cell === at(r + 1, c + 1) && cell === at(r + 2, c + 2) && cell === at(r + 3, c + 3)) return cell;
+      if (r >= 3 && c <= width - 4 && cell === at(r - 1, c + 1) && cell === at(r - 2, c + 2) && cell === at(r - 3, c + 3)) return cell;
+    }
+  }
+  return null;
+}
+
+function applyOptimisticConnectFourMove(board, move) {
+  if (!Array.isArray(board)) return null;
+  const col = parseInt(move, 10);
+  if (!Number.isInteger(col) || col < 0 || col > 6) return null;
+  const nextBoard = [...board];
+  for (let row = 5; row >= 0; row -= 1) {
+    const idx = row * 7 + col;
+    if (!nextBoard[idx]) {
+      nextBoard[idx] = "U";
+      return nextBoard;
+    }
+  }
+  return null;
+}
+
+function applyOptimisticBattleshipMove(data, move) {
+  if (!data || typeof data !== "object") return null;
+  const idx = parseInt(move, 10);
+  if (!Number.isInteger(idx) || idx < 0 || idx >= 25) return null;
+  const guesses = Array.isArray(data.userGuesses) ? [...data.userGuesses] : [];
+  if (guesses.includes(idx)) return null;
+  const hits = {
+    user: Array.isArray(data.hits?.user) ? [...data.hits.user] : [],
+    spiritkin: Array.isArray(data.hits?.spiritkin) ? [...data.hits.spiritkin] : [],
+  };
+  guesses.push(idx);
+  if (Array.isArray(data.spiritkinTargets) && data.spiritkinTargets.includes(idx)) {
+    hits.user.push(idx);
+  }
+  return {
+    ...cloneGameState(data),
+    userGuesses: guesses,
+    hits,
+    lastMove: String(idx),
+  };
+}
+
+function applyOptimisticOutcome(nextGame) {
+  if (!nextGame?.data) return;
+  if (nextGame.type === "tictactoe") {
+    const winner = detectOptimisticLineWinner(nextGame.data.board || []);
+    if (winner) {
+      nextGame.data.winner = winner;
+      nextGame.status = "ended";
+      nextGame.result = {
+        winner: winner === "X" ? "user" : "spiritkin",
+        reason: "line-complete",
+        label: winner === "X" ? "You aligned the line." : `${state.selectedSpiritkin?.name || "Spiritkin"} aligned the line.`,
+        isDraw: false,
+      };
+    } else if ((nextGame.data.board || []).every(Boolean)) {
+      nextGame.status = "ended";
+      nextGame.result = { winner: null, reason: "draw", label: "The grid resolved into a draw.", isDraw: true };
+    }
+  } else if (nextGame.type === "connect_four") {
+    const winner = detectOptimisticConnectFourWinner(nextGame.data.board || []);
+    if (winner) {
+      nextGame.data.winner = winner;
+      nextGame.status = "ended";
+      nextGame.result = {
+        winner: winner === "U" ? "user" : "spiritkin",
+        reason: "connect-four",
+        label: winner === "U" ? "You connected four." : `${state.selectedSpiritkin?.name || "Spiritkin"} connected four.`,
+        isDraw: false,
+      };
+    } else if (!(nextGame.data.board || []).includes(null)) {
+      nextGame.status = "ended";
+      nextGame.result = { winner: null, reason: "draw", label: "The board filled into a draw.", isDraw: true };
+    }
+  } else if (nextGame.type === "battleship") {
+    const targetCount = Array.isArray(nextGame.data.spiritkinTargets) ? nextGame.data.spiritkinTargets.length : 0;
+    if ((nextGame.data.hits?.user || []).length >= targetCount && targetCount > 0) {
+      nextGame.data.winner = "user";
+      nextGame.status = "ended";
+      nextGame.result = {
+        winner: "user",
+        reason: "fleet-cleared",
+        label: "You found every hidden vessel.",
+        isDraw: false,
+      };
+    }
+  }
+}
+
 function buildOptimisticGameState(game, move) {
   const nextGame = cloneGameState(game);
   if (!nextGame || !nextGame.type || !nextGame.data) return null;
@@ -1684,6 +1806,26 @@ function buildOptimisticGameState(game, move) {
       nextGame.data.lastMove = move;
       changed = true;
     }
+  } else if (nextGame.type === "tictactoe") {
+    const nextBoard = applyOptimisticTicTacToeMove(nextGame.data.board, move);
+    if (nextBoard) {
+      nextGame.data.board = nextBoard;
+      nextGame.data.lastMove = String(move);
+      changed = true;
+    }
+  } else if (nextGame.type === "connect_four") {
+    const nextBoard = applyOptimisticConnectFourMove(nextGame.data.board, move);
+    if (nextBoard) {
+      nextGame.data.board = nextBoard;
+      nextGame.data.lastMove = String(move);
+      changed = true;
+    }
+  } else if (nextGame.type === "battleship") {
+    const nextData = applyOptimisticBattleshipMove(nextGame.data, move);
+    if (nextData) {
+      nextGame.data = nextData;
+      changed = true;
+    }
   }
 
   if (!changed) return null;
@@ -1696,11 +1838,12 @@ function buildOptimisticGameState(game, move) {
   });
   nextGame.moveCount = Number(nextGame.moveCount || 0) + 1;
   nextGame.turn = "spiritkin";
+  applyOptimisticOutcome(nextGame);
   return nextGame;
 }
 
 async function executeGameMove(move, options = {}) {
-  if (!move || !state.conversationId || !state.activeGame || state.gameLoading) return;
+  if (!move || !state.conversationId || !state.activeGame || state.activeGame.status !== "active" || state.gameLoading) return;
 
   const { addUserMessage = false } = options;
   const previousGame = cloneGameState(state.activeGame);
@@ -1716,7 +1859,9 @@ async function executeGameMove(move, options = {}) {
 
     if (optimisticGame) {
       state.activeGame = optimisticGame;
-      state.gameSpiritkinMessage = `${state.selectedSpiritkin.name} is considering the board...`;
+      state.gameSpiritkinMessage = optimisticGame.status === "ended"
+        ? (optimisticGame.result?.label || "Game complete.")
+        : `${state.selectedSpiritkin.name} is considering the board...`;
       if (SpiritverseGames && SpiritverseGames.reset) {
         SpiritverseGames.reset();
       }
@@ -1739,7 +1884,9 @@ async function executeGameMove(move, options = {}) {
     if (data.ok) {
       state.activeGame = data.game;
       state.gameSpiritkinMessage = data.spiritkinMessage || null;
-      state.statusText = addUserMessage ? "Move accepted." : "";
+      state.statusText = data.game?.status === "ended"
+        ? (data.game?.result?.label || "Game complete.")
+        : (addUserMessage ? "Move accepted." : "");
       state.statusError = false;
 
       if (SpiritverseGames && SpiritverseGames.reset) {
@@ -1790,6 +1937,83 @@ async function submitGameMove(move) {
   return executeGameMove(move, { addUserMessage: true });
 }
 
+async function startGameSession(gameType) {
+  if (!state.conversationId || !gameType) return false;
+  try {
+    state.statusText = `Starting ${gameType}...`;
+    state.gameLoading = true;
+    render();
+    const res = await fetch(`${API}/v1/games/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: state.userId,
+        conversationId: state.conversationId,
+        gameType,
+        spiritkinName: state.selectedSpiritkin.name
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      state.statusText = data.message || "Failed to start game.";
+      state.statusError = true;
+      render();
+      return false;
+    }
+
+    state.activeGame = data.game;
+    state.gameSpiritkinMessage = data.spiritkinMessage || null;
+    state.gameInstructions = data.instructions || null;
+    state.gameEchoGuide = data.guide || null;
+    state.gameInput = "";
+    state.statusText = "Game started.";
+    state.statusError = false;
+
+    if (SpiritverseGames && SpiritverseGames.reset) {
+      SpiritverseGames.reset();
+    }
+
+    if (data.spiritkinMessage) {
+      state.messages.push({
+        id: uuid(),
+        role: "assistant",
+        content: data.spiritkinMessage,
+        spiritkinName: state.selectedSpiritkin.name,
+        spiritkinVoice: state.selectedSpiritkin?.ui?.voice || "nova",
+        time: nowIso(),
+        status: "sent",
+        tags: ["game:start"]
+      });
+    }
+    render();
+    return true;
+  } catch (err) {
+    console.error("Failed to start game", err);
+    state.statusText = "Failed to start game.";
+    state.statusError = true;
+    render();
+    return false;
+  } finally {
+    state.gameLoading = false;
+    render();
+  }
+}
+
+function buildGameOutcomeSummary(game, spiritkinName) {
+  const result = game?.result || null;
+  if (!result) return null;
+  if (result.isDraw) {
+    return { headline: "Draw", detail: result.label || "The game ended in balance." };
+  }
+  if (result.winner === "user") {
+    return { headline: "You Won", detail: result.label || `You finished ${game?.name || "the game"} cleanly.` };
+  }
+  if (result.winner === "spiritkin") {
+    return { headline: `${spiritkinName} Won`, detail: result.label || `${spiritkinName} finished the game cleanly.` };
+  }
+  return { headline: "Game Complete", detail: result.label || "The game is complete." };
+}
+
 function render() {
   const root = document.getElementById("root");
   if (!root) return;
@@ -1819,7 +2043,7 @@ function render() {
   }
 
   // Render visual game board after DOM update
-  if (state.activeGame && state.activeGame.status === 'active' && SpiritverseGames) {
+  if (state.activeGame && SpiritverseGames) {
     requestAnimationFrame(() => {
       const spiritkin = state.selectedSpiritkin;
       SpiritverseGames.render(
@@ -2401,7 +2625,13 @@ function buildChatView() {
                       <div class="depth-label">Shadow</div>
                       <p>${esc(depthEchoes.shadows)}</p>
                     </div>
-                  ` : ''}
+                  ` : `
+                    <div class="game-controls">
+                      <button class="game-expand-btn" data-action="replay-game" data-game="${esc(state.activeGame.type)}">
+                        Play again
+                      </button>
+                    </div>
+                  `}
                 </div>
               ` : ''}
               
@@ -2554,7 +2784,7 @@ function buildChatView() {
 
           ${state.activePresenceTab === 'games' ? `
             <div class="games-view">
-              ${!state.activeGame || state.activeGame.status !== 'active' ? `
+              ${!state.activeGame ? `
                 <div class="panel-label">Spiritverse Games</div>
                 <p class="games-intro">Choose a game to play with ${esc(spiritkin.name)}.</p>
                 <div class="games-list">
@@ -2579,21 +2809,47 @@ function buildChatView() {
                 </div>
               ` : `
                 <div class="active-game-panel">
+                  ${(() => {
+                    const outcome = buildGameOutcomeSummary(state.activeGame, spiritkin.name);
+                    return outcome ? `
+                      <div class="game-outcome-banner ${state.activeGame.result?.isDraw ? 'draw' : state.activeGame.result?.winner === 'user' ? 'win' : 'loss'}">
+                        <div class="game-outcome-title">${esc(outcome.headline)}</div>
+                        <div class="game-outcome-detail">${esc(outcome.detail)}</div>
+                        <div class="game-outcome-actions">
+                          <button class="btn btn-primary btn-xs" data-action="replay-game" data-game="${esc(state.activeGame.type)}">Play again</button>
+                          <button class="btn btn-ghost btn-xs" data-action="clear-finished-game">Choose another game</button>
+                        </div>
+                      </div>
+                    ` : '';
+                  })()}
                   <div class="game-panel-header">
                     <div class="game-panel-title">
                       <span class="game-panel-icon">${
                         state.activeGame.type === 'chess' ? '\u265F' :
                         state.activeGame.type === 'checkers' ? '\uD83C\uDFF1' :
                         state.activeGame.type === 'go' ? '\uD83C\uDF0C' :
-                        state.activeGame.type === 'spirit_cards' ? '\uD83C\uDCCF' : '\uD83D\uDD14'
+                        state.activeGame.type === 'spirit_cards' ? '\uD83C\uDCCF' :
+                        state.activeGame.type === 'tictactoe' ? '\u25A6' :
+                        state.activeGame.type === 'connect_four' ? '\u25CF' :
+                        state.activeGame.type === 'battleship' ? '\u2693' : '\uD83D\uDD14'
                       }</span>
                       <strong>${esc(state.activeGame.name || state.activeGame.type)}</strong>
                     </div>
-                    <button class="btn btn-ghost btn-xs game-end-btn" data-action="end-game">End game</button>
+                    ${state.activeGame.status === 'active'
+                      ? `<button class="btn btn-ghost btn-xs game-end-btn" data-action="end-game">End game</button>`
+                      : `<button class="btn btn-ghost btn-xs game-end-btn" data-action="clear-finished-game">Close</button>`}
                   </div>
 
-                  <div class="game-turn-badge ${state.activeGame.turn === 'user' ? 'turn-user' : 'turn-spiritkin'}">
-                    ${state.activeGame.turn === 'user' ? 'Your turn' : `${esc(spiritkin.name)} is thinking...`}
+                  <div class="game-turn-badge ${state.activeGame.status === 'ended' ? 'turn-finished' : state.activeGame.turn === 'user' ? 'turn-user' : 'turn-spiritkin'}">
+                    ${state.activeGame.status === 'ended'
+                      ? (state.activeGame.result?.isDraw
+                        ? 'Finished in a draw'
+                        : state.activeGame.result?.winner === 'user'
+                          ? 'You finished the game'
+                          : `${esc(spiritkin.name)} finished the game`)
+                      : state.activeGame.turn === 'user'
+                        ? 'Your turn'
+                        : `${esc(spiritkin.name)} is thinking...`}
                   </div>
 
                   ${state.gameSpiritkinMessage ? `
@@ -3386,56 +3642,27 @@ async function onClick(event) {
 
   if (action === "start-game") {
     const gameType = element.dataset.game;
-    if (!state.conversationId) return;
-    try {
-      state.statusText = `Starting ${gameType}...`;
-      state.gameLoading = true;
-      render();
-      const res = await fetch(`${API}/v1/games/start`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: state.userId,
-          conversationId: state.conversationId,
-          gameType,
-          spiritkinName: state.selectedSpiritkin.name
-        })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        state.activeGame = data.game;
-        state.gameSpiritkinMessage = data.spiritkinMessage || null;
-        state.gameInstructions = data.instructions || null;
-        state.gameEchoGuide = data.guide || null;
-        state.gameInput = "";
-        state.statusText = "Game started.";
-        // Show the opening message in chat too
-        if (data.spiritkinMessage) {
-          state.messages.push({
-            id: uuid(),
-            role: "assistant",
-            content: data.spiritkinMessage,
-            spiritkinName: state.selectedSpiritkin.name,
-            spiritkinVoice: state.selectedSpiritkin?.ui?.voice || "nova",
-            time: nowIso(),
-            status: "sent"
-          });
-        }
-        render();
-      } else {
-        state.statusText = data.message || "Failed to start game.";
-        state.statusError = true;
-        render();
-      }
-    } catch (err) {
-      console.error("Failed to start game", err);
-      state.statusText = "Failed to start game.";
-      state.statusError = true;
-      render();
-    } finally {
-      state.gameLoading = false;
-      render();
+    await startGameSession(gameType);
+    return;
+  }
+
+  if (action === "replay-game") {
+    const gameType = element.dataset.game || state.activeGame?.type;
+    if (!gameType) return;
+    await startGameSession(gameType);
+    return;
+  }
+
+  if (action === "clear-finished-game") {
+    if (SpiritverseGames && SpiritverseGames.reset) {
+      SpiritverseGames.reset();
     }
+    state.activeGame = null;
+    state.gameSpiritkinMessage = null;
+    state.gameInstructions = null;
+    state.gameEchoGuide = null;
+    state.gameInput = "";
+    render();
     return;
   }
 
@@ -3462,7 +3689,7 @@ async function onClick(event) {
 
   // ---- VISUAL GAME BOARD ACTIONS ----
   if (action === "chess-square-click") {
-    if (!state.activeGame || state.activeGame.type !== 'chess' || state.gameLoading) return;
+    if (!state.activeGame || state.activeGame.type !== 'chess' || state.activeGame.status !== 'active' || state.gameLoading) return;
     if (state.activeGame.turn !== 'user') return;
     const sq = element.dataset.sq;
     if (!sq || !SpiritverseGames) return;
@@ -3476,7 +3703,7 @@ async function onClick(event) {
   }
 
   if (action === "checkers-square-click") {
-    if (!state.activeGame || state.activeGame.type !== 'checkers' || state.gameLoading) return;
+    if (!state.activeGame || state.activeGame.type !== 'checkers' || state.activeGame.status !== 'active' || state.gameLoading) return;
     if (state.activeGame.turn !== 'user') return;
     const sq = element.dataset.sq;
     if (sq === undefined || sq === null || sq === '' || !SpiritverseGames) return;
@@ -3491,7 +3718,7 @@ async function onClick(event) {
   }
 
   if (action === "go-square-click") {
-    if (!state.activeGame || state.activeGame.type !== 'go' || state.gameLoading) return;
+    if (!state.activeGame || state.activeGame.type !== 'go' || state.activeGame.status !== 'active' || state.gameLoading) return;
     if (state.activeGame.turn !== 'user') return;
     const idx = element.dataset.idx;
     if (idx === undefined || idx === null || idx === '' || !SpiritverseGames) return;
@@ -3505,7 +3732,7 @@ async function onClick(event) {
   }
 
   if (action === "ttt-cell-click") {
-    if (!state.activeGame || state.activeGame.type !== 'tictactoe' || state.gameLoading) return;
+    if (!state.activeGame || state.activeGame.type !== 'tictactoe' || state.activeGame.status !== 'active' || state.gameLoading) return;
     if (state.activeGame.turn !== 'user') return;
     const idx = element.dataset.idx;
     if (idx === undefined || idx === null || idx === '') return;
@@ -3514,7 +3741,7 @@ async function onClick(event) {
   }
 
   if (action === "connect4-column-click") {
-    if (!state.activeGame || state.activeGame.type !== 'connect_four' || state.gameLoading) return;
+    if (!state.activeGame || state.activeGame.type !== 'connect_four' || state.activeGame.status !== 'active' || state.gameLoading) return;
     if (state.activeGame.turn !== 'user') return;
     const col = element.dataset.col;
     if (col === undefined || col === null || col === '') return;
@@ -3523,7 +3750,7 @@ async function onClick(event) {
   }
 
   if (action === "battleship-cell-click") {
-    if (!state.activeGame || state.activeGame.type !== 'battleship' || state.gameLoading) return;
+    if (!state.activeGame || state.activeGame.type !== 'battleship' || state.activeGame.status !== 'active' || state.gameLoading) return;
     if (state.activeGame.turn !== 'user') return;
     const idx = element.dataset.idx;
     if (idx === undefined || idx === null || idx === '') return;
@@ -3562,14 +3789,16 @@ async function onClick(event) {
           userId: state.userId,
           conversationId: state.conversationId,
           spiritkinName: state.selectedSpiritkin?.name,
-          outcome: 'completed'
+          outcome: 'forfeit'
         })
       });
       const endData = endRes.ok ? await endRes.json().catch(() => null) : null;
-      state.activeGame = null;
-      state.gameSpiritkinMessage = null;
+      state.activeGame = endData?.game || state.activeGame;
+      state.gameSpiritkinMessage = endData?.message || state.gameSpiritkinMessage;
       state.gameInstructions = null;
       state.gameEchoGuide = null;
+      state.statusText = endData?.game?.result?.label || endData?.message || "Game ended.";
+      state.statusError = false;
       // Phase 2: Game-to-World Progression — show echo unlock notification
       if (endData?.progression?.echoUnlock) {
         state.currentEchoUnlock = {
