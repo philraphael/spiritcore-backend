@@ -45,6 +45,7 @@ import { createEngagementEngine }         from "./services/engagementEngine.mjs"
 import { createGameEngine }             from "./services/gameEngine.mjs";
 import { createSpiritMemoryEngine }     from "./services/spiritMemoryEngine.mjs";
 import { createWorldProgression }       from "./services/worldProgression.mjs";
+import { createResponseEngine }         from "./services/responseEngine.mjs";
 
 /**
  * Build and return the fully wired service container.
@@ -102,6 +103,7 @@ export function buildContainer() {
 
   // --- Phase I: Proactive Engagement Engine ---
   const engagementEngine = createEngagementEngine({ supabase, bus, worldService });
+  const responseEngine = createResponseEngine();
 
   // --- Phase K: SpiritMemoryEngine (10x unified long-term memory) ---
   const spiritMemoryEngine = createSpiritMemoryEngine({ supabase, bus });
@@ -124,6 +126,7 @@ export function buildContainer() {
     hierarchicalMemoryService,  // Phase H: hierarchical memory
     engagementEngine,            // Phase I: proactive engagement
     spiritMemoryEngine,          // Phase K: 10x unified memory
+    responseEngine,
   });
 
   // --- Phase M: World Progression Engine ---
@@ -150,6 +153,7 @@ export function buildContainer() {
     memoryExtractor,
     hierarchicalMemoryService,
     engagementEngine,
+    responseEngine,
     gameEngine,                  // Phase J
     spiritMemoryEngine,          // Phase K
     worldProgression,            // Phase M

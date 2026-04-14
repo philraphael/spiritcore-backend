@@ -42,6 +42,7 @@ export const createOrchestrator = ({
   hierarchicalMemoryService,
   engagementEngine,
   spiritMemoryEngine,
+  responseEngine,
 }) => {
   const interact = async ({ userId, input, spiritkin, conversationId, context = {} }) => {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
@@ -220,8 +221,17 @@ export const createOrchestrator = ({
     const identityFragment = identityGovernor.buildPromptFragment(resolvedIdentity);
     const crisisOverride = identityGovernor.getCrisisOverride(resolvedIdentity);
     const safetyInstruction = safetyPreResult.instruction ?? null;
+    const relationship = responseEngine?.deriveRelationshipState({
+      identity: resolvedIdentity,
+      context: {
+        memories: contextBundle?.memories,
+        episodes: contextBundle?.episodes,
+        bondMilestones: memoryBrief?.bondMilestones ?? [],
+      },
+      worldState: nextWorldState,
+    }) ?? null;
 
-    const adapterResult = await withTimeout(
+    const rawAdapterResult = await withTimeout(
       adapter.generate({
         traceId,
         userId,
@@ -241,6 +251,7 @@ export const createOrchestrator = ({
           summary: contextBundle?.summary_episode,
           // Phase K: rich memory brief for long-term recall
           memoryBrief: memoryBrief?.brief ?? null,
+          relationship,
           identityFacts: memoryBrief?.identity ?? [],
           bondMilestones: memoryBrief?.bondMilestones ?? [],
           gameSessions: memoryBrief?.games ?? [],
@@ -251,6 +262,20 @@ export const createOrchestrator = ({
       config.timeouts.adapter,
       "adapter generation"
     );
+
+    const adapterResult = responseEngine
+      ? responseEngine.wrapResponse({
+          adapterResult: rawAdapterResult,
+          identity: resolvedIdentity,
+          input,
+          context: {
+            ...contextBundle,
+            relationship,
+            bondMilestones: memoryBrief?.bondMilestones ?? [],
+          },
+          worldState: nextWorldState,
+        })
+      : rawAdapterResult;
 
     // Stage 9b: Apply LLM-derived scene name to world state if meaningful
     const adapterSceneName = typeof adapterResult.sceneName === "string" && adapterResult.sceneName.trim()

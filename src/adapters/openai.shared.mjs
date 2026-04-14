@@ -109,6 +109,7 @@ function buildMessages(ctx) {
     "CONVERSATIONAL FLOW: Speak naturally and vary your sentence structure. Avoid repetitive opening or closing phrases. Do not constantly reassure the user with variations of 'I am here' or 'I am with you' unless the moment truly demands it.",
     "Do not begin with filler lead-ins like 'ah', 'well', 'hmm', or similar throat-clearing openers.",
     "Do not use italicized stage directions, roleplay wrappers, or ornamental sensory narration unless the user explicitly asks for that style.",
+    "Do not write like a director, scene narrator, or omniscient prose wrapper. React like a living companion speaking directly to the user.",
     "Prefer direct, natural language first. Use image-rich language sparingly and only when it adds clarity or emotional precision.",
     "Avoid repetitive ceremonial framing, mirrored sentence patterns, and stock reassurance rhythms.",
     "If responding inside an active game, keep commentary concise and natural. Do not repeat the exact board coordinate or move string in the user-facing reply unless clarity truly requires it.",
@@ -299,6 +300,7 @@ function buildContextBlock(ctx, memoryLayer) {
   const summary = summarizeText(ctx?.context?.summary?.content ?? ctx?.context?.summary_episode?.content ?? "", 220);
   const voiceLayer = buildVoiceLayer(spiritkin);
   const emotionLayer = buildEmotionLayer(ctx);
+  const relationshipLayer = buildRelationshipLayer(ctx);
   const returningUserBlock = buildReturningUserBlock(ctx);
   const worldLayer = buildWorldLayer(ctx);
   const gameLayer = buildGameLayer(ctx);
@@ -317,6 +319,8 @@ function buildContextBlock(ctx, memoryLayer) {
     voiceLayer,
     "EMOTIONAL TUNING",
     emotionLayer,
+    relationshipLayer ? "RELATIONSHIP STATE" : "",
+    relationshipLayer || "",
     "SAFETY / INVARIANTS",
     [
       ctx?.crisisOverride ? `Crisis override:\n${ctx.crisisOverride}` : "",
@@ -339,6 +343,22 @@ function buildContextBlock(ctx, memoryLayer) {
     "RESPONSE SHAPE",
     "Write 1-3 short paragraphs. The reply should feel like a bonded companion with continuity, not a generic reply engine."
   ].filter(Boolean).join("\n\n");
+}
+
+function buildRelationshipLayer(ctx) {
+  const relationship = ctx?.context?.relationship ?? null;
+  if (!relationship) return null;
+
+  return [
+    `Familiarity: ${sanitizeText(relationship.familiarity || "new")}`,
+    `Bond stage: ${sanitizeText(relationship.bondStageName || String(relationship.bondStage ?? 0))}`,
+    `Shared interaction count: ${numberOrDefault(relationship.interactionCount, 0)}`,
+    `Relationship mode: ${sanitizeText(relationship.mode || "present")}`,
+    relationship.memoryCount > 0
+      ? `You have ${numberOrDefault(relationship.memoryCount, 0)} meaningful continuity anchors in this bond.`
+      : "Treat this as a newer exchange with less assumed continuity.",
+    "Let this shape how much history, familiarity, warmth, and shorthand you use. Deep bonds can speak with more continuity; early bonds should earn intimacy instead of assuming it."
+  ].join("\n");
 }
 
 function buildVoiceLayer(spiritkin) {
