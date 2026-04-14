@@ -89,6 +89,7 @@ export function createSharedGameRuntime() {
       moveCount: 0,
       history: [],
       data: meta.createData(),
+      result: null,
       startedAt: new Date().toISOString(),
     };
   }
@@ -124,7 +125,10 @@ export function createSharedGameRuntime() {
   }
 
   function chooseFallbackMove(game, player = "spiritkin") {
-    if (game.type === "chess") return "e7e5";
+    if (game.type === "chess") {
+      const moves = listLegalChessMoves(game.data?.fen, player === "user" ? "w" : "b");
+      return moves[0] ?? null;
+    }
     if (game.type === "checkers") return "11-15";
     if (game.type === "go") return "G7";
     if (game.type === "tictactoe") return String(game.data.board.findIndex((cell) => cell == null));
@@ -165,6 +169,7 @@ export function createSharedGameRuntime() {
     chooseFallbackMove,
     extractMove,
     buildPrompt,
+    describeOutcome,
   };
 }
 
@@ -186,27 +191,33 @@ function buildGameToneInstruction(gameType, spiritkinName) {
 }
 
 function applyChessMove(game, move) {
-  const nextFen = applyFenMove(game.data.fen, move);
-  if (!nextFen) return false;
-  game.data.fen = nextFen;
+  const playerColor = moveColorForTurn(game, move);
+  const applied = applyFenMove(game.data.fen, move, playerColor);
+  if (!applied) return false;
+  game.data.fen = applied.fen;
   game.data.lastMove = move;
+  applyChessOutcome(game, applied.nextTurnColor);
   return true;
 }
 
-function applyFenMove(fen, move) {
-  const parts = String(fen || "").split(" ");
-  const board = parts[0].split("/").map((row) => row.replace(/\d/g, (n) => " ".repeat(parseInt(n, 10))).split(""));
+function applyFenMove(fen, move, playerColor) {
+  const parts = String(fen || "").trim().split(/\s+/);
+  const board = parseFenBoard(parts[0]);
   const match = String(move || "").match(/^([a-h])([1-8])([a-h])([1-8])$/i);
   if (!match) return null;
   const fromCol = match[1].toLowerCase().charCodeAt(0) - 97;
   const fromRow = 8 - parseInt(match[2], 10);
   const toCol = match[3].toLowerCase().charCodeAt(0) - 97;
   const toRow = 8 - parseInt(match[4], 10);
-  if (!board[fromRow]?.[fromCol] || board[fromRow][fromCol] === " ") return null;
-  board[toRow][toCol] = board[fromRow][fromCol];
-  board[fromRow][fromCol] = " ";
-  const nextBoard = board.map((row) => row.join("").replace(/ +/g, (spaces) => spaces.length)).join("/");
-  return `${nextBoard} ${parts[1] === "w" ? "b" : "w"} - - 0 1`;
+  if (!isLegalChessMove(board, fromRow, fromCol, toRow, toCol, playerColor)) return null;
+  const nextBoard = cloneBoard(board);
+  nextBoard[toRow][toCol] = promoteIfNeeded(nextBoard[fromRow][fromCol], toRow);
+  nextBoard[fromRow][fromCol] = " ";
+  const nextTurnColor = playerColor === "w" ? "b" : "w";
+  return {
+    fen: `${boardToFen(nextBoard)} ${nextTurnColor} - - 0 1`,
+    nextTurnColor,
+  };
 }
 
 function applyCheckersMove(game, move) {
@@ -240,7 +251,19 @@ function applyTicTacToeMove(game, move, player) {
   game.data.board[idx] = player === "user" ? "X" : "O";
   game.data.lastMove = String(idx);
   game.data.winner = detectLineWinner(game.data.board, 3);
-  if (game.data.winner || game.data.board.every(Boolean)) game.status = "ended";
+  if (game.data.winner) {
+    setOutcome(game, {
+      winner: game.data.winner === "X" ? "user" : "spiritkin",
+      reason: "line-complete",
+      label: game.data.winner === "X" ? "You aligned the line." : "Your Spiritkin aligned the line.",
+    });
+  } else if (game.data.board.every(Boolean)) {
+    setOutcome(game, {
+      winner: null,
+      reason: "draw",
+      label: "The grid resolved into a draw.",
+    });
+  }
   return true;
 }
 
@@ -253,7 +276,19 @@ function applyConnectFourMove(game, move, player) {
   game.data.board[idx] = player === "user" ? "U" : "S";
   game.data.lastMove = String(col);
   game.data.winner = detectConnectFourWinner(game.data.board);
-  if (game.data.winner || !game.data.board.includes(null)) game.status = "ended";
+  if (game.data.winner) {
+    setOutcome(game, {
+      winner: game.data.winner === "U" ? "user" : "spiritkin",
+      reason: "connect-four",
+      label: game.data.winner === "U" ? "You connected four." : "Your Spiritkin connected four.",
+    });
+  } else if (!game.data.board.includes(null)) {
+    setOutcome(game, {
+      winner: null,
+      reason: "draw",
+      label: "The board filled into a draw.",
+    });
+  }
   return true;
 }
 
@@ -269,7 +304,11 @@ function applyBattleshipMove(game, move, player) {
   game.data.lastMove = String(idx);
   if (game.data.hits.user.length >= game.data.spiritkinTargets.length || game.data.hits.spiritkin.length >= game.data.userTargets.length) {
     game.data.winner = game.data.hits.user.length >= game.data.spiritkinTargets.length ? "user" : "spiritkin";
-    game.status = "ended";
+    setOutcome(game, {
+      winner: game.data.winner,
+      reason: "fleet-cleared",
+      label: game.data.winner === "user" ? "You found every hidden vessel." : "Your Spiritkin found every hidden vessel.",
+    });
   }
   return true;
 }
@@ -351,6 +390,225 @@ function firstUnguessedCell(data, player) {
     if (!guesses.includes(i)) return i;
   }
   return 0;
+}
+
+function setOutcome(game, { winner = null, reason = "completed", label = "Game complete." }) {
+  game.status = "ended";
+  game.result = {
+    winner,
+    reason,
+    label,
+    isDraw: winner == null,
+  };
+}
+
+function describeOutcome(game) {
+  return game?.result ?? null;
+}
+
+function moveColorForTurn(game, move) {
+  const fenTurn = String(game?.data?.fen || "").trim().split(/\s+/)[1];
+  if (fenTurn === "w" || fenTurn === "b") return fenTurn;
+  return game?.turn === "user" ? "w" : "b";
+}
+
+function applyChessOutcome(game, nextTurnColor) {
+  const board = parseFenBoard(String(game.data.fen || "").split(/\s+/)[0]);
+  const nextKing = findKing(board, nextTurnColor);
+  const winner = nextTurnColor === "w" ? "spiritkin" : "user";
+  if (!nextKing) {
+    setOutcome(game, {
+      winner,
+      reason: "king-lost",
+      label: winner === "user" ? "You ended the game decisively." : "Your Spiritkin ended the game decisively.",
+    });
+    return;
+  }
+
+  const legalMoves = listLegalChessMoves(game.data.fen, nextTurnColor);
+  if (legalMoves.length > 0) {
+    game.result = null;
+    return;
+  }
+
+  if (isSquareAttacked(board, nextKing.row, nextKing.col, nextTurnColor === "w" ? "b" : "w")) {
+    setOutcome(game, {
+      winner,
+      reason: "checkmate",
+      label: winner === "user" ? "Checkmate. You closed the board cleanly." : "Checkmate. Your Spiritkin closed the board cleanly.",
+    });
+    return;
+  }
+
+  setOutcome(game, {
+    winner: null,
+    reason: "stalemate",
+    label: "Stalemate. No legal move remains.",
+  });
+}
+
+function listLegalChessMoves(fen, color) {
+  const parts = String(fen || "").trim().split(/\s+/);
+  const board = parseFenBoard(parts[0]);
+  const moves = [];
+  for (let row = 0; row < 8; row += 1) {
+    for (let col = 0; col < 8; col += 1) {
+      const piece = board[row]?.[col];
+      if (!piece || piece === " ") continue;
+      if (pieceColor(piece) !== color) continue;
+      for (const [toRow, toCol] of getPseudoMoves(board, row, col)) {
+        if (isLegalChessMove(board, row, col, toRow, toCol, color)) {
+          moves.push(coordsToMove(row, col, toRow, toCol));
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+function isLegalChessMove(board, fromRow, fromCol, toRow, toCol, color) {
+  const piece = board[fromRow]?.[fromCol];
+  if (!piece || piece === " " || pieceColor(piece) !== color) return false;
+  const pseudoMoves = getPseudoMoves(board, fromRow, fromCol);
+  if (!pseudoMoves.some(([row, col]) => row === toRow && col === toCol)) return false;
+  const nextBoard = cloneBoard(board);
+  nextBoard[toRow][toCol] = promoteIfNeeded(nextBoard[fromRow][fromCol], toRow);
+  nextBoard[fromRow][fromCol] = " ";
+  const king = findKing(nextBoard, color);
+  if (!king) return false;
+  return !isSquareAttacked(nextBoard, king.row, king.col, color === "w" ? "b" : "w");
+}
+
+function getPseudoMoves(board, row, col) {
+  const piece = board[row]?.[col];
+  if (!piece || piece === " ") return [];
+  const color = pieceColor(piece);
+  const type = piece.toUpperCase();
+  const moves = [];
+  const push = (nextRow, nextCol) => {
+    if (!isOnBoard(nextRow, nextCol)) return false;
+    const target = board[nextRow][nextCol];
+    if (target !== " " && target && pieceColor(target) === color) return false;
+    moves.push([nextRow, nextCol]);
+    return !target || target === " ";
+  };
+
+  if (type === "P") {
+    const dir = color === "w" ? -1 : 1;
+    const startRow = color === "w" ? 6 : 1;
+    if (isOnBoard(row + dir, col) && isEmpty(board[row + dir][col])) {
+      moves.push([row + dir, col]);
+      if (row === startRow && isOnBoard(row + dir * 2, col) && isEmpty(board[row + dir * 2][col])) {
+        moves.push([row + dir * 2, col]);
+      }
+    }
+    for (const offset of [-1, 1]) {
+      const targetRow = row + dir;
+      const targetCol = col + offset;
+      if (!isOnBoard(targetRow, targetCol)) continue;
+      const target = board[targetRow][targetCol];
+      if (!isEmpty(target) && pieceColor(target) !== color) {
+        moves.push([targetRow, targetCol]);
+      }
+    }
+    return moves;
+  }
+
+  if (type === "N") {
+    for (const [dr, dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]) {
+      push(row + dr, col + dc);
+    }
+    return moves;
+  }
+
+  if (type === "K") {
+    for (const [dr, dc] of [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]) {
+      push(row + dr, col + dc);
+    }
+    return moves;
+  }
+
+  const directions = [];
+  if (type === "B" || type === "Q") directions.push([-1,-1],[-1,1],[1,-1],[1,1]);
+  if (type === "R" || type === "Q") directions.push([-1,0],[1,0],[0,-1],[0,1]);
+
+  for (const [dr, dc] of directions) {
+    let step = 1;
+    while (true) {
+      const nextRow = row + dr * step;
+      const nextCol = col + dc * step;
+      if (!push(nextRow, nextCol)) break;
+      step += 1;
+    }
+  }
+  return moves;
+}
+
+function isSquareAttacked(board, row, col, byColor) {
+  for (let r = 0; r < 8; r += 1) {
+    for (let c = 0; c < 8; c += 1) {
+      const piece = board[r]?.[c];
+      if (!piece || piece === " " || pieceColor(piece) !== byColor) continue;
+      const type = piece.toUpperCase();
+      if (type === "P") {
+        const dir = byColor === "w" ? -1 : 1;
+        if ((r + dir === row) && (c - 1 === col || c + 1 === col)) return true;
+        continue;
+      }
+      if (getPseudoMoves(board, r, c).some(([nextRow, nextCol]) => nextRow === row && nextCol === col)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function parseFenBoard(fenBoard) {
+  return String(fenBoard || "")
+    .split("/")
+    .map((row) => row.replace(/\d/g, (n) => " ".repeat(parseInt(n, 10))).split(""));
+}
+
+function boardToFen(board) {
+  return board
+    .map((row) => row.join("").replace(/ +/g, (spaces) => spaces.length))
+    .join("/");
+}
+
+function cloneBoard(board) {
+  return board.map((row) => row.slice());
+}
+
+function findKing(board, color) {
+  const king = color === "w" ? "K" : "k";
+  for (let row = 0; row < 8; row += 1) {
+    for (let col = 0; col < 8; col += 1) {
+      if (board[row]?.[col] === king) return { row, col };
+    }
+  }
+  return null;
+}
+
+function pieceColor(piece) {
+  return piece === piece.toUpperCase() ? "w" : "b";
+}
+
+function isOnBoard(row, col) {
+  return row >= 0 && row < 8 && col >= 0 && col < 8;
+}
+
+function isEmpty(value) {
+  return !value || value === " ";
+}
+
+function coordsToMove(fromRow, fromCol, toRow, toCol) {
+  return `${String.fromCharCode(97 + fromCol)}${8 - fromRow}${String.fromCharCode(97 + toCol)}${8 - toRow}`;
+}
+
+function promoteIfNeeded(piece, toRow) {
+  if (piece === "P" && toRow === 0) return "Q";
+  if (piece === "p" && toRow === 7) return "q";
+  return piece;
 }
 
 function generateCardDeck() {
