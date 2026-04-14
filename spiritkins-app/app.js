@@ -66,6 +66,10 @@ let _AUDIO_CONTEXT = null;
 let _currentAudio = null;
 let _voiceLoopTimer = null;
 let _audioPlaying = false;
+let _recognition = null;
+let _recognitionRunId = 0;
+let _recognitionStopRequested = false;
+let _lastVoiceSubmission = { text: "", at: 0 };
 
 function getMediaToggleState(muted) {
   return muted
@@ -1544,7 +1548,9 @@ async function sendMessage(overrideText) {
     }
     // Auto-speak the response unless muted
     if (!state.voiceMuted) {
-      speakMessage(assistantMsgId).catch(() => {});
+      speakMessage(assistantMsgId).catch(() => {
+        if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(500);
+      });
     }
   } catch (error) {
     state.messages = state.messages.map((message) => (
@@ -1854,14 +1860,22 @@ function maybeAutoOpenGameMic() {
 }
 
 function shouldKeepVoiceLoopActive() {
-  return state.voiceMode && !state.voiceMuted && state.onboardingComplete && !state.crownGateOpening;
+  return state.voiceMode
+    && !state.voiceMuted
+    && state.onboardingComplete
+    && !state.crownGateOpening
+    && !state.showCrownGateHome;
 }
 
-function scheduleVoiceLoop(delay = 350) {
+function clearVoiceLoopTimer() {
   if (_voiceLoopTimer) {
     clearTimeout(_voiceLoopTimer);
     _voiceLoopTimer = null;
   }
+}
+
+function scheduleVoiceLoop(delay = 350) {
+  clearVoiceLoopTimer();
   if (!shouldKeepVoiceLoopActive() || _recognition || state.loadingReply || _audioPlaying) return;
   _voiceLoopTimer = window.setTimeout(() => {
     _voiceLoopTimer = null;
@@ -3370,10 +3384,6 @@ async function onClick(event) {
     return;
   }
 
-  async function submitGameMove(move) {
-    return executeGameMove(move, { addUserMessage: true });
-  }
-
   if (action === "start-game") {
     const gameType = element.dataset.game;
     if (!state.conversationId) return;
@@ -3703,8 +3713,6 @@ async function onClick(event) {
   }
 }
 
-let _recognition = null;
-
 function startListening() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
@@ -3714,60 +3722,93 @@ function startListening() {
     return;
   }
 
-  if (_recognition) {
+  if (_recognition || state.loadingReply || _audioPlaying) {
     return;
   }
 
-  _recognition = new SpeechRecognition();
-  _recognition.continuous = false;
-  _recognition.interimResults = false;
-  _recognition.lang = "en-US";
+  const recognition = new SpeechRecognition();
+  const runId = ++_recognitionRunId;
+  _recognitionStopRequested = false;
+  _recognition = recognition;
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = "en-US";
 
-  _recognition.onstart = () => {
+  const isActiveRun = () => _recognition === recognition && runId === _recognitionRunId;
+
+  recognition.onstart = () => {
+    if (!isActiveRun()) return;
     state.voiceListening = true;
     state.statusText = "Listening… Speak now.";
     state.statusError = false;
     render();
   };
 
-  _recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
+  recognition.onresult = (event) => {
+    if (!isActiveRun()) return;
+    const transcript = String(event.results?.[0]?.[0]?.transcript || "").trim();
     state.input = transcript;
     state.voiceListening = false;
     _recognition = null;
+    _recognitionStopRequested = false;
     render();
+    if (!transcript) {
+      if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(450);
+      return;
+    }
+    const now = Date.now();
+    if (_lastVoiceSubmission.text === transcript && (now - _lastVoiceSubmission.at) < 1500) {
+      if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(450);
+      return;
+    }
+    _lastVoiceSubmission = { text: transcript, at: now };
     sendMessage(transcript);
   };
 
-  _recognition.onerror = (event) => {
+  recognition.onerror = (event) => {
+    if (!isActiveRun()) return;
     state.voiceListening = false;
     state.statusText = `Voice error: ${event.error}. Tap 🎤 to try again.`;
     state.statusError = true;
     _recognition = null;
+    const stopRequested = _recognitionStopRequested;
+    _recognitionStopRequested = false;
+    if (!stopRequested && event.error !== "aborted") {
+      render();
+      if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(700);
+      return;
+    }
+    state.statusText = "";
+    state.statusError = false;
     render();
-    if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(700);
   };
 
-  _recognition.onend = () => {
+  recognition.onend = () => {
+    const stopRequested = _recognitionStopRequested;
     if (state.voiceListening) {
       state.voiceListening = false;
       render();
     }
-    _recognition = null;
+    if (isActiveRun()) {
+      _recognition = null;
+    }
+    _recognitionStopRequested = false;
+    if (stopRequested) return;
     if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(450);
   };
 
-  _recognition.start();
+  recognition.start();
 }
 
 function stopListening() {
-  if (_voiceLoopTimer) {
-    clearTimeout(_voiceLoopTimer);
-    _voiceLoopTimer = null;
-  }
+  clearVoiceLoopTimer();
   if (_recognition) {
-    _recognition.stop();
+    _recognitionStopRequested = true;
+    const recognition = _recognition;
     _recognition = null;
+    try {
+      recognition.stop();
+    } catch (_) {}
   }
   state.voiceListening = false;
   state.statusText = "";
@@ -3810,9 +3851,14 @@ document.addEventListener("DOMContentLoaded", () => {
 async function playAudio(buffer) {
   try {
     _audioPlaying = true;
+    clearVoiceLoopTimer();
     if (_recognition) {
-      _recognition.stop();
+      _recognitionStopRequested = true;
+      const recognition = _recognition;
       _recognition = null;
+      try {
+        recognition.stop();
+      } catch (_) {}
     }
     // Stop any currently playing audio
     if (_currentAudio instanceof HTMLAudioElement) {
@@ -3840,6 +3886,7 @@ async function playAudio(buffer) {
     };
     audio.onerror = (e) => {
       _audioPlaying = false;
+      URL.revokeObjectURL(url);
       if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(500);
     };
     
@@ -3862,6 +3909,7 @@ async function playAudio(buffer) {
           }
           state.statusError = false;
           render();
+          if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(500);
         });
     } else {
       _currentAudio = audio;
