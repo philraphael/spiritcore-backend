@@ -10,7 +10,7 @@
   --text: #ecf5ff;
   --muted: #9db8cb;
   --faint: #678297;
-  --gold: #f2dba0;
+  --gold: #82b7d9;
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
   --radius-lg: 28px;
   --radius-md: 20px;
@@ -19,8 +19,8 @@
   --raien: #f5a623;
   --kairo: #4ecdc4;
   --generic: #b8a6ff;
-  --realm-accent: rgba(242, 219, 160, 0.9);
-  --realm-accent-soft: rgba(242, 219, 160, 0.18);
+  --realm-accent: rgba(130, 183, 217, 0.9);
+  --realm-accent-soft: rgba(130, 183, 217, 0.18);
   --realm-glow-a: rgba(132, 200, 255, 0.18);
   --realm-glow-b: rgba(243, 159, 209, 0.16);
   --realm-glow-c: rgba(246, 164, 92, 0.1);

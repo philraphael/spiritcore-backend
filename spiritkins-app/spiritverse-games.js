@@ -406,6 +406,15 @@ export const SpiritverseGames = {
         case 'echo_trials':
           this.renderEchoTrials(target, payload, onMoveSubmit, isExp);
           break;
+        case 'tictactoe':
+          this.renderTicTacToe(target, payload, onMoveSubmit, isExp);
+          break;
+        case 'connect_four':
+          this.renderConnectFour(target, payload, onMoveSubmit, isExp);
+          break;
+        case 'battleship':
+          this.renderBattleship(target, payload, onMoveSubmit, isExp);
+          break;
       }
     };
 
@@ -453,6 +462,15 @@ export const SpiritverseGames = {
           break;
         case 'echo_trials':
           this.renderEchoTrials(target, payload, onMoveSubmit, isExp);
+          break;
+        case 'tictactoe':
+          this.renderTicTacToe(target, payload, onMoveSubmit, isExp);
+          break;
+        case 'connect_four':
+          this.renderConnectFour(target, payload, onMoveSubmit, isExp);
+          break;
+        case 'battleship':
+          this.renderBattleship(target, payload, onMoveSubmit, isExp);
           break;
         default:
           if (target) target.innerHTML = `<div style="padding:2rem;text-align:center;color:#ccc">Grand Stage not available for this game type.</div>`;
@@ -576,6 +594,58 @@ export const SpiritverseGames = {
       const input = (typeof container === 'string' ? document.getElementById(container) : container).querySelector('#echo-answer');
       if (input) input.focus();
     }, 100);
+  },
+
+  renderTicTacToe(container, gameData) {
+    const board = gameData.board || Array(9).fill(null);
+    const winner = gameData.winner || null;
+    const html = `
+      <div class="sv-mini-game sv-ttt">
+        <div class="sv-mini-grid sv-ttt-grid">
+          ${board.map((cell, idx) => `
+            <button class="sv-mini-cell ttt-cell" data-action="ttt-cell-click" data-idx="${idx}" ${cell ? "disabled" : ""}>
+              ${cell || ""}
+            </button>
+          `).join('')}
+        </div>
+        <div class="sv-mini-caption">${winner ? `${winner === 'X' ? 'You' : 'Spiritkin'} aligned the line.` : 'Claim three in a line.'}</div>
+      </div>
+    `;
+    (typeof container === 'string' ? document.getElementById(container) : container).innerHTML = html;
+  },
+
+  renderConnectFour(container, gameData) {
+    const board = gameData.board || Array(42).fill(null);
+    const html = `
+      <div class="sv-mini-game sv-connect4">
+        <div class="sv-connect4-head">
+          ${Array.from({ length: 7 }, (_, col) => `<button class="sv-connect4-drop" data-action="connect4-column-click" data-col="${col}">Drop</button>`).join('')}
+        </div>
+        <div class="sv-connect4-grid">
+          ${board.map((cell, idx) => `<button class="sv-mini-cell connect4-cell ${cell === 'U' ? 'user' : cell === 'S' ? 'spiritkin' : ''}" data-action="connect4-column-click" data-col="${idx % 7}">${cell === 'U' ? '●' : cell === 'S' ? '◉' : ''}</button>`).join('')}
+        </div>
+        <div class="sv-mini-caption">${gameData.winner ? `${gameData.winner === 'U' ? 'You' : 'Spiritkin'} connected four.` : 'Drop a star into any column.'}</div>
+      </div>
+    `;
+    (typeof container === 'string' ? document.getElementById(container) : container).innerHTML = html;
+  },
+
+  renderBattleship(container, gameData) {
+    const guesses = new Set(gameData.userGuesses || []);
+    const hits = new Set(gameData.hits?.user || []);
+    const html = `
+      <div class="sv-mini-game sv-battleship">
+        <div class="sv-battleship-grid">
+          ${Array.from({ length: 25 }, (_, idx) => {
+            const guessed = guesses.has(idx);
+            const hit = hits.has(idx);
+            return `<button class="sv-mini-cell battleship-cell ${hit ? 'hit' : guessed ? 'miss' : ''}" data-action="battleship-cell-click" data-idx="${idx}" ${guessed ? "disabled" : ""}>${hit ? '✦' : guessed ? '•' : ''}</button>`;
+          }).join('')}
+        </div>
+        <div class="sv-mini-caption">${gameData.winner ? `${gameData.winner === 'user' ? 'You' : 'Spiritkin'} found every hidden vessel.` : 'Search the deep grid for the hidden fleet.'}</div>
+      </div>
+    `;
+    (typeof container === 'string' ? document.getElementById(container) : container).innerHTML = html;
   },
 
   handleChessSquareClick(sq, fen, onMoveSubmit) {

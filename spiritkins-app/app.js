@@ -1151,7 +1151,7 @@ function resolveReadAloudPayload(scope = state.activePresenceTab) {
     if (!state.activeGame) {
       return {
         voice: spiritkin.ui.voice || "nova",
-        text: `The Games Chamber is quiet. You can begin Celestial Chess, Veil Checkers, Star Mapping, Spirit Cards, or the Echo Trials with ${spiritkin.name}.`
+        text: `The Games Chamber is quiet. You can begin Celestial Chess, Veil Checkers, Star Mapping, Spirit Cards, Echo Trials, TicTacToe of Echoes, Connect Four Constellations, or Abyssal Battleship with ${spiritkin.name}.`
       };
     }
     const lastMoves = summarizeEntries((state.activeGame.history || []).slice(-3).map((entry) => {
@@ -2549,7 +2549,10 @@ function buildChatView() {
                     { id: "checkers", name: "Veil Checkers", icon: "\uD83C\uDFF1", desc: "Light against shadow across the Veil" },
                     { id: "go", name: "Star-Mapping (Go)", icon: "\uD83C\uDF0C", desc: "Place stones on a living star chart" },
                     { id: "spirit_cards", name: "Spirit-Cards", icon: "\uD83C\uDCCF", desc: "Spiritverse trading card game" },
-                    { id: "echo_trials", name: "Echo Trials", icon: "\uD83D\uDD14", desc: "Echoes riddles from the deep Spiritverse" }
+                    { id: "echo_trials", name: "Echo Trials", icon: "\uD83D\uDD14", desc: "Echoes riddles from the deep Spiritverse" },
+                    { id: "tictactoe", name: "TicTacToe of Echoes", icon: "\u25A6", desc: "Quick pattern duel with your companion" },
+                    { id: "connect_four", name: "Connect Four Constellations", icon: "\u25CF", desc: "Drop stars and connect four first" },
+                    { id: "battleship", name: "Abyssal Battleship", icon: "\u2693", desc: "Trade hidden strikes across the deep grid" }
                   ].map(game => `
                     <button class="ritual-card ${esc(meta.cls)}" data-action="start-game" data-game="${game.id}">
                       <span class="ritual-icon">${game.icon}</span>
@@ -3488,6 +3491,33 @@ async function onClick(event) {
     const c = idxNum % size;
     const move = `${String.fromCharCode(65 + c)}${size - r}`;
     submitGameMove(move);
+    return;
+  }
+
+  if (action === "ttt-cell-click") {
+    if (!state.activeGame || state.activeGame.type !== 'tictactoe' || state.gameLoading) return;
+    if (state.activeGame.turn !== 'user') return;
+    const idx = element.dataset.idx;
+    if (idx === undefined || idx === null || idx === '') return;
+    submitGameMove(String(idx));
+    return;
+  }
+
+  if (action === "connect4-column-click") {
+    if (!state.activeGame || state.activeGame.type !== 'connect_four' || state.gameLoading) return;
+    if (state.activeGame.turn !== 'user') return;
+    const col = element.dataset.col;
+    if (col === undefined || col === null || col === '') return;
+    submitGameMove(String(col));
+    return;
+  }
+
+  if (action === "battleship-cell-click") {
+    if (!state.activeGame || state.activeGame.type !== 'battleship' || state.gameLoading) return;
+    if (state.activeGame.turn !== 'user') return;
+    const idx = element.dataset.idx;
+    if (idx === undefined || idx === null || idx === '') return;
+    submitGameMove(String(idx));
     return;
   }
 

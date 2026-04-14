@@ -60,11 +60,11 @@
   margin-bottom: 4px;
 }
 .turn-user { background: rgba(78,205,196,0.15); color: #4ecdc4; border: 1px solid rgba(78,205,196,0.3); }
-.turn-spiritkin { background: rgba(242,219,160,0.1); color: #f2dba0; border: 1px solid rgba(242,219,160,0.2); animation: pulse-glow 1.5s infinite; }
+.turn-spiritkin { background: rgba(130,183,217,0.12); color: #82b7d9; border: 1px solid rgba(130,183,217,0.24); animation: pulse-glow 1.5s infinite; }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(242,219,160,0); }
-  50% { box-shadow: 0 0 8px 2px rgba(242,219,160,0.2); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(130,183,217,0); }
+  50% { box-shadow: 0 0 8px 2px rgba(130,183,217,0.18); }
 }
 
 /* ---- SPIRITKIN COMMENTARY ---- */
@@ -134,9 +134,9 @@
   font-family: 'Cormorant Garamond', serif;
   font-size: 1.6rem;
   font-weight: 700;
-  color: #f2dba0;
+  color: #82b7d9;
   letter-spacing: 0.08em;
-  text-shadow: 0 0 15px rgba(242,219,160,0.3);
+  text-shadow: 0 0 15px rgba(130,183,217,0.28);
 }
 
 .game-fullscreen-close {
@@ -153,6 +153,84 @@
 .game-fullscreen-close:hover {
   background: rgba(255,80,80,0.25);
   box-shadow: 0 0 15px rgba(255,80,80,0.2);
+}
+
+.sv-mini-game {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.sv-mini-caption {
+  color: #9db8cb;
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.sv-mini-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.sv-mini-cell {
+  border: 1px solid rgba(130,183,217,0.24);
+  background: rgba(10, 24, 36, 0.92);
+  color: #ecf5ff;
+  border-radius: 12px;
+  min-height: 54px;
+  font-size: 1.2rem;
+}
+
+.sv-mini-cell:hover:not(:disabled) {
+  background: rgba(18, 38, 56, 0.96);
+  border-color: rgba(130,183,217,0.48);
+}
+
+.sv-ttt-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sv-connect4-head,
+.sv-connect4-grid,
+.sv-battleship-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.sv-connect4-head {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.sv-connect4-drop {
+  border: 1px solid rgba(130,183,217,0.24);
+  background: rgba(7, 20, 31, 0.96);
+  color: #82b7d9;
+  border-radius: 10px;
+  padding: 8px 0;
+}
+
+.sv-connect4-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.connect4-cell.user {
+  color: #4ecdc4;
+}
+
+.connect4-cell.spiritkin {
+  color: #82b7d9;
+}
+
+.sv-battleship-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.battleship-cell.hit {
+  color: #4ecdc4;
+}
+
+.battleship-cell.miss {
+  color: #678297;
 }
 
 /* Main stage area */
