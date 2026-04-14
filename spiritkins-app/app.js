@@ -64,6 +64,8 @@ function worldArtImage(filename, alt, cls = "", eager = false) {
 // Audio state - must be declared at top level
 let _AUDIO_CONTEXT = null;
 let _currentAudio = null;
+let _voiceLoopTimer = null;
+let _audioPlaying = false;
 
 function getMediaToggleState(muted) {
   return muted
@@ -1787,7 +1789,7 @@ function render() {
   if (!root) return;
   root.innerHTML = buildApp();
   syncMountedMedia({ attemptPlay: !state.mediaMuted });
-  maybeAutoOpenGameMic();
+  if (!state.voiceMode) maybeAutoOpenGameMic();
 
   // Handle RevealAnimation lifecycle
   if (state.customSpiritkinRevealed && state.generatedSpiritkin) {
@@ -1832,6 +1834,7 @@ function getAutoMicTurnKey(game) {
 }
 
 function maybeAutoOpenGameMic() {
+  if (state.voiceMode) return;
   const turnKey = getAutoMicTurnKey(state.activeGame);
   if (!turnKey) {
     state.autoMicTurnKey = null;
@@ -1848,6 +1851,23 @@ function maybeAutoOpenGameMic() {
       startListening();
     } catch (_) {}
   }, 120);
+}
+
+function shouldKeepVoiceLoopActive() {
+  return state.voiceMode && !state.voiceMuted && state.onboardingComplete && !state.crownGateOpening;
+}
+
+function scheduleVoiceLoop(delay = 350) {
+  if (_voiceLoopTimer) {
+    clearTimeout(_voiceLoopTimer);
+    _voiceLoopTimer = null;
+  }
+  if (!shouldKeepVoiceLoopActive() || _recognition || state.loadingReply || _audioPlaying) return;
+  _voiceLoopTimer = window.setTimeout(() => {
+    _voiceLoopTimer = null;
+    if (!shouldKeepVoiceLoopActive() || _recognition || state.loadingReply || _audioPlaying) return;
+    startListening();
+  }, delay);
 }
 
 function buildApp() {
@@ -3226,18 +3246,18 @@ async function onClick(event) {
       ctx.resume().then(() => {
         state.voiceMode = true;
         localStorage.setItem("sk_voice_mode", "1");
-        state.statusText = "Voice mode enabled. Listening…";
+        state.statusText = "Voice mode enabled. Continuous channel opening…";
         state.statusError = false;
         render();
-        startListening();
+        scheduleVoiceLoop(0);
       });
     } else {
       state.voiceMode = true;
       localStorage.setItem("sk_voice_mode", "1");
-      state.statusText = "Voice mode enabled. Listening…";
+      state.statusText = "Voice mode enabled. Continuous channel opening…";
       state.statusError = false;
       render();
-      startListening();
+      scheduleVoiceLoop(0);
     }
     return;
   }
@@ -3245,6 +3265,8 @@ async function onClick(event) {
   if (action === "toggle-mute") {
     state.voiceMuted = !state.voiceMuted;
     localStorage.setItem("sk_voice_muted", state.voiceMuted ? "1" : "0");
+    if (!state.voiceMuted && state.voiceMode) scheduleVoiceLoop(0);
+    if (state.voiceMuted) stopListening();
     render();
     return;
   }
@@ -3663,8 +3685,7 @@ function startListening() {
   }
 
   if (_recognition) {
-    _recognition.stop();
-    _recognition = null;
+    return;
   }
 
   _recognition = new SpeechRecognition();
@@ -3685,7 +3706,6 @@ function startListening() {
     state.voiceListening = false;
     _recognition = null;
     render();
-    // Auto-send after voice input — mic does NOT auto-reactivate (manual push-to-talk only)
     sendMessage(transcript);
   };
 
@@ -3695,7 +3715,7 @@ function startListening() {
     state.statusError = true;
     _recognition = null;
     render();
-    // Mic does NOT auto-reactivate after error — manual push-to-talk only
+    if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(700);
   };
 
   _recognition.onend = () => {
@@ -3704,13 +3724,17 @@ function startListening() {
       render();
     }
     _recognition = null;
-    // Mic does NOT auto-reactivate on end — manual push-to-talk only
+    if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(450);
   };
 
   _recognition.start();
 }
 
 function stopListening() {
+  if (_voiceLoopTimer) {
+    clearTimeout(_voiceLoopTimer);
+    _voiceLoopTimer = null;
+  }
   if (_recognition) {
     _recognition.stop();
     _recognition = null;
@@ -3730,7 +3754,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 800);
   // Restore voice mode if previously enabled (requires prior user gesture)
   if (state.voiceMode && state.onboardingComplete) {
-    setTimeout(() => { try { startListening(); } catch(e) {} }, 1500);
+    setTimeout(() => { try { scheduleVoiceLoop(0); } catch(e) {} }, 1500);
   }
   const root = document.getElementById("root");
   root.addEventListener("input", onInput);
@@ -3755,6 +3779,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function playAudio(buffer) {
   try {
+    _audioPlaying = true;
+    if (_recognition) {
+      _recognition.stop();
+      _recognition = null;
+    }
     // Stop any currently playing audio
     if (_currentAudio instanceof HTMLAudioElement) {
       _currentAudio.pause();
@@ -3775,10 +3804,13 @@ async function playAudio(buffer) {
     audio.src = url;
     audio.volume = 1.0;
     audio.onended = () => {
+      _audioPlaying = false;
       URL.revokeObjectURL(url);
+      if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(350);
     };
     audio.onerror = (e) => {
-      // Audio error handler
+      _audioPlaying = false;
+      if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(500);
     };
     
     // Attempting to play audio
@@ -3791,6 +3823,7 @@ async function playAudio(buffer) {
           _currentAudio = audio;
         })
         .catch(err => {
+          _audioPlaying = false;
           // Audio play failed
           if (err.name === 'NotAllowedError') {
             state.statusText = "🔊 Click the speaker button to enable audio playback.";
@@ -3804,6 +3837,7 @@ async function playAudio(buffer) {
       _currentAudio = audio;
     }
   } catch (e) {
+    _audioPlaying = false;
     // Failed to create audio element
     state.statusText = "Failed to play audio: " + e.message;
     state.statusError = true;
