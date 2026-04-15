@@ -2448,7 +2448,7 @@ function buildCrownGateEntry() {
       <div class="entry-gate-scrim"></div>
       <div class="entry-gate-shell">
         <button class="entry-skip-btn" data-action="skip-gate" ${needsConsent && !state.consentChecked ? "disabled" : ""}>Skip</button>
-        <div class="entry-copy">
+        <div class="entry-copy ${state.entryVideoStarted ? "entry-copy-hidden" : ""}">
           <div class="entry-glyph-wrap">
             <div class="entry-glyph">SC</div>
             <div class="entry-glyph-line">SpiritCore</div>
@@ -2466,15 +2466,6 @@ function buildCrownGateEntry() {
             <span class="entry-pillar">${returning && state.primarySpiritkin ? `Bonded: ${esc(state.primarySpiritkin.name)}` : "First bond ahead"}</span>
           </div>
           <div class="entry-cta">
-            <div class="entry-name-row">
-              <input
-                type="text"
-                placeholder="Your name (optional)"
-                data-field="entry-name"
-                value="${esc(state.userNameDraft)}"
-                maxlength="40"
-              />
-            </div>
             <button class="btn btn-primary btn-wide entry-main-cta" data-action="continue" ${needsConsent && !state.consentChecked ? "disabled" : ""}>
               ${state.crownGateOpening ? "Opening the Crown Gate..." : "Enter The SpiritVerse & Begin Your Journey"}
             </button>

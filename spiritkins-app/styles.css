@@ -4987,8 +4987,9 @@ button[data-action="begin-quest"]:active,
 .entry-screen-gate,
 .entry-stage-screen,
 .spiritcore-welcome-screen {
-  position: relative;
-  min-height: 100svh;
+  position: fixed;
+  inset: 0;
+  min-height: 100dvh;
   width: 100%;
   margin: 0;
   padding: 0;
@@ -5045,22 +5046,50 @@ button[data-action="begin-quest"]:active,
 }
 
 .entry-gate-shell {
-  width: min(760px, calc(100% - 32px));
-  margin: auto;
-  padding: 32px 20px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  padding: 20px;
   display: flex;
-  justify-content: flex-end;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .entry-copy {
   max-width: 620px;
-  margin-top: auto;
+  width: min(620px, calc(100% - 24px));
   padding: 28px 28px 30px;
   border: 1px solid rgba(242, 219, 160, 0.18);
   border-radius: 28px;
   background: rgba(7, 13, 22, 0.68);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(16px);
+  pointer-events: auto;
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+}
+
+.entry-copy-hidden {
+  opacity: 0;
+  transform: translateY(24px);
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.24s ease, transform 0.24s ease, visibility 0.24s ease;
+}
+
+.entry-screen-gate.is-playing .entry-copy {
+  opacity: 0;
+  transform: translateY(24px);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.entry-screen-gate.is-playing .entry-gate-scrim {
+  background:
+    linear-gradient(180deg, rgba(2, 6, 14, 0.12) 0%, rgba(2, 6, 14, 0.2) 100%),
+    radial-gradient(circle at 50% 40%, rgba(242, 219, 160, 0.04), transparent 36%);
 }
 
 .entry-main-cta {
@@ -5081,6 +5110,7 @@ button[data-action="begin-quest"]:active,
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-size: 0.72rem;
+  pointer-events: auto;
 }
 
 .entry-skip-btn:disabled {
