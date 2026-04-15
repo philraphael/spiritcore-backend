@@ -246,7 +246,7 @@ app.get("/portraits/:filename", async (req, reply) => {
 app.get("/videos/:filename", async (req, reply) => {
   const { filename } = req.params;
   // Whitelist video filenames to prevent directory traversal
-  const allowedVideos = ["lyra_intro.mp4", "raien_intro.mp4", "kairo_intro.mp4", "welcome_intro.mp4"];
+  const allowedVideos = ["lyra_intro.mp4", "raien_intro.mp4", "kairo_intro.mp4", "welcome_intro.mp4", "gate_entrance_final.mp4"];
   if (!allowedVideos.includes(filename)) {
     return reply.code(404).send({ ok: false, error: "Video not found" });
   }

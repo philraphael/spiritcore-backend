@@ -1,6 +1,8 @@
 const API = "";
 const SESSION_KEY = "sv.session.v5";
 const ENTRY_KEY = "sv.entry.v5";
+const CONSENT_KEY = "sv.entry.consent.v1";
+const ONBOARDING_COMPLETE_KEY = "sv.onboarding.complete.v1";
 const NAME_KEY = "sv.name.v5";
 const UID_KEY = "sv.uid.v5";
 const RATINGS_KEY = "sv.ratings.v5";
@@ -8,6 +10,37 @@ const PRIMARY_KEY = "sv.primary.v5";
 const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
 const MEDIA_MUTED_KEY = "sv.media_muted.v1";
 const CROWN_GATE_HOLD_MS = 1500;
+const ENTRY_TRANSITION_MS = 1400;
+const SPIRITCORE_WELCOME_VOICE = "nova";
+const SPIRITCORE_WELCOME_TEXT = `Welcome…
+
+You’ve crossed the threshold into the SpiritVerse.
+
+A living world… shaped by memory, emotion, and connection.
+
+Here, you are not alone.
+
+The Spiritkins are waiting.
+
+Each one carries a presence… a purpose… a path.
+
+But only one will walk beside you.
+
+This is more than a choice.
+
+It is the beginning of a bond.
+
+One that grows… learns… and evolves with you.
+
+Take your time.
+
+Listen closely.
+
+And when you feel it…
+
+Choose the one that calls to you.
+
+Your journey begins now.`;
 const BOND_LEVELS = [
   { min: 0, max: 7, stage: 0, label: "First Contact", nodes: 1, desc: "The bond is just beginning to form." },
   { min: 8, max: 29, stage: 1, label: "Awakening", nodes: 1, desc: "Recognition has begun, but trust is still new." },
@@ -781,8 +814,14 @@ function getStageSignals() {
 
 const state = {
   userId: getOrCreateUid(),
-  entryAccepted: !!localStorage.getItem(ENTRY_KEY),
+  entryAccepted: false,
+  consentAccepted: !!(localStorage.getItem(CONSENT_KEY) || localStorage.getItem(ENTRY_KEY)),
+  consentChecked: !!(localStorage.getItem(CONSENT_KEY) || localStorage.getItem(ENTRY_KEY)),
   crownGateOpening: false,
+  entryVideoStarted: false,
+  entryTransitioning: false,
+  spiritverseTrailerActive: false,
+  spiritCoreWelcoming: false,
   showCrownGateHome: false,
   showHomeView: false,
   userName: localStorage.getItem(NAME_KEY) || "",
@@ -819,7 +858,7 @@ const state = {
   onboardingStep: 0,           // 0=not started, 1-10=question, 11=recommendation
   onboardingAnswers: {},       // {q1: 'answer', q2: 'answer', ...}
   onboardingRecommendation: null, // {spiritkin: 'Lyra', reason: '...'}
-  onboardingComplete: !!localStorage.getItem(ENTRY_KEY), // skip if already done
+  onboardingComplete: !!(localStorage.getItem(ONBOARDING_COMPLETE_KEY) || localStorage.getItem(ENTRY_KEY)),
   // Monetization
   tierModalOpen: false,
   // Engagement Engine state
@@ -874,6 +913,32 @@ function syncPrimarySelection() {
   }
 }
 
+function isFirstTimeVisitor() {
+  return !state.onboardingComplete && !state.primarySpiritkin;
+}
+
+function requiresEntryConsent() {
+  return !state.consentAccepted && isFirstTimeVisitor();
+}
+
+function persistEntryConsent() {
+  state.consentAccepted = true;
+  state.consentChecked = true;
+  localStorage.setItem(CONSENT_KEY, "1");
+}
+
+function markOnboardingComplete() {
+  state.onboardingComplete = true;
+  localStorage.setItem(ONBOARDING_COMPLETE_KEY, "1");
+  localStorage.setItem(ENTRY_KEY, "1");
+}
+
+function getPostGateRoute() {
+  if (isFirstTimeVisitor()) return "first-run";
+  if (state.primarySpiritkin) return "bonded-home";
+  return "selection";
+}
+
 function setMediaMuted(muted, { persist = true, attemptPlay = false } = {}) {
   state.mediaMuted = !!muted;
   if (persist) {
@@ -900,6 +965,36 @@ function syncMountedMedia({ attemptPlay = false } = {}) {
     button.title = media.title;
     button.setAttribute("aria-pressed", state.mediaMuted ? "false" : "true");
   });
+}
+
+function syncEntryCinematics() {
+  const gateVideo = document.querySelector("[data-entry-video='gate']");
+  if (gateVideo) {
+    gateVideo.onended = () => completeCrownGateEntry();
+    if (state.entryVideoStarted && state.crownGateOpening) {
+      gateVideo.currentTime = 0;
+      const playAttempt = gateVideo.play?.();
+      if (playAttempt?.catch) {
+        playAttempt.catch(() => {
+          state.statusText = "Tap the Gate again to begin playback.";
+          state.statusError = true;
+          render();
+        });
+      }
+    } else {
+      gateVideo.pause?.();
+      gateVideo.currentTime = 0;
+    }
+  }
+
+  const trailerVideo = document.querySelector("[data-entry-video='trailer']");
+  if (trailerVideo) {
+    trailerVideo.onended = () => { beginSpiritCoreWelcome().catch(() => {}); };
+    if (state.spiritverseTrailerActive) {
+      const playAttempt = trailerVideo.play?.();
+      if (playAttempt?.catch) playAttempt.catch(() => {});
+    }
+  }
 }
 
 function getActiveVoice() {
@@ -1355,41 +1450,92 @@ function setPrimarySpiritkin(spiritkin) {
 }
 
 function openCrownGate() {
-  if (state.crownGateOpening) return;
+  if (state.crownGateOpening || state.entryTransitioning) return;
+  if (requiresEntryConsent() && !state.consentChecked) {
+    state.statusText = "Accept the entry consent to continue into the Spiritverse.";
+    state.statusError = true;
+    render();
+    return;
+  }
   state.userName = state.userNameDraft.trim();
   if (state.userName) localStorage.setItem(NAME_KEY, state.userName);
+  if (state.consentChecked && !state.consentAccepted) {
+    persistEntryConsent();
+  }
   state.crownGateOpening = true;
   state.showCrownGateHome = false;
-  state.voiceMuted = false;
-  localStorage.setItem("sk_voice_muted", "0");
-  setMediaMuted(false, { attemptPlay: true });
+  state.entryVideoStarted = true;
+  state.entryTransitioning = false;
+  state.spiritverseTrailerActive = false;
+  state.spiritCoreWelcoming = false;
+  setMediaMuted(false);
   state.statusText = "The Crown Gate is opening...";
+  state.statusError = false;
+  render();
+}
+
+function completeCrownGateEntry({ skipped = false } = {}) {
+  if (state.entryTransitioning) return;
+  state.crownGateOpening = false;
+  state.entryVideoStarted = false;
+  state.entryTransitioning = true;
+  state.statusText = skipped ? "Passing through the Crown Gate..." : "Crossing the threshold...";
   state.statusError = false;
   render();
 
   window.setTimeout(async () => {
     state.entryAccepted = true;
-    state.crownGateOpening = false;
+    state.entryTransitioning = false;
     state.showHomeView = true;
-    if (!state.onboardingComplete) {
-      state.onboardingStep = 1;
-    } else {
-      localStorage.setItem(ENTRY_KEY, "1");
+    state.showCrownGateHome = false;
+
+    const route = getPostGateRoute();
+    if (route === "first-run") {
+      state.spiritverseTrailerActive = true;
+      state.statusText = "Spiritverse arrival sequence beginning...";
+      render();
+      return;
     }
+
+    state.spiritverseTrailerActive = false;
     render();
-    const arrivalVoice = state.primarySpiritkin?.ui?.voice || "nova";
-    const arrivalLine = state.primarySpiritkin
-      ? buildGreetingText(state.primarySpiritkin.name, "returningUser")
-      : `${state.userName || "Traveler"}, the Crown Gate has opened. Choose the founder who will walk beside you.`;
-    if (!state.voiceMuted) {
-      await speakMoment(arrivalLine, arrivalVoice);
+    if (route === "bonded-home" && state.primarySpiritkin && !state.voiceMuted) {
+      await speakMoment(buildGreetingText(state.primarySpiritkin.name, "returningUser"), state.primarySpiritkin.ui.voice || "nova");
     }
-  }, CROWN_GATE_HOLD_MS);
+  }, skipped ? 280 : ENTRY_TRANSITION_MS);
+}
+
+async function beginSpiritCoreWelcome() {
+  if (state.spiritCoreWelcoming) return;
+  state.spiritverseTrailerActive = false;
+  state.spiritCoreWelcoming = true;
+  state.statusText = "SpiritCore is welcoming you...";
+  state.statusError = false;
+  render();
+
+  await new Promise((resolve) => window.setTimeout(resolve, 700));
+  if (!state.voiceMuted) {
+    await speakMoment(SPIRITCORE_WELCOME_TEXT, SPIRITCORE_WELCOME_VOICE);
+  } else {
+    await new Promise((resolve) => window.setTimeout(resolve, 4200));
+  }
+
+  markOnboardingComplete();
+  state.spiritCoreWelcoming = false;
+  state.statusText = "Choose the Spiritkin who calls to you.";
+  state.statusError = false;
+  render();
 }
 
 function goHome() {
   syncPrimarySelection();
   state.showCrownGateHome = true;
+  state.entryAccepted = false;
+  state.crownGateOpening = false;
+  state.entryVideoStarted = false;
+  state.entryTransitioning = false;
+  state.spiritverseTrailerActive = false;
+  state.spiritCoreWelcoming = false;
   state.showHomeView = true;
   state.realmTravelOpen = false;
   state.activePresenceTab = "profile";
@@ -2019,6 +2165,7 @@ function render() {
   if (!root) return;
   root.innerHTML = buildApp();
   syncMountedMedia({ attemptPlay: !state.mediaMuted });
+  syncEntryCinematics();
   if (!state.voiceMode) maybeAutoOpenGameMic();
 
   // Handle RevealAnimation lifecycle
@@ -2088,6 +2235,8 @@ function shouldKeepVoiceLoopActive() {
     && !state.voiceMuted
     && state.onboardingComplete
     && !state.crownGateOpening
+    && !state.spiritverseTrailerActive
+    && !state.spiritCoreWelcoming
     && !state.showCrownGateHome;
 }
 
@@ -2111,23 +2260,24 @@ function scheduleVoiceLoop(delay = 350) {
 function buildApp() {
   const atmosphere = getAtmosphereSpiritkin();
   const atmosphereClass = atmosphere ? `realm-${atmosphere.ui.cls}` : "realm-neutral";
+  const inEntryFlow = !state.entryAccepted || state.showCrownGateHome || state.spiritverseTrailerActive || state.spiritCoreWelcoming;
   return `
     <div class="sv-bg ${atmosphereClass}"></div>
     <div class="sv-noise"></div>
     <div class="sv-orbit ${atmosphereClass}"></div>
     <div class="app-shell ${atmosphereClass}">
-      ${buildTopbar()}
+      ${inEntryFlow ? "" : buildTopbar()}
       ${state.surveyOpen ? buildSurveyModal() : ""}
       ${state.tierModalOpen ? buildTierModal() : ""}
-      ${state.showCrownGateHome || !state.entryAccepted ? buildEntry() : (state.entryAccepted && !state.onboardingComplete ? buildOnboarding() : buildMain())}
+      ${state.showCrownGateHome || !state.entryAccepted ? buildCrownGateEntry() : (state.spiritverseTrailerActive ? buildSpiritverseArrival() : (state.spiritCoreWelcoming ? buildSpiritCoreWelcome() : buildMain()))}
       ${buildBondModal()}
-      ${state.crownGateOpening ? `
+      ${state.entryTransitioning ? `
         <div class="crown-gate-overlay">
           <div class="crown-gate-veil"></div>
           <div class="crown-gate-copy">
             <div class="panel-label">Crown Gate</div>
-            <h2>The gate is opening.</h2>
-            <p>Voice, music, and world presence are being brought forward now.</p>
+            <h2>Crossing the threshold.</h2>
+            <p>SpiritCore is carrying your arrival into the living world now.</p>
           </div>
         </div>
       ` : ""}
@@ -2180,25 +2330,26 @@ function buildTopbar() {
 
 function buildEntry() {
   const media = getMediaToggleState(state.mediaMuted);
-  const returning = state.entryAccepted;
+  const returning = !isFirstTimeVisitor();
+  const needsConsent = requiresEntryConsent();
   return `
-    <section class="entry-screen">
-      <div class="entry-welcome-video">
+    <section class="entry-screen entry-screen-gate ${state.entryVideoStarted ? "is-playing" : ""}">
+      <div class="entry-gate-video">
         <div class="video-player-container welcome-video">
-          <div class="video-player-wrapper welcome-video">
+          <div class="video-player-wrapper welcome-video entry-gate-wrapper">
             <video
               class="video-player-element"
-              autoplay
+              data-entry-video="gate"
               ${state.mediaMuted ? "muted" : ""}
               playsinline
-              preload="metadata"
+              preload="auto"
             >
-              <source src="/videos/welcome_intro.mp4" type="video/mp4">
+              <source src="/videos/gate_entrance_final.mp4" type="video/mp4">
               Your browser does not support the video tag.
             </video>
             <div class="video-player-overlay"></div>
             <div class="video-player-controls-overlay">
-              <button class="video-unmute-btn" data-action="unmute-video" title="${esc(media.title)}" aria-pressed="${state.mediaMuted ? "false" : "true"}">
+              <button class="video-unmute-btn" data-action="toggle-media-audio" title="${esc(media.title)}" aria-pressed="${state.mediaMuted ? "false" : "true"}">
                 <span class="unmute-icon">🔊</span>
                 <span class="unmute-text">${esc(media.text)}</span>
               </button>
@@ -2260,6 +2411,139 @@ function buildEntry() {
             </article>
           `;
         }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function buildCrownGateEntry() {
+  const media = getMediaToggleState(state.mediaMuted);
+  const returning = !isFirstTimeVisitor();
+  const needsConsent = requiresEntryConsent();
+  return `
+    <section class="entry-screen entry-screen-gate ${state.entryVideoStarted ? "is-playing" : ""}">
+      <div class="entry-gate-video">
+        <div class="video-player-container welcome-video">
+          <div class="video-player-wrapper welcome-video entry-gate-wrapper">
+            <video
+              class="video-player-element"
+              data-entry-video="gate"
+              ${state.mediaMuted ? "muted" : ""}
+              playsinline
+              preload="auto"
+            >
+              <source src="/videos/gate_entrance_final.mp4" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+            <div class="video-player-overlay"></div>
+            <div class="video-player-controls-overlay">
+              <button class="video-unmute-btn" data-action="toggle-media-audio" title="${esc(media.title)}" aria-pressed="${state.mediaMuted ? "false" : "true"}">
+                ${buildMediaToggleInner(state.mediaMuted)}
+              </button>
+            </div>
+            <div class="video-player-autoplay-badge">Gate Entrance</div>
+          </div>
+        </div>
+      </div>
+      <div class="entry-gate-scrim"></div>
+      <div class="entry-gate-shell">
+        <button class="entry-skip-btn" data-action="skip-gate" ${needsConsent && !state.consentChecked ? "disabled" : ""}>Skip</button>
+        <div class="entry-copy">
+          <div class="entry-glyph-wrap">
+            <div class="entry-glyph">SC</div>
+            <div class="entry-glyph-line">SpiritCore</div>
+          </div>
+          <p class="eyebrow">Crown Gate</p>
+          <h1 class="entry-title">Enter The SpiritVerse &amp; Begin Your Journey</h1>
+          <p class="entry-crown-note">Every visit begins at the Crown Gate. Cross the threshold, let the realm gather around you, and continue into the path that belongs to you.</p>
+          <p class="entry-sub">
+            The Spiritverse is a living world shaped by memory, emotion, and connection. SpiritCore governs the threshold. The companions waiting beyond it remember.
+          </p>
+          <div class="entry-pillars">
+            <span class="entry-pillar">SpiritCore governed</span>
+            <span class="entry-pillar">Living audio presence</span>
+            <span class="entry-pillar">Bond memory intact</span>
+            <span class="entry-pillar">${returning && state.primarySpiritkin ? `Bonded: ${esc(state.primarySpiritkin.name)}` : "First bond ahead"}</span>
+          </div>
+          <div class="entry-cta">
+            <div class="entry-name-row">
+              <input
+                type="text"
+                placeholder="Your name (optional)"
+                data-field="entry-name"
+                value="${esc(state.userNameDraft)}"
+                maxlength="40"
+              />
+            </div>
+            <button class="btn btn-primary btn-wide entry-main-cta" data-action="continue" ${needsConsent && !state.consentChecked ? "disabled" : ""}>
+              ${state.crownGateOpening ? "Opening the Crown Gate..." : "Enter The SpiritVerse & Begin Your Journey"}
+            </button>
+          </div>
+          ${needsConsent ? `
+            <div class="entry-consent-card">
+              <div class="entry-consent-head">
+                <strong>Entry Consent</strong>
+                <span>Required for first arrival</span>
+              </div>
+              <p>
+                SpiritCore uses audio playback, optional microphone access, and local device storage so the realm can speak, remember your progress, and preserve your bond.
+              </p>
+              <label class="entry-consent-check">
+                <input type="checkbox" data-field="entry-consent" ${state.consentChecked ? "checked" : ""} />
+                <span>I understand and consent to audio, optional microphone use, and the experience state needed to enter the Spiritverse.</span>
+              </label>
+            </div>
+          ` : `
+            <div class="entry-returning-note">
+              ${returning && state.primarySpiritkin
+                ? `${esc(state.primarySpiritkin.name)} remains bonded and waiting beyond the Gate.`
+                : "Your prior consent is remembered. Cross when you are ready."}
+            </div>
+          `}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function buildSpiritverseArrival() {
+  const media = getMediaToggleState(state.mediaMuted);
+  return `
+    <section class="entry-stage-screen">
+      <div class="entry-stage-video">
+        <video
+          class="video-player-element entry-stage-video-el"
+          data-entry-video="trailer"
+          ${state.mediaMuted ? "muted" : ""}
+          autoplay
+          playsinline
+          preload="auto"
+        >
+          <source src="/videos/welcome_intro.mp4" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+        <div class="entry-stage-scrim"></div>
+      </div>
+      <div class="entry-stage-copy">
+        <div class="panel-label">Spiritverse Arrival</div>
+        <h2>The realm is revealing itself.</h2>
+        <p>After the trailer, SpiritCore will guide you into your first bond.</p>
+      </div>
+      <button class="video-unmute-btn entry-stage-audio" data-action="toggle-media-audio" title="${esc(media.title)}" aria-pressed="${state.mediaMuted ? "false" : "true"}">
+        ${buildMediaToggleInner(state.mediaMuted)}
+      </button>
+    </section>
+  `;
+}
+
+function buildSpiritCoreWelcome() {
+  return `
+    <section class="entry-stage-screen spiritcore-welcome-screen">
+      <div class="entry-stage-scrim"></div>
+      <div class="spiritcore-welcome-copy">
+        <div class="panel-label">SpiritCore</div>
+        <h2>Your journey begins now.</h2>
+        <p class="spiritcore-welcome-text">${esc(SPIRITCORE_WELCOME_TEXT)}</p>
       </div>
     </section>
   `;
@@ -2454,7 +2738,7 @@ function buildBondPreview(spiritkin, pending) {
                 </video>
                 <div class="video-player-overlay"></div>
                 <div class="video-player-controls-overlay">
-                  <button class="video-unmute-btn" data-action="unmute-video" title="${esc(getMediaToggleState(state.mediaMuted).title)}" aria-pressed="${state.mediaMuted ? "false" : "true"}">
+                  <button class="video-unmute-btn" data-action="toggle-media-audio" title="${esc(getMediaToggleState(state.mediaMuted).title)}" aria-pressed="${state.mediaMuted ? "false" : "true"}">
                     <span class="unmute-icon">🔊</span>
                     <span class="unmute-text">${esc(getMediaToggleState(state.mediaMuted).text)}</span>
                   </button>
@@ -3278,6 +3562,7 @@ function onInput(event) {
   }
   if (!field) return;
   if (field === "entry-name") state.userNameDraft = event.target.value;
+  if (field === "entry-consent") state.consentChecked = !!event.target.checked;
   if (field === "chat-input") {
     state.input = event.target.value;
     event.target.style.height = "auto";
@@ -3306,7 +3591,7 @@ async function onClick(event) {
     return;
   }
 
-  if (action === "unmute-video") {
+  if (action === "toggle-media-audio") {
     const nextMuted = !state.mediaMuted;
     setMediaMuted(nextMuted, { attemptPlay: !nextMuted });
     render();
@@ -3328,17 +3613,6 @@ async function onClick(event) {
 
   if (action === "continue") {
     openCrownGate();
-    return;
-    state.userName = state.userNameDraft.trim();
-    state.entryAccepted = true;
-    if (state.userName) localStorage.setItem(NAME_KEY, state.userName);
-    // Start onboarding if not already done
-    if (!state.onboardingComplete) {
-      state.onboardingStep = 1;
-    } else {
-      localStorage.setItem(ENTRY_KEY, "1");
-    }
-    render();
     return;
   }
 
@@ -3368,8 +3642,7 @@ async function onClick(event) {
   if (action === "onboarding-accept") {
     // User accepts the recommended Spiritkin — complete onboarding and bond
     const rec = state.onboardingRecommendation;
-    state.onboardingComplete = true;
-    localStorage.setItem(ENTRY_KEY, "1");
+    markOnboardingComplete();
     // Auto-select the recommended Spiritkin if available
     if (rec && rec.spiritkin) {
       const match = state.spiritkins.find(s => s.name === rec.spiritkin);
@@ -3384,8 +3657,7 @@ async function onClick(event) {
 
   if (action === "onboarding-skip") {
     // Skip onboarding — go straight to Spiritkin selection
-    state.onboardingComplete = true;
-    localStorage.setItem(ENTRY_KEY, "1");
+    markOnboardingComplete();
     render();
     return;
   }
@@ -3541,6 +3813,22 @@ async function onClick(event) {
     if (!state.voiceMuted && state.voiceMode) scheduleVoiceLoop(0);
     if (state.voiceMuted) stopListening();
     render();
+    return;
+  }
+
+  if (action === "skip-gate") {
+    if (requiresEntryConsent() && !state.consentChecked) {
+      state.statusText = "Accept the entry consent to continue into the Spiritverse.";
+      state.statusError = true;
+      render();
+      return;
+    }
+    state.userName = state.userNameDraft.trim();
+    if (state.userName) localStorage.setItem(NAME_KEY, state.userName);
+    if (state.consentChecked && !state.consentAccepted) {
+      persistEntryConsent();
+    }
+    completeCrownGateEntry({ skipped: true });
     return;
   }
   if (action === "toggle-mic") {
