@@ -5071,6 +5071,49 @@ button[data-action="begin-quest"]:active,
   overflow: auto;
 }
 
+.entry-screen-gate .eyebrow {
+  letter-spacing: 0.24em;
+}
+
+.entry-screen-gate .entry-title {
+  font-size: clamp(2.2rem, 4.6vw, 4rem);
+  line-height: 0.94;
+  letter-spacing: 0.035em;
+  margin-bottom: 12px;
+  background: linear-gradient(180deg, rgba(255, 247, 225, 0.98) 0%, rgba(242, 219, 160, 0.88) 55%, rgba(214, 224, 239, 0.92) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 18px rgba(242, 219, 160, 0.08);
+  animation: spiritgateTitleFade 1.05s ease-out both;
+}
+
+.entry-screen-gate .entry-crown-note {
+  font-size: 1rem;
+  line-height: 1.35;
+  letter-spacing: 0.03em;
+  color: rgba(250, 236, 197, 0.94);
+  margin-bottom: 12px;
+}
+
+.entry-screen-gate .entry-sub {
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+
+@keyframes spiritgateTitleFade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
 .entry-copy-hidden {
   opacity: 0;
   transform: translateY(24px);

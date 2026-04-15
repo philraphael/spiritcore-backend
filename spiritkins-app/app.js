@@ -2275,7 +2275,7 @@ function buildApp() {
         <div class="crown-gate-overlay">
           <div class="crown-gate-veil"></div>
           <div class="crown-gate-copy">
-            <div class="panel-label">Crown Gate</div>
+            <div class="panel-label">SpiritGate</div>
             <h2>Crossing the threshold.</h2>
             <p>SpiritCore is carrying your arrival into the living world now.</p>
           </div>
@@ -2453,11 +2453,14 @@ function buildCrownGateEntry() {
             <div class="entry-glyph">SC</div>
             <div class="entry-glyph-line">SpiritCore</div>
           </div>
-          <p class="eyebrow">Crown Gate</p>
-          <h1 class="entry-title">Enter The SpiritVerse &amp; Begin Your Journey</h1>
-          <p class="entry-crown-note">Every visit begins at the Crown Gate. Cross the threshold, let the realm gather around you, and continue into the path that belongs to you.</p>
+          <p class="eyebrow">SPIRITGATE</p>
+          <h1 class="entry-title">Enter the SpiritVerse</h1>
+          <p class="entry-crown-note">Step beyond the Gate… and awaken what awaits you.</p>
           <p class="entry-sub">
-            The Spiritverse is a living world shaped by memory, emotion, and connection. SpiritCore governs the threshold. The companions waiting beyond it remember.
+            Every visit begins at the SpiritGate. Step forward, let the world gather around you, and continue along the path that calls to you.
+          </p>
+          <p class="entry-sub">
+            The SpiritVerse is a living realm shaped by memory, emotion, and connection. SpiritCore governs the Gate. The companions waiting beyond it remember.
           </p>
           <div class="entry-pillars">
             <span class="entry-pillar">SpiritCore governed</span>
@@ -2467,7 +2470,7 @@ function buildCrownGateEntry() {
           </div>
           <div class="entry-cta">
             <button class="btn btn-primary btn-wide entry-main-cta" data-action="continue" ${needsConsent && !state.consentChecked ? "disabled" : ""}>
-              ${state.crownGateOpening ? "Opening the Crown Gate..." : "Enter The SpiritVerse & Begin Your Journey"}
+              ${state.crownGateOpening ? "Opening the SpiritGate..." : "Enter the SpiritVerse"}
             </button>
           </div>
           ${needsConsent ? `
