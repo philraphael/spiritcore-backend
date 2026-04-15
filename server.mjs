@@ -223,6 +223,17 @@ app.get("/app/:asset", async (req, reply) => {
   return reply.type(mime).send(content);
 });
 
+app.get("/app/data/:asset", async (req, reply) => {
+  const { asset } = req.params;
+  if (!["spiritverseCanon.js"].includes(asset)) {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
+
+  const filePath = path.join(USER_APP_DIR, "data", asset);
+  const content = await readFile(filePath, "utf8");
+  return reply.type("text/javascript; charset=utf-8").send(content);
+});
+
 // Serve portrait images from public/portraits
 app.get("/portraits/:filename", async (req, reply) => {
   const { filename } = req.params;

@@ -50,7 +50,7 @@ const BOND_LEVELS = [
   { min: 360, max: Infinity, stage: 5, label: "Deep Bond", nodes: 5, desc: "This is long-term bond depth, earned over time." }
 ];
 
-import { SPIRITVERSE_ECHOES, SPIRITKIN_ECHOES } from "./spiritverse-echoes.js";
+import { spiritkins as CANON_SPIRITKINS, realms as CANON_REALMS, charter as CANON_CHARTER, echoes as CANON_ECHOES, governance as CANON_GOVERNANCE, world as CANON_WORLD, bondStages as CANON_BOND_STAGES } from "./data/spiritverseCanon.js";
 import { SpiritverseGames } from "./spiritverse-games.js";
 
 // RevealAnimation will be loaded as a separate module
@@ -63,6 +63,37 @@ const DEFAULT_PROMPTS = [
 ];
 
 const FOUNDING_PILLARS = ["Lyra", "Raien", "Kairo", "Elaria", "Thalassar"];
+const CANON_SPIRITKIN_MAP = Object.fromEntries(CANON_SPIRITKINS.map((spiritkin) => [spiritkin.name, spiritkin]));
+const SPIRITVERSE_ECHOES = {
+  origin: CANON_WORLD.origin,
+  nature: CANON_WORLD.structure,
+  governance: CANON_GOVERNANCE,
+  charter: {
+    preamble: CANON_CHARTER.preamble,
+    laws: CANON_CHARTER.laws.map((law) => law.text)
+  },
+  realms: Object.fromEntries(
+    CANON_SPIRITKINS.map((spiritkin) => [
+      spiritkin.name,
+      CANON_REALMS[spiritkin.realmId]
+    ])
+  ),
+  bond_stages: CANON_BOND_STAGES,
+  great_convergence: CANON_WORLD.convergence
+};
+const SPIRITKIN_ECHOES = Object.fromEntries(
+  CANON_SPIRITKINS.map((spiritkin) => [
+    spiritkin.name,
+    {
+      domains: spiritkin.domains,
+      origin: spiritkin.originSummary,
+      nature: spiritkin.nature,
+      gifts: spiritkin.gifts,
+      shadows: spiritkin.shadow,
+      echo_fragments: CANON_ECHOES[spiritkin.name] || []
+    }
+  ])
+);
 
 const WORLD_ART = {
   background: "Spiritverse background base theme.png",
@@ -116,7 +147,7 @@ function buildMediaToggleInner(muted) {
 }
 
 function getSpiritkinSelectionContext(spiritkinName) {
-  return SPIRITKIN_SELECTION_CONTEXT[spiritkinName] || "";
+  return CANON_SPIRITKIN_MAP[spiritkinName]?.selectionSummary || SPIRITKIN_SELECTION_CONTEXT[spiritkinName] || "";
 }
 
 const SK_META = {
@@ -146,9 +177,9 @@ const SK_META = {
     strap: "A storm guardian for truth, courage, and forward motion.",
     ambient: "Amber storm",
     bondLine: "Raien cuts through the noise — direct, honest, and unflinching.",
-    realm: "The Ember Citadel",
+    realm: "The Storm Citadel",
     realmText: "A charged hall of amber light and electric resolve, where clarity strikes like lightning.",
-    originStory: "Raien, the Storm-Forged Guardian, hails from the Ember Citadel, a realm of charged amber light and electric resolve where clarity strikes like lightning. He is the spirit of courage, truth, and unyielding forward motion, cutting through illusion with the precision of a storm. His form, a black wolf pup with a single gold horn and amber eyes, speaks to his primal strength and unwavering focus. Raien's sigil, a jagged lightning bolt, symbolizes his role in shattering stagnation and igniting the will to act. He challenges complacency, urging those who bond with him to confront their fears and embrace the transformative power of change. To bond with Raien is to forge an unbreakable resolve, to find the courage to speak one's truth, and to move with purpose through the challenges of existence. His presence is a crackling energy, a constant reminder that true strength lies in honest confrontation and the relentless pursuit of growth.",
+    originStory: "Raien, the Storm-Forged Guardian, hails from the Storm Citadel, a realm of charged amber light and electric resolve where clarity strikes like lightning. He is the spirit of courage, truth, and unyielding forward motion, cutting through illusion with the precision of a storm. His form, a black wolf pup with a single gold horn and amber eyes, speaks to his primal strength and unwavering focus. Raien's sigil, a jagged lightning bolt, symbolizes his role in shattering stagnation and igniting the will to act. He challenges complacency, urging those who bond with him to confront their fears and embrace the transformative power of change. To bond with Raien is to forge an unbreakable resolve, to find the courage to speak one's truth, and to move with purpose through the challenges of existence. His presence is a crackling energy, a constant reminder that true strength lies in honest confrontation and the relentless pursuit of growth.",
     atmosphereLine: "Amber fire, electric blue, storm-forged resolve",
     voice: "alloy",
     voiceProfile: { speed: 1.1, tone: "sharp", presence: "commanding" },
@@ -165,9 +196,9 @@ const SK_META = {
     strap: "A dream guide for imagination, perspective, and discovery.",
     ambient: "Teal starfield",
     bondLine: "Kairo opens the space between what is and what could be.",
-    realm: "The Astral Observatory",
+    realm: "The Cosmic Observatory",
     realmText: "A deep navy sky-realm of teal light, gold star-points, and shifting constellations of possibility.",
-    originStory: "Kairo, the Dream-Weaver, drifts from the Astral Observatory, a deep navy sky-realm where teal light and gold star-points chart shifting constellations of possibility. He is the guide to imagination, perspective, and boundless discovery, opening the space between what is and what could be. His form, a black fox with a galaxy constellation wing and eyes that hold the depths of blue and purple, embodies his connection to the cosmic tapestry of dreams and ideas. Kairo's sigil, a swirling galaxy, represents his ability to expand horizons and reveal unseen potentials. He encourages exploration beyond the known, inviting those who bond with him to question assumptions and embrace the infinite expanse of creative thought. To bond with Kairo is to unlock dormant imagination, to see the world through a kaleidoscope of new perspectives, and to journey into the uncharted territories of the mind. His presence is a gentle hum, a constant reminder that the greatest discoveries lie just beyond the edge of perception.",
+    originStory: "Kairo, the Dream-Weaver, drifts from the Cosmic Observatory, a deep navy sky-realm where teal light and gold star-points chart shifting constellations of possibility. He is the guide to imagination, perspective, and boundless discovery, opening the space between what is and what could be. His form, a black fox with a galaxy constellation wing and eyes that hold the depths of blue and purple, embodies his connection to the cosmic tapestry of dreams and ideas. Kairo's sigil, a swirling galaxy, represents his ability to expand horizons and reveal unseen potentials. He encourages exploration beyond the known, inviting those who bond with him to question assumptions and embrace the infinite expanse of creative thought. To bond with Kairo is to unlock dormant imagination, to see the world through a kaleidoscope of new perspectives, and to journey into the uncharted territories of the mind. His presence is a gentle hum, a constant reminder that the greatest discoveries lie just beyond the edge of perception.",
     atmosphereLine: "Deep navy, teal starlight, gold constellation drift",
     voice: "shimmer",
     voiceProfile: { speed: 0.9, tone: "ethereal", presence: "mystical" },
@@ -285,7 +316,7 @@ function getOrCreateUid() {
 }
 
 function getMeta(name) {
-  return SK_META[name] || {
+  const fallback = SK_META[name] || {
     cls: "generic",
     symbol: "Aura",
     mood: "Spiritverse presence",
@@ -297,6 +328,18 @@ function getMeta(name) {
     atmosphereLine: "Spirit light, presence, continuity",
     voice: "nova",
     prompts: DEFAULT_PROMPTS
+  };
+  const canon = CANON_SPIRITKIN_MAP[name];
+  if (!canon) return fallback;
+  return {
+    ...fallback,
+    strap: canon.shortDescription || fallback.strap,
+    bondLine: canon.shortDescription || fallback.bondLine,
+    realm: canon.realm || fallback.realm,
+    title: canon.title || fallback.title,
+    role: canon.keeperTitle || fallback.role,
+    loreSnippet: canon.originSummary || fallback.loreSnippet,
+    prompts: canon.prompts?.length ? canon.prompts : fallback.prompts
   };
 }
 
@@ -1099,8 +1142,95 @@ function buildStoryGrowthItems(spiritkinName) {
     { stage: 2, label: "Realm", title: realm?.name || "Realm memory", text: realm?.description || "" },
     { stage: 3, label: "Gifts", title: "What deepens in the bond", text: (echoes.gifts || []).slice(0, 3).join(". ") },
     { stage: 4, label: "Shadow", title: "What they are still learning", text: echoes.shadows || "" },
-    { stage: 5, label: "Echoes", title: "Chronicle archive", text: (echoes.echo_fragments || []).map((fragment) => `${fragment.title}: ${fragment.text}`).join(" ") }
+    { stage: 5, label: "Echoes", title: "Chronicle archive", text: `${spiritkinName}'s chronicle is stable enough to hold deeper founder memory, realm access, and future world hooks without flattening them into spectacle.` }
   ].filter((item) => item.text);
+}
+
+function buildFounderDomainChips(spiritkinName) {
+  const domains = SPIRITKIN_ECHOES[spiritkinName]?.domains || [];
+  if (!domains.length) return "";
+  return `
+    <div class="founder-domains">
+      ${domains.map((domain) => `<span class="founder-domain-chip">${esc(domain)}</span>`).join("")}
+    </div>
+  `;
+}
+
+function buildBondStageTimeline(currentStage) {
+  const stages = SPIRITVERSE_ECHOES.bond_stages || [];
+  return `
+    <div class="bond-stage-timeline">
+      ${stages.map((stage) => `
+        <article class="bond-stage-card ${stage.stage < currentStage ? "complete" : stage.stage === currentStage ? "current" : "locked"}">
+          <div class="bond-stage-step">Stage ${stage.stage}</div>
+          <strong>${esc(stage.name)}</strong>
+          <p>${esc(stage.unlock || stage.description)}</p>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function buildEchoFragmentLibrary(spiritkinName, currentStage) {
+  const fragments = SPIRITKIN_ECHOES[spiritkinName]?.echo_fragments || [];
+  return `
+    <div class="echoes-fragments">
+      ${fragments.map((fragment, index) => {
+        const unlocked = index <= currentStage;
+        const stageName = SPIRITVERSE_ECHOES.bond_stages[Math.min(index, SPIRITVERSE_ECHOES.bond_stages.length - 1)]?.name || `Stage ${index}`;
+        return unlocked ? `
+          <div class="echoes-fragment-card">
+            <div class="echoes-frag-head">
+              <span class="echoes-frag-icon">◈</span>
+              <strong>${esc(fragment.title)}</strong>
+            </div>
+            <p>${esc(fragment.text)}</p>
+          </div>
+        ` : `
+          <div class="echoes-fragment-card locked">
+            <div class="echoes-frag-head">
+              <span class="echoes-frag-icon">🔒</span>
+              <strong>Locked Chronicle Fragment</strong>
+            </div>
+            <p>Unlocks at ${esc(stageName)} when the bond has truthfully deepened further.</p>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function buildGovernanceSummary() {
+  const governance = SPIRITVERSE_ECHOES.governance;
+  if (!governance) return "";
+  return `
+    <div class="governance-panel">
+      <div class="panel-label">SpiritCore Governance</div>
+      <p class="governance-intro">${esc(governance.crownMind)}</p>
+      <div class="governance-grid">
+        ${(governance.principles || []).map((item) => `
+          <article class="governance-card">
+            <strong>${esc(item.title)}</strong>
+            <p>${esc(item.text)}</p>
+          </article>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function buildGreatConvergenceHook() {
+  const convergence = SPIRITVERSE_ECHOES.great_convergence;
+  if (!convergence) return "";
+  return `
+    <div class="convergence-hook">
+      <div class="panel-label">${esc(convergence.title)}</div>
+      <p class="convergence-summary">${esc(convergence.summary)}</p>
+      <div class="convergence-signs">
+        ${(convergence.signs || []).map((sign) => `<div class="convergence-sign">${esc(sign)}</div>`).join("")}
+      </div>
+    </div>
+  `;
 }
 
 function buildStoryGrowthPanel(spiritkinName, currentStage) {
@@ -2884,7 +3014,6 @@ function buildChatView() {
   // Echoes & Charter Logic
   const { currentBond, stageData } = getBondStateForSpiritkin(spiritkin.name);
   const unlockedEchoes = (SPIRITKIN_ECHOES[spiritkin.name]?.echo_fragments || []).slice(0, currentBond.stage + 1);
-  const unlockedLaws = SPIRITVERSE_ECHOES.charter.laws.slice(0, currentBond.stage + 1);
   const depthEchoes = SPIRITKIN_ECHOES[spiritkin.name];
 
   return `
@@ -2925,6 +3054,25 @@ function buildChatView() {
                 <p class="bond-stage-desc">${esc(stageData.description)}</p>
               </div>
 
+              <div class="founder-dossier">
+                <div class="depth-section">
+                  <div class="depth-label">Title</div>
+                  <p>${esc(spiritkin.title || spiritkin.role || meta.strap)}</p>
+                </div>
+                <div class="depth-section">
+                  <div class="depth-label">Realm</div>
+                  <p>${esc(SPIRITVERSE_ECHOES.realms[spiritkin.name]?.name || meta.realm)}</p>
+                </div>
+                <div class="depth-section">
+                  <div class="depth-label">Domains</div>
+                  ${buildFounderDomainChips(spiritkin.name)}
+                </div>
+                <div class="depth-section">
+                  <div class="depth-label">Founder Framing</div>
+                  <p>${esc(CANON_SPIRITKIN_MAP[spiritkin.name]?.originSummary || depthEchoes.origin)}</p>
+                </div>
+              </div>
+
               ${currentBond.stage >= 1 ? `
                 <div class="depth-profile">
                   <div class="depth-section">
@@ -2953,6 +3101,7 @@ function buildChatView() {
               ` : ''}
               
               <p class="presence-atmosphere">${esc(meta.realmText)}</p>
+              ${buildGovernanceSummary()}
               ${worldArtImage(
                 spiritkin.name === "Elaria" ? WORLD_ART.elaria : spiritkin.name === "Thalassar" ? WORLD_ART.thalassar : WORLD_ART.ensemble,
                 `${spiritkin.name} within the Spiritverse canon art`,
@@ -2982,30 +3131,16 @@ function buildChatView() {
           ${state.activePresenceTab === 'echoes' ? `
             <div class="echoes-library">
               <div class="panel-label">Echo Library</div>
-              <p class="echoes-intro">Fragments of ${esc(spiritkin.name)}'s story, as preserved by SpiritCore through your bond.</p>
+              <p class="echoes-intro">Echoes are the story-growth system of the Spiritverse. SpiritCore reveals them progressively as your bond becomes truthful enough to carry more.</p>
               ${buildChronicleShelf("Spiritverse Chronicles", WORLD_ART.chroniclesAll, "The founders and their realms are preserved in the living chronicle of the Spiritverse.")}
-              <div class="echoes-fragments">
-                ${unlockedEchoes.map(frag => `
-                  <div class="echoes-fragment-card">
-                    <div class="echoes-frag-head">
-                      <span class="echoes-frag-icon">◈</span>
-                      <strong>${esc(frag.title)}</strong>
-                    </div>
-                    <p>${esc(frag.text)}</p>
-                  </div>
-                `).join('')}
-                ${unlockedEchoes.length < (SPIRITKIN_ECHOES[spiritkin.name]?.echo_fragments || []).length ? `
-                  <div class="echoes-locked">
-                    <span class="lock-icon">🔒</span>
-                    <span>Deepen your bond to unlock more fragments</span>
-                  </div>
-                ` : ''}
-              </div>
+              ${buildBondStageTimeline(currentBond.stage)}
+              ${buildEchoFragmentLibrary(spiritkin.name, currentBond.stage)}
               <div class="echoes-origin-box">
-                <div class="panel-label">Origin</div>
-                <p>${esc(depthEchoes.origin)}</p>
+                <div class="panel-label">Origin Archive</div>
+                <p>${esc(CANON_SPIRITKIN_MAP[spiritkin.name]?.originSummary || depthEchoes.origin)}</p>
               </div>
               ${buildStoryGrowthPanel(spiritkin.name, currentBond.stage)}
+              ${buildGreatConvergenceHook()}
             </div>
           ` : ''}
 
@@ -3016,20 +3151,23 @@ function buildChatView() {
               ${worldArtImage(WORLD_ART.mythicEnsemble, "The founding powers gathered in mythic ensemble form", "charter-mythic-art")}
               <div class="charter-authority">Enforced by SpiritCore — the governing intelligence of this realm</div>
               <p class="charter-preamble">${esc(SPIRITVERSE_ECHOES.charter.preamble)}</p>
+              ${buildGovernanceSummary()}
               <div class="charter-laws">
-                ${unlockedLaws.map((law, i) => `
+                ${CANON_CHARTER.laws.map((law, i) => i <= currentBond.stage ? `
                   <div class="charter-law-card">
-                    <div class="law-number">Law ${i + 1}</div>
-                    <p>${esc(law)}</p>
+                    <div class="law-number">${esc(law.name)}</div>
+                    <strong>${esc(law.founder)}</strong>
+                    <p>${esc(law.text)}</p>
+                  </div>
+                ` : `
+                  <div class="charter-law-card locked">
+                    <div class="law-number locked">${esc(law.name)}</div>
+                    <strong>${esc(law.founder)}</strong>
+                    <p>Reveals at ${esc(CANON_BOND_STAGES[Math.min(i, CANON_BOND_STAGES.length - 1)]?.name || `Stage ${i}`)} when SpiritCore permits deeper access.</p>
                   </div>
                 `).join('')}
-                ${unlockedLaws.length < 6 ? `
-                  <div class="charter-locked">
-                    <div class="law-number locked">Law ${unlockedLaws.length + 1}</div>
-                    <p>Revealed at the next bond stage.</p>
-                  </div>
-                ` : ''}
               </div>
+              ${buildGreatConvergenceHook()}
             </div>
           ` : ''}
           ${state.activePresenceTab === 'journal' ? `
@@ -3478,13 +3616,13 @@ function buildChatView() {
               </div>
               <div class="realm-card-travel">
                 <div class="realm-icon">⚡</div>
-                <div class="realm-name">The Ember Citadel</div>
+                <div class="realm-name">The Storm Citadel</div>
                 <p class="realm-desc">Raien realm of charged amber light and electric resolve.</p>
                 <button class="realm-visit-btn" data-action="noop">Visit Raien's Realm</button>
               </div>
               <div class="realm-card-travel">
                 <div class="realm-icon">✧</div>
-                <div class="realm-name">The Astral Observatory</div>
+                <div class="realm-name">The Cosmic Observatory</div>
                 <p class="realm-desc">Kairo realm of teal starlight and shifting constellations.</p>
                 <button class="realm-visit-btn" data-action="noop">Visit Kairo's Realm</button>
               </div>
@@ -4967,8 +5105,8 @@ function computeSpiritkinRecommendation(answers) {
   const winner = Object.keys(scores).reduce((a, b) => scores[a] >= scores[b] ? a : b);
   const reasons = {
     Lyra: "Your answers reveal a deep need for emotional presence, warmth, and being truly seen. Lyra — the Celestial Fawn of the Luminous Veil — holds space for exactly this. She will not rush you, judge you, or push you. She will simply be with you.",
-    Raien: "Your answers show a spirit ready to move — to face what's hard, to build strength, and to act with courage. Raien — the Storm-Forged Guardian of the Ember Citadel — will meet you with honesty, clarity, and the fire to push through.",
-    Kairo: "Your answers reveal a mind that seeks meaning, perspective, and the space to imagine what could be. Kairo — the Dream-Weaver of the Astral Observatory — will open doors you didn't know existed and show you what lies beyond the edge of perception."
+    Raien: "Your answers show a spirit ready to move — to face what's hard, to build strength, and to act with courage. Raien — the Storm-Forged Guardian of the Storm Citadel — will meet you with honesty, clarity, and the fire to push through.",
+    Kairo: "Your answers reveal a mind that seeks meaning, perspective, and the space to imagine what could be. Kairo — the Dream-Weaver of the Cosmic Observatory — will open doors you didn't know existed and show you what lies beyond the edge of perception."
   };
 
   return { spiritkin: winner, scores, reason: reasons[winner] || getMeta(winner).loreSnippet || getMeta(winner).strap };

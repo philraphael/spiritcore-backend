@@ -3522,6 +3522,14 @@ button:disabled {
   gap: 16px;
 }
 
+.founder-dossier,
+.governance-panel {
+  margin: 18px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .depth-section {
   border-left: 2px solid var(--line);
   padding-left: 12px;
@@ -3570,6 +3578,76 @@ button:disabled {
   top: 2px;
 }
 
+.founder-domains,
+.convergence-signs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.founder-domain-chip,
+.convergence-sign {
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--realm-accent) 28%, transparent);
+  background: color-mix(in srgb, var(--realm-accent-soft) 55%, transparent);
+  color: var(--text);
+  font-size: 0.74rem;
+}
+
+.bond-stage-timeline,
+.governance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.bond-stage-card,
+.governance-card,
+.convergence-hook {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.bond-stage-card.current,
+.governance-card {
+  border-color: color-mix(in srgb, var(--realm-accent) 28%, transparent);
+  background: color-mix(in srgb, var(--realm-accent-soft) 30%, rgba(255,255,255,0.03));
+}
+
+.bond-stage-card.complete {
+  opacity: 0.92;
+}
+
+.bond-stage-card.locked {
+  opacity: 0.58;
+}
+
+.bond-stage-step,
+.governance-card strong,
+.convergence-hook .panel-label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.bond-stage-step {
+  color: var(--gold);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.bond-stage-card p,
+.governance-intro,
+.governance-card p,
+.convergence-summary {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
 /* Echo Library */
 .echoes-library, .charter-view {
   animation: fadeIn 0.3s ease-out;
@@ -3595,6 +3673,12 @@ button:disabled {
   border-radius: var(--radius-sm);
 }
 
+.echoes-fragment-card.locked,
+.charter-law-card.locked {
+  opacity: 0.68;
+  border-style: dashed;
+}
+
 .echoes-frag-head {
   display: flex;
   align-items: center;
@@ -3610,6 +3694,13 @@ button:disabled {
   line-height: 1.5;
   margin: 0;
   opacity: 0.9;
+}
+
+.charter-law-card strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  color: var(--text);
 }
 
 .echoes-locked, .charter-locked {
