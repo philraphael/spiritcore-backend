@@ -641,6 +641,7 @@ button:disabled {
     radial-gradient(circle at 50% 42%, rgba(242, 219, 160, 0.18), transparent 28%),
     linear-gradient(180deg, rgba(7, 10, 18, 0.22), rgba(7, 10, 18, 0.78));
   backdrop-filter: blur(6px);
+  animation: crownGateVeilShift 1s ease-out both;
 }
 
 .crown-gate-copy {
@@ -653,6 +654,7 @@ button:disabled {
   background: rgba(8, 14, 26, 0.76);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
   text-align: center;
+  animation: crownGateCopyLift 0.92s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .crown-gate-copy h2 {
@@ -664,6 +666,28 @@ button:disabled {
 .crown-gate-copy p {
   margin: 0;
   color: var(--muted);
+}
+
+@keyframes crownGateVeilShift {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(6px);
+  }
+}
+
+@keyframes crownGateCopyLift {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .entry-crown-note {
@@ -1001,6 +1025,25 @@ button:disabled {
 
 .focus-tone {
   margin-top: 12px;
+}
+
+.focus-selection-context,
+.sk-selection-context {
+  margin: 0;
+  color: rgba(242, 219, 160, 0.9);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.focus-selection-context {
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(242, 219, 160, 0.14);
+  background: rgba(242, 219, 160, 0.06);
+}
+
+.sk-selection-context {
+  min-height: 72px;
 }
 
 .focus-atmosphere,

@@ -115,6 +115,10 @@ function buildMediaToggleInner(muted) {
   return `<span class="unmute-icon">${media.icon}</span><span class="unmute-text">${media.text}</span>`;
 }
 
+function getSpiritkinSelectionContext(spiritkinName) {
+  return SPIRITKIN_SELECTION_CONTEXT[spiritkinName] || "";
+}
+
 const SK_META = {
   Lyra: {
     cls: "lyra",
@@ -217,6 +221,14 @@ const SK_META = {
       "Show me what this feeling becomes if I stop resisting it."
     ]
   }
+};
+
+const SPIRITKIN_SELECTION_CONTEXT = {
+  Lyra: "Choose Lyra if you need emotional steadiness, tenderness, and a companion who helps you name what you feel without pressure.",
+  Raien: "Choose Raien if you need courage, momentum, and someone who will help you face what is true and act on it cleanly.",
+  Kairo: "Choose Kairo if you need perspective, imagination, and a guide who opens new possibilities when you feel mentally boxed in.",
+  Elaria: "Choose Elaria if you need clarity, rightful timing, and a sovereign presence that helps truth become legible without confusion.",
+  Thalassar: "Choose Thalassar if you need depth, patience, and a witness who can stay with what is unfolding beneath the surface."
 };
 
 function uuid() {
@@ -2163,6 +2175,7 @@ function buildGameOutcomeSummary(game, spiritkinName) {
 function render() {
   const root = document.getElementById("root");
   if (!root) return;
+  enforceEntryVoiceSilence();
   root.innerHTML = buildApp();
   syncMountedMedia({ attemptPlay: !state.mediaMuted });
   syncEntryCinematics();
@@ -2233,11 +2246,32 @@ function maybeAutoOpenGameMic() {
 function shouldKeepVoiceLoopActive() {
   return state.voiceMode
     && !state.voiceMuted
+    && state.entryAccepted
     && state.onboardingComplete
     && !state.crownGateOpening
     && !state.spiritverseTrailerActive
     && !state.spiritCoreWelcoming
     && !state.showCrownGateHome;
+}
+
+function enforceEntryVoiceSilence() {
+  const inEntryRitual = !state.entryAccepted || state.showCrownGateHome || state.spiritverseTrailerActive || state.spiritCoreWelcoming;
+  if (!inEntryRitual) return;
+  clearVoiceLoopTimer();
+  if (_recognition) {
+    _recognitionStopRequested = true;
+    const recognition = _recognition;
+    _recognition = null;
+    try {
+      recognition.stop();
+    } catch (_) {}
+  }
+  if (state.voiceListening) {
+    state.voiceListening = false;
+  }
+  if (state.statusText === "Listening… Speak now." || state.statusText === "Listening... Speak now.") {
+    state.statusText = "";
+  }
 }
 
 function clearVoiceLoopTimer() {
@@ -2276,8 +2310,8 @@ function buildApp() {
           <div class="crown-gate-veil"></div>
           <div class="crown-gate-copy">
             <div class="panel-label">SpiritGate</div>
-            <h2>Crossing the threshold.</h2>
-            <p>SpiritCore is carrying your arrival into the living world now.</p>
+            <h2>The Gate is opening.</h2>
+            <p>Let the threshold settle around you. SpiritCore is carrying your arrival into the living world.</p>
           </div>
         </div>
       ` : ""}
@@ -2634,6 +2668,9 @@ function buildBondedHomeView() {
             <button class="btn btn-primary" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
               ${state.loadingConv ? "Opening bonded channel..." : state.conversationId ? `Resume with ${esc(spiritkin.name)}` : `Begin with ${esc(spiritkin.name)}`}
             </button>
+            <button class="btn btn-ghost" data-action="open-games-hub" ${state.loadingConv ? "disabled" : ""}>
+              ${state.loadingConv && !state.conversationId ? "Preparing Games..." : "Open Games"}
+            </button>
             <button class="btn btn-ghost" data-action="open-bond-manager">Manage bond</button>
           </div>
         </div>
@@ -2752,6 +2789,7 @@ function buildBondPreview(spiritkin, pending) {
           <div class="focus-founder-line">Founding Pillar</div>
           <div class="focus-tags">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
           <div class="focus-tone">${esc(describePresence(spiritkin) || spiritkin.ui.bondLine)}</div>
+          ${pending ? `<p class="focus-selection-context">${esc(getSpiritkinSelectionContext(spiritkin.name))}</p>` : ""}
           ${!pending ? buildResonanceDepth(spiritkin.name, spiritkin.ui.cls) : ''}
           <div class="focus-atmosphere">${esc(spiritkin.ui.realmText)}</div>
           <p class="focus-origin-story">${esc(spiritkin.ui.loreSnippet || spiritkin.ui.originStory)}</p>
@@ -2781,6 +2819,7 @@ function buildBondCard(spiritkin, index, subdued) {
       <div class="sk-role">${esc(spiritkin.role || spiritkin.ui.bondLine)}</div>
       <div class="sk-essence">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
       <p class="sk-tone">${esc(describePresence(spiritkin) || spiritkin.ui.strap)}</p>
+      <p class="sk-selection-context">${esc(getSpiritkinSelectionContext(spiritkin.name))}</p>
       <div class="sk-origin-story">${esc(spiritkin.ui.loreSnippet || spiritkin.ui.originStory)}</div>
       <div class="sk-footer-note">${activeBond ? "This companion owns your active sessions." : subdued ? "Available only through rebonding." : "Preview and confirm to bond."}</div>
     </article>
@@ -3756,6 +3795,17 @@ async function onClick(event) {
   }
 
   if (action === "begin") { await beginConversation(); return; }
+  if (action === "open-games-hub") {
+    state.activePresenceTab = "games";
+    if (!state.conversationId) {
+      await beginConversation();
+    } else {
+      state.showHomeView = false;
+      render();
+      narratePresenceTab("games").catch(() => {});
+    }
+    return;
+  }
   if (action === "send") { await sendMessage(); return; }
   if (action === "prompt") { await sendMessage(element.dataset.prompt || ""); return; }
   if (action === "read-visible") { await performReadAloud(element.dataset.scope || state.activePresenceTab); return; }
