@@ -1113,6 +1113,11 @@ const state = {
   gameInstructions: null,        // instructions for the current game type
   gameLoading: false,            // loading state for game moves
   pendingGameType: null,         // game currently opening
+  issueReporterOpen: false,
+  issueReportText: "",
+  issueReportContextNote: "",
+  issueReportSubmitting: false,
+  issueReportStatus: null,
   // Phase 6: Shared Spiritverse Events
   spiritverseEvent: null,        // current active Spiritverse event
   spiritverseEventNext: null,    // time until next event
@@ -3018,6 +3023,77 @@ function scheduleVoiceLoop(delay = 350) {
   return;
 }
 
+function getIssueFeatureContext() {
+  if (state.activeGame?.status === "active") return "games";
+  if (state.conversationId && state.activePresenceTab) return state.activePresenceTab;
+  if (state.showHomeView && state.primarySpiritkin) return "bond_home";
+  if (!state.primarySpiritkin) return "selection";
+  return state.activePresenceTab || "profile";
+}
+
+function getIssueSourceContext() {
+  if (state.activeGame?.status === "active") return "live_game_session";
+  if (state.conversationId) return "bonded_conversation";
+  if (state.showHomeView) return "bonded_home";
+  return "app_surface";
+}
+
+function buildIssueContextSummary() {
+  const parts = [`Feature: ${getIssueFeatureContext().replace(/_/g, " ")}`];
+  if (state.selectedSpiritkin?.name) parts.push(`Spiritkin: ${state.selectedSpiritkin.name}`);
+  if (state.activeGame?.type) parts.push(`Game: ${state.activeGame.type.replace(/_/g, " ")}`);
+  if (state.conversationId) parts.push("Conversation active");
+  return parts.join(" • ");
+}
+
+async function submitIssueReport() {
+  const reportText = state.issueReportText.trim();
+  if (!reportText || state.issueReportSubmitting) return;
+
+  state.issueReportSubmitting = true;
+  state.issueReportStatus = null;
+  render();
+
+  try {
+    const response = await fetch(`${API}/v1/issues/report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        reportText,
+        userId: state.userId,
+        conversationId: state.conversationId || null,
+        spiritkinName: state.selectedSpiritkin?.name || state.primarySpiritkin?.name || null,
+        sessionId: state.conversationId || null,
+        sourceContext: [getIssueSourceContext(), state.issueReportContextNote.trim()].filter(Boolean).join(" | "),
+        currentFeature: getIssueFeatureContext(),
+      }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.message || "Could not submit the report.");
+    }
+
+    state.issueReportStatus = {
+      kind: "success",
+      text: data.captured
+        ? "Thanks. Your beta report was logged for review."
+        : "Thanks. We noted that, but it did not need a repair queue entry right now.",
+    };
+    state.issueReportText = "";
+    state.issueReportContextNote = "";
+    state.issueReporterOpen = false;
+  } catch (error) {
+    state.issueReportStatus = {
+      kind: "error",
+      text: error.message || "Could not send your report right now.",
+    };
+  } finally {
+    state.issueReportSubmitting = false;
+    render();
+  }
+}
+
 function buildApp() {
   const atmosphere = getAtmosphereSpiritkin();
   const atmosphereClass = atmosphere ? `realm-${atmosphere.ui.cls}` : "realm-neutral";
@@ -3031,6 +3107,7 @@ function buildApp() {
       ${state.surveyOpen ? buildSurveyModal() : ""}
       ${state.tierModalOpen ? buildTierModal() : ""}
       ${state.showCrownGateHome || !state.entryAccepted ? buildCrownGateEntry() : (state.spiritverseTrailerActive ? buildSpiritverseArrival() : (state.spiritCoreWelcoming ? buildSpiritCoreWelcome() : buildMain()))}
+      ${!inEntryFlow ? buildIssueReporter() : ""}
       ${buildBondModal()}
       ${state.entryTransitioning ? `
         <div class="crown-gate-overlay">
@@ -3082,10 +3159,63 @@ function buildTopbar() {
         ${active ? `<div class="presence-chip ${esc(active.ui.cls)}">Bonded: ${esc(active.name)}</div>` : `<div class="presence-chip">Choose a companion</div>`}
         ${state.entryAccepted && state.primarySpiritkin ? `<button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>` : ""}
         ${state.entryAccepted && state.conversationId ? `<button class="btn btn-ghost btn-sm" data-action="new-session">New session</button>` : ""}
+        ${state.entryAccepted ? `<button class="btn btn-ghost btn-sm" data-action="toggle-issue-reporter">${state.issueReporterOpen ? "Close report" : "Report issue"}</button>` : ""}
         ${state.entryAccepted && state.userName ? `<span class="topbar-user">${esc(state.userName)}</span>` : ""}
         ${state.entryAccepted ? `<button class="btn btn-ghost btn-sm topbar-upgrade-btn" data-action="open-tier-modal">✦ Membership</button>` : ""}
       </div>
     </header>
+  `;
+}
+
+function buildIssueReporter() {
+  const contextSummary = buildIssueContextSummary();
+  const status = state.issueReportStatus;
+  return `
+    <div class="issue-reporter ${state.issueReporterOpen ? "open" : ""}">
+      ${status ? `
+        <div class="issue-status issue-status-${esc(status.kind)}">
+          <span>${esc(status.text)}</span>
+          <button class="issue-status-close" data-action="dismiss-issue-status" aria-label="Dismiss issue status">×</button>
+        </div>
+      ` : ""}
+      <button class="issue-reporter-fab" data-action="toggle-issue-reporter" aria-expanded="${state.issueReporterOpen ? "true" : "false"}">
+        <span class="issue-reporter-fab-label">Something not working right?</span>
+      </button>
+      ${state.issueReporterOpen ? `
+        <div class="issue-reporter-panel">
+          <div class="issue-reporter-head">
+            <div>
+              <div class="panel-label">Beta Feedback</div>
+              <h3>Tell us what happened</h3>
+            </div>
+            <button class="btn btn-ghost btn-sm" data-action="toggle-issue-reporter">Close</button>
+          </div>
+          <p class="issue-reporter-copy">Short and direct is enough. We automatically include your current Spiritverse context.</p>
+          <div class="issue-reporter-context">${esc(contextSummary)}</div>
+          <textarea
+            class="issue-reporter-textarea"
+            data-field="issue-report-text"
+            rows="4"
+            maxlength="2000"
+            placeholder="voice keeps turning off&#10;tic tac toe did not update&#10;stop repeating that phrase"
+          >${esc(state.issueReportText)}</textarea>
+          <input
+            class="issue-reporter-input"
+            data-field="issue-report-context"
+            type="text"
+            maxlength="120"
+            value="${esc(state.issueReportContextNote)}"
+            placeholder="Optional note: what were you doing?"
+          />
+          <div class="issue-reporter-actions">
+            <button class="btn btn-primary" data-action="submit-issue-report" ${state.issueReportSubmitting ? "disabled" : ""}>
+              ${state.issueReportSubmitting ? "Sending report..." : "Send report"}
+            </button>
+            <button class="btn btn-ghost btn-sm" data-action="prefill-issue-report">Use example</button>
+          </div>
+        </div>
+      ` : ""}
+    </div>
   `;
 }
 
@@ -4331,6 +4461,8 @@ function onInput(event) {
   if (!field) return;
   if (field === "entry-name") state.userNameDraft = event.target.value;
   if (field === "entry-consent") state.consentChecked = !!event.target.checked;
+  if (field === "issue-report-text") state.issueReportText = event.target.value;
+  if (field === "issue-report-context") state.issueReportContextNote = event.target.value;
   if (field === "chat-input") {
     state.input = event.target.value;
     event.target.style.height = "auto";
@@ -4526,6 +4658,32 @@ async function onClick(event) {
 
   if (action === "go-home") {
     goHome();
+    return;
+  }
+
+  if (action === "toggle-issue-reporter") {
+    state.issueReporterOpen = !state.issueReporterOpen;
+    if (!state.issueReporterOpen) state.issueReportContextNote = "";
+    render();
+    return;
+  }
+
+  if (action === "dismiss-issue-status") {
+    state.issueReportStatus = null;
+    render();
+    return;
+  }
+
+  if (action === "prefill-issue-report") {
+    state.issueReportText = state.activeGame?.status === "active"
+      ? `${state.activeGame.name || state.activeGame.type} did not update the way I expected.`
+      : "Something is not working right.";
+    render();
+    return;
+  }
+
+  if (action === "submit-issue-report") {
+    await submitIssueReport();
     return;
   }
 

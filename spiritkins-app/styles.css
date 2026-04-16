@@ -5408,3 +5408,133 @@ button[data-action="begin-quest"]:active,
     bottom: 14px;
   }
 }
+
+.issue-reporter {
+  position: fixed;
+  right: 20px;
+  bottom: 18px;
+  z-index: 45;
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.issue-reporter-fab,
+.issue-reporter-panel,
+.issue-status {
+  border: 1px solid rgba(242, 219, 160, 0.18);
+  background: rgba(7, 13, 22, 0.82);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+}
+
+.issue-reporter-fab {
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border-radius: 999px;
+  color: var(--text);
+}
+
+.issue-reporter-fab-label {
+  font-weight: 600;
+}
+
+.issue-reporter-panel {
+  width: min(420px, calc(100vw - 24px));
+  padding: 18px;
+  border-radius: 22px;
+}
+
+.issue-reporter-head,
+.issue-reporter-actions,
+.issue-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.issue-reporter-head h3 {
+  margin: 4px 0 0;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1.75rem;
+}
+
+.issue-reporter-copy,
+.issue-reporter-context,
+.issue-status {
+  color: var(--muted);
+}
+
+.issue-reporter-context {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  font-size: 0.84rem;
+}
+
+.issue-reporter-textarea,
+.issue-reporter-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.045);
+  color: var(--text);
+  padding: 13px 14px;
+  outline: none;
+}
+
+.issue-reporter-textarea {
+  min-height: 120px;
+  resize: vertical;
+  margin-bottom: 10px;
+}
+
+.issue-reporter-textarea:focus,
+.issue-reporter-input:focus {
+  border-color: rgba(242, 219, 160, 0.3);
+}
+
+.issue-reporter-actions {
+  margin-top: 12px;
+}
+
+.issue-status {
+  width: min(420px, calc(100vw - 24px));
+  padding: 12px 14px;
+  border-radius: 18px;
+}
+
+.issue-status-success {
+  border-color: rgba(111, 208, 227, 0.28);
+}
+
+.issue-status-error {
+  border-color: rgba(255, 125, 125, 0.3);
+}
+
+.issue-status-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+}
+
+@media (max-width: 760px) {
+  .issue-reporter {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    justify-items: stretch;
+  }
+
+  .issue-reporter-fab,
+  .issue-reporter-panel,
+  .issue-status {
+    width: 100%;
+    max-width: none;
+  }
+}

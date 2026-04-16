@@ -25,7 +25,7 @@ const SK_META = {
 // ─── State ─────────────────────────────────────────────────────────────────
 
 const state = {
-  activeTab: "monitor", // monitor, voice, world, system
+  activeTab: "monitor", // monitor, voice, world, repair, system
   spiritkins: [],
   selectedSpiritkin: null,
   selectedVoice: "nova",
@@ -34,6 +34,8 @@ const state = {
   selectedConversationMessages: [],
   systemStats: {},
   globalMetrics: {},
+  issueDigest: null,
+  repairHandoff: null,
   isTestingVoice: false,
   loading: false,
   error: null,
@@ -92,6 +94,16 @@ async function refreshData() {
     const convData = await convRes.json();
     state.recentConversations = convData.conversations || [];
 
+    // 4. Fetch issue review data
+    const [digestRes, handoffRes] = await Promise.all([
+      fetch(`${API}/v1/admin/issues/digest`),
+      fetch(`${API}/v1/admin/issues/repair-handoff`)
+    ]);
+    const digestData = await digestRes.json();
+    const handoffData = await handoffRes.json();
+    state.issueDigest = digestData.digest || null;
+    state.repairHandoff = handoffData.handoff || null;
+
     render();
   } catch (err) {
     console.warn("Refresh failed:", err);
@@ -122,6 +134,7 @@ function render() {
       </header>
 
       <nav class="cc-tabs-nav">
+        <button class="cc-tab-btn ${state.activeTab === 'repair' ? 'active' : ''}" onclick="switchTab('repair')">REPAIR REVIEW</button>
         <button class="cc-tab-btn ${state.activeTab === 'monitor' ? 'active' : ''}" onclick="switchTab('monitor')">📡 MONITOR</button>
         <button class="cc-tab-btn ${state.activeTab === 'voice' ? 'active' : ''}" onclick="switchTab('voice')">🔊 VOICE LAB</button>
         <button class="cc-tab-btn ${state.activeTab === 'world' ? 'active' : ''}" onclick="switchTab('world')">🌌 WORLD STATE</button>
@@ -157,6 +170,7 @@ function renderActiveTab() {
     case "monitor": return renderMonitorTab();
     case "voice": return renderVoiceTab();
     case "world": return renderWorldTab();
+    case "repair": return renderRepairTab();
     case "system": return renderSystemTab();
     default: return renderMonitorTab();
   }
@@ -357,6 +371,148 @@ function renderSystemTab() {
 }
 
 // ─── Handlers ──────────────────────────────────────────────────────────────
+
+function renderRepairTab() {
+  const digest = state.issueDigest;
+  const handoff = state.repairHandoff;
+  if (!digest || !handoff) {
+    return `
+      <div class="cc-tab-content">
+        <section class="cc-card">
+          <h3>Repair Review</h3>
+          <p class="cc-empty">Issue review data is not available yet.</p>
+        </section>
+      </div>
+    `;
+  }
+
+  const recurring = handoff.top_recurring_bugs || [];
+  const severe = handoff.highest_severity_issues || [];
+  const emerging = handoff.newly_emerging_issues || [];
+  const areas = handoff.repeat_complaints_by_system_area || [];
+  const packets = handoff.repair_packets || [];
+
+  return `
+    <div class="cc-tab-content">
+      <div class="cc-dashboard">
+        <section class="cc-card" style="grid-column: span 2;">
+          <div class="cc-section-head">
+            <div>
+              <h3>Owner Review Status</h3>
+              <p class="cc-section-sub">Review only. No autonomous patching or deployment is enabled.</p>
+            </div>
+            <div class="cc-governance-pill">Owner Approval Required</div>
+          </div>
+          <div class="cc-stat-grid">
+            <div class="cc-stat-box">
+              <span class="cc-stat-val">${handoff.total_repair_packets || 0}</span>
+              <span class="cc-stat-label">Repair Packets</span>
+            </div>
+            <div class="cc-stat-box">
+              <span class="cc-stat-val">${(digest.unresolved_issues || []).length}</span>
+              <span class="cc-stat-label">Unresolved Issues</span>
+            </div>
+            <div class="cc-stat-box">
+              <span class="cc-stat-val">${(digest.grouped_recurring_issues || []).length}</span>
+              <span class="cc-stat-label">Recurring Clusters</span>
+            </div>
+            <div class="cc-stat-box">
+              <span class="cc-stat-val">${Object.keys(digest.top_bug_themes || {}).length}</span>
+              <span class="cc-stat-label">Bug Areas</span>
+            </div>
+          </div>
+        </section>
+        <section class="cc-card">
+          <h3>Top Recurring Bugs</h3>
+          <div class="cc-issue-list">
+            ${recurring.length ? recurring.map((item) => `
+              <div class="cc-issue-item">
+                <div class="cc-issue-top">
+                  <strong>${item.probable_area}</strong>
+                  <span class="cc-severity ${item.severity}">${item.severity}</span>
+                </div>
+                <div class="cc-issue-summary">${item.summary}</div>
+                <div class="cc-issue-meta">${item.related_reports} related reports • confidence ${Number(item.confidence || 0).toFixed(2)}</div>
+              </div>
+            `).join("") : '<p class="cc-empty">No recurring bugs queued.</p>'}
+          </div>
+        </section>
+        <section class="cc-card">
+          <h3>Highest Severity Issues</h3>
+          <div class="cc-issue-list">
+            ${severe.length ? severe.map((item) => `
+              <div class="cc-issue-item">
+                <div class="cc-issue-top">
+                  <strong>${item.feature_context?.probable_area || 'general_app'}</strong>
+                  <span class="cc-severity ${item.severity}">${item.severity}</span>
+                </div>
+                <div class="cc-issue-summary">${item.summary}</div>
+                <div class="cc-issue-meta">${item.recent_related_reports?.length || 0} linked reports</div>
+              </div>
+            `).join("") : '<p class="cc-empty">No high-severity issues detected.</p>'}
+          </div>
+        </section>
+        <section class="cc-card">
+          <h3>Newly Emerging Issues</h3>
+          <div class="cc-issue-list">
+            ${emerging.length ? emerging.map((item) => `
+              <div class="cc-issue-item">
+                <div class="cc-issue-top">
+                  <strong>${item.feature_context?.probable_area || 'general_app'}</strong>
+                  <span class="cc-confidence">confidence ${Number(item.confidence || 0).toFixed(2)}</span>
+                </div>
+                <div class="cc-issue-summary">${item.summary}</div>
+              </div>
+            `).join("") : '<p class="cc-empty">No emerging issues yet.</p>'}
+          </div>
+        </section>
+        <section class="cc-card">
+          <h3>Repeat Complaints by System Area</h3>
+          <div class="cc-issue-list">
+            ${areas.length ? areas.map((item) => `
+              <div class="cc-issue-item">
+                <div class="cc-issue-top">
+                  <strong>${item.probable_area}</strong>
+                  <span class="cc-confidence">${item.complaints} complaints</span>
+                </div>
+                <div class="cc-issue-meta">${item.clusters} active cluster${item.clusters === 1 ? "" : "s"}</div>
+              </div>
+            `).join("") : '<p class="cc-empty">No system-area repeats yet.</p>'}
+          </div>
+        </section>
+        <section class="cc-card" style="grid-column: span 2;">
+          <h3>Repair Packets</h3>
+          <div class="cc-packet-list">
+            ${packets.length ? packets.map((packet) => `
+              <article class="cc-packet-card">
+                <div class="cc-issue-top">
+                  <strong>${packet.feature_context?.probable_area || "general_app"}</strong>
+                  <span class="cc-severity ${packet.severity}">${packet.severity}</span>
+                </div>
+                <h4>${packet.summary}</h4>
+                <div class="cc-packet-grid">
+                  <div>
+                    <div class="cc-packet-label">Reproduction hints</div>
+                    <ul class="cc-packet-listing">
+                      ${(packet.reproduction_hints || []).map((hint) => `<li>${hint}</li>`).join("")}
+                    </ul>
+                  </div>
+                  <div>
+                    <div class="cc-packet-label">Recent related reports</div>
+                    <ul class="cc-packet-listing">
+                      ${(packet.recent_related_reports || []).map((report) => `<li>${report.summary}</li>`).join("")}
+                    </ul>
+                  </div>
+                </div>
+                <div class="cc-issue-meta">${packet.recommended_next_action}</div>
+              </article>
+            `).join("") : '<p class="cc-empty">No repair packets available.</p>'}
+          </div>
+        </section>
+      </div>
+    </div>
+  `;
+}
 
 window.switchTab = function(tabId) {
   state.activeTab = tabId;
