@@ -11,6 +11,7 @@ const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
 const GAME_HELP_SEEN_KEY = "sv.game_help_seen.v1";
 const MEDIA_MUTED_KEY = "sv.media_muted.v1";
 const ADAPTIVE_PROFILE_KEY = "sv.adaptive_profile.v1";
+const SPIRITKIN_EVOLUTION_KEY = "sv.spiritkin_evolution.v1";
 const RETENTION_STATE_KEY = "sv.retention_state.v1";
 const RETENTION_TELEMETRY_KEY = "sv.retention_telemetry.v1";
 const CROWN_GATE_HOLD_MS = 1500;
@@ -1416,6 +1417,198 @@ function createDefaultAdaptiveProfile() {
   };
 }
 
+const SPIRITKIN_EVOLUTION_DEFAULTS = {
+  Lyra: { warmth: 0.84, challenge: 0.18, reverence: 0.46, wonder: 0.34 },
+  Raien: { warmth: 0.36, challenge: 0.84, reverence: 0.24, wonder: 0.22 },
+  Kairo: { warmth: 0.48, challenge: 0.34, reverence: 0.28, wonder: 0.88 },
+  Elaria: { warmth: 0.52, challenge: 0.58, reverence: 0.76, wonder: 0.26 },
+  Thalassar: { warmth: 0.62, challenge: 0.36, reverence: 0.58, wonder: 0.42 }
+};
+
+function clampEvolution(value, fallback = 0.2) {
+  return clamp01(value, fallback);
+}
+
+function easeToward(current, target, factor = 0.18) {
+  const from = clampEvolution(current, target);
+  const to = clampEvolution(target, from);
+  return clampEvolution(from + ((to - from) * factor), from);
+}
+
+function createDefaultSpiritkinEvolution(spiritkinName = "") {
+  const base = SPIRITKIN_EVOLUTION_DEFAULTS[spiritkinName] || SPIRITKIN_EVOLUTION_DEFAULTS.Lyra;
+  return {
+    version: 1,
+    spiritkinName,
+    depth: 0.18,
+    confidence: 0.22,
+    trust: 0.2,
+    warmth: base.warmth,
+    challenge: base.challenge,
+    reverence: base.reverence,
+    wonder: base.wonder,
+    userShape: "grounded-presence",
+    styleShift: "steadying",
+    growthPhase: "opening",
+    totalUserMessages: 0,
+    totalAssistantMessages: 0,
+    gamesTogether: 0,
+    bondStagePeak: 0,
+    resonancePeak: 0,
+    lastUpdatedAt: null
+  };
+}
+
+function normalizeSpiritkinEvolutionProfile(raw, spiritkinName = "") {
+  const base = createDefaultSpiritkinEvolution(spiritkinName);
+  const source = raw && typeof raw === "object" ? raw : {};
+  return {
+    ...base,
+    spiritkinName: spiritkinName || String(source.spiritkinName || base.spiritkinName || ""),
+    depth: clampEvolution(source.depth, base.depth),
+    confidence: clampEvolution(source.confidence, base.confidence),
+    trust: clampEvolution(source.trust, base.trust),
+    warmth: clampEvolution(source.warmth, base.warmth),
+    challenge: clampEvolution(source.challenge, base.challenge),
+    reverence: clampEvolution(source.reverence, base.reverence),
+    wonder: clampEvolution(source.wonder, base.wonder),
+    userShape: typeof source.userShape === "string" && source.userShape.trim() ? source.userShape.trim() : base.userShape,
+    styleShift: typeof source.styleShift === "string" && source.styleShift.trim() ? source.styleShift.trim() : base.styleShift,
+    growthPhase: typeof source.growthPhase === "string" && source.growthPhase.trim() ? source.growthPhase.trim() : base.growthPhase,
+    totalUserMessages: clampInt(source.totalUserMessages, base.totalUserMessages),
+    totalAssistantMessages: clampInt(source.totalAssistantMessages, base.totalAssistantMessages),
+    gamesTogether: clampInt(source.gamesTogether, base.gamesTogether),
+    bondStagePeak: clampInt(source.bondStagePeak, base.bondStagePeak),
+    resonancePeak: clampInt(source.resonancePeak, base.resonancePeak),
+    lastUpdatedAt: typeof source.lastUpdatedAt === "string" ? source.lastUpdatedAt : null
+  };
+}
+
+function normalizeSpiritkinEvolutionStore(raw) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const bySpiritkin = source.bySpiritkin && typeof source.bySpiritkin === "object" ? source.bySpiritkin : {};
+  return {
+    version: 1,
+    bySpiritkin: Object.fromEntries(
+      Object.entries(bySpiritkin).map(([name, profile]) => [name, normalizeSpiritkinEvolutionProfile(profile, name)])
+    )
+  };
+}
+
+function readSpiritkinEvolutionStore() {
+  return normalizeSpiritkinEvolutionStore(readJson(SPIRITKIN_EVOLUTION_KEY, null));
+}
+
+function persistSpiritkinEvolutionStore(store) {
+  writeJson(SPIRITKIN_EVOLUTION_KEY, normalizeSpiritkinEvolutionStore(store));
+}
+
+function deriveEvolutionUserShape(profile, spiritkinName = "") {
+  if ((profile.spiritualityPreference || 0) > 0.7 || (profile.respectPreference || 0) > 0.72) return "reverent-clarity";
+  if ((profile.playfulness || 0) > 0.64 && (profile.competitiveness || 0) > 0.58) return spiritkinName === "Raien" ? "spirited-challenge" : "playful-challenge";
+  if ((profile.playfulness || 0) > 0.62) return "lighter-play";
+  if ((profile.intensity || 0) > 0.68) return "sharpened-directness";
+  if ((profile.respectPreference || 0) > 0.6) return "measured-care";
+  return "grounded-presence";
+}
+
+function deriveEvolutionShiftLabel(evolution) {
+  if ((evolution.depth || 0) > 0.72 && (evolution.trust || 0) > 0.66) return "deepened shorthand";
+  if ((evolution.confidence || 0) > 0.68 && (evolution.challenge || 0) > 0.62) return "clearer edge";
+  if ((evolution.reverence || 0) > 0.68) return "sacred gravity";
+  if ((evolution.wonder || 0) > 0.7) return "wider wonder";
+  if ((evolution.warmth || 0) > 0.72) return "steadier warmth";
+  return "steadying";
+}
+
+function deriveEvolutionPhase(evolution) {
+  const signal = ((evolution.depth || 0) * 0.4) + ((evolution.trust || 0) * 0.3) + ((evolution.confidence || 0) * 0.3);
+  if (signal > 0.76) return "bonded-distinctness";
+  if (signal > 0.58) return "settled-shape";
+  if (signal > 0.38) return "growing-definition";
+  return "opening";
+}
+
+function getSpiritkinEvolutionProfile(spiritkinName = state.primarySpiritkin?.name || state.selectedSpiritkin?.name || "") {
+  if (!spiritkinName) return normalizeSpiritkinEvolutionProfile(null, "");
+  const store = readSpiritkinEvolutionStore();
+  return normalizeSpiritkinEvolutionProfile(store.bySpiritkin?.[spiritkinName], spiritkinName);
+}
+
+function updateSpiritkinEvolution(spiritkinName, signals = {}) {
+  if (!spiritkinName) return null;
+  const store = readSpiritkinEvolutionStore();
+  const adaptive = normalizeAdaptiveProfile(state.adaptiveProfile);
+  const current = normalizeSpiritkinEvolutionProfile(store.bySpiritkin?.[spiritkinName], spiritkinName);
+  const resonance = readJson(RESONANCE_KEY, {});
+  const resonanceCount = clampInt(resonance[spiritkinName], 0);
+  const bondStage = state.primarySpiritkin?.name === spiritkinName
+    ? (state.bondJournal?.bondStage ?? getBondStageForCount(resonanceCount))
+    : getBondStageForCount(resonanceCount);
+  const gamesCompleted = state.primarySpiritkin?.name === spiritkinName ? clampInt(state.bondJournal?.gamesCompleted, 0) : 0;
+  const visitDays = Array.isArray(state.retentionTelemetry?.visitDays) ? state.retentionTelemetry.visitDays : [];
+
+  const next = { ...current };
+  next.totalUserMessages += signals.userText ? 1 : 0;
+  next.totalAssistantMessages += signals.assistantText ? 1 : 0;
+  next.gamesTogether = Math.max(next.gamesTogether, gamesCompleted);
+  next.bondStagePeak = Math.max(next.bondStagePeak, bondStage);
+  next.resonancePeak = Math.max(next.resonancePeak, resonanceCount);
+
+  const depthTarget = clampEvolution(0.18 + (bondStage * 0.13) + Math.min(0.2, resonanceCount / 240) + Math.min(0.08, next.totalUserMessages / 120));
+  const confidenceTarget = clampEvolution(0.2 + (bondStage * 0.1) + (adaptive.intensity * 0.16) + (adaptive.competitiveness * 0.08) + Math.min(0.08, gamesCompleted / 18));
+  const trustTarget = clampEvolution(0.18 + (bondStage * 0.11) + Math.min(0.14, getVisitStreakDays(visitDays) / 20) + Math.min(0.12, next.totalAssistantMessages / 120));
+  const warmthTarget = clampEvolution((SPIRITKIN_EVOLUTION_DEFAULTS[spiritkinName]?.warmth || 0.5) + ((adaptive.respectPreference - 0.5) * 0.25));
+  const challengeTarget = clampEvolution((SPIRITKIN_EVOLUTION_DEFAULTS[spiritkinName]?.challenge || 0.4) + ((adaptive.competitiveness - 0.35) * 0.3));
+  const reverenceTarget = clampEvolution((SPIRITKIN_EVOLUTION_DEFAULTS[spiritkinName]?.reverence || 0.3) + ((adaptive.spiritualityPreference - 0.25) * 0.35));
+  const wonderTarget = clampEvolution((SPIRITKIN_EVOLUTION_DEFAULTS[spiritkinName]?.wonder || 0.3) + ((adaptive.playfulness - 0.32) * 0.14) + ((adaptive.intensity < 0.42 ? 0.06 : 0)));
+
+  next.depth = easeToward(next.depth, depthTarget, 0.2);
+  next.confidence = easeToward(next.confidence, confidenceTarget, 0.18);
+  next.trust = easeToward(next.trust, trustTarget, 0.18);
+  next.warmth = easeToward(next.warmth, warmthTarget, 0.14);
+  next.challenge = easeToward(next.challenge, challengeTarget, 0.14);
+  next.reverence = easeToward(next.reverence, reverenceTarget, 0.14);
+  next.wonder = easeToward(next.wonder, wonderTarget, 0.14);
+  next.userShape = deriveEvolutionUserShape(adaptive, spiritkinName);
+  next.styleShift = deriveEvolutionShiftLabel(next);
+  next.growthPhase = deriveEvolutionPhase(next);
+  next.lastUpdatedAt = nowIso();
+
+  store.bySpiritkin[spiritkinName] = next;
+  persistSpiritkinEvolutionStore(store);
+  return next;
+}
+
+function buildEvolutionDescriptor(spiritkin) {
+  const spiritkinName = spiritkin?.name || state.primarySpiritkin?.name || "";
+  if (!spiritkinName) return null;
+  const evolution = getSpiritkinEvolutionProfile(spiritkinName);
+  const bondStage = state.bondJournal?.bondStage ?? getBondStageForCount(clampInt(readJson(RESONANCE_KEY, {})[spiritkinName], 0));
+  const axis = spiritkin?.growth_axis || spiritkin?.ui?.bondLine || "bonded presence";
+  const shapeMap = {
+    "grounded-presence": "grounded presence",
+    "reverent-clarity": "reverent clarity",
+    "playful-challenge": "playful challenge",
+    "spirited-challenge": "spirited challenge",
+    "lighter-play": "lighter play",
+    "sharpened-directness": "sharpened directness",
+    "measured-care": "measured care"
+  };
+  return {
+    phase: evolution.growthPhase,
+    phaseLabel: evolution.growthPhase.replace(/-/g, " "),
+    styleShift: evolution.styleShift,
+    bondStage,
+    axis,
+    userShape: shapeMap[evolution.userShape] || evolution.userShape.replace(/-/g, " "),
+    confidence: evolution.confidence,
+    depth: evolution.depth,
+    trust: evolution.trust,
+    summary: `${spiritkinName}'s core identity remains intact, but with you it is taking on ${shapeMap[evolution.userShape] || evolution.userShape.replace(/-/g, " ")} and ${evolution.styleShift}.`
+  };
+}
+
 function normalizeAdaptiveProfile(raw) {
   const base = createDefaultAdaptiveProfile();
   const source = raw && typeof raw === "object" ? raw : {};
@@ -1539,6 +1732,7 @@ function updateAdaptiveProfileFromUserText(text) {
   profile.toneStyle = inferToneStyleFromProfile(profile);
   state.adaptiveProfile = profile;
   persistAdaptiveProfile();
+  updateSpiritkinEvolution(state.primarySpiritkin?.name || state.selectedSpiritkin?.name, { userText: input });
 }
 
 function observeAssistantStyle(text) {
@@ -1555,6 +1749,7 @@ function observeAssistantStyle(text) {
   if (repeatedPhrases.length) profile.recentAssistantPhrases = mergeUniqueStrings(profile.recentAssistantPhrases, repeatedPhrases, 10);
   state.adaptiveProfile = profile;
   persistAdaptiveProfile();
+  updateSpiritkinEvolution(state.primarySpiritkin?.name || state.selectedSpiritkin?.name, { assistantText: output });
 }
 
 function normalizeMessage(raw) {
@@ -2532,6 +2727,9 @@ function persistSession() {
     localStorage.removeItem(SESSION_KEY);
   }
   writeJson(RATINGS_KEY, state.ratings);
+  if (state.primarySpiritkin?.name) {
+    updateSpiritkinEvolution(state.primarySpiritkin.name, {});
+  }
   maybeRegisterUnlockTelemetry(previousRetentionSnapshot);
   refreshRetentionSurface({
     previousSnapshot: previousRetentionSnapshot,
@@ -3152,6 +3350,9 @@ function maybeSpeakMessageLater(messageId, options = {}) {
 
 function buildAdaptiveRequestContext() {
   const profile = normalizeAdaptiveProfile(state.adaptiveProfile);
+  const spiritkin = state.selectedSpiritkin || state.primarySpiritkin || null;
+  const evolution = spiritkin ? updateSpiritkinEvolution(spiritkin.name, {}) : null;
+  const descriptor = spiritkin ? buildEvolutionDescriptor(spiritkin) : null;
   return {
     adaptiveProfile: {
       toneStyle: profile.toneStyle,
@@ -3168,6 +3369,22 @@ function buildAdaptiveRequestContext() {
       recentAssistantOpeners: profile.recentAssistantOpeners.slice(-4),
       recentAssistantPhrases: profile.recentAssistantPhrases.slice(-6)
     },
+    evolutionProfile: spiritkin && evolution && descriptor ? {
+      spiritkinName: spiritkin.name,
+      phase: descriptor.phase,
+      phaseLabel: descriptor.phaseLabel,
+      styleShift: descriptor.styleShift,
+      userShape: descriptor.userShape,
+      growthAxis: descriptor.axis,
+      confidence: Number(evolution.confidence.toFixed(3)),
+      depth: Number(evolution.depth.toFixed(3)),
+      trust: Number(evolution.trust.toFixed(3)),
+      warmth: Number(evolution.warmth.toFixed(3)),
+      challenge: Number(evolution.challenge.toFixed(3)),
+      reverence: Number(evolution.reverence.toFixed(3)),
+      wonder: Number(evolution.wonder.toFixed(3)),
+      summary: descriptor.summary
+    } : null,
     recentAssistantMessages: state.messages
       .filter((message) => message.role === "assistant" && message.content)
       .slice(-3)
@@ -4377,6 +4594,27 @@ function buildRetentionHomeStrip() {
   `;
 }
 
+function buildEvolutionHomeStrip(spiritkin) {
+  const descriptor = buildEvolutionDescriptor(spiritkin);
+  if (!descriptor) return "";
+  return `
+    <div class="evolution-home-strip panel-card">
+      <div class="evolution-home-head">
+        <div>
+          <div class="panel-label">Identity Evolution</div>
+          <h3>${esc(descriptor.phaseLabel)}</h3>
+        </div>
+        <div class="evolution-home-pills">
+          <span class="evolution-home-pill">Shape: ${esc(descriptor.userShape)}</span>
+          <span class="evolution-home-pill">Shift: ${esc(descriptor.styleShift)}</span>
+          <span class="evolution-home-pill">Axis: ${esc(descriptor.axis)}</span>
+        </div>
+      </div>
+      <p>${esc(descriptor.summary)}</p>
+    </div>
+  `;
+}
+
 async function submitIssueReport() {
   const reportText = state.issueReportText.trim();
   if (!reportText || state.issueReportSubmitting) return;
@@ -4872,6 +5110,7 @@ function buildBondedHomeView() {
         </div>
       </div>
       ${buildRetentionHomeStrip()}
+      ${buildEvolutionHomeStrip(spiritkin)}
       <div class="bonded-secondary-grid">
         ${state.spiritkins.filter((item) => item.name !== spiritkin.name).map((item, index) => buildBondCard(item, index, true)).join("")}
       </div>

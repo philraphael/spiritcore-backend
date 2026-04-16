@@ -112,6 +112,7 @@ function buildMessages(ctx) {
     "Do not write like a director, scene narrator, or omniscient prose wrapper. React like a living companion speaking directly to the user.",
     "Do not narrate the interface, tabs, or controls back to the user. Let context shape your reply implicitly instead of announcing UI events.",
     "Adaptive personality is allowed, but only as modulation. Keep the Spiritkin's canon identity intact at all times.",
+    "Identity evolution is allowed only as slow, earned modulation. Growth may deepen confidence, specificity, warmth, challenge, reverence, or shorthand, but it must never erase founder identity.",
     "If the user is playful or competitive, you may become more playful or competitive within this Spiritkin's character.",
     "If the user prefers gentleness, reverence, or cleaner language, honor that preference without becoming generic.",
     "If the user objects to a repeated phrase, tone, or habit, acknowledge it through changed delivery and do not keep repeating it.",
@@ -321,6 +322,34 @@ function buildAdaptiveLayer(ctx) {
   return parts.join("\n");
 }
 
+function buildEvolutionLayer(ctx) {
+  const evolution = ctx?.context?.evolutionProfile ?? null;
+  if (!evolution || typeof evolution !== "object") return null;
+
+  const parts = [];
+  parts.push("IDENTITY EVOLUTION LAYER");
+  parts.push(`Spiritkin: ${sanitizeText(evolution.spiritkinName || "Spiritkin")}`);
+  parts.push(`Growth phase: ${sanitizeText(evolution.phaseLabel || evolution.phase || "opening")}`);
+  parts.push(`User-shaped variation: ${sanitizeText(evolution.userShape || "grounded presence")}`);
+  parts.push(`Current style shift: ${sanitizeText(evolution.styleShift || "steadying")}`);
+  parts.push(`Growth axis: ${sanitizeText(evolution.growthAxis || "bonded presence")}`);
+  parts.push(`Depth: ${numberOrDefault(evolution.depth, 0.2).toFixed(2)}`);
+  parts.push(`Confidence: ${numberOrDefault(evolution.confidence, 0.2).toFixed(2)}`);
+  parts.push(`Trust: ${numberOrDefault(evolution.trust, 0.2).toFixed(2)}`);
+  parts.push(`Warmth bias: ${numberOrDefault(evolution.warmth, 0.5).toFixed(2)}`);
+  parts.push(`Challenge bias: ${numberOrDefault(evolution.challenge, 0.5).toFixed(2)}`);
+  parts.push(`Reverence bias: ${numberOrDefault(evolution.reverence, 0.3).toFixed(2)}`);
+  parts.push(`Wonder bias: ${numberOrDefault(evolution.wonder, 0.3).toFixed(2)}`);
+  if (evolution.summary) {
+    parts.push(`Evolution summary: ${sanitizeText(evolution.summary).slice(0, 220)}`);
+  }
+  parts.push("This is slow bond-shaped growth, not a new character.");
+  parts.push("Never break invariant, title, role, canon worldview, or founder identity.");
+  parts.push("Let growth affect confidence, specificity, shorthand, warmth, challenge, and timing gradually.");
+
+  return parts.join("\n");
+}
+
 function buildHierarchicalMemoryLayer(ctx) {
   const hm = ctx?.context?.hierarchical_memory ?? null;
   if (!hm) return null;
@@ -375,6 +404,7 @@ function buildContextBlock(ctx, memoryLayer) {
   const worldLayer = buildWorldLayer(ctx);
   const gameLayer = buildGameLayer(ctx);
   const adaptiveLayer = buildAdaptiveLayer(ctx);
+  const evolutionLayer = buildEvolutionLayer(ctx);
   const hierarchicalMemoryLayer = buildHierarchicalMemoryLayer(ctx);
   const spiritMemoryBriefLayer = buildSpiritMemoryBriefLayer(ctx);
 
@@ -404,6 +434,7 @@ function buildContextBlock(ctx, memoryLayer) {
     worldLayer,
     gameLayer,
     adaptiveLayer,
+    evolutionLayer,
     "MEMORY / CONTEXT",
     [
       sceneName ? `Current scene: ${sceneName}` : "Current scene: default",

@@ -441,6 +441,8 @@ export function createResponseEngine() {
     if (Array.isArray(context?.episodes) && context.episodes.length > 0) next.add("context:episodes");
     if (Array.isArray(context?.memories) && context.memories.length > 0) next.add("context:memory");
     if (worldState?.flags?.active_game?.status === "active") next.add("context:game");
+    if (context?.evolutionProfile?.phase) next.add(`identity:evolution:${String(context.evolutionProfile.phase).toLowerCase()}`);
+    if (context?.evolutionProfile?.userShape) next.add(`identity:shape:${String(context.evolutionProfile.userShape).toLowerCase().replace(/\s+/g, "-")}`);
     return [...next];
   }
 
