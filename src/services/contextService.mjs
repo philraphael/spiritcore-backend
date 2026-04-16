@@ -16,7 +16,7 @@
 import { AppError } from "../errors.mjs";
 import { getEchoFragment } from "../canon/spiritverseEchoes.mjs";
 
-export function createContextService({ supabase, emotionService, episodeService, memoryService, hierarchicalMemoryService, worldService }) {
+export function createContextService({ supabase, emotionService, episodeService, memoryService, hierarchicalMemoryService, structuredMemoryService, worldService }) {
 
   /**
    * Assemble the full context bundle for a conversation turn.
@@ -31,7 +31,7 @@ export function createContextService({ supabase, emotionService, episodeService,
     const maxEpisodes = policy.max_episodes ?? 5;
 
     // Run all context reads in parallel for efficiency
-    const [emotion, episodes, summary, memories, hierarchical, worldCtx] = await Promise.allSettled([
+    const [emotion, episodes, summary, memories, hierarchical, structured, worldCtx] = await Promise.allSettled([
       emotionService.getState({ userId, spiritkinId, conversationId }),
       episodeService.fetchRecent({ userId, spiritkinId, conversationId, limit: maxEpisodes }),
       episodeService.fetchLatestSummary({ userId, spiritkinId, conversationId }),
@@ -39,6 +39,16 @@ export function createContextService({ supabase, emotionService, episodeService,
       hierarchicalMemoryService
         ? hierarchicalMemoryService.getHierarchicalContext({ userId, spiritkinId, limit: 5 })
         : Promise.resolve({ semantic: [], episodic: [], procedural: [] }),
+      structuredMemoryService
+        ? structuredMemoryService.buildContextSnapshot({
+            userId,
+            spiritkinId,
+            conversationId,
+            recentText,
+            contextTags: [spiritkinName || "", `bond_stage_${bondStage}`].filter(Boolean),
+            limit: 6,
+          })
+        : Promise.resolve({ top: [], corrections: [], milestones: [], preferences: [], brief: "", hasMemories: false }),
       worldService && conversationId
         ? worldService.getWorldContext({ userId, conversationId, spiritkinName })
         : Promise.resolve(null),
@@ -62,6 +72,9 @@ export function createContextService({ supabase, emotionService, episodeService,
     const hierarchicalValue = hierarchical.status === "fulfilled"
       ? hierarchical.value
       : { semantic: [], episodic: [], procedural: [] };
+    const structuredValue = structured.status === "fulfilled"
+      ? structured.value
+      : { top: [], corrections: [], milestones: [], preferences: [], brief: "", hasMemories: false };
 
     return {
       user_id: userId,
@@ -75,6 +88,7 @@ export function createContextService({ supabase, emotionService, episodeService,
       semantic_facts: hierarchicalValue.semantic ?? [],
       episodic_milestones: hierarchicalValue.episodic ?? [],
       procedural_patterns: hierarchicalValue.procedural ?? [],
+      structured_memory: structuredValue,
       // Echoes injection
       echoes: echoFragment,
       // Living Spiritverse world context
@@ -84,6 +98,13 @@ export function createContextService({ supabase, emotionService, episodeService,
         semantic_facts: hierarchicalValue.semantic ?? [],
         episodic_milestones: hierarchicalValue.episodic ?? [],
         procedural_patterns: hierarchicalValue.procedural ?? [],
+      },
+      memory_foundation: {
+        top: structuredValue.top ?? [],
+        corrections: structuredValue.corrections ?? [],
+        milestones: structuredValue.milestones ?? [],
+        preferences: structuredValue.preferences ?? [],
+        brief: structuredValue.brief ?? "",
       },
       recent_text: String(recentText),
       built_at: new Date().toISOString(),

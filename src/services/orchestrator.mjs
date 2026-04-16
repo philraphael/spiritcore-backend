@@ -40,6 +40,7 @@ export const createOrchestrator = ({
   safetyGovernor,
   memoryExtractor,
   hierarchicalMemoryService,
+  structuredMemoryService,
   engagementEngine,
   spiritMemoryEngine,
   responseEngine,
@@ -110,6 +111,8 @@ export const createOrchestrator = ({
         conversationId: convId,
         recentText: input,
         policy: {},
+        spiritkinName: resolvedIdentity.name,
+        bondStage: 0,
       }),
       world.get({ userId, conversationId: convId }),
       spiritMemoryEngine
@@ -251,11 +254,15 @@ export const createOrchestrator = ({
           summary: contextBundle?.summary_episode,
           // Phase K: rich memory brief for long-term recall
           memoryBrief: memoryBrief?.brief ?? null,
+          structuredMemory: contextBundle?.structured_memory?.brief ?? null,
           relationship,
           identityFacts: memoryBrief?.identity ?? [],
           bondMilestones: memoryBrief?.bondMilestones ?? [],
           gameSessions: memoryBrief?.games ?? [],
           sessionSummaries: memoryBrief?.sessions ?? [],
+          memoryCorrections: contextBundle?.structured_memory?.corrections ?? [],
+          memoryMilestones: contextBundle?.structured_memory?.milestones ?? [],
+          memoryPreferences: contextBundle?.structured_memory?.preferences ?? [],
           ...context,
         },
       }),
@@ -419,6 +426,27 @@ export const createOrchestrator = ({
           label: emotionMeta3?.label ?? adapterResult.emotion?.tone,
           arc: emotionMeta3?.arc ?? "opening",
           intensity: emotionMeta3?.intensity ?? 0,
+        },
+        worldState: nextWorldState,
+        bondStage: nextWorldState?.bond?.stage ?? null,
+        previousBondStage: worldSnap?.state?.bond?.stage ?? null,
+      }).catch(() => {});
+    }
+
+    if (structuredMemoryService && policyState.state !== "delete_due") {
+      const emotionMeta4 = adapterResult.emotion?.metadata_json ?? {};
+      structuredMemoryService.recordInteractionMemories({
+        userId,
+        spiritkinId,
+        conversationId: convId,
+        userText: input,
+        spiritkinResponse: finalResponseText,
+        emotionState: {
+          tone: adapterResult.emotion?.tone,
+          label: emotionMeta4?.label ?? adapterResult.emotion?.tone,
+          arc: emotionMeta4?.arc ?? "opening",
+          intensity: emotionMeta4?.intensity ?? 0,
+          metadata_json: emotionMeta4,
         },
         worldState: nextWorldState,
         bondStage: nextWorldState?.bond?.stage ?? null,

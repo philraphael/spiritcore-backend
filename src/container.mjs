@@ -41,6 +41,7 @@ import { createMessageService }      from "./services/messageService.mjs";
 import { createSafetyGovernor }      from "./services/safetyGovernor.mjs";
 import { createMemoryExtractor }        from "./services/memoryExtractor.mjs";
 import { createHierarchicalMemoryService } from "./services/hierarchicalMemory.mjs";
+import { createStructuredMemoryService } from "./services/structuredMemoryService.mjs";
 import { createEngagementEngine }         from "./services/engagementEngine.mjs";
 import { createGameEngine }             from "./services/gameEngine.mjs";
 import { createSpiritMemoryEngine }     from "./services/spiritMemoryEngine.mjs";
@@ -79,6 +80,7 @@ export function buildContainer() {
 
   // --- Phase H: Hierarchical Memory (Semantic, Episodic, Procedural) ---
   const hierarchicalMemoryService = createHierarchicalMemoryService({ supabase, bus });
+  const structuredMemoryService = createStructuredMemoryService({ supabase, bus });
 
   // --- Conversation & Context ---
   const conversationService = createConversationService({ supabase, registry });
@@ -88,6 +90,7 @@ export function buildContainer() {
     episodeService,
     memoryService,
     hierarchicalMemoryService,
+    structuredMemoryService,
     worldService,
   });
 
@@ -124,6 +127,7 @@ export function buildContainer() {
     safetyGovernor,             // Phase E
     memoryExtractor,            // Phase G: deep memory
     hierarchicalMemoryService,  // Phase H: hierarchical memory
+    structuredMemoryService,
     engagementEngine,            // Phase I: proactive engagement
     spiritMemoryEngine,          // Phase K: 10x unified memory
     responseEngine,
@@ -152,6 +156,7 @@ export function buildContainer() {
     safetyGovernor,
     memoryExtractor,
     hierarchicalMemoryService,
+    structuredMemoryService,
     engagementEngine,
     responseEngine,
     gameEngine,                  // Phase J
