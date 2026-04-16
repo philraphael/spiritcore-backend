@@ -48,6 +48,11 @@ function numberOrDefault(value, fallback = 0) {
 }
 
 export function createResponseEngine() {
+  function buildMemoryTelemetryContext(context = {}) {
+    const structured = context?.structured_memory ?? context?.structuredMemory ?? null;
+    return structured && typeof structured === "object" ? structured : { top: [], corrections: [], milestones: [], preferences: [] };
+  }
+
   function deriveRelationshipState({ identity, context = {}, worldState = {} }) {
     const bond = worldState?.bond ?? {};
     const interactionCount = Number(bond.interaction_count ?? 0);
@@ -81,6 +86,110 @@ export function createResponseEngine() {
       mode,
       bondStageName: String(bond.stage_name ?? "").trim() || "First Contact",
       gameOutcome: activeGame?.status === "ended" ? activeGame?.data?.winner ?? null : null,
+    };
+  }
+
+  function getStructuredMemoryInfluence(context = {}, input = "", relationship = {}) {
+    const structured = buildMemoryTelemetryContext(context);
+    const terms = String(input || "").toLowerCase();
+    const gameMode = relationship?.mode === "play" || relationship?.mode === "afterplay";
+    const supportMode = /\b(help|hurting|sad|grief|anxious|scared|lonely|overwhelmed|calm|gentle|respectful)\b/.test(terms);
+
+    const pool = [
+      ...(Array.isArray(structured.corrections) ? structured.corrections.map((entry) => ({ bucket: "correction", entry })) : []),
+      ...(Array.isArray(structured.preferences) ? structured.preferences.map((entry) => ({ bucket: "preference", entry })) : []),
+      ...(Array.isArray(structured.milestones) ? structured.milestones.map((entry) => ({ bucket: "milestone", entry })) : []),
+      ...(Array.isArray(structured.top) ? structured.top.map((entry) => ({ bucket: "top", entry })) : []),
+    ]
+      .filter(({ entry }) => entry?.content)
+      .map(({ bucket, entry }) => {
+        const type = String(entry?.type || "");
+        const content = String(entry?.content || "").trim();
+        const lower = content.toLowerCase();
+        let score = numberOrDefault(entry?.ranking?.score, 0);
+        if (bucket === "correction") score += 5 + numberOrDefault(entry?.correctionPriority, 0);
+        if (bucket === "preference") score += 2;
+        if (type === "gameplay_tendency") score += gameMode ? 3.5 : -1.2;
+        if ((type === "emotional_anchor" || type === "milestone") && supportMode) score += 2.8;
+        if ((type === "emotional_anchor" || type === "milestone") && !supportMode && !gameMode) score -= 0.5;
+        if ((type === "spiritual_preference" || type === "respect_preference" || type === "tone_preference") && /\b(tone|calm|gentle|respect|spiritual|faith|pray|clean|cuss|swear)\b/.test(terms)) score += 2.2;
+        if (/\brepeat|repeating|phrase|tone|tease|narrat/.test(terms) && type === "correction") score += 2.4;
+        if (gameMode && type === "gameplay_tendency") score += 1.4;
+        if (!gameMode && type === "gameplay_tendency") score -= 0.6;
+        if (content && terms && lower.split(/\W+/).some((token) => token.length > 3 && terms.includes(token))) score += 1.2;
+        return { bucket, type, content, score, entry };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const selected = [];
+    for (const candidate of pool) {
+      const correctionCount = selected.filter((item) => item.bucket === "correction").length;
+      const milestoneCount = selected.filter((item) => item.type === "milestone" || item.type === "emotional_anchor").length;
+      if (candidate.bucket === "correction" && correctionCount >= 2) continue;
+      if ((candidate.type === "milestone" || candidate.type === "emotional_anchor") && milestoneCount >= 1) continue;
+      if (candidate.score < 1.6) continue;
+      selected.push(candidate);
+      if (selected.length >= 2) break;
+    }
+    return selected;
+  }
+
+  function applyStructuredMemoryInfluence(text, context = {}, input = "", relationship = {}) {
+    let output = String(text || "").trim();
+    if (!output) return { text: output, memorySignals: [] };
+
+    const signals = getStructuredMemoryInfluence(context, input, relationship);
+    if (!signals.length) return { text: output, memorySignals: [] };
+
+    const lower = output.toLowerCase();
+    for (const signal of signals) {
+      if (signal.type === "correction") {
+        const correctionText = signal.content.toLowerCase();
+        output = output
+          .replace(/\b(as always|like before|again and again)\b/gi, "")
+          .replace(/\bI remember\b/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (/teas|cocky|rude/.test(correctionText)) {
+          output = output
+            .replace(/\bdon't be mad if you lose\b/gi, "stay with me here")
+            .replace(/\bdon't glare at me\b/gi, "easy")
+            .replace(/\btoo late\b/gi, "you saw it happen");
+        }
+      }
+      if ((signal.type === "respect_preference" || signal.type === "spiritual_preference") && /\b(?:damn|hell|shit|ass)\b/i.test(output)) {
+        output = output
+          .replace(/\bdamn\b/gi, "truly")
+          .replace(/\bhell\b/gi, "rough")
+          .replace(/\bshit\b/gi, "mess")
+          .replace(/\bass\b/gi, "hard");
+      }
+      if (signal.type === "tone_preference" && /gentle|calm|respectful/.test(signal.content.toLowerCase())) {
+        output = output
+          .replace(/\bjust\b/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+      if (signal.type === "gameplay_tendency" && relationship?.mode === "play" && !/\b(move|answer|play|pattern|opening)\b/i.test(lower)) {
+        output = `${output} ${buildNaturalGameReaction(null, relationship)}`.replace(/\s+/g, " ").trim();
+      }
+    }
+
+    return {
+      text: trimFillerLead(
+        output
+          .replace(/\s+/g, " ")
+          .replace(/\.\s*,/g, ".")
+          .replace(/^[,\s.]+/, "")
+          .replace(/^(and|but|so)\b[\s,]*/i, "")
+          .trim()
+      ),
+      memorySignals: signals.map((signal) => ({
+        type: signal.type,
+        bucket: signal.bucket,
+        score: Number(signal.score.toFixed(3)),
+        content: signal.content.slice(0, 120),
+      })),
     };
   }
 
@@ -287,14 +396,22 @@ export function createResponseEngine() {
     const base = normalizeAdapterResult(adapterResult);
     const relationship = deriveRelationshipState({ identity, context, worldState, input });
     const realistic = applyRelationshipRealism(base.text, identity, relationship, input) || base.text;
-    const text = applyAdaptivePersonality(realistic, identity, relationship, context, input) || realistic;
+    const adaptiveText = applyAdaptivePersonality(realistic, identity, relationship, context, input) || realistic;
+    const structuredInfluence = applyStructuredMemoryInfluence(adaptiveText, context, input, relationship);
+    const text = structuredInfluence.text || adaptiveText;
     const tags = extendTags(base.tags, relationship, context, worldState);
+    if (structuredInfluence.memorySignals.length > 0) tags.push("memory:structured");
+    const memoryUsage = {
+      selected: structuredInfluence.memorySignals,
+      used: structuredInfluence.memorySignals.length > 0,
+    };
 
     return {
       ...base,
       text,
       tags,
       relationship,
+      memoryUsage,
     };
   }
 

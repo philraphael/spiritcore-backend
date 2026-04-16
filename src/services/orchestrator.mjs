@@ -312,6 +312,19 @@ export const createOrchestrator = ({
       });
     }
 
+    if (adapterResult?.memoryUsage?.used) {
+      bus.emit("orchestrator.memory.used", {
+        traceId,
+        conversationId: convId,
+        spiritkin: resolvedIdentity.name,
+        selected: adapterResult.memoryUsage.selected?.map((item) => ({
+          type: item.type,
+          bucket: item.bucket,
+          score: item.score,
+        })) ?? [],
+      });
+    }
+
     // Stage 11: Safety post-pass
     let finalResponseText = adapterResult.text;
     let safetyPostResult;
@@ -537,6 +550,7 @@ export const createOrchestrator = ({
           driftDetected: governance.driftDetected,
           matched: governance.matched,
         },
+        memoryUsage: adapterResult.memoryUsage ?? { used: false, selected: [] },
         entitlement,
         policy: policyState,
       },

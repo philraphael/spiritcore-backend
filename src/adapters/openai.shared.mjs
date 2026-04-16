@@ -617,6 +617,9 @@ function buildMemoryLayer(ctx) {
     ...selected.map((candidate, index) => (
       `${index + 1}. ${candidate.label} [score=${candidate.score}]${candidate.why ? ` [why=${candidate.why}]` : ""}\n${candidate.text}`
     )),
+    "Guardrails: prefer at most one strong correction/preference cue and at most one milestone or emotional cue. Do not recap old facts unless they genuinely improve this moment.",
+    "Correction memories outrank style flourishes. If a correction cue is present, honor it through changed delivery more than by explicitly mentioning it.",
+    "Milestones and emotional anchors should be used sparingly and only when the emotional field or topic actually connects.",
     "If you use one of these cues directly in the reply, set memory_used=true. If you do not rely on them, set memory_used=false."
   ].join("\n\n");
 }
@@ -643,7 +646,9 @@ function collectMemorySnippets(ctx) {
 function selectMemoryCandidates(ctx) {
   const input = sanitizeText(ctx?.input);
   const emotionTone = sanitizeText(ctx?.context?.emotion?.tone || ctx?.context?.emotion?.label || "");
+  const structuredCandidates = buildStructuredMemoryCandidates(ctx);
   const candidates = [
+    ...structuredCandidates,
     ...buildEpisodeCandidates(ctx),
     ...buildMemoryCandidates(ctx),
     ...buildSummaryCandidates(ctx)
@@ -652,7 +657,54 @@ function selectMemoryCandidates(ctx) {
 
   return candidates
     .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+    .slice(0, structuredCandidates.length ? 4 : 3)
+    .reduce((selected, candidate) => {
+      const milestoneCount = selected.filter((item) => item.kind === "structured milestone" || item.kind === "structured emotional anchor").length;
+      const correctionCount = selected.filter((item) => item.kind === "structured correction").length;
+      if (candidate.kind === "structured correction" && correctionCount >= 1) return selected;
+      if ((candidate.kind === "structured milestone" || candidate.kind === "structured emotional anchor") && milestoneCount >= 1) return selected;
+      if (selected.length >= 3) return selected;
+      selected.push(candidate);
+      return selected;
+    }, []);
+}
+
+function buildStructuredMemoryCandidates(ctx) {
+  const structured = ctx?.context?.structured_memory ?? null;
+  if (!structured || typeof structured !== "object") return [];
+
+  const push = (kind, entry, extra = {}) => {
+    if (!entry?.content) return null;
+    return {
+      kind,
+      order: 0,
+      text: summarizeText(entry.content, 220),
+      emotionLabel: sanitizeText(entry?.tags?.join(" ") || ""),
+      createdAt: entry?.createdAt ?? "",
+      memoryType: sanitizeText(entry?.type || ""),
+      baseScore: Number(entry?.ranking?.score || 0),
+      correctionPriority: numberOrDefault(entry?.correctionPriority, 0),
+      emotionalWeight: numberOrDefault(entry?.emotionalWeight, 0),
+      relevanceHint: numberOrDefault(entry?.ranking?.relevance, 0),
+      ...extra,
+    };
+  };
+
+  const candidates = [
+    ...(Array.isArray(structured.corrections) ? structured.corrections.map((entry) => push("structured correction", entry, { priorityClass: "correction" })) : []),
+    ...(Array.isArray(structured.preferences) ? structured.preferences.map((entry) => {
+      const type = String(entry?.type || "");
+      const kind = type === "gameplay_tendency" ? "structured gameplay tendency" : "structured preference";
+      return push(kind, entry, { priorityClass: type === "gameplay_tendency" ? "gameplay" : "preference" });
+    }) : []),
+    ...(Array.isArray(structured.milestones) ? structured.milestones.map((entry) => {
+      const kind = entry?.type === "emotional_anchor" ? "structured emotional anchor" : "structured milestone";
+      return push(kind, entry, { priorityClass: entry?.type === "emotional_anchor" ? "emotion" : "milestone" });
+    }) : []),
+    ...(Array.isArray(structured.top) ? structured.top.map((entry) => push("structured memory", entry, { priorityClass: "general" })) : []),
+  ].filter(Boolean);
+
+  return candidates;
 }
 
 function buildEpisodeCandidates(ctx) {
@@ -708,6 +760,8 @@ function scoreCandidate(candidate, input, emotionTone) {
   const loweredText = text.toLowerCase();
   let score = 0;
   const reasons = [];
+  const gameActive = /\b(game|chess|checkers|tic|toe|connect|battleship|cards|star)\b/.test(loweredInput);
+  const supportMode = /\b(help|hurting|sad|grief|anxious|scared|lonely|overwhelmed|calm|gentle|respectful)\b/.test(loweredInput) || /grief|hurt|sad|vulnerability|longing|gentle/.test(String(emotionTone).toLowerCase());
 
   const overlap = sharedTokenCount(loweredInput, loweredText);
   if (overlap > 0) {
@@ -736,6 +790,34 @@ function scoreCandidate(candidate, input, emotionTone) {
     reasons.push("summary");
   }
 
+  if (candidate.kind.startsWith("structured")) {
+    const baseScore = numberOrDefault(candidate.baseScore, 0);
+    score += baseScore * 4;
+    if (candidate.priorityClass === "correction") {
+      score += 4 + (numberOrDefault(candidate.correctionPriority, 0) * 2);
+      reasons.push("correction-priority");
+    }
+    if (candidate.priorityClass === "preference") {
+      score += 2;
+      reasons.push("preference");
+    }
+    if (candidate.priorityClass === "gameplay" && gameActive) {
+      score += 3;
+      reasons.push("gameplay-fit");
+    } else if (candidate.priorityClass === "gameplay") {
+      score -= 1.25;
+    }
+    if (candidate.priorityClass === "emotion" || candidate.priorityClass === "milestone") {
+      if (supportMode || numberOrDefault(candidate.emotionalWeight, 0) > 0.72 || numberOrDefault(candidate.relevanceHint, 0) > 0.3) {
+        score += 2.2;
+        reasons.push(candidate.priorityClass === "emotion" ? "emotional-fit" : "milestone-fit");
+      } else {
+        score -= 1.4;
+        reasons.push("milestone-held");
+      }
+    }
+  }
+
   if (candidate.createdAt) {
     const recencyBonus = recencyScore(candidate.createdAt);
     if (recencyBonus > 0) {
@@ -749,7 +831,19 @@ function scoreCandidate(candidate, input, emotionTone) {
     text,
     score,
     why: reasons.join(", "),
-    label: candidate.kind === "recent episode"
+    label: candidate.kind === "structured correction"
+      ? "Correction memory"
+      : candidate.kind === "structured preference"
+        ? "Preference memory"
+        : candidate.kind === "structured gameplay tendency"
+          ? "Gameplay tendency"
+          : candidate.kind === "structured emotional anchor"
+            ? "Emotional anchor"
+            : candidate.kind === "structured milestone"
+              ? "Milestone memory"
+              : candidate.kind === "structured memory"
+                ? "Structured memory"
+      : candidate.kind === "recent episode"
       ? "Recent episode"
       : candidate.kind === "summary"
         ? "Continuity summary"
