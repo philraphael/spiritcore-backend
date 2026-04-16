@@ -11,9 +11,11 @@ const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
 const MEDIA_MUTED_KEY = "sv.media_muted.v1";
 const ADAPTIVE_PROFILE_KEY = "sv.adaptive_profile.v1";
 const CROWN_GATE_HOLD_MS = 1500;
-const ENTRY_TRANSITION_MS = 1400;
-const SPIRITGATE_VIDEO_FAILSAFE_MS = 9000;
+const ENTRY_TRANSITION_MS = 2600;
+const SPIRITGATE_VIDEO_FAILSAFE_MS = 2400;
 const SPIRITGATE_TRAILER_FAILSAFE_MS = 18000;
+const SPIRITGATE_POST_VIDEO_PAUSE_MS = 2000;
+const SPIRITGATE_POST_COPY_SETTLE_MS = 1000;
 const INTERACTION_BUILD_MARKER = "interaction-audit-2026-04-16-live-v2";
 const SPIRITCORE_WELCOME_VOICE = "nova";
 const SPIRITCORE_WELCOME_TEXT = `Welcome…
@@ -62,6 +64,8 @@ let revealAnimationInstance = null;
 let spiritGateFallbackTimer = null;
 let spiritGateArrivalFallbackTimer = null;
 let spiritGateActiveAttemptId = 0;
+let spiritGateTransitionRevealTimer = null;
+let spiritGateTransitionRouteTimer = null;
 
 const DEFAULT_PROMPTS = [
   "Tell me what kind of presence you are.",
@@ -743,17 +747,21 @@ function buildPortrait(name, cls, size) {
     "Thalassar": worldArtUrl(WORLD_ART.thalassar)
   };
   const portraitPath = portraitMap[name] || "";
+  const eagerPortrait = size === "portrait-card" || size === "portrait-focus" || size === "portrait-hero";
 
   const portraitContent = portraitPath 
     ? `
+      <div class="portrait-fallback-svg">${portraitSvg(name)}</div>
       <img
         src="${portraitPath}"
         alt="Portrait of ${name}"
         class="portrait-image"
-        loading="lazy"
-        onerror="this.style.display='none'; if (this.nextElementSibling) this.nextElementSibling.style.display='block';"
+        loading="${eagerPortrait ? "eager" : "lazy"}"
+        decoding="async"
+        ${eagerPortrait ? 'fetchpriority="high"' : ""}
+        onload="this.classList.add('is-loaded'); this.parentElement.classList.add('portrait-loaded');"
+        onerror="this.style.display='none'; this.parentElement.classList.add('portrait-fallback-only');"
       />
-      <div class="portrait-fallback-svg" style="display:none">${portraitSvg(name)}</div>
     `
     : portraitSvg(name);
   return `
@@ -1407,6 +1415,17 @@ function clearSpiritGateArrivalFallback() {
   }
 }
 
+function clearSpiritGateTransitionTimers() {
+  if (spiritGateTransitionRevealTimer) {
+    window.clearTimeout(spiritGateTransitionRevealTimer);
+    spiritGateTransitionRevealTimer = null;
+  }
+  if (spiritGateTransitionRouteTimer) {
+    window.clearTimeout(spiritGateTransitionRouteTimer);
+    spiritGateTransitionRouteTimer = null;
+  }
+}
+
 function failSpiritGateEntry(message, error, detail = {}) {
   const reason = error instanceof Error ? error.message : error;
   console.error("Gate video failed", { message, reason, ...detail });
@@ -1445,6 +1464,14 @@ function armSpiritGateArrivalFallback(source) {
 function syncEntryCinematics() {
   const gateVideo = document.querySelector("[data-entry-video='gate']");
   if (gateVideo) {
+    gateVideo.onplay = () => {
+      clearSpiritGateFallback();
+      logSpiritGate("gate-video-play", { currentTime: gateVideo.currentTime, paused: gateVideo.paused });
+    };
+    gateVideo.onplaying = () => {
+      clearSpiritGateFallback();
+      logSpiritGate("gate-video-playing", { currentTime: gateVideo.currentTime, paused: gateVideo.paused });
+    };
     gateVideo.onended = () => {
       logSpiritGate("gate-video-ended", { currentTime: gateVideo.currentTime, duration: gateVideo.duration || null });
       completeCrownGateEntry({ source: "gate-video-ended" });
@@ -1467,6 +1494,7 @@ function syncEntryCinematics() {
       }
     } else {
       clearSpiritGateFallback();
+      clearSpiritGateTransitionTimers();
       gateVideo.pause?.();
       gateVideo.currentTime = 0;
     }
@@ -2067,6 +2095,7 @@ function openCrownGate() {
   }
   clearSpiritGateFallback();
   clearSpiritGateArrivalFallback();
+  clearSpiritGateTransitionTimers();
   spiritGateActiveAttemptId += 1;
   state.crownGateOpening = true;
   state.showCrownGateHome = false;
@@ -2082,6 +2111,28 @@ function openCrownGate() {
   render();
 }
 
+async function finalizeCrownGateRoute({ skipped = false, source = "unspecified" } = {}) {
+  state.entryAccepted = true;
+  state.entryTransitioning = false;
+  state.showHomeView = true;
+  state.showCrownGateHome = false;
+
+  const route = getPostGateRoute();
+  logSpiritGate("entry-route-resolved", { route, skipped, source });
+  if (route === "first-run") {
+    state.spiritverseTrailerActive = true;
+    state.statusText = "Spiritverse arrival sequence beginning...";
+    render();
+    return;
+  }
+
+  state.spiritverseTrailerActive = false;
+  render();
+  if (route === "bonded-home" && state.primarySpiritkin && !state.voiceMuted) {
+    await speakMoment(buildGreetingText(state.primarySpiritkin.name, "returningUser"), state.primarySpiritkin.ui.voice || "nova");
+  }
+}
+
 function completeCrownGateEntry({ skipped = false, source = "unspecified", force = false } = {}) {
   if (state.entryTransitioning && !force) {
     logSpiritGate("entry-complete-ignored", { source });
@@ -2090,39 +2141,40 @@ function completeCrownGateEntry({ skipped = false, source = "unspecified", force
   logSpiritGate("entry-completing", { skipped, source, force });
   clearSpiritGateFallback();
   clearSpiritGateArrivalFallback();
+  clearSpiritGateTransitionTimers();
   spiritGateActiveAttemptId += 1;
   state.crownGateOpening = false;
   state.entryVideoStarted = false;
-  state.entryTransitioning = true;
-  state.statusText = skipped ? "Passing through the Crown Gate..." : "Crossing the threshold...";
+  state.entryTransitioning = !!skipped;
+  state.statusText = skipped ? "Passing through the Crown Gate..." : "The threshold is settling...";
   state.statusError = false;
   render();
 
-  window.setTimeout(async () => {
-    try {
-      state.entryAccepted = true;
-      state.entryTransitioning = false;
-      state.showHomeView = true;
-      state.showCrownGateHome = false;
-
-      const route = getPostGateRoute();
-      logSpiritGate("entry-route-resolved", { route, skipped, source });
-      if (route === "first-run") {
-        state.spiritverseTrailerActive = true;
-        state.statusText = "Spiritverse arrival sequence beginning...";
-        render();
-        return;
+  if (skipped) {
+    window.setTimeout(async () => {
+      try {
+        await finalizeCrownGateRoute({ skipped, source });
+      } catch (error) {
+        failSpiritGateEntry("SpiritGate entry failed. Refresh and try again.", error, { source, skipped });
       }
+    }, 280);
+    return;
+  }
 
-      state.spiritverseTrailerActive = false;
-      render();
-      if (route === "bonded-home" && state.primarySpiritkin && !state.voiceMuted) {
-        await speakMoment(buildGreetingText(state.primarySpiritkin.name, "returningUser"), state.primarySpiritkin.ui.voice || "nova");
+  spiritGateTransitionRevealTimer = window.setTimeout(() => {
+    state.entryTransitioning = true;
+    state.statusText = "Crossing the threshold...";
+    state.statusError = false;
+    render();
+
+    spiritGateTransitionRouteTimer = window.setTimeout(async () => {
+      try {
+        await finalizeCrownGateRoute({ skipped, source });
+      } catch (error) {
+        failSpiritGateEntry("SpiritGate entry failed. Refresh and try again.", error, { source, skipped });
       }
-    } catch (error) {
-      failSpiritGateEntry("SpiritGate entry failed. Refresh and try again.", error, { source, skipped });
-    }
-  }, skipped ? 280 : ENTRY_TRANSITION_MS);
+    }, ENTRY_TRANSITION_MS + SPIRITGATE_POST_COPY_SETTLE_MS);
+  }, SPIRITGATE_POST_VIDEO_PAUSE_MS);
 }
 
 async function beginSpiritCoreWelcome() {
@@ -2152,6 +2204,7 @@ function goHome() {
   syncPrimarySelection();
   clearSpiritGateFallback();
   clearSpiritGateArrivalFallback();
+  clearSpiritGateTransitionTimers();
   spiritGateActiveAttemptId += 1;
   state.showCrownGateHome = true;
   state.entryAccepted = false;
