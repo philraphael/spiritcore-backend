@@ -1,4 +1,5 @@
 import { getGameTheme } from "./data/gameThemes.js";
+import { getGameAssetPackage, resolveGameAsset } from "./data/gameAssetManifest.js";
 
 /**
  * Spiritverse Games Engine — Visual Interactive Boards (GRAND STAGE EDITION)
@@ -61,11 +62,34 @@ function themeVarsToStyle(theme) {
     .join("; ");
 }
 
+function resolveThemeAssetPackage(type, theme) {
+  return theme?.assets || getGameAssetPackage(type);
+}
+
+function buildAssetDataAttributes(type, theme) {
+  const assets = resolveThemeAssetPackage(type, theme);
+  if (!assets) return "";
+  const boardAsset = resolveGameAsset(type, "board");
+  const roomAsset = resolveGameAsset(type, "room");
+  const fallbackAsset = assets.fallback || null;
+  const attrs = [
+    ["data-asset-root", assets.sourceRoot],
+    ["data-asset-board", boardAsset?.sourcePath || ""],
+    ["data-asset-room", roomAsset?.sourcePath || ""],
+    ["data-asset-fallback", fallbackAsset?.fallbackKey || fallbackAsset?.renderer || ""]
+  ];
+  return attrs
+    .filter(([, value]) => value)
+    .map(([name, value]) => `${name}="${escapeAttribute(value)}"`)
+    .join(" ");
+}
+
 function withThemeFrame(content, type, theme, extraClass = "") {
   const classes = ["sv-theme-shell", `sv-theme-${type}`];
   if (extraClass) classes.push(extraClass);
+  const assetAttrs = buildAssetDataAttributes(type, theme);
   return `
-    <div class="${classes.join(" ")}" data-game-theme="${type}" data-associated-spiritkin="${theme.associatedSpiritkin}" style="${themeVarsToStyle(theme)}">
+    <div class="${classes.join(" ")}" data-game-theme="${type}" data-associated-spiritkin="${theme.associatedSpiritkin}" ${assetAttrs} style="${themeVarsToStyle(theme)}">
       ${content}
     </div>
   `;
@@ -123,6 +147,14 @@ const GrandStage = {
     overlay.id = 'grand-stage';
     overlay.dataset.gameTheme = gameType;
     overlay.dataset.associatedSpiritkin = theme.associatedSpiritkin;
+    const assetPackage = resolveThemeAssetPackage(gameType, theme);
+    if (assetPackage?.sourceRoot) overlay.dataset.assetRoot = assetPackage.sourceRoot;
+    const boardAsset = resolveGameAsset(gameType, "board");
+    const roomAsset = resolveGameAsset(gameType, "room");
+    const fallbackAsset = assetPackage?.fallback || null;
+    if (boardAsset?.sourcePath) overlay.dataset.assetBoard = boardAsset.sourcePath;
+    if (roomAsset?.sourcePath) overlay.dataset.assetRoom = roomAsset.sourcePath;
+    if (fallbackAsset?.fallbackKey || fallbackAsset?.renderer) overlay.dataset.assetFallback = fallbackAsset?.fallbackKey || fallbackAsset?.renderer;
     for (const [key, value] of Object.entries(theme.cssVars || {})) {
       overlay.style.setProperty(key, value);
     }

@@ -1,3 +1,5 @@
+import { getGameAssetPackage } from "./gameAssetManifest.js";
+
 const baseTheme = {
   boardStyle: "Celestial lacquered board",
   pieceStyle: "Luminous sigils",
@@ -195,6 +197,7 @@ export function getGameTheme(gameType) {
   return {
     ...baseTheme,
     ...(GAME_THEMES[gameType] || {}),
+    assets: getGameAssetPackage(gameType),
     cssVars: {
       ...baseTheme.cssVars,
       ...(GAME_THEMES[gameType]?.cssVars || {})
