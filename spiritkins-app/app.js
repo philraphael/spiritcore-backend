@@ -1123,6 +1123,10 @@ const state = {
   dailyQuestLoading: false,
   dailyQuestStarted: false,      // user clicked "Begin Quest"
   adaptiveProfile: normalizeAdaptiveProfile(readJson(ADAPTIVE_PROFILE_KEY, null)),
+  lastReactionTimestamp: 0,
+  reactionCooldownMs: 0,
+  recentReactionKeys: [],
+  recentReactionTexts: [],
   // Realm Travel
   realmTravelOpen: false,        // whether realm travel modal is open
   // Game UI state
@@ -1487,9 +1491,11 @@ function buildPresenceTabNarration(tab, spiritkin, currentBond, stageData, depth
     if (state.activeGame.status === "ended") {
       return buildGameOutcomeReaction(spiritkin.name, state.activeGame) || buildPresenceReaction("games", spiritkin, seed + 4);
     }
-    return state.activeGame.turn === "user"
-      ? `${buildPresenceReaction("games", spiritkin, seed + 5)} Your move.`
-      : buildGamePendingReaction(spiritkin.name, state.activeGame.type, state.activeGame.history?.length || 0);
+    if (state.activeGame.turn === "user") {
+      const line = buildPresenceReaction("games", spiritkin, seed + 5);
+      return line ? `${line} Your move.` : "";
+    }
+    return buildGamePendingReaction(spiritkin.name, state.activeGame.type, state.activeGame.history?.length || 0);
   }
   if (tab === "journal") {
     return buildPresenceReaction("journal", spiritkin, seed + 6);
@@ -2453,44 +2459,149 @@ const COMPANION_REACTION_BANKS = {
   }
 };
 
-function pickCompanionReaction(spiritkinName, bucket, seed = 0) {
+function hashSeed(value) {
+  const input = String(value || "");
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seededUnit(value) {
+  return hashSeed(value) / 4294967295;
+}
+
+function normalizeReactionText(text) {
+  return String(text || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function toneHasTag(tone, tags) {
+  const value = String(tone || "").toLowerCase();
+  return tags.some((tag) => value.includes(tag));
+}
+
+function getReactionCooldownMs(kind, profile) {
+  const baseMap = {
+    presence: 14000,
+    "game-pending": 8500,
+    "game-entry": 1500,
+    "game-outcome": 900
+  };
+  let cooldown = baseMap[kind] || 7000;
+  if (profile.playfulness > 0.62) cooldown -= 800;
+  if (profile.competitiveness > 0.62 && kind !== "presence") cooldown -= 1200;
+  if (profile.respectPreference > 0.68 || profile.spiritualityPreference > 0.62) cooldown += 1800;
+  if (profile.repetitionSensitivity > 0.6) cooldown += 2200;
+  return Math.max(kind === "game-outcome" ? 600 : 1200, cooldown);
+}
+
+function shouldSpeakReaction(kind, reactionKey, profile) {
+  const now = Date.now();
+  const cooldownMs = getReactionCooldownMs(kind, profile);
+  const elapsed = now - (state.lastReactionTimestamp || 0);
+  const repeatedKey = reactionKey && state.recentReactionKeys.includes(reactionKey);
+  const isMajorMoment = kind === "game-entry" || kind === "game-outcome";
+  if (isMajorMoment) {
+    return { allow: elapsed >= Math.min(cooldownMs, 900), cooldownMs };
+  }
+  if (elapsed < cooldownMs) return { allow: false, cooldownMs };
+  if (repeatedKey) return { allow: false, cooldownMs };
+  return { allow: true, cooldownMs };
+}
+
+function rememberReactionUsage(reactionKey, text, cooldownMs) {
+  state.lastReactionTimestamp = Date.now();
+  state.reactionCooldownMs = cooldownMs;
+  state.recentReactionKeys = [...state.recentReactionKeys, reactionKey].filter(Boolean).slice(-6);
+  state.recentReactionTexts = [...state.recentReactionTexts, normalizeReactionText(text)].filter(Boolean).slice(-4);
+}
+
+function shouldSuppressReaction(entry, profile) {
+  const tone = String(entry?.tone || "").toLowerCase();
+  const text = normalizeReactionText(entry?.text);
+  if (!text) return true;
+  if (profile.correctionFlags?.avoidTeasing && toneHasTag(tone, ["teasing", "playful", "challenging"])) return true;
+  if (profile.competitiveness < 0.4 && toneHasTag(tone, ["teasing", "challenging", "charged", "confident", "bold"])) return true;
+  if ((profile.respectPreference > 0.68 || profile.spiritualityPreference > 0.62) && toneHasTag(tone, ["teasing", "sarcastic", "dry", "charged", "aggressive"])) return true;
+  if (profile.dislikedPhrases.some((phrase) => text.includes(String(phrase || "").toLowerCase()))) return true;
+  return false;
+}
+
+function scoreReactionWeight(entry, profile, kind, seed, index) {
+  const tone = String(entry?.tone || "").toLowerCase();
+  const text = normalizeReactionText(entry?.text);
+  const opener = extractOpeningSignature(text);
+  let weight = Number.isFinite(Number(entry?.weight)) ? Number(entry.weight) : 1;
+
+  if (profile.playfulness > 0.58 && toneHasTag(tone, ["playful", "light", "curious"])) weight *= 1.45;
+  if (profile.competitiveness > 0.62 && toneHasTag(tone, ["charged", "confident", "direct", "bold", "challenging", "focused"])) weight *= 1.55;
+  if (profile.competitiveness < 0.4 && toneHasTag(tone, ["gentle", "warm", "calm", "steady", "respectful", "soft"])) weight *= 1.35;
+  if ((profile.respectPreference > 0.62 || profile.spiritualityPreference > 0.58) && toneHasTag(tone, ["gentle", "respectful", "calm", "steady", "regal", "solemn", "measured", "warm"])) weight *= 1.5;
+  if (profile.intensity > 0.66 && toneHasTag(tone, ["charged", "direct", "firm", "bold", "urgent", "commanding"])) weight *= 1.2;
+  if (profile.intensity < 0.38 && toneHasTag(tone, ["gentle", "soft", "calm", "warm", "steady", "resonant"])) weight *= 1.2;
+  if (profile.correctionFlags?.avoidNarration && toneHasTag(tone, ["measured", "regal", "solemn"])) weight *= 1.1;
+  if (kind === "game-pending") weight *= 0.82;
+  if (kind === "presence") weight *= 0.88;
+  if (profile.repetitionSensitivity > 0.54 && profile.recentAssistantPhrases.some((phrase) => text.includes(String(phrase || "").toLowerCase()))) weight *= 0.12;
+  if (profile.recentAssistantOpeners.includes(opener)) weight *= 0.2;
+  if (state.recentReactionTexts.some((recent) => recent && text.includes(recent))) weight *= 0.08;
+  if (state.recentReactionKeys.includes(`${kind}:${index}:${opener}`)) weight *= 0.15;
+  weight *= 0.9 + (seededUnit(`${seed}:${index}:${tone}:${text}`) * 0.35);
+  return weight;
+}
+
+function pickCompanionReaction(spiritkinName, bucket, seed = 0, options = {}) {
   const bank = COMPANION_REACTION_BANKS[spiritkinName]?.[bucket];
   if (!Array.isArray(bank) || !bank.length) return "";
   const profile = normalizeAdaptiveProfile(state.adaptiveProfile);
-  const scored = bank.map((entry, index) => {
-    const tone = String(entry?.tone || "").toLowerCase();
-    let score = index === (Math.abs(seed) % bank.length) ? 1.5 : 0;
-    if (profile.playfulness > 0.6 && /(playful|light|teasing|curious)/.test(tone)) score += 1.6;
-    if (profile.competitiveness > 0.58 && /(charged|confident|direct|bold|challenging|focused)/.test(tone)) score += 1.4;
-    if ((profile.respectPreference > 0.62 || profile.spiritualityPreference > 0.58) && /(gentle|respectful|calm|steady|regal|solemn|measured|warm)/.test(tone)) score += 1.7;
-    if (profile.intensity > 0.66 && /(charged|direct|firm|bold|urgent|commanding)/.test(tone)) score += 1.1;
-    if (profile.intensity < 0.38 && /(gentle|soft|calm|warm|steady|resonant)/.test(tone)) score += 1.1;
-    if (profile.correctionFlags.avoidTeasing && /(teasing|playful)/.test(tone)) score -= 2;
-    if (profile.correctionFlags.avoidNarration && /(measured|regal|solemn)/.test(tone)) score += 0.2;
-    if (profile.repetitionSensitivity > 0.6 && profile.recentAssistantPhrases.some((phrase) => String(entry?.text || "").toLowerCase().includes(phrase))) score -= 2.2;
-    if (profile.recentAssistantOpeners.includes(extractOpeningSignature(entry?.text || ""))) score -= 1.6;
-    if (profile.dislikedPhrases.some((phrase) => String(entry?.text || "").toLowerCase().includes(phrase))) score -= 3;
-    return { entry, score };
-  }).sort((a, b) => b.score - a.score);
-  return scored[0]?.entry?.text || bank[Math.abs(seed) % bank.length]?.text || "";
+  const kind = options.kind || "presence";
+  const eligible = bank
+    .map((entry, index) => {
+      const text = String(entry?.text || "").trim();
+      const opener = extractOpeningSignature(text);
+      const reactionKey = `${kind}:${bucket}:${spiritkinName}:${index}:${opener}`;
+      if (shouldSuppressReaction(entry, profile)) return null;
+      const weight = scoreReactionWeight(entry, profile, kind, seed, index);
+      if (!(weight > 0)) return null;
+      return { entry, index, weight, reactionKey };
+    })
+    .filter(Boolean);
+  if (!eligible.length) return "";
+
+  const totalWeight = eligible.reduce((sum, item) => sum + item.weight, 0);
+  let cursor = seededUnit(`${kind}:${bucket}:${spiritkinName}:${seed}:${state.messages.length}:${state.activeGame?.moveCount || 0}`) * totalWeight;
+  let chosen = eligible[eligible.length - 1];
+  for (const item of eligible) {
+    cursor -= item.weight;
+    if (cursor <= 0) {
+      chosen = item;
+      break;
+    }
+  }
+  const cooldownState = shouldSpeakReaction(kind, chosen.reactionKey, profile);
+  if (!cooldownState.allow) return "";
+  rememberReactionUsage(chosen.reactionKey, chosen.entry.text, cooldownState.cooldownMs);
+  return chosen.entry.text || "";
 }
 
 function buildGameEntryReaction(spiritkinName, gameType) {
   const seed = `${spiritkinName}:${gameType}`.length + (state.messages?.length || 0);
-  return pickCompanionReaction(spiritkinName, "games", seed);
+  return pickCompanionReaction(spiritkinName, "games", seed, { kind: "game-entry" });
 }
 
 function buildGamePendingReaction(spiritkinName, gameType, move) {
   const seed = String(move || "").length + `${spiritkinName}:${gameType}`.length + (state.activeGame?.moveCount || 0);
-  return pickCompanionReaction(spiritkinName, "thinking", seed);
+  return pickCompanionReaction(spiritkinName, "thinking", seed, { kind: "game-pending" });
 }
 
 function buildGameOutcomeReaction(spiritkinName, game) {
   if (!game?.result) return "";
-  if (game.result.isDraw) return pickCompanionReaction(spiritkinName, "draw", game.moveCount || 0);
+  if (game.result.isDraw) return pickCompanionReaction(spiritkinName, "draw", game.moveCount || 0, { kind: "game-outcome" });
   return game.result.winner === "user"
-    ? pickCompanionReaction(spiritkinName, "win", game.moveCount || 0)
-    : pickCompanionReaction(spiritkinName, "loss", game.moveCount || 0);
+    ? pickCompanionReaction(spiritkinName, "win", game.moveCount || 0, { kind: "game-outcome" })
+    : pickCompanionReaction(spiritkinName, "loss", game.moveCount || 0, { kind: "game-outcome" });
 }
 
 function buildPresenceReaction(tab, spiritkin, seed = 0) {
@@ -2499,10 +2610,10 @@ function buildPresenceReaction(tab, spiritkin, seed = 0) {
     tab === "echoes" ? "depth" :
     tab === "charter" ? "law" :
     tab === "games" ? "games" :
-    tab === "journal" ? "memory" :
-    tab === "events" || tab === "quest" ? "adventure" :
-    "focus";
-  return pickCompanionReaction(spiritkin?.name, bucket, seed);
+      tab === "journal" ? "memory" :
+      tab === "events" || tab === "quest" ? "adventure" :
+      "focus";
+  return pickCompanionReaction(spiritkin?.name, bucket, seed, { kind: "presence" });
 }
 
 function applyOptimisticOutcome(nextGame) {
