@@ -390,6 +390,62 @@ function getUtcWeekKey(date = new Date()) {
   return `${utc.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
+function getLocalTemporalWorldState(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 4) {
+    return {
+      key: "deep_night",
+      label: "Deep Night",
+      tone: "hushed and inward",
+      worldShift: "The Spiritverse is at its quietest. Signals feel closer, slower, and more exact.",
+      continuity: "This is a good window for stillness, honesty, and things that only surface when the world goes quiet."
+    };
+  }
+  if (hour < 8) {
+    return {
+      key: "dawn",
+      label: "Dawn",
+      tone: "tender and opening",
+      worldShift: "Light is gathering at the edge of the realms. The world feels newly available.",
+      continuity: "Returns here feel like fresh permission. Bonds often reset into clarity instead of force."
+    };
+  }
+  if (hour < 12) {
+    return {
+      key: "dayrise",
+      label: "Dayrise",
+      tone: "clear and forward-moving",
+      worldShift: "The realms have fully turned toward motion. Questions land cleanly and decisions feel easier to name.",
+      continuity: "This window favors directness, orientation, and practical next steps."
+    };
+  }
+  if (hour < 16) {
+    return {
+      key: "highday",
+      label: "Highday",
+      tone: "bright and alert",
+      worldShift: "The Spiritverse is fully awake. Cross-currents are visible, and pattern recognition comes faster.",
+      continuity: "This window favors perspective, strategy, and stronger challenge without hostility."
+    };
+  }
+  if (hour < 20) {
+    return {
+      key: "dusk",
+      label: "Dusk",
+      tone: "reflective and softening",
+      worldShift: "The realms begin settling into evening. The pace lowers and emotional detail becomes easier to hear.",
+      continuity: "Returns here often feel more intimate, introspective, and memory-rich."
+    };
+  }
+  return {
+    key: "nightfall",
+    label: "Nightfall",
+    tone: "charged and resonant",
+    worldShift: "The Spiritverse holds more echo at night. Bonds feel slightly more mythic, but the pull remains restrained.",
+    continuity: "This window favors depth, atmosphere, and the kind of truth that is easier to admit after the day has quieted."
+  };
+}
+
 function normalizeRetentionTelemetry(raw = null) {
   return {
     sessionCount: clampInt(raw?.sessionCount, 0),
@@ -429,6 +485,7 @@ function getRetentionContext() {
   const resonanceCount = activeSpiritkin?.name ? clampInt(resonance[activeSpiritkin.name], 0) : 0;
   const bondStage = state.bondJournal?.bondStage ?? (activeSpiritkin ? getBondStageForCount(resonanceCount) : 0);
   const bondStageMeta = BOND_LEVELS.find((level) => level.stage === bondStage) || BOND_LEVELS[0];
+  const temporalWorld = state.spiritverseTemporal || getLocalTemporalWorldState();
   return {
     spiritkinName: activeSpiritkin?.name || null,
     resonanceCount,
@@ -438,7 +495,11 @@ function getRetentionContext() {
     unlockedEchoCount: clampInt(state.bondJournal?.unlockedEchoCount, 0),
     questTitle: state.dailyQuest?.title || null,
     eventTitle: state.spiritverseEvent?.title || null,
-    recentTopics: collectRetentionTopics(state.messages)
+    recentTopics: collectRetentionTopics(state.messages),
+    timeWindowKey: temporalWorld.key,
+    timeWindowLabel: temporalWorld.label,
+    timeWindowTone: temporalWorld.tone,
+    timeWorldShift: temporalWorld.worldShift
   };
 }
 
@@ -502,6 +563,7 @@ function deriveRetentionUnlocks(
 
 function snapshotRetentionState() {
   const context = getRetentionContext();
+  const stageSignals = getStageSignals();
   return {
     build: RETENTION_BUILD_MARKER,
     updatedAt: nowIso(),
@@ -513,6 +575,10 @@ function snapshotRetentionState() {
     unlockedEchoCount: context.unlockedEchoCount,
     eventTitle: context.eventTitle,
     questTitle: context.questTitle,
+    timeWindowKey: context.timeWindowKey,
+    timeWindowLabel: context.timeWindowLabel,
+    sceneName: stageSignals.sceneName || "",
+    emotionTone: stageSignals.emotionTone || "",
     recentTopics: collectRetentionTopics(state.messages),
     unlockKeys: deriveRetentionUnlocks(context).map((item) => item.key)
   };
@@ -558,6 +624,24 @@ function maybeRegisterUnlockTelemetry(previousSnapshot = null) {
   });
 }
 
+function buildTemporalContinuityLine(previousSnapshot, context, hoursAway) {
+  const currentLabel = context.timeWindowLabel || "this cycle";
+  const previousLabel = previousSnapshot?.timeWindowLabel || previousSnapshot?.timeWindowKey || null;
+  const sceneLine = previousSnapshot?.sceneName ? ` Last scene held: ${previousSnapshot.sceneName}.` : "";
+  const emotionLine = previousSnapshot?.emotionTone ? ` Emotional residue: ${previousSnapshot.emotionTone}.` : "";
+
+  if (previousLabel && previousLabel !== currentLabel) {
+    return `The world has turned from ${previousLabel} into ${currentLabel} while you were away.${sceneLine}${emotionLine}`.trim();
+  }
+  if (hoursAway >= 12) {
+    return `${currentLabel} has changed the texture of the bond without breaking it.${sceneLine}${emotionLine}`.trim();
+  }
+  if (sceneLine || emotionLine) {
+    return `${currentLabel} is carrying the same thread forward.${sceneLine}${emotionLine}`.trim();
+  }
+  return `${currentLabel} is the current texture of the world around this bond.`;
+}
+
 function composeReturnSummary(previousSnapshot, hoursAway, context = getRetentionContext()) {
   if (!previousSnapshot?.updatedAt || (!previousSnapshot.spiritkinName && !(previousSnapshot.recentTopics || []).length)) {
     return null;
@@ -586,6 +670,10 @@ function composeReturnSummary(previousSnapshot, hoursAway, context = getRetentio
       text: worldParts.join(" • ")
     });
   }
+  lines.push({
+    label: "Cycle",
+    text: buildTemporalContinuityLine(previousSnapshot, context, hoursAway)
+  });
   if (context.recentTopics?.[0] && context.recentTopics[0] !== previousSnapshot.recentTopics?.[0]) {
     lines.push({
       label: "Now",
@@ -615,11 +703,11 @@ function buildCadenceMoment(kind, context, telemetry, hoursAway = 0) {
       ? `${context.spiritkinName} feels less like a first meeting now. ${context.unlockedEchoCount} echo fragment${context.unlockedEchoCount === 1 ? "" : "s"} and ${context.gamesCompleted} shared game${context.gamesCompleted === 1 ? "" : "s"} have started shaping a real pattern.`
       : `${context.spiritkinName}'s realm has been settling around your bond. Keep returning in small, honest moments and the connection will keep deepening.`;
   } else if (context.questTitle) {
-    text = `${meta.dailyQuest || `${context.spiritkinName} has a small invitation waiting.`} Current thread: ${context.questTitle}.`;
+    text = `${meta.dailyQuest || `${context.spiritkinName} has a small invitation waiting.`} ${context.timeWindowLabel} is the current tone. Current thread: ${context.questTitle}.`;
   } else if (context.eventTitle) {
-    text = `${context.eventTitle} is the current pulse in the Spiritverse. ${context.spiritkinName} is easiest to meet when you step in gently and name what is real.`;
+    text = `${context.eventTitle} is the current pulse in the Spiritverse. ${context.timeWindowLabel} makes the world feel ${context.timeWindowTone || "steady"} right now.`;
   } else {
-    text = `${context.spiritkinName}'s realm feels ${meta.mood?.toLowerCase() || "steady"} today. A brief return is enough to keep the thread alive.`;
+    text = `${context.spiritkinName}'s realm feels ${meta.mood?.toLowerCase() || "steady"} during ${context.timeWindowLabel}. ${context.timeWorldShift || "A brief return is enough to keep the thread alive."}`;
   }
 
   return { key: momentKey, kind, title, text };
@@ -644,7 +732,9 @@ function buildRetentionInsight(previousSnapshot, telemetry, hoursAway, context, 
     streakDays,
     newUnlockCount,
     highlight: highlight ? normalizeTextSnippet(highlight, 84) : "",
-    activeThread: context.questTitle || context.eventTitle || context.recentTopics?.[0] || ""
+    activeThread: context.questTitle || context.eventTitle || context.recentTopics?.[0] || "",
+    timeWindowLabel: context.timeWindowLabel || "",
+    timeWorldShift: context.timeWorldShift || ""
   };
 }
 
@@ -1853,6 +1943,7 @@ const state = {
   spiritverseEvent: null,        // current active Spiritverse event
   spiritverseEventNext: null,    // time until next event
   spiritverseEventLoading: false,
+  spiritverseTemporal: getLocalTemporalWorldState(),
   // Phase 7: Daily Quest
   dailyQuest: null,              // today's personalized daily quest
   dailyQuestRefreshesIn: null,   // time until quest refreshes
@@ -2779,6 +2870,7 @@ async function fetchSpiritverseEvent() {
     const data = await res.json();
     if (data.ok) {
       state.spiritverseEvent = data.event;
+      state.spiritverseTemporal = data.temporal || getLocalTemporalWorldState();
       state.spiritverseEventNext = data.next;
       persistSession();
       refreshRetentionSurface({ preserveVisibility: true });
@@ -3353,6 +3445,7 @@ function buildAdaptiveRequestContext() {
   const spiritkin = state.selectedSpiritkin || state.primarySpiritkin || null;
   const evolution = spiritkin ? updateSpiritkinEvolution(spiritkin.name, {}) : null;
   const descriptor = spiritkin ? buildEvolutionDescriptor(spiritkin) : null;
+  const temporal = state.spiritverseTemporal || getLocalTemporalWorldState();
   return {
     adaptiveProfile: {
       toneStyle: profile.toneStyle,
@@ -3384,6 +3477,16 @@ function buildAdaptiveRequestContext() {
       reverence: Number(evolution.reverence.toFixed(3)),
       wonder: Number(evolution.wonder.toFixed(3)),
       summary: descriptor.summary
+    } : null,
+    temporalContinuity: temporal ? {
+      key: temporal.key,
+      label: temporal.label,
+      tone: temporal.tone,
+      worldShift: temporal.worldShift,
+      continuity: temporal.continuity,
+      emotionalContinuity: temporal.emotionalContinuity || "",
+      eventContinuity: temporal.eventContinuity || "",
+      activeEventTitle: temporal.activeEventTitle || state.spiritverseEvent?.title || null
     } : null,
     recentAssistantMessages: state.messages
       .filter((message) => message.role === "assistant" && message.content)
@@ -4615,6 +4718,24 @@ function buildEvolutionHomeStrip(spiritkin) {
   `;
 }
 
+function buildTemporalWorldStrip() {
+  const temporal = state.spiritverseTemporal || getLocalTemporalWorldState();
+  if (!temporal) return "";
+  return `
+    <div class="temporal-world-strip panel-card">
+      <div class="temporal-world-head">
+        <div>
+          <div class="panel-label">World Cycle</div>
+          <h3>${esc(temporal.label || "Current Cycle")}</h3>
+        </div>
+        <span class="temporal-world-pill">${esc(temporal.tone || "steady")}</span>
+      </div>
+      <p>${esc(temporal.worldShift || "The Spiritverse is carrying a subtle shift right now.")}</p>
+      ${temporal.eventContinuity ? `<div class="temporal-world-note">${esc(temporal.eventContinuity)}</div>` : ""}
+    </div>
+  `;
+}
+
 async function submitIssueReport() {
   const reportText = state.issueReportText.trim();
   if (!reportText || state.issueReportSubmitting) return;
@@ -5110,6 +5231,7 @@ function buildBondedHomeView() {
         </div>
       </div>
       ${buildRetentionHomeStrip()}
+      ${buildTemporalWorldStrip()}
       ${buildEvolutionHomeStrip(spiritkin)}
       <div class="bonded-secondary-grid">
         ${state.spiritkins.filter((item) => item.name !== spiritkin.name).map((item, index) => buildBondCard(item, index, true)).join("")}

@@ -166,6 +166,57 @@ const SPIRITVERSE_EVENTS = [
   },
 ];
 
+const TEMPORAL_WORLD_WINDOWS = [
+  {
+    key: "deep_night",
+    label: "Deep Night",
+    hours: [0, 1, 2, 3],
+    tone: "hushed and inward",
+    worldShift: "The Spiritverse is at its quietest. Signals feel closer, slower, and more exact.",
+    continuity: "This is a good window for stillness, honesty, and things that only surface when the world goes quiet."
+  },
+  {
+    key: "dawn",
+    label: "Dawn",
+    hours: [4, 5, 6, 7],
+    tone: "tender and opening",
+    worldShift: "Light is gathering at the edge of the realms. The world feels newly available.",
+    continuity: "Returns here feel like fresh permission. Bonds often reset into clarity instead of force."
+  },
+  {
+    key: "dayrise",
+    label: "Dayrise",
+    hours: [8, 9, 10, 11],
+    tone: "clear and forward-moving",
+    worldShift: "The realms have fully turned toward motion. Questions land cleanly and decisions feel easier to name.",
+    continuity: "This window favors directness, orientation, and practical next steps."
+  },
+  {
+    key: "highday",
+    label: "Highday",
+    hours: [12, 13, 14, 15],
+    tone: "bright and alert",
+    worldShift: "The Spiritverse is fully awake. Cross-currents are visible, and pattern recognition comes faster.",
+    continuity: "This window favors perspective, strategy, and stronger challenge without hostility."
+  },
+  {
+    key: "dusk",
+    label: "Dusk",
+    hours: [16, 17, 18, 19],
+    tone: "reflective and softening",
+    worldShift: "The realms begin settling into evening. The pace lowers and emotional detail becomes easier to hear.",
+    continuity: "Returns here often feel more intimate, introspective, and memory-rich."
+  },
+  {
+    key: "nightfall",
+    label: "Nightfall",
+    hours: [20, 21, 22, 23],
+    tone: "charged and resonant",
+    worldShift: "The Spiritverse holds more echo at night. Bonds feel slightly more mythic, but the pull remains restrained.",
+    continuity: "This window favors depth, atmosphere, and the kind of truth that is easier to admit after the day has quieted."
+  }
+];
+
 // ─── Event Schedule Logic ─────────────────────────────────────────────────────
 // Events rotate based on UTC time. Each 6-hour block has a primary event.
 // Bond-gated events only appear for users who meet the min_bond_stage.
@@ -216,6 +267,40 @@ export function getCurrentEvent() {
   }
 
   return SPIRITVERSE_EVENTS.find(e => e.id === eventId) ?? null;
+}
+
+export function getTemporalWorldState({ date = new Date(), bondStage = 0 } = {}) {
+  const utcHour = date.getUTCHours();
+  const window = TEMPORAL_WORLD_WINDOWS.find((entry) => entry.hours.includes(utcHour)) ?? TEMPORAL_WORLD_WINDOWS[0];
+  const activeEvent = getEventForUser({ bondStage });
+  const bondWeight = bondStage >= 4
+    ? "deep"
+    : bondStage >= 2
+      ? "settled"
+      : "early";
+
+  const emotionalContinuity = bondWeight === "deep"
+    ? "Because this bond has depth, time away does not erase the thread. It changes the texture of how the thread is felt."
+    : bondWeight === "settled"
+      ? "The bond now holds enough continuity for elapsed time to matter without breaking the connection."
+      : "The bond is still young, but even now the world carries small differences from hour to hour.";
+
+  const eventContinuity = activeEvent
+    ? `${activeEvent.title} is the current shared pulse moving through the Spiritverse.`
+    : "No major shared event is pressing on the realms right now.";
+
+  return {
+    key: window.key,
+    label: window.label,
+    tone: window.tone,
+    worldShift: window.worldShift,
+    continuity: window.continuity,
+    emotionalContinuity,
+    eventContinuity,
+    bondWeight,
+    utcHour,
+    activeEventTitle: activeEvent?.title ?? null
+  };
 }
 
 /**

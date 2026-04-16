@@ -5887,6 +5887,51 @@ button[data-action="begin-quest"]:active,
   line-height: 1.62;
 }
 
+.temporal-world-strip {
+  width: min(1120px, 100%);
+  margin: 16px auto 0;
+  padding: 16px 18px;
+}
+
+.temporal-world-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.temporal-world-head h3 {
+  margin: 6px 0 0;
+  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  font-size: clamp(1.18rem, 1.7vw, 1.45rem);
+}
+
+.temporal-world-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--realm-accent, #dcb5ff) 24%, transparent);
+  background: color-mix(in srgb, var(--realm-accent, #dcb5ff) 10%, transparent);
+  color: var(--text);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.temporal-world-strip p {
+  margin: 12px 0 0;
+  color: var(--text);
+  line-height: 1.62;
+}
+
+.temporal-world-note {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
 @media (max-width: 720px) {
   .retention-panel {
     width: calc(100% - 24px);
@@ -5922,5 +5967,9 @@ button[data-action="begin-quest"]:active,
 
   .evolution-home-pills {
     justify-content: flex-start;
+  }
+
+  .temporal-world-head {
+    flex-direction: column;
   }
 }

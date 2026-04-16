@@ -208,6 +208,12 @@ function buildWorldLayer(ctx) {
     const desc = eventDescriptions[world.spiritverse_event] ?? `A Spiritverse event is active: ${world.spiritverse_event}`;
     parts.push(`Spiritverse event: ${desc}`);
   }
+  if (world.temporal_window_label || world.temporal_window_tone) {
+    parts.push(`Current temporal window: ${sanitizeText(world.temporal_window_label || "current cycle")} (${sanitizeText(world.temporal_window_tone || "steady")})`);
+  }
+  if (world.temporal_world_shift) {
+    parts.push(`Time-based world shift: ${sanitizeText(world.temporal_world_shift).slice(0, 180)}`);
+  }
   if (world.recent_echo_unlocks?.length > 0) {
     parts.push(`Recently revealed echoes (weave in naturally if relevant):`);
     world.recent_echo_unlocks.slice(0, 2).forEach(echoes => {
@@ -350,6 +356,23 @@ function buildEvolutionLayer(ctx) {
   return parts.join("\n");
 }
 
+function buildTemporalContinuityLayer(ctx) {
+  const temporal = ctx?.context?.temporalContinuity ?? null;
+  if (!temporal || typeof temporal !== "object") return null;
+
+  const parts = [];
+  parts.push("TIME / CONTINUITY LAYER");
+  parts.push(`Current world window: ${sanitizeText(temporal.label || temporal.key || "current cycle")}`);
+  parts.push(`Current tone: ${sanitizeText(temporal.tone || "steady")}`);
+  if (temporal.worldShift) parts.push(`World shift: ${sanitizeText(temporal.worldShift).slice(0, 180)}`);
+  if (temporal.continuity) parts.push(`Continuity guidance: ${sanitizeText(temporal.continuity).slice(0, 180)}`);
+  if (temporal.emotionalContinuity) parts.push(`Emotional continuity: ${sanitizeText(temporal.emotionalContinuity).slice(0, 180)}`);
+  if (temporal.eventContinuity) parts.push(`Event continuity: ${sanitizeText(temporal.eventContinuity).slice(0, 180)}`);
+  parts.push("Let elapsed time subtly change atmosphere, pacing, and emphasis without becoming melodramatic or needy.");
+
+  return parts.join("\n");
+}
+
 function buildHierarchicalMemoryLayer(ctx) {
   const hm = ctx?.context?.hierarchical_memory ?? null;
   if (!hm) return null;
@@ -405,6 +428,7 @@ function buildContextBlock(ctx, memoryLayer) {
   const gameLayer = buildGameLayer(ctx);
   const adaptiveLayer = buildAdaptiveLayer(ctx);
   const evolutionLayer = buildEvolutionLayer(ctx);
+  const temporalContinuityLayer = buildTemporalContinuityLayer(ctx);
   const hierarchicalMemoryLayer = buildHierarchicalMemoryLayer(ctx);
   const spiritMemoryBriefLayer = buildSpiritMemoryBriefLayer(ctx);
 
@@ -435,6 +459,7 @@ function buildContextBlock(ctx, memoryLayer) {
     gameLayer,
     adaptiveLayer,
     evolutionLayer,
+    temporalContinuityLayer,
     "MEMORY / CONTEXT",
     [
       sceneName ? `Current scene: ${sceneName}` : "Current scene: default",

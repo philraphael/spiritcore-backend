@@ -14,6 +14,7 @@ import {
   getEventForUser,
   getNextEvent,
   getAllEvents,
+  getTemporalWorldState,
 } from "../services/spiritverseEvents.mjs";
 
 export async function spiritverseEventRoutes(fastify) {
@@ -35,10 +36,12 @@ export async function spiritverseEventRoutes(fastify) {
 
     const event = getEventForUser({ bondStage });
     const next = getNextEvent();
+    const temporal = getTemporalWorldState({ bondStage });
 
     return reply.send({
       ok: true,
       event: event ?? null,
+      temporal,
       next: {
         hoursUntil: next.hoursUntil,
         minutesUntil: next.minutesUntil,
