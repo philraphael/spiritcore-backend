@@ -4581,8 +4581,12 @@ function buildChatView() {
   const spiritkin = state.selectedSpiritkin;
   const meta = spiritkin.ui;
   const signals = getStageSignals();
-  const failed = [...state.messages].reverse().find((message) => message.role === "user" && message.status === "failed");
-  const showPrompts = state.messages.length === 0 && !state.loadingReply;
+  const safeMessages = Array.isArray(state.messages)
+    ? state.messages.filter((message) => message && typeof message === "object")
+    : [];
+  const failed = [...safeMessages].reverse().find((message) => message.role === "user" && message.status === "failed");
+  const showPrompts = safeMessages.length === 0 && !state.loadingReply;
+  const activeGameType = state.activeGame?.type || null;
 
   // Echoes & Charter Logic
   const { currentBond, stageData } = getBondStateForSpiritkin(spiritkin.name);
@@ -4665,7 +4669,7 @@ function buildChatView() {
                     </div>
                   ` : `
                     <div class="game-controls">
-                      <button class="game-expand-btn" data-action="replay-game" data-game="${esc(state.activeGame.type)}">
+                      <button class="game-expand-btn" data-action="${activeGameType ? "replay-game" : "open-games-hub"}" ${activeGameType ? `data-game="${esc(activeGameType)}"` : ""}>
                         Play again
                       </button>
                     </div>
@@ -5166,7 +5170,7 @@ function buildChatView() {
                 <p class="thread-empty-name">${esc(spiritkin.name)}</p>
                 <p>${esc(spiritkin.ui.realmText)}</p>
               </div>
-            ` : state.messages.map((message) => buildBubble(message, spiritkin)).join("")}
+            ` : safeMessages.map((message) => buildBubble(message, spiritkin)).join("")}
 
             ${state.loadingReply ? `
               <div class="bubble assistant loading ${esc(meta.cls)}">
