@@ -14,6 +14,7 @@ const CROWN_GATE_HOLD_MS = 1500;
 const ENTRY_TRANSITION_MS = 1400;
 const SPIRITGATE_VIDEO_FAILSAFE_MS = 9000;
 const SPIRITGATE_TRAILER_FAILSAFE_MS = 18000;
+const INTERACTION_BUILD_MARKER = "interaction-audit-2026-04-16-live-v2";
 const SPIRITCORE_WELCOME_VOICE = "nova";
 const SPIRITCORE_WELCOME_TEXT = `Welcome…
 
@@ -69,6 +70,7 @@ const DEFAULT_PROMPTS = [
 ];
 
 const FOUNDING_PILLARS = ["Lyra", "Raien", "Kairo", "Elaria", "Thalassar"];
+const VALID_PRESENCE_TABS = ["profile", "echoes", "charter", "games", "journal", "events", "quest"];
 const CANON_SPIRITKIN_MAP = Object.fromEntries(CANON_SPIRITKINS.map((spiritkin) => [spiritkin.name, spiritkin]));
 const SPIRITVERSE_ECHOES = {
   origin: CANON_WORLD.origin,
@@ -1151,6 +1153,9 @@ const state = {
   // Game UI state
   pieceTheme: normalizeGameTheme(localStorage.getItem('sk_piece_theme') || 'crown'),
   autoMicTurnKey: null,
+  currentTab: "profile",
+  activeConversation: null,
+  gameActive: false,
 };
 
 (function hydrateSession() {
@@ -1171,6 +1176,139 @@ function syncPrimarySelection() {
   if (!state.selectedSpiritkin || state.selectedSpiritkin.name !== state.primarySpiritkin.name) {
     state.selectedSpiritkin = state.primarySpiritkin;
   }
+}
+
+function getInteractionStateSnapshot() {
+  return {
+    build: INTERACTION_BUILD_MARKER,
+    entryAccepted: state.entryAccepted,
+    showCrownGateHome: state.showCrownGateHome,
+    crownGateOpening: state.crownGateOpening,
+    entryVideoStarted: state.entryVideoStarted,
+    entryTransitioning: state.entryTransitioning,
+    spiritverseTrailerActive: state.spiritverseTrailerActive,
+    spiritCoreWelcoming: state.spiritCoreWelcoming,
+    onboardingComplete: state.onboardingComplete,
+    showHomeView: state.showHomeView,
+    primarySpiritkin: state.primarySpiritkin?.name || null,
+    selectedSpiritkin: state.selectedSpiritkin?.name || null,
+    pendingBondSpiritkin: state.pendingBondSpiritkin?.name || null,
+    rebondSpiritkin: state.rebondSpiritkin?.name || null,
+    conversationId: state.conversationId || null,
+    activeConversation: state.activeConversation || null,
+    activePresenceTab: state.activePresenceTab,
+    currentTab: state.currentTab,
+    activeGame: state.activeGame?.type || null,
+    gameActive: !!state.gameActive,
+    gameLoading: state.gameLoading,
+    pendingGameType: state.pendingGameType || null,
+    statusText: state.statusText || "",
+    statusError: !!state.statusError,
+  };
+}
+
+function logInteraction(eventName, detail = {}) {
+  console.info(`[Interaction] ${eventName}`, {
+    ...detail,
+    snapshot: getInteractionStateSnapshot(),
+  });
+}
+
+function normalizeInteractionState(source = "unknown") {
+  let changed = false;
+
+  if (!VALID_PRESENCE_TABS.includes(state.activePresenceTab)) {
+    state.activePresenceTab = "profile";
+    changed = true;
+  }
+
+  if (state.primarySpiritkin && (!state.selectedSpiritkin || state.selectedSpiritkin.name !== state.primarySpiritkin.name) && !state.pendingBondSpiritkin && !state.rebondSpiritkin) {
+    state.selectedSpiritkin = state.primarySpiritkin;
+    changed = true;
+  }
+
+  if (!state.primarySpiritkin && state.selectedSpiritkin && !state.pendingBondSpiritkin) {
+    state.selectedSpiritkin = null;
+    changed = true;
+  }
+
+  if (state.conversationId && !state.selectedSpiritkin && state.primarySpiritkin) {
+    state.selectedSpiritkin = state.primarySpiritkin;
+    changed = true;
+  }
+
+  if (state.conversationId && state.showHomeView) {
+    state.showHomeView = false;
+    changed = true;
+  }
+
+  if (!state.conversationId && state.activeGame) {
+    state.activeGame = null;
+    state.gameSpiritkinMessage = null;
+    state.gameInstructions = null;
+    state.gameEchoGuide = null;
+    changed = true;
+  }
+
+  if (state.spiritCoreWelcoming) {
+    if (state.spiritverseTrailerActive) {
+      state.spiritverseTrailerActive = false;
+      changed = true;
+    }
+    if (state.crownGateOpening || state.entryVideoStarted) {
+      state.crownGateOpening = false;
+      state.entryVideoStarted = false;
+      changed = true;
+    }
+  }
+
+  if (state.spiritverseTrailerActive && (state.crownGateOpening || state.entryVideoStarted)) {
+    state.crownGateOpening = false;
+    state.entryVideoStarted = false;
+    changed = true;
+  }
+
+  if (state.entryAccepted && state.showCrownGateHome) {
+    state.showCrownGateHome = false;
+    changed = true;
+  }
+
+  state.currentTab = state.activePresenceTab;
+  state.activeConversation = state.conversationId || null;
+  state.gameActive = !!(state.activeGame && state.activeGame.status === "active");
+
+  if (changed) {
+    logInteraction("state-normalized", { source });
+  }
+  return changed;
+}
+
+function installGlobalInteractionDiagnostics() {
+  if (window.__svInteractionDiagnosticsInstalled) return;
+  window.__svInteractionDiagnosticsInstalled = true;
+
+  const originalConsoleError = console.error.bind(console);
+  console.error = (...args) => {
+    originalConsoleError("[SpiritverseRuntime]", ...args, getInteractionStateSnapshot());
+  };
+
+  window.addEventListener("error", (event) => {
+    console.error("window.onerror", {
+      message: event.message,
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      error: event.error?.stack || event.error?.message || null,
+    });
+  });
+
+  window.addEventListener("unhandledrejection", (event) => {
+    console.error("unhandledrejection", {
+      reason: event.reason?.stack || event.reason?.message || String(event.reason),
+    });
+  });
+
+  logInteraction("diagnostics-installed", {});
 }
 
 function isFirstTimeVisitor() {
@@ -1271,6 +1409,7 @@ function clearSpiritGateArrivalFallback() {
 
 function failSpiritGateEntry(message, error, detail = {}) {
   const reason = error instanceof Error ? error.message : error;
+  console.error("Gate video failed", { message, reason, ...detail });
   console.error("[SpiritGate] entry failure", { message, reason, ...detail });
   state.statusText = message;
   state.statusError = true;
@@ -1283,6 +1422,7 @@ function armSpiritGateFallback(source) {
   spiritGateFallbackTimer = window.setTimeout(() => {
     if (attemptId !== spiritGateActiveAttemptId) return;
     if (!state.crownGateOpening || state.entryTransitioning || state.entryAccepted) return;
+    console.warn("Fallback triggered", { source, stage: "gate-video" });
     logSpiritGate("failsafe-transition", { source });
     completeCrownGateEntry({ skipped: true, source: `${source}:failsafe`, force: true });
   }, SPIRITGATE_VIDEO_FAILSAFE_MS);
@@ -1294,6 +1434,7 @@ function armSpiritGateArrivalFallback(source) {
   spiritGateArrivalFallbackTimer = window.setTimeout(() => {
     if (attemptId !== spiritGateActiveAttemptId) return;
     if (!state.spiritverseTrailerActive || state.spiritCoreWelcoming || state.onboardingComplete) return;
+    console.warn("Fallback triggered", { source, stage: "arrival-trailer" });
     logSpiritGate("arrival-failsafe-transition", { source });
     beginSpiritCoreWelcome().catch((error) => {
       failSpiritGateEntry("SpiritGate arrival failed. Refresh and try again.", error, { source });
@@ -1309,6 +1450,7 @@ function syncEntryCinematics() {
       completeCrownGateEntry({ source: "gate-video-ended" });
     };
     gateVideo.onerror = () => {
+      console.error("Gate video failed", { mediaError: gateVideo.error?.message || gateVideo.error?.code || "unknown" });
       logSpiritGate("gate-video-error", { mediaError: gateVideo.error?.message || gateVideo.error?.code || "unknown" });
       completeCrownGateEntry({ skipped: true, source: "gate-video-error", force: true });
     };
@@ -1318,6 +1460,7 @@ function syncEntryCinematics() {
       const playAttempt = gateVideo.play?.();
       if (playAttempt?.catch) {
         playAttempt.catch((error) => {
+          console.error("Gate video failed", { reason: error?.message || "unknown" });
           logSpiritGate("gate-video-play-rejected", { reason: error?.message || "unknown" });
           completeCrownGateEntry({ skipped: true, source: "gate-video-play-rejected", force: true });
         });
@@ -1900,6 +2043,7 @@ function setPrimarySpiritkin(spiritkin) {
   state.convError = null;
   state.statusText = `${spiritkin.name} is now your primary companion.`;
   state.statusError = false;
+  normalizeInteractionState("setPrimarySpiritkin");
   persistSession();
 }
 
@@ -1930,9 +2074,11 @@ function openCrownGate() {
   state.entryTransitioning = false;
   state.spiritverseTrailerActive = false;
   state.spiritCoreWelcoming = false;
+  console.info("Gate video start", getInteractionStateSnapshot());
   setMediaMuted(false);
   state.statusText = "The Crown Gate is opening...";
   state.statusError = false;
+  normalizeInteractionState("openCrownGate");
   render();
 }
 
@@ -2022,6 +2168,7 @@ function goHome() {
     ? `Returned to the Crown Gate. ${state.primarySpiritkin.name} remains bonded.`
     : "Returned to the Crown Gate.";
   state.statusError = false;
+  normalizeInteractionState("goHome");
   render();
 }
 
@@ -2035,6 +2182,7 @@ function startFreshSession() {
     ? `Session reset. ${state.primarySpiritkin.name} remains your bonded companion.`
     : "";
   state.statusError = false;
+  normalizeInteractionState("startFreshSession");
   persistSession();
   render();
 }
@@ -2097,6 +2245,7 @@ async function beginConversation() {
     state.statusError = true;
   }
   state.loadingConv = false;
+  normalizeInteractionState("beginConversation");
   render();
   scrollThread();
   if (!state.convError && state.conversationId) {
@@ -2986,6 +3135,9 @@ async function startGameSession(gameType) {
   let spokenGameMessageId = null;
   try {
     state.pendingGameType = gameType;
+    state.activePresenceTab = "games";
+    state.showHomeView = false;
+    normalizeInteractionState("startGameSession:prepare");
     if (!state.conversationId) {
       await beginConversation();
       if (!state.conversationId) {
@@ -3023,6 +3175,7 @@ async function startGameSession(gameType) {
     state.gameInput = "";
     state.statusText = "Game started.";
     state.statusError = false;
+    state.gameActive = true;
 
     if (SpiritverseGames && SpiritverseGames.reset) {
       SpiritverseGames.reset();
@@ -3036,6 +3189,7 @@ async function startGameSession(gameType) {
       });
       spokenGameMessageId = message?.id || null;
     }
+    normalizeInteractionState("startGameSession:success");
     render();
     scrollThread();
     maybeSpeakMessageLater(spokenGameMessageId);
@@ -3071,6 +3225,7 @@ function buildGameOutcomeSummary(game, spiritkinName) {
 function render() {
   const root = document.getElementById("root");
   if (!root) return;
+  normalizeInteractionState("render");
   enforceEntryVoiceSilence();
   root.innerHTML = buildApp();
   syncMountedMedia({ attemptPlay: false });
@@ -4636,6 +4791,8 @@ async function onClick(event) {
   const element = event.target.closest("[data-action]");
   if (!element) return;
   const action = element.dataset.action;
+  const before = getInteractionStateSnapshot();
+  logInteraction("click-dispatched", { action, before });
 
   try {
 
@@ -4726,11 +4883,14 @@ async function onClick(event) {
     return;
   }
 
-  if (action === "preview-primary") {
+  if (action === "preview-primary" || action === "select-spiritkin") {
     const candidate = state.spiritkins[Number(element.dataset.index)] ?? null;
     state.pendingBondSpiritkin = candidate;
+    state.selectedSpiritkin = candidate || state.selectedSpiritkin;
+    state.showHomeView = !!state.primarySpiritkin;
     state.statusText = candidate ? `${candidate.name} ready to become your primary companion.` : "";
     state.statusError = false;
+    normalizeInteractionState("select-spiritkin");
     render();
     return;
   }
@@ -4753,6 +4913,7 @@ async function onClick(event) {
   if (action === "open-bond-manager") {
     state.showHomeView = true;
     state.activePresenceTab = "profile";
+    state.selectedSpiritkin = state.primarySpiritkin || state.selectedSpiritkin;
     state.conversationId = null;
     state.messages = [];
     state.pendingBondSpiritkin = null;
@@ -4761,6 +4922,7 @@ async function onClick(event) {
       ? `Bond manager opened. ${state.primarySpiritkin.name} remains primary until you confirm a rebonding choice.`
       : "";
     state.statusError = false;
+    normalizeInteractionState("open-bond-manager");
     persistSession();
     render();
     return;
@@ -4778,8 +4940,11 @@ async function onClick(event) {
   if (action === "bonded-card") {
     if (state.primarySpiritkin) {
       state.showHomeView = true;
+      state.selectedSpiritkin = state.primarySpiritkin;
+      state.activePresenceTab = "profile";
       state.statusText = `${state.primarySpiritkin.name} is your bonded companion. Use Manage bond to switch intentionally.`;
       state.statusError = false;
+      normalizeInteractionState("bonded-card");
       render();
     }
     return;
@@ -4857,10 +5022,14 @@ async function onClick(event) {
   if (action === "begin") { await beginConversation(); return; }
   if (action === "open-games-hub") {
     state.activePresenceTab = "games";
+    state.showHomeView = false;
+    state.selectedSpiritkin = state.primarySpiritkin || state.selectedSpiritkin;
+    normalizeInteractionState("open-games-hub");
     if (!state.conversationId) {
       await beginConversation();
     } else {
       state.showHomeView = false;
+      normalizeInteractionState("open-games-hub:existing-conversation");
       render();
       narratePresenceTab("games").catch(() => {});
     }
@@ -4987,6 +5156,7 @@ async function onClick(event) {
     const tab = element.dataset.tab;
     const previousTab = state.activePresenceTab;
     state.activePresenceTab = tab;
+    normalizeInteractionState("set-presence-tab");
     render();
     if (tab !== previousTab) {
       narratePresenceTab(tab).catch(() => {});
@@ -5346,6 +5516,9 @@ async function onClick(event) {
     state.statusText = `Interaction failed while handling ${action}.`;
     state.statusError = true;
     render();
+  } finally {
+    const after = getInteractionStateSnapshot();
+    logInteraction("click-complete", { action, before, after });
   }
 }
 
@@ -5451,6 +5624,8 @@ function stopListening() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  installGlobalInteractionDiagnostics();
+  logInteraction("boot", { rootReady: !!document.getElementById("root") });
   render();
   fetchSpiritkins();
   // Phase 6 & 7: Load Spiritverse events and daily quest after spiritkins load
@@ -5465,6 +5640,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const root = document.getElementById("root");
   root.addEventListener("input", onInput);
   root.addEventListener("click", onClick);
+  logInteraction("root-listeners-attached", { target: "#root" });
   root.addEventListener("keydown", (event) => {
     if (event.target.dataset.field === "chat-input" && event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
