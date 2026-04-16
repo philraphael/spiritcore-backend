@@ -3651,7 +3651,6 @@ function buildCrownGateEntry() {
       </div>
       <div class="entry-gate-scrim"></div>
       <div class="entry-gate-shell">
-        <button class="entry-skip-btn" data-action="skip-gate" ${needsConsent && !state.consentChecked ? "disabled" : ""}>Skip</button>
         <div class="entry-copy ${state.entryVideoStarted ? "entry-copy-hidden" : ""}">
           <div class="entry-glyph-wrap">
             <div class="entry-glyph">SC</div>
@@ -3671,11 +3670,6 @@ function buildCrownGateEntry() {
             <span class="entry-pillar">Living audio presence</span>
             <span class="entry-pillar">Bond memory intact</span>
             <span class="entry-pillar">${returning && state.primarySpiritkin ? `Bonded: ${esc(state.primarySpiritkin.name)}` : "First bond ahead"}</span>
-          </div>
-          <div class="entry-cta">
-            <button class="btn btn-primary btn-wide entry-main-cta" data-action="continue" ${needsConsent && !state.consentChecked ? "disabled" : ""}>
-              ${state.crownGateOpening ? "Opening the SpiritGate..." : "Enter the SpiritVerse"}
-            </button>
           </div>
           ${needsConsent ? `
             <div class="entry-consent-card">
@@ -3698,6 +3692,14 @@ function buildCrownGateEntry() {
                 : "Your prior consent is remembered. Cross when you are ready."}
             </div>
           `}
+          <div class="entry-action-rail">
+            <button class="entry-skip-btn" data-action="skip-gate" ${needsConsent && !state.consentChecked ? "disabled" : ""}>Skip</button>
+            <div class="entry-cta">
+              <button class="btn btn-primary btn-wide entry-main-cta" data-action="continue" ${needsConsent && !state.consentChecked ? "disabled" : ""}>
+                ${state.crownGateOpening ? "Opening the SpiritGate..." : "Enter the SpiritVerse"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </section>
