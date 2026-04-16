@@ -1,3 +1,5 @@
+import { getGameTheme } from "./data/gameThemes.js";
+
 /**
  * Spiritverse Games Engine — Visual Interactive Boards (GRAND STAGE EDITION)
  * All 5 games rendered as real visual boards with Spiritverse theming.
@@ -45,6 +47,30 @@ const CHESS_PIECE_THEMES = {
   celestial: CHESS_PIECES
 };
 
+function resolveGameTheme(type, overrideTheme) {
+  const gameTheme = getGameTheme(type);
+  if (type === "chess" && overrideTheme && CHESS_THEME_OPTIONS.some((option) => option.id === overrideTheme)) {
+    return { ...gameTheme, boardVariant: overrideTheme };
+  }
+  return gameTheme;
+}
+
+function themeVarsToStyle(theme) {
+  return Object.entries(theme?.cssVars || {})
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("; ");
+}
+
+function withThemeFrame(content, type, theme, extraClass = "") {
+  const classes = ["sv-theme-shell", `sv-theme-${type}`];
+  if (extraClass) classes.push(extraClass);
+  return `
+    <div class="${classes.join(" ")}" data-game-theme="${type}" data-associated-spiritkin="${theme.associatedSpiritkin}" style="${themeVarsToStyle(theme)}">
+      ${content}
+    </div>
+  `;
+}
+
 // ============================================================
 // GRAND STAGE OVERLAY — Unified Fullscreen System
 // ============================================================
@@ -53,7 +79,7 @@ const GrandStage = {
   gameType: null,
   spiritkin: null,
   
-  open(gameType, spiritkin, renderFn) {
+  open(gameType, spiritkin, renderFn, theme = resolveGameTheme(gameType)) {
     if (this.isOpen) this.close();
     this.isOpen = true;
     this.gameType = gameType;
@@ -62,6 +88,11 @@ const GrandStage = {
     const overlay = document.createElement('div');
     overlay.className = 'game-fullscreen-overlay';
     overlay.id = 'grand-stage';
+    overlay.dataset.gameTheme = gameType;
+    overlay.dataset.associatedSpiritkin = theme.associatedSpiritkin;
+    for (const [key, value] of Object.entries(theme.cssVars || {})) {
+      overlay.style.setProperty(key, value);
+    }
     
     overlay.innerHTML = `
       <div class="game-fullscreen-header">
@@ -152,23 +183,23 @@ function parseFEN(fen) {
   return board;
 }
 
-function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, onSquareClick, isExpanded = false, theme = 'crown') {
-  console.log('renderChessBoard called with theme:', theme);
+function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, onSquareClick, isExpanded = false, theme = resolveGameTheme("chess")) {
   const board = parseFEN(fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
   const files = ['a','b','c','d','e','f','g','h'];
+  const themeId = theme.boardVariant || 'crown';
 
   let html = '';
   if (!isExpanded) {
     html += `<div class="game-board-controls" style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:340px;margin-bottom:6px;">
       <div class="piece-theme-selector">
         <span class="piece-theme-label">Theme</span>
-        ${CHESS_THEME_OPTIONS.map((option) => `<button class="piece-theme-btn ${theme === option.id ? 'active' : ''}" data-action="set-piece-theme" data-theme="${option.id}">${option.label}</button>`).join('')}
+        ${CHESS_THEME_OPTIONS.map((option) => `<button class="piece-theme-btn ${themeId === option.id ? 'active' : ''}" data-action="set-piece-theme" data-theme="${option.id}">${option.label}</button>`).join('')}
       </div>
       <button class="game-expand-btn" data-action="chess-expand">&#x26F6; Grand Stage</button>
     </div>`;
   }
 
-  html += `<div class="chess-board chess-theme-${theme} ${isExpanded ? 'board-3d' : ''}" id="chess-board" style="${isExpanded ? 'width: 560px; max-width: none;' : ''}">`;
+  html += `<div class="chess-board chess-theme-${themeId} ${isExpanded ? 'board-3d' : ''}" id="chess-board" style="${isExpanded ? 'width: 560px; max-width: none;' : ''}">`;
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
       const sq = files[file] + (8 - rank);
@@ -184,7 +215,7 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
       if (isLastMove) cellClass += ' chess-last-move';
 
       const pieceKey = piece ? `${piece.color}${piece.type}` : null;
-      const themePieces = CHESS_PIECE_THEMES[theme] || CHESS_PIECE_THEMES['crown'];
+      const themePieces = CHESS_PIECE_THEMES[themeId] || CHESS_PIECE_THEMES['crown'];
       const pieceSvg = pieceKey && themePieces[pieceKey] ? themePieces[pieceKey] : '';
 
       html += `<div class="${cellClass}" data-sq="${sq}" data-action="chess-square-click">`;
@@ -196,20 +227,19 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
   }
   html += `</div>`;
   
-  console.log('Chess board HTML generated, length:', html.length);
   if (!isExpanded) {
     html += `<div class="chess-labels-files">`;
     for (const f of files) html += `<span>${f}</span>`;
     html += `</div>`;
   }
 
-  container.innerHTML = html;
+  container.innerHTML = withThemeFrame(html, 'chess', theme, isExpanded ? 'sv-theme-expanded' : '');
 
   if (!isExpanded) {
     const expandBtn = container.querySelector('[data-action="chess-expand"]');
     if (expandBtn) {
       expandBtn.onclick = () => {
-        GrandStage.open('chess', 'Spiritkin', (c, exp) => renderChessBoard(c, fen, selectedSquare, validMoves, lastMove, onSquareClick, exp));
+        GrandStage.open('chess', 'Spiritkin', (c, exp) => renderChessBoard(c, fen, selectedSquare, validMoves, lastMove, onSquareClick, exp, theme), theme);
       };
     }
   }
@@ -218,7 +248,7 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
 // ============================================================
 // CHECKERS ENGINE & RENDERER
 // ============================================================
-function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, onSquareClick, isExpanded = false) {
+function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, onSquareClick, isExpanded = false, theme = resolveGameTheme("checkers")) {
   const board = boardArray || Array(32).fill(null);
   
   let html = '';
@@ -258,13 +288,13 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, o
     }
   }
   html += `</div>`;
-  container.innerHTML = html;
+  container.innerHTML = withThemeFrame(html, 'checkers', theme, isExpanded ? 'sv-theme-expanded' : '');
 
   if (!isExpanded) {
     const expandBtn = container.querySelector('[data-action="checkers-expand"]');
     if (expandBtn) {
       expandBtn.onclick = () => {
-        GrandStage.open('checkers', 'Spiritkin', (c, exp) => renderCheckersBoard(c, boardArray, selectedPiece, validMoves, onSquareClick, exp));
+        GrandStage.open('checkers', 'Spiritkin', (c, exp) => renderCheckersBoard(c, boardArray, selectedPiece, validMoves, onSquareClick, exp, theme), theme);
       };
     }
   }
@@ -273,7 +303,7 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, o
 // ============================================================
 // GO (STAR-MAPPING) RENDERER
 // ============================================================
-function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpanded = false) {
+function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpanded = false, theme = resolveGameTheme("go")) {
   const size = 13;
   const board = boardArray || Array(size * size).fill(null);
 
@@ -310,13 +340,13 @@ function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpande
     }
   }
   html += `</div>`;
-  container.innerHTML = html;
+  container.innerHTML = withThemeFrame(html, 'go', theme, isExpanded ? 'sv-theme-expanded' : '');
 
   if (!isExpanded) {
     const expandBtn = container.querySelector('[data-action="go-expand"]');
     if (expandBtn) {
       expandBtn.onclick = () => {
-        GrandStage.open('go', 'Spiritkin', (c, exp) => renderGoBoard(c, boardArray, lastMove, onSquareClick, exp));
+        GrandStage.open('go', 'Spiritkin', (c, exp) => renderGoBoard(c, boardArray, lastMove, onSquareClick, exp, theme), theme);
       };
     }
   }
@@ -373,6 +403,7 @@ export const SpiritverseGames = {
     if (!theme) theme = 'crown';
     if (!gameData || !gameData.type) return;
     const type = gameData.type;
+    const gameTheme = resolveGameTheme(type, theme);
     const payload = getGamePayload(gameData);
     const viewPayload = { ...payload, status: gameData.status, result: gameData.result };
     const gameCommentary = commentary || gameData.commentary || "The board is yours.";
@@ -386,12 +417,12 @@ export const SpiritverseGames = {
         case 'chess':
           renderChessBoard(target, chessFen, this.chess.selectedSquare, this.chess.validMoves, lastMove, (sq) => {
             this.handleChessSquareClick(sq, chessFen, onMoveSubmit);
-          }, isExp, theme);
+          }, isExp, gameTheme);
           break;
         case 'checkers':
           renderCheckersBoard(target, board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
             this.handleCheckersSquareClick(sq, board, 'white', onMoveSubmit);
-          }, isExp);
+          }, isExp, gameTheme);
           break;
         case 'go':
           renderGoBoard(target, board, lastMove, (idx) => {
@@ -399,22 +430,22 @@ export const SpiritverseGames = {
             const r = Math.floor(idx / size);
             const c = idx % size;
             onMoveSubmit(`${String.fromCharCode(65 + c)}${size - r}`);
-          }, isExp);
+          }, isExp, gameTheme);
           break;
         case 'spirit_cards':
-          this.renderSpiritCards(target, viewPayload, onMoveSubmit, isExp);
+          this.renderSpiritCards(target, viewPayload, onMoveSubmit, isExp, gameTheme);
           break;
         case 'echo_trials':
-          this.renderEchoTrials(target, viewPayload, onMoveSubmit, isExp);
+          this.renderEchoTrials(target, viewPayload, onMoveSubmit, isExp, gameTheme);
           break;
         case 'tictactoe':
-          this.renderTicTacToe(target, viewPayload, onMoveSubmit, isExp);
+          this.renderTicTacToe(target, viewPayload, onMoveSubmit, isExp, gameTheme);
           break;
         case 'connect_four':
-          this.renderConnectFour(target, viewPayload, onMoveSubmit, isExp);
+          this.renderConnectFour(target, viewPayload, onMoveSubmit, isExp, gameTheme);
           break;
         case 'battleship':
-          this.renderBattleship(target, viewPayload, onMoveSubmit, isExp);
+          this.renderBattleship(target, viewPayload, onMoveSubmit, isExp, gameTheme);
           break;
       }
     };
@@ -432,6 +463,7 @@ export const SpiritverseGames = {
     if (!theme) theme = 'crown';
     if (!gameData || !gameData.type) return;
     const type = gameData.type;
+    const gameTheme = resolveGameTheme(type, theme);
     const payload = getGamePayload(gameData);
     const viewPayload = { ...payload, status: gameData.status, result: gameData.result };
     const commentary = gameData.commentary || "The board is set. Let us see where the resonance leads.";
@@ -444,12 +476,12 @@ export const SpiritverseGames = {
         case 'chess':
           renderChessBoard(target, chessFen, this.chess.selectedSquare, this.chess.validMoves, lastMove, (sq) => {
             this.handleChessSquareClick(sq, chessFen, onMoveSubmit);
-          }, isExp, theme);
+          }, isExp, gameTheme);
           break;
         case 'checkers':
           renderCheckersBoard(target, board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
             this.handleCheckersSquareClick(sq, board, 'white', onMoveSubmit);
-          }, isExp);
+          }, isExp, gameTheme);
           break;
         case 'go':
           renderGoBoard(target, board, lastMove, (idx) => {
@@ -457,28 +489,28 @@ export const SpiritverseGames = {
             const r = Math.floor(idx / size);
             const c = idx % size;
             onMoveSubmit(`${String.fromCharCode(65 + c)}${size - r}`);
-          }, isExp);
+          }, isExp, gameTheme);
           break;
         case 'spirit_cards':
-          this.renderSpiritCards(target, viewPayload, onMoveSubmit, isExp);
+          this.renderSpiritCards(target, viewPayload, onMoveSubmit, isExp, gameTheme);
           break;
         case 'echo_trials':
-          this.renderEchoTrials(target, viewPayload, onMoveSubmit, isExp);
+          this.renderEchoTrials(target, viewPayload, onMoveSubmit, isExp, gameTheme);
           break;
         case 'tictactoe':
-          this.renderTicTacToe(target, viewPayload, onMoveSubmit, isExp);
+          this.renderTicTacToe(target, viewPayload, onMoveSubmit, isExp, gameTheme);
           break;
         case 'connect_four':
-          this.renderConnectFour(target, viewPayload, onMoveSubmit, isExp);
+          this.renderConnectFour(target, viewPayload, onMoveSubmit, isExp, gameTheme);
           break;
         case 'battleship':
-          this.renderBattleship(target, viewPayload, onMoveSubmit, isExp);
+          this.renderBattleship(target, viewPayload, onMoveSubmit, isExp, gameTheme);
           break;
         default:
           if (target) target.innerHTML = `<div style="padding:2rem;text-align:center;color:#ccc">Grand Stage not available for this game type.</div>`;
       }
     };
-    GrandStage.open(type, spiritkinName, renderFn);
+    GrandStage.open(type, spiritkinName, renderFn, gameTheme);
     // Update commentary immediately
     const comm = document.getElementById('gs-commentary');
     if (comm && commentary) comm.innerText = commentary;
@@ -493,7 +525,7 @@ export const SpiritverseGames = {
     }
   },
 
-  renderSpiritCards(container, gameData, onMoveSubmit, isExpanded) {
+  renderSpiritCards(container, gameData, onMoveSubmit, isExpanded, theme = resolveGameTheme("spirit_cards")) {
     const hand = gameData.hand || [];
     const mana = gameData.mana || 5;
     const board = gameData.board || [];
@@ -543,10 +575,11 @@ export const SpiritverseGames = {
       </div>
     `;
     
+    const themedHtml = withThemeFrame(html, 'spirit_cards', theme, isExpanded ? 'sv-theme-expanded' : '');
     if (typeof container === 'string') {
-      document.getElementById(container).innerHTML = html;
+      document.getElementById(container).innerHTML = themedHtml;
     } else {
-      container.innerHTML = html;
+      container.innerHTML = themedHtml;
     }
     
     // Add click handlers for cards
@@ -556,7 +589,7 @@ export const SpiritverseGames = {
     });
   },
   
-  renderEchoTrials(container, gameData, onMoveSubmit, isExpanded) {
+  renderEchoTrials(container, gameData, onMoveSubmit, isExpanded, theme = resolveGameTheme("echo_trials")) {
     const riddle = gameData.riddle || "A riddle awaits...";
     const attempts = gameData.attempts || 0;
     const maxAttempts = gameData.maxAttempts || 3;
@@ -582,10 +615,11 @@ export const SpiritverseGames = {
       </div>
     `;
     
+    const themedHtml = withThemeFrame(html, 'echo_trials', theme, isExpanded ? 'sv-theme-expanded' : '');
     if (typeof container === 'string') {
-      document.getElementById(container).innerHTML = html;
+      document.getElementById(container).innerHTML = themedHtml;
     } else {
-      container.innerHTML = html;
+      container.innerHTML = themedHtml;
     }
     
     // Store the onMoveSubmit for the button
@@ -598,7 +632,7 @@ export const SpiritverseGames = {
     }, 100);
   },
 
-  renderTicTacToe(container, gameData) {
+  renderTicTacToe(container, gameData, _onMoveSubmit, isExpanded, theme = resolveGameTheme("tictactoe")) {
     const board = gameData.board || Array(9).fill(null);
     const winner = gameData.winner || null;
     const finished = Boolean(gameData.result || winner || board.every(Boolean));
@@ -606,7 +640,7 @@ export const SpiritverseGames = {
       <div class="sv-mini-game sv-ttt">
         <div class="sv-mini-grid sv-ttt-grid">
           ${board.map((cell, idx) => `
-            <button class="sv-mini-cell ttt-cell" data-action="ttt-cell-click" data-idx="${idx}" ${cell || finished ? "disabled" : ""}>
+            <button class="sv-mini-cell ttt-cell ${cell === 'X' ? 'mark-user' : cell === 'O' ? 'mark-spiritkin' : ''}" data-action="ttt-cell-click" data-idx="${idx}" ${cell || finished ? "disabled" : ""}>
               ${cell || ""}
             </button>
           `).join('')}
@@ -614,10 +648,10 @@ export const SpiritverseGames = {
         <div class="sv-mini-caption">${gameData.result?.isDraw ? 'The grid resolved into a draw.' : winner ? `${winner === 'X' ? 'You' : 'Spiritkin'} aligned the line.` : 'Claim three in a line.'}</div>
       </div>
     `;
-    (typeof container === 'string' ? document.getElementById(container) : container).innerHTML = html;
+    (typeof container === 'string' ? document.getElementById(container) : container).innerHTML = withThemeFrame(html, 'tictactoe', theme, isExpanded ? 'sv-theme-expanded' : '');
   },
 
-  renderConnectFour(container, gameData) {
+  renderConnectFour(container, gameData, _onMoveSubmit, isExpanded, theme = resolveGameTheme("connect_four")) {
     const board = gameData.board || Array(42).fill(null);
     const finished = Boolean(gameData.result || gameData.winner || !board.includes(null));
     const html = `
@@ -631,10 +665,10 @@ export const SpiritverseGames = {
         <div class="sv-mini-caption">${gameData.result?.isDraw ? 'The board filled into a draw.' : gameData.winner ? `${gameData.winner === 'U' ? 'You' : 'Spiritkin'} connected four.` : 'Drop a star into any column.'}</div>
       </div>
     `;
-    (typeof container === 'string' ? document.getElementById(container) : container).innerHTML = html;
+    (typeof container === 'string' ? document.getElementById(container) : container).innerHTML = withThemeFrame(html, 'connect_four', theme, isExpanded ? 'sv-theme-expanded' : '');
   },
 
-  renderBattleship(container, gameData) {
+  renderBattleship(container, gameData, _onMoveSubmit, isExpanded, theme = resolveGameTheme("battleship")) {
     const guesses = new Set(gameData.userGuesses || []);
     const hits = new Set(gameData.hits?.user || []);
     const finished = Boolean(gameData.result || gameData.winner);
@@ -650,7 +684,7 @@ export const SpiritverseGames = {
         <div class="sv-mini-caption">${gameData.winner ? `${gameData.winner === 'user' ? 'You' : 'Spiritkin'} found every hidden vessel.` : 'Search the deep grid for the hidden fleet.'}</div>
       </div>
     `;
-    (typeof container === 'string' ? document.getElementById(container) : container).innerHTML = html;
+    (typeof container === 'string' ? document.getElementById(container) : container).innerHTML = withThemeFrame(html, 'battleship', theme, isExpanded ? 'sv-theme-expanded' : '');
   },
 
   handleChessSquareClick(sq, fen, onMoveSubmit) {
