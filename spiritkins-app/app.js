@@ -146,6 +146,8 @@ let _recognition = null;
 let _recognitionRunId = 0;
 let _recognitionStopRequested = false;
 let _lastVoiceSubmission = { text: "", at: 0 };
+let _voiceAwaitingUserTurn = false;
+let _voiceTurnCaptureAfterAudio = false;
 
 function getMediaToggleState(muted) {
   return muted
@@ -1962,7 +1964,7 @@ async function deliverConversationGreeting(context = "newSession") {
   });
   render();
   scrollThread();
-  maybeSpeakMessageLater(greetingMessage?.id);
+  maybeSpeakMessageLater(greetingMessage?.id, { armUserTurn: shouldKeepVoiceLoopActive() });
 }
 
 function persistSession() {
@@ -2303,9 +2305,6 @@ async function beginConversation() {
   scrollThread();
   if (!state.convError && state.conversationId) {
     await deliverConversationGreeting("newSession");
-    if (shouldKeepVoiceLoopActive() && !_recognition) {
-      scheduleVoiceLoop(220);
-    }
   }
 }
 
@@ -2313,6 +2312,7 @@ async function sendMessage(overrideText) {
   syncPrimarySelection();
   const text = (overrideText ?? state.input).trim();
   if (!text || state.loadingReply) return;
+  clearVoiceTurnCapture();
   updateAdaptiveProfileFromUserText(text);
   state.showCrownGateHome = false;
   state.showHomeView = false;
@@ -2380,8 +2380,10 @@ async function sendMessage(overrideText) {
     }
     // Auto-speak the response unless muted
     if (!state.voiceMuted) {
-      speakMessage(assistantMsgId).catch(() => {
-        if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(500);
+      speakMessage(assistantMsgId, { armUserTurn: shouldKeepVoiceLoopActive() }).catch(() => {
+        if (shouldKeepVoiceLoopActive()) {
+          setVoiceWaitingStatus();
+        }
       });
     }
   } catch (error) {
@@ -2575,9 +2577,9 @@ function pushAssistantMoment(content, overrides = {}) {
   return message;
 }
 
-function maybeSpeakMessageLater(messageId) {
+function maybeSpeakMessageLater(messageId, options = {}) {
   if (!messageId || state.voiceMuted) return;
-  Promise.resolve().then(() => speakMessage(messageId)).catch(() => {});
+  Promise.resolve().then(() => speakMessage(messageId, options)).catch(() => {});
 }
 
 function buildAdaptiveRequestContext() {
@@ -3378,11 +3380,37 @@ function clearVoiceLoopTimer() {
   }
 }
 
+function clearVoiceTurnCapture() {
+  clearVoiceLoopTimer();
+  _voiceAwaitingUserTurn = false;
+  _voiceTurnCaptureAfterAudio = false;
+}
+
+function setVoiceWaitingStatus(message = "I'm here when you're ready. Tap the mic or type to continue.") {
+  state.statusText = message;
+  state.statusError = false;
+  render();
+}
+
+function requestVoiceTurnCapture(options = {}) {
+  const { afterAudio = false, delay = 350 } = options;
+  clearVoiceLoopTimer();
+  if (!shouldKeepVoiceLoopActive()) {
+    clearVoiceTurnCapture();
+    return false;
+  }
+  _voiceAwaitingUserTurn = true;
+  _voiceTurnCaptureAfterAudio = !!afterAudio || _audioPlaying;
+  if (_voiceTurnCaptureAfterAudio) return true;
+  scheduleVoiceLoop(delay);
+  return true;
+}
+
 function scheduleVoiceLoop(delay = 350) {
   clearVoiceLoopTimer();
-  if (!shouldKeepVoiceLoopActive()) return;
+  if (!shouldKeepVoiceLoopActive() || !_voiceAwaitingUserTurn) return;
   _voiceLoopTimer = window.setTimeout(() => {
-    if (!shouldKeepVoiceLoopActive() || _recognition || _audioPlaying) return;
+    if (!shouldKeepVoiceLoopActive() || !_voiceAwaitingUserTurn || _recognition || _audioPlaying) return;
     try {
       startListening();
     } catch (_) {}
@@ -5595,6 +5623,8 @@ function startListening() {
     return;
   }
 
+  clearVoiceLoopTimer();
+  _voiceTurnCaptureAfterAudio = false;
   const recognition = new SpeechRecognition();
   const runId = ++_recognitionRunId;
   _recognitionStopRequested = false;
@@ -5621,6 +5651,7 @@ function startListening() {
     state.input = transcript;
     render();
     if (!transcript) return;
+    _voiceAwaitingUserTurn = false;
     const now = Date.now();
     if (_lastVoiceSubmission.text === transcript && (now - _lastVoiceSubmission.at) < 1500) return;
     _lastVoiceSubmission = { text: transcript, at: now };
@@ -5643,6 +5674,7 @@ function startListening() {
     state.statusText = "";
     state.statusError = false;
     render();
+    clearVoiceTurnCapture();
   };
 
   recognition.onend = () => {
@@ -5655,17 +5687,30 @@ function startListening() {
       _recognition = null;
     }
     _recognitionStopRequested = false;
-    if (stopRequested) return;
-    if (shouldKeepVoiceLoopActive() && !_audioPlaying) {
-      scheduleVoiceLoop(320);
+    if (stopRequested) {
+      clearVoiceTurnCapture();
+      return;
+    }
+    clearVoiceTurnCapture();
+    if (!state.loadingReply && !state.convError) {
+      setVoiceWaitingStatus();
     }
   };
 
-  recognition.start();
+  try {
+    recognition.start();
+  } catch (error) {
+    _recognition = null;
+    state.voiceListening = false;
+    state.statusText = `Voice input could not start: ${error.message}`;
+    state.statusError = true;
+    clearVoiceTurnCapture();
+    render();
+  }
 }
 
 function stopListening() {
-  clearVoiceLoopTimer();
+  clearVoiceTurnCapture();
   if (_recognition) {
     _recognitionStopRequested = true;
     const recognition = _recognition;
@@ -5689,10 +5734,6 @@ document.addEventListener("DOMContentLoaded", () => {
     fetchSpiritverseEvent();
     fetchDailyQuest();
   }, 800);
-  // Restore voice mode if previously enabled (requires prior user gesture)
-  if (state.voiceMode && state.onboardingComplete && canUseVoiceInteraction()) {
-    setTimeout(() => { try { if (!_recognition && !state.voiceMuted) startListening(); } catch(e) {} }, 1500);
-  }
   const root = document.getElementById("root");
   root.addEventListener("input", onInput);
   root.addEventListener("click", onClick);
@@ -5745,12 +5786,18 @@ async function playAudio(buffer) {
     audio.onended = () => {
       _audioPlaying = false;
       URL.revokeObjectURL(url);
-      if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(350);
+      if (_voiceTurnCaptureAfterAudio) {
+        _voiceTurnCaptureAfterAudio = false;
+        requestVoiceTurnCapture({ delay: 220 });
+      }
     };
     audio.onerror = (e) => {
       _audioPlaying = false;
       URL.revokeObjectURL(url);
-      if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(500);
+      if (_voiceTurnCaptureAfterAudio) {
+        _voiceTurnCaptureAfterAudio = false;
+        setVoiceWaitingStatus("Audio playback failed. Tap the mic or type to continue.");
+      }
     };
     
     // Attempting to play audio
@@ -5771,14 +5818,21 @@ async function playAudio(buffer) {
             state.statusText = "Failed to play audio: " + err.message;
           }
           state.statusError = false;
+          if (_voiceTurnCaptureAfterAudio) {
+            _voiceTurnCaptureAfterAudio = false;
+            _voiceAwaitingUserTurn = false;
+          }
           render();
-          if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(500);
         });
     } else {
       _currentAudio = audio;
     }
   } catch (e) {
     _audioPlaying = false;
+    if (_voiceTurnCaptureAfterAudio) {
+      _voiceTurnCaptureAfterAudio = false;
+      _voiceAwaitingUserTurn = false;
+    }
     // Failed to create audio element
     state.statusText = "Failed to play audio: " + e.message;
     state.statusError = true;
@@ -5786,7 +5840,7 @@ async function playAudio(buffer) {
   }
 }
 
-async function speakMessage(messageId) {
+async function speakMessage(messageId, options = {}) {
   const message = state.messages.find(msg => msg.id === messageId);
   if (!message || !message.content) {
     // No message found or no content
@@ -5794,10 +5848,19 @@ async function speakMessage(messageId) {
   }
 
   try {
+    if (options.armUserTurn) {
+      requestVoiceTurnCapture({ afterAudio: true });
+    }
     const voice = message.spiritkinVoice || "nova";
     await speakText(message.content, voice);
   } catch (error) {
     // Speech generation failed
+    if (options.armUserTurn) {
+      clearVoiceTurnCapture();
+    }
+    if (options.armUserTurn && shouldKeepVoiceLoopActive()) {
+      setVoiceWaitingStatus();
+    }
     state.statusText = "Speech generation failed: " + error.message;
     state.statusError = true;
     render();
