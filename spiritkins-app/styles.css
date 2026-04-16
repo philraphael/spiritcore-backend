@@ -5417,6 +5417,7 @@ button[data-action="begin-quest"]:active,
   display: grid;
   justify-items: end;
   gap: 10px;
+  pointer-events: none;
 }
 
 .issue-reporter-fab,
@@ -5426,6 +5427,7 @@ button[data-action="begin-quest"]:active,
   background: rgba(7, 13, 22, 0.82);
   backdrop-filter: blur(18px);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+  pointer-events: auto;
 }
 
 .issue-reporter-fab {

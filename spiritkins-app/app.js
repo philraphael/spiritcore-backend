@@ -147,6 +147,15 @@ function buildMediaToggleInner(muted) {
   return `<span class="unmute-icon">${media.icon}</span><span class="unmute-text">${media.text}</span>`;
 }
 
+function canUseVoiceInteraction() {
+  if (!state.entryAccepted) return false;
+  if (state.showCrownGateHome || state.spiritverseTrailerActive || state.spiritCoreWelcoming) return false;
+  if (state.showHomeView) return false;
+  if (!state.selectedSpiritkin || !state.conversationId) return false;
+  if (state.loadingConv || state.loadingReply) return false;
+  return true;
+}
+
 function getSpiritkinSelectionContext(spiritkinName) {
   return CANON_SPIRITKIN_MAP[spiritkinName]?.selectionSummary || SPIRITKIN_SELECTION_CONTEXT[spiritkinName] || "";
 }
@@ -1193,6 +1202,16 @@ function setMediaMuted(muted, { persist = true, attemptPlay = false } = {}) {
   syncMountedMedia({ attemptPlay });
 }
 
+function pauseMountedVideoAudio() {
+  document.querySelectorAll(".video-player-element").forEach((video) => {
+    if (typeof video.pause === "function" && !video.paused) {
+      try {
+        video.pause();
+      } catch (_) {}
+    }
+  });
+}
+
 function syncMountedMedia({ attemptPlay = false } = {}) {
   const media = getMediaToggleState(state.mediaMuted);
   document.querySelectorAll(".video-player-element").forEach((video) => {
@@ -1952,6 +1971,9 @@ async function beginConversation() {
   scrollThread();
   if (!state.convError && state.conversationId) {
     await deliverConversationGreeting("newSession");
+    if (shouldKeepVoiceLoopActive() && !_recognition) {
+      scheduleVoiceLoop(220);
+    }
   }
 }
 
@@ -2921,7 +2943,7 @@ function render() {
   if (!root) return;
   enforceEntryVoiceSilence();
   root.innerHTML = buildApp();
-  syncMountedMedia({ attemptPlay: !state.mediaMuted });
+  syncMountedMedia({ attemptPlay: false });
   syncEntryCinematics();
   if (!state.voiceMode) maybeAutoOpenGameMic();
 
@@ -2988,7 +3010,7 @@ function maybeAutoOpenGameMic() {
 }
 
 function shouldKeepVoiceLoopActive() {
-  return false;
+  return state.voiceMode && !state.voiceMuted && canUseVoiceInteraction();
 }
 
 function enforceEntryVoiceSilence() {
@@ -3020,7 +3042,13 @@ function clearVoiceLoopTimer() {
 
 function scheduleVoiceLoop(delay = 350) {
   clearVoiceLoopTimer();
-  return;
+  if (!shouldKeepVoiceLoopActive()) return;
+  _voiceLoopTimer = window.setTimeout(() => {
+    if (!shouldKeepVoiceLoopActive() || _recognition || _audioPlaying) return;
+    try {
+      startListening();
+    } catch (_) {}
+  }, Math.max(250, delay));
 }
 
 function getIssueFeatureContext() {
@@ -4587,6 +4615,8 @@ async function onClick(event) {
   }
 
   if (action === "open-bond-manager") {
+    state.showHomeView = true;
+    state.activePresenceTab = "profile";
     state.conversationId = null;
     state.messages = [];
     state.pendingBondSpiritkin = null;
@@ -4611,6 +4641,7 @@ async function onClick(event) {
 
   if (action === "bonded-card") {
     if (state.primarySpiritkin) {
+      state.showHomeView = true;
       state.statusText = `${state.primarySpiritkin.name} is your bonded companion. Use Manage bond to switch intentionally.`;
       state.statusError = false;
       render();
@@ -5177,6 +5208,10 @@ function startListening() {
     return;
   }
 
+  if (!canUseVoiceInteraction()) {
+    return;
+  }
+
   if (_recognition || state.loadingReply || _audioPlaying) {
     return;
   }
@@ -5210,6 +5245,7 @@ function startListening() {
     const now = Date.now();
     if (_lastVoiceSubmission.text === transcript && (now - _lastVoiceSubmission.at) < 1500) return;
     _lastVoiceSubmission = { text: transcript, at: now };
+    stopListening();
     sendMessage(transcript);
   };
 
@@ -5241,6 +5277,9 @@ function startListening() {
     }
     _recognitionStopRequested = false;
     if (stopRequested) return;
+    if (shouldKeepVoiceLoopActive() && !_audioPlaying) {
+      scheduleVoiceLoop(320);
+    }
   };
 
   recognition.start();
@@ -5270,7 +5309,7 @@ document.addEventListener("DOMContentLoaded", () => {
     fetchDailyQuest();
   }, 800);
   // Restore voice mode if previously enabled (requires prior user gesture)
-  if (state.voiceMode && state.onboardingComplete) {
+  if (state.voiceMode && state.onboardingComplete && canUseVoiceInteraction()) {
     setTimeout(() => { try { if (!_recognition && !state.voiceMuted) startListening(); } catch(e) {} }, 1500);
   }
   const root = document.getElementById("root");
@@ -5298,6 +5337,10 @@ async function playAudio(buffer) {
   try {
     _audioPlaying = true;
     clearVoiceLoopTimer();
+    if (_recognition) {
+      stopListening();
+    }
+    pauseMountedVideoAudio();
     // Stop any currently playing audio
     if (_currentAudio instanceof HTMLAudioElement) {
       _currentAudio.pause();
