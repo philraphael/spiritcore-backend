@@ -168,10 +168,14 @@ export function createResponseEngine() {
     if (!callbackSignal) return text;
 
     const inputLower = String(input || "").toLowerCase();
+    const hasExplicitMemoryCue = /\b(again|before|still|last time|lately|remember|been|back|return|carrying|thread|same|continue)\b/.test(inputLower);
+    const hasEmotionalCue = /\b(hurting|sad|grief|afraid|lonely|thank you|ready|finally)\b/.test(inputLower);
+    const hasPreferenceCue = /\b(clean|respect|gentle|calm|smooth|spiritual|faith|prayer)\b/.test(inputLower);
     const shouldShow =
-      (callbackSignal.type === "gameplay_tendency" && relationship?.mode === "play") ||
-      (["respect_preference", "spiritual_preference", "tone_preference"].includes(callbackSignal.type) && /\b(clean|respect|gentle|calm|smooth|spiritual|faith|prayer)\b/.test(inputLower)) ||
-      ((callbackSignal.type === "milestone" || callbackSignal.type === "emotional_anchor") && /\b(hurting|sad|grief|afraid|lonely|thank you|ready|finally)\b/.test(inputLower));
+      (callbackSignal.type === "gameplay_tendency" && relationship?.mode === "play" && (hasExplicitMemoryCue || /\b(move|play|opening|pattern|again)\b/.test(inputLower))) ||
+      (["respect_preference", "spiritual_preference", "tone_preference"].includes(callbackSignal.type) && hasPreferenceCue) ||
+      ((callbackSignal.type === "milestone" || callbackSignal.type === "emotional_anchor") &&
+        (hasEmotionalCue || (hasExplicitMemoryCue && relationship?.familiarity !== "new")));
 
     if (!shouldShow) return text;
     const callback = buildMemoryCallback(callbackSignal, relationship, identity);

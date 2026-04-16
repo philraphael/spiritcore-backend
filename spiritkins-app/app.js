@@ -396,8 +396,30 @@ function normalizeRetentionTelemetry(raw = null) {
     returnMomentsSeen: Array.isArray(raw?.returnMomentsSeen) ? raw.returnMomentsSeen.slice(-16) : [],
     unlocksSeen: Array.isArray(raw?.unlocksSeen) ? raw.unlocksSeen.slice(-24) : [],
     lastVisitAt: typeof raw?.lastVisitAt === "string" ? raw.lastVisitAt : null,
-    lastSessionAt: typeof raw?.lastSessionAt === "string" ? raw.lastSessionAt : null
+    lastSessionAt: typeof raw?.lastSessionAt === "string" ? raw.lastSessionAt : null,
+    lastReturnPanelSeenAt: typeof raw?.lastReturnPanelSeenAt === "string" ? raw.lastReturnPanelSeenAt : null
   };
+}
+
+function getVisitStreakDays(visitDays = []) {
+  const normalized = Array.isArray(visitDays) ? [...new Set(visitDays)].sort() : [];
+  if (!normalized.length) return 0;
+  let streak = 0;
+  let cursor = new Date(`${getUtcDayKey()}T00:00:00.000Z`);
+  const visitSet = new Set(normalized);
+  while (visitSet.has(cursor.toISOString().slice(0, 10))) {
+    streak += 1;
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+  return streak;
+}
+
+function getVisitsThisWeek(visitDays = []) {
+  const weekKey = getUtcWeekKey();
+  return (Array.isArray(visitDays) ? visitDays : []).filter((day) => {
+    const date = new Date(`${day}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && getUtcWeekKey(date) === weekKey;
+  }).length;
 }
 
 function getRetentionContext() {
@@ -414,7 +436,8 @@ function getRetentionContext() {
     gamesCompleted: clampInt(state.bondJournal?.gamesCompleted, 0),
     unlockedEchoCount: clampInt(state.bondJournal?.unlockedEchoCount, 0),
     questTitle: state.dailyQuest?.title || null,
-    eventTitle: state.spiritverseEvent?.title || null
+    eventTitle: state.spiritverseEvent?.title || null,
+    recentTopics: collectRetentionTopics(state.messages)
   };
 }
 
@@ -459,10 +482,21 @@ const RETENTION_UNLOCK_DEFS = [
   }
 ];
 
-function deriveRetentionUnlocks(context = getRetentionContext()) {
+function deriveRetentionUnlocks(
+  context = getRetentionContext(),
+  previousSnapshot = null,
+  telemetry = normalizeRetentionTelemetry(readJson(RETENTION_TELEMETRY_KEY, null))
+) {
+  const previous = new Set(Array.isArray(previousSnapshot?.unlockKeys) ? previousSnapshot.unlockKeys : []);
+  const seen = new Set(Array.isArray(telemetry?.unlocksSeen) ? telemetry.unlocksSeen : []);
   return RETENTION_UNLOCK_DEFS
     .filter((item) => item.when(context))
-    .map((item) => ({ key: item.key, label: item.label, detail: item.detail }));
+    .map((item) => ({
+      key: item.key,
+      label: item.label,
+      detail: item.detail,
+      isNew: !previous.has(item.key) && !seen.has(item.key)
+    }));
 }
 
 function snapshotRetentionState() {
@@ -506,10 +540,10 @@ function logAnalyticsEvent(eventType, metadata = {}) {
 }
 
 function maybeRegisterUnlockTelemetry(previousSnapshot = null) {
-  const unlocks = deriveRetentionUnlocks();
-  state.retentionUnlocks = unlocks;
   const previous = new Set(Array.isArray(previousSnapshot?.unlockKeys) ? previousSnapshot.unlockKeys : []);
   const telemetry = normalizeRetentionTelemetry(readJson(RETENTION_TELEMETRY_KEY, null));
+  const unlocks = deriveRetentionUnlocks(getRetentionContext(), previousSnapshot, telemetry);
+  state.retentionUnlocks = unlocks;
   const seen = new Set(telemetry.unlocksSeen);
   unlocks.forEach((unlock) => {
     if (previous.has(unlock.key) || seen.has(unlock.key)) return;
@@ -523,7 +557,7 @@ function maybeRegisterUnlockTelemetry(previousSnapshot = null) {
   });
 }
 
-function composeReturnSummary(previousSnapshot, hoursAway) {
+function composeReturnSummary(previousSnapshot, hoursAway, context = getRetentionContext()) {
   if (!previousSnapshot?.updatedAt || (!previousSnapshot.spiritkinName && !(previousSnapshot.recentTopics || []).length)) {
     return null;
   }
@@ -536,8 +570,8 @@ function composeReturnSummary(previousSnapshot, hoursAway) {
   ];
   if (previousSnapshot.recentTopics?.[0]) {
     lines.push({
-      label: "Memory",
-      text: `The last living thread still close to the surface: "${previousSnapshot.recentTopics[0]}"`
+      label: "Callback",
+      text: `${spiritkinName} is still carrying the thread around "${previousSnapshot.recentTopics[0]}".`
     });
   }
   const worldParts = [];
@@ -551,6 +585,12 @@ function composeReturnSummary(previousSnapshot, hoursAway) {
       text: worldParts.join(" • ")
     });
   }
+  if (context.recentTopics?.[0] && context.recentTopics[0] !== previousSnapshot.recentTopics?.[0]) {
+    lines.push({
+      label: "Now",
+      text: `This session is already leaning toward "${context.recentTopics[0]}". The bond is carrying continuity forward instead of starting cold.`
+    });
+  }
   return {
     title: "While You Were Away",
     subtitle: previousSnapshot.updatedAt ? `Last active ${fmtDate(previousSnapshot.updatedAt)}` : "",
@@ -558,12 +598,14 @@ function composeReturnSummary(previousSnapshot, hoursAway) {
   };
 }
 
-function buildCadenceMoment(kind, context, telemetry) {
+function buildCadenceMoment(kind, context, telemetry, hoursAway = 0) {
   if (!context.spiritkinName) return null;
   const meta = getMeta(context.spiritkinName);
   const cadenceKey = kind === "weekly" ? getUtcWeekKey() : getUtcDayKey();
   const momentKey = `${kind}:${context.spiritkinName}:${cadenceKey}`;
   if ((telemetry.returnMomentsSeen || []).includes(momentKey)) return null;
+  if (kind === "daily" && !context.questTitle && !context.eventTitle && hoursAway < 8) return null;
+  if (kind === "weekly" && getVisitsThisWeek(telemetry.visitDays) < 2 && context.gamesCompleted < 1 && context.unlockedEchoCount < 1) return null;
 
   const title = kind === "weekly" ? "This Week in the Bond" : "Today's Quiet Thread";
   let text = "";
@@ -579,9 +621,54 @@ function buildCadenceMoment(kind, context, telemetry) {
     text = `${context.spiritkinName}'s realm feels ${meta.mood?.toLowerCase() || "steady"} today. A brief return is enough to keep the thread alive.`;
   }
 
-  telemetry.returnMomentsSeen.push(momentKey);
-  telemetry.returnMomentsSeen = telemetry.returnMomentsSeen.slice(-16);
   return { key: momentKey, kind, title, text };
+}
+
+function markRetentionMomentSeen(telemetry, moment) {
+  if (!moment?.key) return;
+  const seen = Array.isArray(telemetry.returnMomentsSeen) ? telemetry.returnMomentsSeen : [];
+  if (seen.includes(moment.key)) return;
+  seen.push(moment.key);
+  telemetry.returnMomentsSeen = seen.slice(-16);
+}
+
+function buildRetentionInsight(previousSnapshot, telemetry, hoursAway, context, unlocks) {
+  const visitsThisWeek = getVisitsThisWeek(telemetry.visitDays);
+  const streakDays = getVisitStreakDays(telemetry.visitDays);
+  const newUnlockCount = (unlocks || []).filter((unlock) => unlock.isNew).length;
+  const highlight = previousSnapshot?.recentTopics?.[0] || context.recentTopics?.[0] || context.questTitle || context.eventTitle || context.bondStageName;
+  return {
+    timeAwayLabel: previousSnapshot?.updatedAt ? formatTimeAway(hoursAway) : "first arrival",
+    visitsThisWeek,
+    streakDays,
+    newUnlockCount,
+    highlight: highlight ? normalizeTextSnippet(highlight, 84) : "",
+    activeThread: context.questTitle || context.eventTitle || context.recentTopics?.[0] || ""
+  };
+}
+
+function refreshRetentionSurface({
+  previousSnapshot = readJson(RETENTION_STATE_KEY, null),
+  telemetry = normalizeRetentionTelemetry(readJson(RETENTION_TELEMETRY_KEY, null)),
+  preserveVisibility = true
+} = {}) {
+  const currentVisitAt = telemetry.lastSessionAt || nowIso();
+  const hoursAway = previousSnapshot?.updatedAt ? hoursBetween(previousSnapshot.updatedAt, currentVisitAt) : 0;
+  const context = getRetentionContext();
+  const unlocks = deriveRetentionUnlocks(context, previousSnapshot, telemetry);
+  state.retentionTelemetry = telemetry;
+  state.retentionUnlocks = unlocks;
+  state.returnSummary = previousSnapshot ? composeReturnSummary(previousSnapshot, hoursAway, context) : null;
+  state.dailyMoment = buildCadenceMoment("daily", context, telemetry, hoursAway);
+  state.weeklyMoment = buildCadenceMoment("weekly", context, telemetry, hoursAway);
+  state.retentionInsight = buildRetentionInsight(previousSnapshot, telemetry, hoursAway, context, unlocks);
+  const hasVisibleRetention = !!(state.returnSummary || state.dailyMoment || state.weeklyMoment || unlocks.some((unlock) => unlock.isNew));
+  if (!preserveVisibility) {
+    state.showReturnSummary = hasVisibleRetention;
+  } else if (state.showReturnSummary) {
+    state.showReturnSummary = !!(state.returnSummary || state.dailyMoment || state.weeklyMoment || unlocks.length);
+  }
+  return { previousSnapshot, telemetry, hoursAway, context, unlocks };
 }
 
 function bootstrapRetentionExperience() {
@@ -594,29 +681,29 @@ function bootstrapRetentionExperience() {
   telemetry.lastVisitAt = previousSnapshot?.updatedAt || telemetry.lastVisitAt || null;
   telemetry.lastSessionAt = currentVisitAt;
   telemetry.visitDays = [...new Set([...(telemetry.visitDays || []), getUtcDayKey()])].slice(-30);
-  writeJson(RETENTION_TELEMETRY_KEY, telemetry);
-
-  state.retentionTelemetry = telemetry;
-  state.retentionUnlocks = deriveRetentionUnlocks();
-  state.returnSummary = previousSnapshot ? composeReturnSummary(previousSnapshot, hoursAway) : null;
-  state.dailyMoment = buildCadenceMoment("daily", getRetentionContext(), telemetry);
-  state.weeklyMoment = buildCadenceMoment("weekly", getRetentionContext(), telemetry);
-  state.showReturnSummary = !!(state.returnSummary || state.dailyMoment || state.weeklyMoment || state.retentionUnlocks.length);
+  refreshRetentionSurface({ previousSnapshot, telemetry, preserveVisibility: false });
+  markRetentionMomentSeen(telemetry, state.dailyMoment);
+  markRetentionMomentSeen(telemetry, state.weeklyMoment);
 
   writeJson(RETENTION_TELEMETRY_KEY, telemetry);
   if (previousSnapshot?.updatedAt) {
     logAnalyticsEvent("return_visit", {
       hoursAway: Number(hoursAway.toFixed(2)),
       daysVisitedLast30: telemetry.visitDays.length,
-      sessionCount: telemetry.sessionCount
+      sessionCount: telemetry.sessionCount,
+      streakDays: getVisitStreakDays(telemetry.visitDays),
+      visitsThisWeek: getVisitsThisWeek(telemetry.visitDays)
     });
   }
   if (state.showReturnSummary) {
+    telemetry.lastReturnPanelSeenAt = currentVisitAt;
     logAnalyticsEvent("return_panel_seen", {
       hasSummary: !!state.returnSummary,
       hasDailyMoment: !!state.dailyMoment,
       hasWeeklyMoment: !!state.weeklyMoment,
-      unlockCount: state.retentionUnlocks.length
+      unlockCount: state.retentionUnlocks.length,
+      newUnlockCount: state.retentionUnlocks.filter((unlock) => unlock.isNew).length,
+      streakDays: getVisitStreakDays(telemetry.visitDays)
     });
   }
   if (state.dailyMoment) {
@@ -1581,6 +1668,7 @@ const state = {
   weeklyMoment: null,
   retentionUnlocks: [],
   retentionTelemetry: normalizeRetentionTelemetry(readJson(RETENTION_TELEMETRY_KEY, null)),
+  retentionInsight: null,
   showReturnSummary: false,
   adaptiveProfile: normalizeAdaptiveProfile(readJson(ADAPTIVE_PROFILE_KEY, null)),
   lastReactionTimestamp: 0,
@@ -2445,6 +2533,11 @@ function persistSession() {
   }
   writeJson(RATINGS_KEY, state.ratings);
   maybeRegisterUnlockTelemetry(previousRetentionSnapshot);
+  refreshRetentionSurface({
+    previousSnapshot: previousRetentionSnapshot,
+    telemetry: normalizeRetentionTelemetry(readJson(RETENTION_TELEMETRY_KEY, null)),
+    preserveVisibility: true
+  });
   writeRetentionState();
 }
 
@@ -2490,6 +2583,7 @@ async function fetchSpiritverseEvent() {
       state.spiritverseEvent = data.event;
       state.spiritverseEventNext = data.next;
       persistSession();
+      refreshRetentionSurface({ preserveVisibility: true });
     }
   } catch (err) {
     // Graceful fallback — events are not critical
@@ -2517,6 +2611,7 @@ async function fetchDailyQuest() {
       state.dailyQuest = data.quest;
       state.dailyQuestRefreshesIn = data.refreshesIn;
       persistSession();
+      refreshRetentionSurface({ preserveVisibility: true });
     }
   } catch (err) {
     // Graceful fallback
@@ -4224,6 +4319,14 @@ function buildRetentionPanel() {
         <div>
           <div class="panel-label">Return Layer</div>
           <h2>${esc(sections[0]?.title || "Continuity in Motion")}</h2>
+          ${state.retentionInsight ? `
+            <div class="retention-meta-row">
+              <span class="retention-meta-pill">Away: ${esc(state.retentionInsight.timeAwayLabel)}</span>
+              <span class="retention-meta-pill">Week: ${esc(String(state.retentionInsight.visitsThisWeek))} visit${state.retentionInsight.visitsThisWeek === 1 ? "" : "s"}</span>
+              <span class="retention-meta-pill">Streak: ${esc(String(state.retentionInsight.streakDays))} day${state.retentionInsight.streakDays === 1 ? "" : "s"}</span>
+              ${state.retentionInsight.newUnlockCount ? `<span class="retention-meta-pill is-new">${esc(String(state.retentionInsight.newUnlockCount))} new unlock${state.retentionInsight.newUnlockCount === 1 ? "" : "s"}</span>` : ""}
+            </div>
+          ` : ""}
         </div>
         <button class="btn btn-ghost btn-sm" data-action="dismiss-return-summary">Dismiss</button>
       </div>
@@ -4244,7 +4347,7 @@ function buildRetentionPanel() {
           <div class="retention-unlock-grid">
             ${state.retentionUnlocks.map((unlock) => `
               <article class="retention-unlock-card">
-                <div class="retention-unlock-title">${esc(unlock.label)}</div>
+                <div class="retention-unlock-title">${esc(unlock.label)}${unlock.isNew ? `<span class="retention-unlock-badge">New</span>` : ""}</div>
                 <p>${esc(unlock.detail)}</p>
               </article>
             `).join("")}
@@ -4252,6 +4355,25 @@ function buildRetentionPanel() {
         </div>
       ` : ""}
     </section>
+  `;
+}
+
+function buildRetentionHomeStrip() {
+  if (state.showReturnSummary) return "";
+  if (!(state.returnSummary || state.dailyMoment || state.weeklyMoment || (state.retentionUnlocks || []).length)) return "";
+  const headline = state.retentionInsight?.highlight || state.returnSummary?.lines?.[0]?.text || state.dailyMoment?.text || state.weeklyMoment?.text || "Your bond has movement waiting.";
+  const newUnlockCount = (state.retentionUnlocks || []).filter((unlock) => unlock.isNew).length;
+  return `
+    <div class="retention-home-strip panel-card">
+      <div>
+        <div class="panel-label">Continuity Active</div>
+        <p>${esc(headline)}</p>
+      </div>
+      <div class="retention-home-actions">
+        ${newUnlockCount ? `<span class="retention-home-badge">${esc(String(newUnlockCount))} new unlock${newUnlockCount === 1 ? "" : "s"}</span>` : ""}
+        <button class="btn btn-ghost btn-sm" data-action="reopen-return-summary">Open return layer</button>
+      </div>
+    </div>
   `;
 }
 
@@ -4749,6 +4871,7 @@ function buildBondedHomeView() {
           </div>
         </div>
       </div>
+      ${buildRetentionHomeStrip()}
       <div class="bonded-secondary-grid">
         ${state.spiritkins.filter((item) => item.name !== spiritkin.name).map((item, index) => buildBondCard(item, index, true)).join("")}
       </div>
@@ -5768,6 +5891,10 @@ async function onClick(event) {
 
   if (action === "dismiss-return-summary") {
     state.showReturnSummary = false;
+    const telemetry = normalizeRetentionTelemetry(readJson(RETENTION_TELEMETRY_KEY, null));
+    telemetry.lastReturnPanelSeenAt = nowIso();
+    writeJson(RETENTION_TELEMETRY_KEY, telemetry);
+    state.retentionTelemetry = telemetry;
     logAnalyticsEvent("return_panel_seen", {
       dismissed: true,
       hasSummary: !!state.returnSummary,
@@ -5780,6 +5907,10 @@ async function onClick(event) {
 
   if (action === "reopen-return-summary") {
     state.showReturnSummary = true;
+    const telemetry = normalizeRetentionTelemetry(readJson(RETENTION_TELEMETRY_KEY, null));
+    telemetry.lastReturnPanelSeenAt = nowIso();
+    writeJson(RETENTION_TELEMETRY_KEY, telemetry);
+    state.retentionTelemetry = telemetry;
     render();
     return;
   }

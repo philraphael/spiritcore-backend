@@ -5685,6 +5685,34 @@ button[data-action="begin-quest"]:active,
   line-height: 1.05;
 }
 
+.retention-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.retention-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--realm-accent, #dcb5ff) 22%, transparent);
+  background: color-mix(in srgb, var(--realm-accent, #dcb5ff) 8%, transparent);
+  color: var(--text);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.retention-meta-pill.is-new,
+.retention-unlock-badge,
+.retention-home-badge {
+  border-color: rgba(240, 192, 64, 0.36);
+  background: rgba(240, 192, 64, 0.14);
+  color: #f5d27a;
+}
+
 .retention-section {
   padding: 14px 0;
   border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
@@ -5763,6 +5791,10 @@ button[data-action="begin-quest"]:active,
   font-weight: 700;
   color: var(--text);
   margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .retention-unlock-card p {
@@ -5770,6 +5802,44 @@ button[data-action="begin-quest"]:active,
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.55;
+}
+
+.retention-unlock-badge,
+.retention-home-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.retention-home-strip {
+  width: min(1120px, 100%);
+  margin: 16px auto 0;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.retention-home-strip p {
+  margin: 6px 0 0;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.retention-home-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 @media (max-width: 720px) {
@@ -5789,5 +5859,15 @@ button[data-action="begin-quest"]:active,
 
   .retention-line-label {
     justify-self: start;
+  }
+
+  .retention-home-strip {
+    padding: 14px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .retention-home-actions {
+    justify-content: flex-start;
   }
 }
