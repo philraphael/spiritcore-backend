@@ -47,7 +47,7 @@ export async function analyticsRoutes(fastify, opts) {
           userId:            { type: "string", minLength: 1 },
           conversationId:    { type: "string", nullable: true },
           spiritkinName:     { type: "string", nullable: true },
-          eventType:         { type: "string", enum: ["start", "end", "spiritkin_selected", "first_message", "abandon"] },
+          eventType:         { type: "string", enum: ["start", "end", "spiritkin_selected", "first_message", "abandon", "return_visit", "return_panel_seen", "daily_moment_seen", "weekly_moment_seen", "light_unlock_reached"] },
           firstMessageDelay: { type: "number", nullable: true },
           sessionDurationMs: { type: "number", nullable: true },
           messageCount:      { type: "number", nullable: true },

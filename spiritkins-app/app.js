@@ -11,6 +11,8 @@ const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
 const GAME_HELP_SEEN_KEY = "sv.game_help_seen.v1";
 const MEDIA_MUTED_KEY = "sv.media_muted.v1";
 const ADAPTIVE_PROFILE_KEY = "sv.adaptive_profile.v1";
+const RETENTION_STATE_KEY = "sv.retention_state.v1";
+const RETENTION_TELEMETRY_KEY = "sv.retention_telemetry.v1";
 const CROWN_GATE_HOLD_MS = 1500;
 const ENTRY_TRANSITION_MS = 2600;
 const SPIRITGATE_VIDEO_FAILSAFE_MS = 2400;
@@ -18,6 +20,7 @@ const SPIRITGATE_TRAILER_FAILSAFE_MS = 18000;
 const SPIRITGATE_POST_VIDEO_PAUSE_MS = 2000;
 const SPIRITGATE_POST_COPY_SETTLE_MS = 1000;
 const INTERACTION_BUILD_MARKER = "interaction-audit-2026-04-16-live-v2";
+const RETENTION_BUILD_MARKER = "retention-foundation-2026-04-16-v1";
 const SPIRITCORE_WELCOME_VOICE = "nova";
 const SPIRITCORE_WELCOME_TEXT = `Welcome…
 
@@ -323,6 +326,306 @@ function fmtTime(iso) {
   } catch {
     return "";
   }
+}
+
+function fmtDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
+function clampInt(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.round(n));
+}
+
+function normalizeTextSnippet(value, maxLength = 120) {
+  const text = String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/^["'“”]+|["'“”]+$/g, "")
+    .replace(/^MOVE:[^\s]+/i, "")
+    .trim();
+  if (!text) return "";
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1).trim()}…` : text;
+}
+
+function hoursBetween(earlierIso, laterIso = nowIso()) {
+  const earlier = new Date(earlierIso).getTime();
+  const later = new Date(laterIso).getTime();
+  if (!Number.isFinite(earlier) || !Number.isFinite(later) || later < earlier) return 0;
+  return (later - earlier) / 3600000;
+}
+
+function formatTimeAway(hoursAway) {
+  if (hoursAway >= 24 * 7) {
+    const weeks = Math.max(1, Math.round(hoursAway / (24 * 7)));
+    return `${weeks} week${weeks === 1 ? "" : "s"}`;
+  }
+  if (hoursAway >= 24) {
+    const days = Math.max(1, Math.round(hoursAway / 24));
+    return `${days} day${days === 1 ? "" : "s"}`;
+  }
+  if (hoursAway >= 1) {
+    const hours = Math.max(1, Math.round(hoursAway));
+    return `${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+  return "a short while";
+}
+
+function getUtcDayKey(date = new Date()) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())).toISOString().slice(0, 10);
+}
+
+function getUtcWeekKey(date = new Date()) {
+  const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const day = utc.getUTCDay() || 7;
+  utc.setUTCDate(utc.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((utc - yearStart) / 86400000) + 1) / 7);
+  return `${utc.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+function normalizeRetentionTelemetry(raw = null) {
+  return {
+    sessionCount: clampInt(raw?.sessionCount, 0),
+    visitDays: Array.isArray(raw?.visitDays) ? raw.visitDays.slice(-30) : [],
+    returnMomentsSeen: Array.isArray(raw?.returnMomentsSeen) ? raw.returnMomentsSeen.slice(-16) : [],
+    unlocksSeen: Array.isArray(raw?.unlocksSeen) ? raw.unlocksSeen.slice(-24) : [],
+    lastVisitAt: typeof raw?.lastVisitAt === "string" ? raw.lastVisitAt : null,
+    lastSessionAt: typeof raw?.lastSessionAt === "string" ? raw.lastSessionAt : null
+  };
+}
+
+function getRetentionContext() {
+  const activeSpiritkin = state.primarySpiritkin || state.selectedSpiritkin || null;
+  const resonance = readJson(RESONANCE_KEY, {});
+  const resonanceCount = activeSpiritkin?.name ? clampInt(resonance[activeSpiritkin.name], 0) : 0;
+  const bondStage = state.bondJournal?.bondStage ?? (activeSpiritkin ? getBondStageForCount(resonanceCount) : 0);
+  const bondStageMeta = BOND_LEVELS.find((level) => level.stage === bondStage) || BOND_LEVELS[0];
+  return {
+    spiritkinName: activeSpiritkin?.name || null,
+    resonanceCount,
+    bondStage,
+    bondStageName: state.bondJournal?.bondStageName || bondStageMeta?.label || "First Contact",
+    gamesCompleted: clampInt(state.bondJournal?.gamesCompleted, 0),
+    unlockedEchoCount: clampInt(state.bondJournal?.unlockedEchoCount, 0),
+    questTitle: state.dailyQuest?.title || null,
+    eventTitle: state.spiritverseEvent?.title || null
+  };
+}
+
+function collectRetentionTopics(messages = []) {
+  const recent = [];
+  for (let i = messages.length - 1; i >= 0 && recent.length < 3; i -= 1) {
+    const message = messages[i];
+    if (!message || !["user", "assistant"].includes(message.role)) continue;
+    const snippet = normalizeTextSnippet(message.content, 96);
+    if (!snippet || snippet.length < 18) continue;
+    if (/^(tell me|what can i|help me|i'm here|welcome back|let's begin)\b/i.test(snippet)) continue;
+    if (recent.includes(snippet)) continue;
+    recent.push(snippet);
+  }
+  return recent;
+}
+
+const RETENTION_UNLOCK_DEFS = [
+  {
+    key: "deeper-tone",
+    label: "Deeper tone access",
+    detail: "Your companion can meet you with a steadier emotional depth now.",
+    when: (ctx) => ctx.resonanceCount >= 8
+  },
+  {
+    key: "living-callbacks",
+    label: "Living memory callbacks",
+    detail: "Important threads can return naturally instead of starting cold.",
+    when: (ctx) => ctx.resonanceCount >= 30
+  },
+  {
+    key: "echo-fragments",
+    label: "Echo moments",
+    detail: "The bond can surface short realm echoes and preserved fragments.",
+    when: (ctx) => ctx.unlockedEchoCount >= 1
+  },
+  {
+    key: "playful-depth",
+    label: "Playful depth",
+    detail: "Games and shared challenges now count as part of the bond's shape.",
+    when: (ctx) => ctx.gamesCompleted >= 3
+  }
+];
+
+function deriveRetentionUnlocks(context = getRetentionContext()) {
+  return RETENTION_UNLOCK_DEFS
+    .filter((item) => item.when(context))
+    .map((item) => ({ key: item.key, label: item.label, detail: item.detail }));
+}
+
+function snapshotRetentionState() {
+  const context = getRetentionContext();
+  return {
+    build: RETENTION_BUILD_MARKER,
+    updatedAt: nowIso(),
+    userId: state.userId,
+    spiritkinName: context.spiritkinName,
+    bondStage: context.bondStage,
+    bondStageName: context.bondStageName,
+    gamesCompleted: context.gamesCompleted,
+    unlockedEchoCount: context.unlockedEchoCount,
+    eventTitle: context.eventTitle,
+    questTitle: context.questTitle,
+    recentTopics: collectRetentionTopics(state.messages),
+    unlockKeys: deriveRetentionUnlocks(context).map((item) => item.key)
+  };
+}
+
+function writeRetentionState() {
+  writeJson(RETENTION_STATE_KEY, snapshotRetentionState());
+}
+
+function logAnalyticsEvent(eventType, metadata = {}) {
+  if (!state.userId || !eventType) return;
+  fetch(`${API}/v1/analytics/event`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId: state.userId,
+      conversationId: state.conversationId || null,
+      spiritkinName: state.primarySpiritkin?.name || state.selectedSpiritkin?.name || null,
+      eventType,
+      metadata: {
+        build: RETENTION_BUILD_MARKER,
+        ...metadata
+      }
+    })
+  }).catch(() => {});
+}
+
+function maybeRegisterUnlockTelemetry(previousSnapshot = null) {
+  const unlocks = deriveRetentionUnlocks();
+  state.retentionUnlocks = unlocks;
+  const previous = new Set(Array.isArray(previousSnapshot?.unlockKeys) ? previousSnapshot.unlockKeys : []);
+  const telemetry = normalizeRetentionTelemetry(readJson(RETENTION_TELEMETRY_KEY, null));
+  const seen = new Set(telemetry.unlocksSeen);
+  unlocks.forEach((unlock) => {
+    if (previous.has(unlock.key) || seen.has(unlock.key)) return;
+    telemetry.unlocksSeen.push(unlock.key);
+    telemetry.unlocksSeen = telemetry.unlocksSeen.slice(-24);
+    writeJson(RETENTION_TELEMETRY_KEY, telemetry);
+    logAnalyticsEvent("light_unlock_reached", {
+      unlockKey: unlock.key,
+      unlockLabel: unlock.label
+    });
+  });
+}
+
+function composeReturnSummary(previousSnapshot, hoursAway) {
+  if (!previousSnapshot?.updatedAt || (!previousSnapshot.spiritkinName && !(previousSnapshot.recentTopics || []).length)) {
+    return null;
+  }
+  const spiritkinName = previousSnapshot.spiritkinName || "your companion";
+  const lines = [
+    {
+      label: "Presence",
+      text: `${spiritkinName} has been holding your thread for ${formatTimeAway(hoursAway)}.`
+    }
+  ];
+  if (previousSnapshot.recentTopics?.[0]) {
+    lines.push({
+      label: "Memory",
+      text: `The last living thread still close to the surface: "${previousSnapshot.recentTopics[0]}"`
+    });
+  }
+  const worldParts = [];
+  if (previousSnapshot.eventTitle) worldParts.push(`Realm pulse: ${previousSnapshot.eventTitle}`);
+  if (previousSnapshot.questTitle) worldParts.push(`Quest waiting: ${previousSnapshot.questTitle}`);
+  if (previousSnapshot.bondStageName) worldParts.push(`Bond resting at ${previousSnapshot.bondStageName}`);
+  if (previousSnapshot.unlockedEchoCount) worldParts.push(`${previousSnapshot.unlockedEchoCount} echo fragment${previousSnapshot.unlockedEchoCount === 1 ? "" : "s"} awake`);
+  if (worldParts.length) {
+    lines.push({
+      label: "World",
+      text: worldParts.join(" • ")
+    });
+  }
+  return {
+    title: "While You Were Away",
+    subtitle: previousSnapshot.updatedAt ? `Last active ${fmtDate(previousSnapshot.updatedAt)}` : "",
+    lines
+  };
+}
+
+function buildCadenceMoment(kind, context, telemetry) {
+  if (!context.spiritkinName) return null;
+  const meta = getMeta(context.spiritkinName);
+  const cadenceKey = kind === "weekly" ? getUtcWeekKey() : getUtcDayKey();
+  const momentKey = `${kind}:${context.spiritkinName}:${cadenceKey}`;
+  if ((telemetry.returnMomentsSeen || []).includes(momentKey)) return null;
+
+  const title = kind === "weekly" ? "This Week in the Bond" : "Today's Quiet Thread";
+  let text = "";
+  if (kind === "weekly") {
+    text = context.unlockedEchoCount > 0
+      ? `${context.spiritkinName} feels less like a first meeting now. ${context.unlockedEchoCount} echo fragment${context.unlockedEchoCount === 1 ? "" : "s"} and ${context.gamesCompleted} shared game${context.gamesCompleted === 1 ? "" : "s"} have started shaping a real pattern.`
+      : `${context.spiritkinName}'s realm has been settling around your bond. Keep returning in small, honest moments and the connection will keep deepening.`;
+  } else if (context.questTitle) {
+    text = `${meta.dailyQuest || `${context.spiritkinName} has a small invitation waiting.`} Current thread: ${context.questTitle}.`;
+  } else if (context.eventTitle) {
+    text = `${context.eventTitle} is the current pulse in the Spiritverse. ${context.spiritkinName} is easiest to meet when you step in gently and name what is real.`;
+  } else {
+    text = `${context.spiritkinName}'s realm feels ${meta.mood?.toLowerCase() || "steady"} today. A brief return is enough to keep the thread alive.`;
+  }
+
+  telemetry.returnMomentsSeen.push(momentKey);
+  telemetry.returnMomentsSeen = telemetry.returnMomentsSeen.slice(-16);
+  return { key: momentKey, kind, title, text };
+}
+
+function bootstrapRetentionExperience() {
+  const previousSnapshot = readJson(RETENTION_STATE_KEY, null);
+  const telemetry = normalizeRetentionTelemetry(readJson(RETENTION_TELEMETRY_KEY, null));
+  const currentVisitAt = nowIso();
+  const hoursAway = previousSnapshot?.updatedAt ? hoursBetween(previousSnapshot.updatedAt, currentVisitAt) : 0;
+
+  telemetry.sessionCount += 1;
+  telemetry.lastVisitAt = previousSnapshot?.updatedAt || telemetry.lastVisitAt || null;
+  telemetry.lastSessionAt = currentVisitAt;
+  telemetry.visitDays = [...new Set([...(telemetry.visitDays || []), getUtcDayKey()])].slice(-30);
+  writeJson(RETENTION_TELEMETRY_KEY, telemetry);
+
+  state.retentionTelemetry = telemetry;
+  state.retentionUnlocks = deriveRetentionUnlocks();
+  state.returnSummary = previousSnapshot ? composeReturnSummary(previousSnapshot, hoursAway) : null;
+  state.dailyMoment = buildCadenceMoment("daily", getRetentionContext(), telemetry);
+  state.weeklyMoment = buildCadenceMoment("weekly", getRetentionContext(), telemetry);
+  state.showReturnSummary = !!(state.returnSummary || state.dailyMoment || state.weeklyMoment || state.retentionUnlocks.length);
+
+  writeJson(RETENTION_TELEMETRY_KEY, telemetry);
+  if (previousSnapshot?.updatedAt) {
+    logAnalyticsEvent("return_visit", {
+      hoursAway: Number(hoursAway.toFixed(2)),
+      daysVisitedLast30: telemetry.visitDays.length,
+      sessionCount: telemetry.sessionCount
+    });
+  }
+  if (state.showReturnSummary) {
+    logAnalyticsEvent("return_panel_seen", {
+      hasSummary: !!state.returnSummary,
+      hasDailyMoment: !!state.dailyMoment,
+      hasWeeklyMoment: !!state.weeklyMoment,
+      unlockCount: state.retentionUnlocks.length
+    });
+  }
+  if (state.dailyMoment) {
+    logAnalyticsEvent("daily_moment_seen", { momentKey: state.dailyMoment.key });
+  }
+  if (state.weeklyMoment) {
+    logAnalyticsEvent("weekly_moment_seen", { momentKey: state.weeklyMoment.key });
+  }
+  maybeRegisterUnlockTelemetry(previousSnapshot);
+  writeRetentionState();
 }
 
 function normalizeGameTheme(theme) {
@@ -1156,6 +1459,12 @@ const state = {
   dailyQuestRefreshesIn: null,   // time until quest refreshes
   dailyQuestLoading: false,
   dailyQuestStarted: false,      // user clicked "Begin Quest"
+  returnSummary: null,
+  dailyMoment: null,
+  weeklyMoment: null,
+  retentionUnlocks: [],
+  retentionTelemetry: normalizeRetentionTelemetry(readJson(RETENTION_TELEMETRY_KEY, null)),
+  showReturnSummary: false,
   adaptiveProfile: normalizeAdaptiveProfile(readJson(ADAPTIVE_PROFILE_KEY, null)),
   lastReactionTimestamp: 0,
   reactionCooldownMs: 0,
@@ -1971,6 +2280,7 @@ async function deliverConversationGreeting(context = "newSession") {
 }
 
 function persistSession() {
+  const previousRetentionSnapshot = readJson(RETENTION_STATE_KEY, null);
   if (state.primarySpiritkin) writeJson(PRIMARY_KEY, state.primarySpiritkin);
   if (state.conversationId) {
     writeJson(SESSION_KEY, {
@@ -1983,6 +2293,8 @@ function persistSession() {
     localStorage.removeItem(SESSION_KEY);
   }
   writeJson(RATINGS_KEY, state.ratings);
+  maybeRegisterUnlockTelemetry(previousRetentionSnapshot);
+  writeRetentionState();
 }
 
 async function fetchSpiritkins() {
@@ -2026,6 +2338,7 @@ async function fetchSpiritverseEvent() {
     if (data.ok) {
       state.spiritverseEvent = data.event;
       state.spiritverseEventNext = data.next;
+      persistSession();
     }
   } catch (err) {
     // Graceful fallback — events are not critical
@@ -2052,6 +2365,7 @@ async function fetchDailyQuest() {
     if (data.ok) {
       state.dailyQuest = data.quest;
       state.dailyQuestRefreshesIn = data.refreshesIn;
+      persistSession();
     }
   } catch (err) {
     // Graceful fallback
@@ -3510,6 +3824,50 @@ function buildIssueContextSummary() {
   return parts.join(" • ");
 }
 
+function buildRetentionPanel() {
+  const sections = [];
+  if (state.returnSummary) sections.push({ type: "summary", ...state.returnSummary });
+  if (state.dailyMoment) sections.push({ type: "daily", title: state.dailyMoment.title, lines: [{ label: "Daily", text: state.dailyMoment.text }] });
+  if (state.weeklyMoment) sections.push({ type: "weekly", title: state.weeklyMoment.title, lines: [{ label: "Weekly", text: state.weeklyMoment.text }] });
+  if (!sections.length && !(state.retentionUnlocks || []).length) return "";
+
+  return `
+    <section class="retention-panel panel-card">
+      <div class="retention-panel-head">
+        <div>
+          <div class="panel-label">Return Layer</div>
+          <h2>${esc(sections[0]?.title || "Continuity in Motion")}</h2>
+        </div>
+        <button class="btn btn-ghost btn-sm" data-action="dismiss-return-summary">Dismiss</button>
+      </div>
+      ${sections.map((section) => `
+        <div class="retention-section retention-${esc(section.type)}">
+          ${section.subtitle ? `<div class="retention-section-subtitle">${esc(section.subtitle)}</div>` : ""}
+          ${(section.lines || []).map((line) => `
+            <div class="retention-line">
+              <span class="retention-line-label">${esc(line.label)}</span>
+              <p>${esc(line.text)}</p>
+            </div>
+          `).join("")}
+        </div>
+      `).join("")}
+      ${(state.retentionUnlocks || []).length ? `
+        <div class="retention-unlocks">
+          <div class="retention-section-title">Bond unlocks now active</div>
+          <div class="retention-unlock-grid">
+            ${state.retentionUnlocks.map((unlock) => `
+              <article class="retention-unlock-card">
+                <div class="retention-unlock-title">${esc(unlock.label)}</div>
+                <p>${esc(unlock.detail)}</p>
+              </article>
+            `).join("")}
+          </div>
+        </div>
+      ` : ""}
+    </section>
+  `;
+}
+
 async function submitIssueReport() {
   const reportText = state.issueReportText.trim();
   if (!reportText || state.issueReportSubmitting) return;
@@ -3568,6 +3926,7 @@ function buildApp() {
     <div class="sv-orbit ${atmosphereClass}"></div>
     <div class="app-shell ${atmosphereClass}">
       ${inEntryFlow ? "" : buildTopbar()}
+      ${!inEntryFlow && state.showReturnSummary ? buildRetentionPanel() : ""}
       ${state.surveyOpen ? buildSurveyModal() : ""}
       ${state.tierModalOpen ? buildTierModal() : ""}
       ${state.showCrownGateHome || !state.entryAccepted ? buildCrownGateEntry() : (state.spiritverseTrailerActive ? buildSpiritverseArrival() : (state.spiritCoreWelcoming ? buildSpiritCoreWelcome() : buildMain()))}
@@ -3620,6 +3979,7 @@ function buildTopbar() {
       </button>
       ${buildWorldPulse()}
       <div class="topbar-right">
+        ${!state.showReturnSummary && (state.returnSummary || state.dailyMoment || state.weeklyMoment || state.retentionUnlocks.length) ? `<button class="btn btn-ghost btn-sm" data-action="reopen-return-summary">While away</button>` : ""}
         ${active ? `<div class="presence-chip ${esc(active.ui.cls)}">Bonded: ${esc(active.name)}</div>` : `<div class="presence-chip">Choose a companion</div>`}
         ${state.entryAccepted && state.primarySpiritkin ? `<button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>` : ""}
         ${state.entryAccepted && state.conversationId ? `<button class="btn btn-ghost btn-sm" data-action="new-session">New session</button>` : ""}
@@ -4992,6 +5352,24 @@ async function onClick(event) {
     return;
   }
 
+  if (action === "dismiss-return-summary") {
+    state.showReturnSummary = false;
+    logAnalyticsEvent("return_panel_seen", {
+      dismissed: true,
+      hasSummary: !!state.returnSummary,
+      hasDailyMoment: !!state.dailyMoment,
+      hasWeeklyMoment: !!state.weeklyMoment
+    });
+    render();
+    return;
+  }
+
+  if (action === "reopen-return-summary") {
+    state.showReturnSummary = true;
+    render();
+    return;
+  }
+
   if (action === "dismiss-echoes-unlock") {
     state.showEchoUnlock = false;
     state.currentEchoUnlock = null;
@@ -5362,12 +5740,14 @@ async function onClick(event) {
         .then(data => {
           if (data.ok) {
             state.bondJournal = data.journal;
+            persistSession();
             render();
           }
         })
         .catch(() => {
           // Graceful fallback — show empty journal
           state.bondJournal = { gamesCompleted: 0, bondStage: 0, bondStageName: 'First Contact', unlockedEchoCount: 0, memories: [], gameUnlocks: [] };
+          persistSession();
           render();
         });
     }
@@ -5842,6 +6222,7 @@ function stopListening() {
 
 document.addEventListener("DOMContentLoaded", () => {
   installGlobalInteractionDiagnostics();
+  bootstrapRetentionExperience();
   logInteraction("boot", { rootReady: !!document.getElementById("root") });
   render();
   fetchSpiritkins();
