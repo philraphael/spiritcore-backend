@@ -42,6 +42,11 @@ const NEW_BOND_SHORTCUT_PATTERNS = [
   /\bagain\b/gi,
 ];
 
+function numberOrDefault(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export function createResponseEngine() {
   function deriveRelationshipState({ identity, context = {}, worldState = {} }) {
     const bond = worldState?.bond ?? {};
@@ -204,6 +209,69 @@ export function createResponseEngine() {
     return trimFillerLead(normalized.join(" ").replace(/\s+/g, " ").trim());
   }
 
+  function applyAdaptivePersonality(text, identity, relationship, context = {}, input = "") {
+    const adaptive = context?.adaptiveProfile ?? null;
+    if (!adaptive || typeof adaptive !== "object") return text;
+
+    let output = String(text || "").trim();
+    if (!output) return output;
+
+    const dislikedPhrases = Array.isArray(adaptive.dislikedPhrases) ? adaptive.dislikedPhrases.filter(Boolean) : [];
+    const blockedOpeners = Array.isArray(adaptive.blockedOpeners) ? adaptive.blockedOpeners.filter(Boolean) : [];
+    const recentAssistantOpeners = Array.isArray(adaptive.recentAssistantOpeners) ? adaptive.recentAssistantOpeners.filter(Boolean) : [];
+    const recentAssistantPhrases = Array.isArray(adaptive.recentAssistantPhrases) ? adaptive.recentAssistantPhrases.filter(Boolean) : [];
+    const flags = adaptive.correctionFlags ?? {};
+
+    const sentences = output
+      .split(/(?<=[.!?])\s+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    if (sentences.length > 0) {
+      const opener = sentences[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9\s']/g, " ")
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 5)
+        .join(" ");
+
+      const openerBlocked = blockedOpeners.includes(opener) || recentAssistantOpeners.includes(opener);
+      const openerContainsDisliked = dislikedPhrases.some((phrase) => sentences[0].toLowerCase().includes(String(phrase).toLowerCase()));
+      const openerFeelsOverused = recentAssistantPhrases.some((phrase) => sentences[0].toLowerCase().includes(String(phrase).toLowerCase()));
+
+      if (openerBlocked || openerContainsDisliked || (numberOrDefault(adaptive.repetitionSensitivity, 0.25) > 0.6 && openerFeelsOverused)) {
+        sentences[0] = buildNaturalVariant(identity, relationship, input);
+      }
+    }
+
+    output = sentences.join(" ").replace(/\s+/g, " ").trim();
+
+    if (dislikedPhrases.length > 0) {
+      for (const phrase of dislikedPhrases) {
+        const pattern = new RegExp(`\\b${escapeRegex(String(phrase).trim())}\\b`, "ig");
+        output = output.replace(pattern, "").replace(/\s+/g, " ").trim();
+      }
+    }
+
+    if ((numberOrDefault(adaptive.respectPreference, 0.5) > 0.72 || numberOrDefault(adaptive.spiritualityPreference, 0.25) > 0.65 || flags.avoidProfanity) && /\b(?:damn|hell|shit|ass)\b/i.test(output)) {
+      output = output
+        .replace(/\bdamn\b/gi, "truly")
+        .replace(/\bhell\b/gi, "rough")
+        .replace(/\bshit\b/gi, "mess")
+        .replace(/\bass\b/gi, "hard");
+    }
+
+    if (flags.avoidTeasing && relationship?.mode === "play") {
+      output = output
+        .replace(/\bdon't be mad if you lose\b/gi, "stay with me here")
+        .replace(/\bdon't glare at me\b/gi, "easy")
+        .replace(/\btoo late\b/gi, "you saw it happen");
+    }
+
+    return trimFillerLead(output.replace(/\s+/g, " ").trim());
+  }
+
   function extendTags(tags, relationship, context, worldState) {
     const next = new Set(tags || []);
     next.add(`relationship:${relationship.familiarity}`);
@@ -218,7 +286,8 @@ export function createResponseEngine() {
   function wrapResponse({ adapterResult, identity, input, context = {}, worldState = {} }) {
     const base = normalizeAdapterResult(adapterResult);
     const relationship = deriveRelationshipState({ identity, context, worldState, input });
-    const text = applyRelationshipRealism(base.text, identity, relationship, input) || base.text;
+    const realistic = applyRelationshipRealism(base.text, identity, relationship, input) || base.text;
+    const text = applyAdaptivePersonality(realistic, identity, relationship, context, input) || realistic;
     const tags = extendTags(base.tags, relationship, context, worldState);
 
     return {
@@ -233,4 +302,8 @@ export function createResponseEngine() {
     wrapResponse,
     deriveRelationshipState,
   };
+}
+
+function escapeRegex(text) {
+  return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

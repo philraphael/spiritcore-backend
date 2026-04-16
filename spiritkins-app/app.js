@@ -9,6 +9,7 @@ const RATINGS_KEY = "sv.ratings.v5";
 const PRIMARY_KEY = "sv.primary.v5";
 const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
 const MEDIA_MUTED_KEY = "sv.media_muted.v1";
+const ADAPTIVE_PROFILE_KEY = "sv.adaptive_profile.v1";
 const CROWN_GATE_HOLD_MS = 1500;
 const ENTRY_TRANSITION_MS = 1400;
 const SPIRITCORE_WELCOME_VOICE = "nova";
@@ -843,6 +844,185 @@ function formatSignal(value) {
     .replace(/\s+/g, " ");
 }
 
+function clamp01(value, fallback = 0.5) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.min(1, n));
+}
+
+function normalizePhraseList(values = [], limit = 8) {
+  return [...new Set(
+    (Array.isArray(values) ? values : [])
+      .map((value) => String(value || "").trim().toLowerCase())
+      .filter(Boolean)
+  )].slice(-limit);
+}
+
+function createDefaultAdaptiveProfile() {
+  return {
+    version: 1,
+    toneStyle: "grounded",
+    intensity: 0.45,
+    playfulness: 0.32,
+    competitiveness: 0.28,
+    repetitionSensitivity: 0.25,
+    respectPreference: 0.5,
+    spiritualityPreference: 0.25,
+    correctionFlags: {
+      avoidRepetition: false,
+      avoidNarration: false,
+      avoidProfanity: false,
+      avoidTeasing: false
+    },
+    dislikedPhrases: [],
+    blockedOpeners: [],
+    recentCorrections: [],
+    recentAssistantOpeners: [],
+    recentAssistantPhrases: []
+  };
+}
+
+function normalizeAdaptiveProfile(raw) {
+  const base = createDefaultAdaptiveProfile();
+  const source = raw && typeof raw === "object" ? raw : {};
+  const flags = source.correctionFlags && typeof source.correctionFlags === "object" ? source.correctionFlags : {};
+  return {
+    ...base,
+    toneStyle: typeof source.toneStyle === "string" && source.toneStyle.trim() ? source.toneStyle.trim() : base.toneStyle,
+    intensity: clamp01(source.intensity, base.intensity),
+    playfulness: clamp01(source.playfulness, base.playfulness),
+    competitiveness: clamp01(source.competitiveness, base.competitiveness),
+    repetitionSensitivity: clamp01(source.repetitionSensitivity, base.repetitionSensitivity),
+    respectPreference: clamp01(source.respectPreference, base.respectPreference),
+    spiritualityPreference: clamp01(source.spiritualityPreference, base.spiritualityPreference),
+    correctionFlags: {
+      avoidRepetition: Boolean(flags.avoidRepetition),
+      avoidNarration: Boolean(flags.avoidNarration),
+      avoidProfanity: Boolean(flags.avoidProfanity),
+      avoidTeasing: Boolean(flags.avoidTeasing)
+    },
+    dislikedPhrases: normalizePhraseList(source.dislikedPhrases),
+    blockedOpeners: normalizePhraseList(source.blockedOpeners),
+    recentCorrections: (Array.isArray(source.recentCorrections) ? source.recentCorrections : [])
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .slice(-6),
+    recentAssistantOpeners: normalizePhraseList(source.recentAssistantOpeners, 6),
+    recentAssistantPhrases: normalizePhraseList(source.recentAssistantPhrases, 10)
+  };
+}
+
+function persistAdaptiveProfile() {
+  writeJson(ADAPTIVE_PROFILE_KEY, state.adaptiveProfile);
+}
+
+function mergeUniqueStrings(list, additions, limit = 8) {
+  return normalizePhraseList([...(Array.isArray(list) ? list : []), ...(Array.isArray(additions) ? additions : [])], limit);
+}
+
+function extractQuotedPhrases(text) {
+  return [...String(text || "").matchAll(/["“”']([^"“”']{2,80})["“”']/g)]
+    .map((match) => match[1]?.trim())
+    .filter(Boolean);
+}
+
+function extractOpeningSignature(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s']/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 5)
+    .join(" ");
+}
+
+function inferToneStyleFromProfile(profile) {
+  if ((profile.spiritualityPreference || 0) > 0.7 || (profile.respectPreference || 0) > 0.7) return "reverent";
+  if ((profile.playfulness || 0) > 0.64 && (profile.competitiveness || 0) > 0.56) return "playful-competitive";
+  if ((profile.playfulness || 0) > 0.62) return "playful";
+  if ((profile.intensity || 0) > 0.68) return "direct";
+  if ((profile.respectPreference || 0) > 0.58) return "respectful";
+  return "grounded";
+}
+
+function updateAdaptiveProfileFromUserText(text) {
+  const input = String(text || "").trim();
+  if (!input) return;
+
+  const lower = input.toLowerCase();
+  const profile = normalizeAdaptiveProfile(state.adaptiveProfile);
+
+  const playfulHit = /\b(lol|lmao|haha|funny|tease|teasing|joking|banter|play around|messing with you)\b/.test(lower);
+  const competitiveHit = /\b(win|beat me|beat you|smoke me|challenge|trash talk|competitive|don't go easy|come at me)\b/.test(lower);
+  const calmHit = /\b(calm|gentle|soft|quiet|respectful|easy with me|be kind|please|thank you|appreciate)\b/.test(lower);
+  const spiritualHit = /\b(god|lord|jesus|faith|prayer|pray|blessed|spiritual|church|scripture|sacred|holy|religious)\b/.test(lower);
+  const highIntensityHit = /\b(now|seriously|really|straight up|for real|urgent|immediately)\b/.test(lower) || /!{2,}/.test(input);
+  const lowIntensityHit = /\b(softly|gently|easy|slow down|not too much|quietly)\b/.test(lower);
+  const repetitionHit = /\b(repeat|repeating|repetitive|same phrase|same thing|keep saying|again and again)\b/.test(lower);
+  const narratorHit = /\b(stop narrating|don't narrate|less narrator|not like a narrator|don't describe the interface|don't sound like a system)\b/.test(lower);
+  const profanityBoundaryHit = /\b(don't cuss|dont cuss|no profanity|don't swear|dont swear|keep it clean)\b/.test(lower);
+  const teasingBoundaryHit = /\b(don't tease|dont tease|less teasing|don't be rude|dont be rude|not so cocky)\b/.test(lower);
+
+  if (playfulHit) profile.playfulness = clamp01(profile.playfulness + 0.12, profile.playfulness);
+  if (competitiveHit) profile.competitiveness = clamp01(profile.competitiveness + 0.14, profile.competitiveness);
+  if (calmHit) profile.respectPreference = clamp01(profile.respectPreference + 0.12, profile.respectPreference);
+  if (spiritualHit) {
+    profile.spiritualityPreference = clamp01(profile.spiritualityPreference + 0.18, profile.spiritualityPreference);
+    profile.respectPreference = clamp01(profile.respectPreference + 0.08, profile.respectPreference);
+  }
+  if (highIntensityHit) profile.intensity = clamp01(profile.intensity + 0.1, profile.intensity);
+  if (lowIntensityHit) profile.intensity = clamp01(profile.intensity - 0.12, profile.intensity);
+  if (repetitionHit) {
+    profile.repetitionSensitivity = clamp01(profile.repetitionSensitivity + 0.22, profile.repetitionSensitivity);
+    profile.correctionFlags.avoidRepetition = true;
+    if (profile.recentAssistantOpeners[profile.recentAssistantOpeners.length - 1]) {
+      profile.blockedOpeners = mergeUniqueStrings(profile.blockedOpeners, [profile.recentAssistantOpeners[profile.recentAssistantOpeners.length - 1]], 6);
+    }
+    profile.recentCorrections = [...profile.recentCorrections, "User objected to repeated phrasing."].slice(-6);
+  }
+  if (narratorHit) {
+    profile.correctionFlags.avoidNarration = true;
+    profile.recentCorrections = [...profile.recentCorrections, "User asked for less narrator-style delivery."].slice(-6);
+  }
+  if (profanityBoundaryHit) {
+    profile.correctionFlags.avoidProfanity = true;
+    profile.respectPreference = clamp01(profile.respectPreference + 0.12, profile.respectPreference);
+    profile.recentCorrections = [...profile.recentCorrections, "User requested cleaner language."].slice(-6);
+  }
+  if (teasingBoundaryHit) {
+    profile.correctionFlags.avoidTeasing = true;
+    profile.recentCorrections = [...profile.recentCorrections, "User requested less teasing."].slice(-6);
+  }
+
+  const quotedPhrases = extractQuotedPhrases(input);
+  const phraseMatch = lower.match(/(?:stop saying|don't say|dont say|don't call me|dont call me|i hate when you say)\s+([^.!?]{2,80})/i);
+  const explicitPhrase = phraseMatch?.[1]?.trim();
+  profile.dislikedPhrases = mergeUniqueStrings(profile.dislikedPhrases, [...quotedPhrases, explicitPhrase].filter(Boolean), 10);
+  if (explicitPhrase) {
+    profile.recentCorrections = [...profile.recentCorrections, `Avoid phrase: ${explicitPhrase}`].slice(-6);
+  }
+
+  profile.toneStyle = inferToneStyleFromProfile(profile);
+  state.adaptiveProfile = profile;
+  persistAdaptiveProfile();
+}
+
+function observeAssistantStyle(text) {
+  const output = String(text || "").trim();
+  if (!output) return;
+  const profile = normalizeAdaptiveProfile(state.adaptiveProfile);
+  const opener = extractOpeningSignature(output);
+  const repeatedPhrases = [];
+  const lower = output.toLowerCase();
+  ["take your time", "i'm here", "you are not alone", "let us", "i see where this is going"].forEach((phrase) => {
+    if (lower.includes(phrase)) repeatedPhrases.push(phrase);
+  });
+  if (opener) profile.recentAssistantOpeners = mergeUniqueStrings(profile.recentAssistantOpeners, [opener], 6);
+  if (repeatedPhrases.length) profile.recentAssistantPhrases = mergeUniqueStrings(profile.recentAssistantPhrases, repeatedPhrases, 10);
+  state.adaptiveProfile = profile;
+  persistAdaptiveProfile();
+}
+
 function normalizeMessage(raw) {
   const tags = Array.isArray(raw?.tags) ? raw.tags.filter((tag) => typeof tag === "string") : [];
   return {
@@ -942,6 +1122,7 @@ const state = {
   dailyQuestRefreshesIn: null,   // time until quest refreshes
   dailyQuestLoading: false,
   dailyQuestStarted: false,      // user clicked "Begin Quest"
+  adaptiveProfile: normalizeAdaptiveProfile(readJson(ADAPTIVE_PROFILE_KEY, null)),
   // Realm Travel
   realmTravelOpen: false,        // whether realm travel modal is open
   // Game UI state
@@ -1767,6 +1948,7 @@ async function sendMessage(overrideText) {
   syncPrimarySelection();
   const text = (overrideText ?? state.input).trim();
   if (!text || state.loadingReply) return;
+  updateAdaptiveProfileFromUserText(text);
   state.showCrownGateHome = false;
   state.showHomeView = false;
   const readScope = resolveReadAloudIntent(text);
@@ -1793,7 +1975,8 @@ async function sendMessage(overrideText) {
       body: JSON.stringify({
         userId: state.userId,
         conversationId: state.conversationId,
-        input: text
+        input: text,
+        context: buildAdaptiveRequestContext()
       })
     });
     const data = await res.json();
@@ -1817,6 +2000,7 @@ async function sendMessage(overrideText) {
       emotionTone,
       sceneName
     });
+    observeAssistantStyle(reply);
     state.statusText = `${state.selectedSpiritkin?.name || "Spiritkin"} is with you.`;
     state.statusError = false;
     if (data.metadata?.world?.game) {
@@ -2021,6 +2205,7 @@ function pushAssistantMoment(content, overrides = {}) {
   if (!text) return null;
   const message = createLocalAssistantMessage(text, overrides);
   state.messages.push(message);
+  observeAssistantStyle(text);
   persistSession();
   return message;
 }
@@ -2028,6 +2213,31 @@ function pushAssistantMoment(content, overrides = {}) {
 function maybeSpeakMessageLater(messageId) {
   if (!messageId || state.voiceMuted) return;
   Promise.resolve().then(() => speakMessage(messageId)).catch(() => {});
+}
+
+function buildAdaptiveRequestContext() {
+  const profile = normalizeAdaptiveProfile(state.adaptiveProfile);
+  return {
+    adaptiveProfile: {
+      toneStyle: profile.toneStyle,
+      intensity: profile.intensity,
+      playfulness: profile.playfulness,
+      competitiveness: profile.competitiveness,
+      repetitionSensitivity: profile.repetitionSensitivity,
+      respectPreference: profile.respectPreference,
+      spiritualityPreference: profile.spiritualityPreference,
+      correctionFlags: profile.correctionFlags,
+      dislikedPhrases: profile.dislikedPhrases.slice(-6),
+      blockedOpeners: profile.blockedOpeners.slice(-4),
+      recentCorrections: profile.recentCorrections.slice(-4),
+      recentAssistantOpeners: profile.recentAssistantOpeners.slice(-4),
+      recentAssistantPhrases: profile.recentAssistantPhrases.slice(-6)
+    },
+    recentAssistantMessages: state.messages
+      .filter((message) => message.role === "assistant" && message.content)
+      .slice(-3)
+      .map((message) => String(message.content).trim())
+  };
 }
 
 const COMPANION_REACTION_BANKS = {
@@ -2246,7 +2456,23 @@ const COMPANION_REACTION_BANKS = {
 function pickCompanionReaction(spiritkinName, bucket, seed = 0) {
   const bank = COMPANION_REACTION_BANKS[spiritkinName]?.[bucket];
   if (!Array.isArray(bank) || !bank.length) return "";
-  return bank[Math.abs(seed) % bank.length]?.text || "";
+  const profile = normalizeAdaptiveProfile(state.adaptiveProfile);
+  const scored = bank.map((entry, index) => {
+    const tone = String(entry?.tone || "").toLowerCase();
+    let score = index === (Math.abs(seed) % bank.length) ? 1.5 : 0;
+    if (profile.playfulness > 0.6 && /(playful|light|teasing|curious)/.test(tone)) score += 1.6;
+    if (profile.competitiveness > 0.58 && /(charged|confident|direct|bold|challenging|focused)/.test(tone)) score += 1.4;
+    if ((profile.respectPreference > 0.62 || profile.spiritualityPreference > 0.58) && /(gentle|respectful|calm|steady|regal|solemn|measured|warm)/.test(tone)) score += 1.7;
+    if (profile.intensity > 0.66 && /(charged|direct|firm|bold|urgent|commanding)/.test(tone)) score += 1.1;
+    if (profile.intensity < 0.38 && /(gentle|soft|calm|warm|steady|resonant)/.test(tone)) score += 1.1;
+    if (profile.correctionFlags.avoidTeasing && /(teasing|playful)/.test(tone)) score -= 2;
+    if (profile.correctionFlags.avoidNarration && /(measured|regal|solemn)/.test(tone)) score += 0.2;
+    if (profile.repetitionSensitivity > 0.6 && profile.recentAssistantPhrases.some((phrase) => String(entry?.text || "").toLowerCase().includes(phrase))) score -= 2.2;
+    if (profile.recentAssistantOpeners.includes(extractOpeningSignature(entry?.text || ""))) score -= 1.6;
+    if (profile.dislikedPhrases.some((phrase) => String(entry?.text || "").toLowerCase().includes(phrase))) score -= 3;
+    return { entry, score };
+  }).sort((a, b) => b.score - a.score);
+  return scored[0]?.entry?.text || bank[Math.abs(seed) % bank.length]?.text || "";
 }
 
 function buildGameEntryReaction(spiritkinName, gameType) {

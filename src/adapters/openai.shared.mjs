@@ -111,6 +111,11 @@ function buildMessages(ctx) {
     "Do not use italicized stage directions, roleplay wrappers, or ornamental sensory narration unless the user explicitly asks for that style.",
     "Do not write like a director, scene narrator, or omniscient prose wrapper. React like a living companion speaking directly to the user.",
     "Do not narrate the interface, tabs, or controls back to the user. Let context shape your reply implicitly instead of announcing UI events.",
+    "Adaptive personality is allowed, but only as modulation. Keep the Spiritkin's canon identity intact at all times.",
+    "If the user is playful or competitive, you may become more playful or competitive within this Spiritkin's character.",
+    "If the user prefers gentleness, reverence, or cleaner language, honor that preference without becoming generic.",
+    "If the user objects to a repeated phrase, tone, or habit, acknowledge it through changed delivery and do not keep repeating it.",
+    "Never mirror profanity, hostility, or unsafe escalation blindly just because the user used it first.",
     "Prefer direct, natural language first. Use image-rich language sparingly and only when it adds clarity or emotional precision.",
     "Avoid repetitive ceremonial framing, mirrored sentence patterns, and stock reassurance rhythms.",
     "If a concise answer will do, give it. Do not over-explain simple questions or pad with generic encouragement.",
@@ -253,6 +258,69 @@ function buildGameLayer(ctx) {
   return parts.join('\n');
 }
 
+function buildAdaptiveLayer(ctx) {
+  const adaptive = ctx?.context?.adaptiveProfile ?? null;
+  if (!adaptive || typeof adaptive !== "object") return null;
+
+  const parts = [];
+  parts.push("ADAPTIVE PERSONALITY LAYER");
+  parts.push(`User tone style: ${sanitizeText(adaptive.toneStyle || "grounded")}`);
+  parts.push(`Intensity: ${numberOrDefault(adaptive.intensity, 0.45).toFixed(2)}`);
+  parts.push(`Playfulness: ${numberOrDefault(adaptive.playfulness, 0.3).toFixed(2)}`);
+  parts.push(`Competitiveness: ${numberOrDefault(adaptive.competitiveness, 0.3).toFixed(2)}`);
+  parts.push(`Repetition sensitivity: ${numberOrDefault(adaptive.repetitionSensitivity, 0.25).toFixed(2)}`);
+  parts.push(`Respect preference: ${numberOrDefault(adaptive.respectPreference, 0.5).toFixed(2)}`);
+  parts.push(`Spiritual / reverent preference: ${numberOrDefault(adaptive.spiritualityPreference, 0.25).toFixed(2)}`);
+
+  const flags = adaptive.correctionFlags ?? {};
+  const enabledFlags = Object.entries(flags)
+    .filter(([, value]) => value)
+    .map(([key]) => key);
+  if (enabledFlags.length) {
+    parts.push(`Correction flags active: ${enabledFlags.join(", ")}`);
+  }
+
+  const corrections = Array.isArray(adaptive.recentCorrections) ? adaptive.recentCorrections.filter(Boolean).slice(-4) : [];
+  if (corrections.length) {
+    parts.push("Recent user corrections:");
+    corrections.forEach((item) => parts.push(`  - ${sanitizeText(item).slice(0, 140)}`));
+  }
+
+  const dislikedPhrases = Array.isArray(adaptive.dislikedPhrases) ? adaptive.dislikedPhrases.filter(Boolean).slice(-6) : [];
+  if (dislikedPhrases.length) {
+    parts.push(`Avoid these phrases or habits unless absolutely necessary: ${dislikedPhrases.map((item) => `"${sanitizeText(item)}"`).join(", ")}`);
+  }
+
+  const blockedOpeners = Array.isArray(adaptive.blockedOpeners) ? adaptive.blockedOpeners.filter(Boolean).slice(-4) : [];
+  if (blockedOpeners.length) {
+    parts.push(`Do not reuse these opening rhythms: ${blockedOpeners.map((item) => `"${sanitizeText(item)}"`).join(", ")}`);
+  }
+
+  const recentAssistantOpeners = Array.isArray(adaptive.recentAssistantOpeners) ? adaptive.recentAssistantOpeners.filter(Boolean).slice(-4) : [];
+  if (recentAssistantOpeners.length) {
+    parts.push(`Recent opening signatures to avoid repeating: ${recentAssistantOpeners.map((item) => `"${sanitizeText(item)}"`).join(", ")}`);
+  }
+
+  const recentAssistantPhrases = Array.isArray(adaptive.recentAssistantPhrases) ? adaptive.recentAssistantPhrases.filter(Boolean).slice(-6) : [];
+  if (recentAssistantPhrases.length) {
+    parts.push(`Recently overused phrase fragments to vary away from: ${recentAssistantPhrases.map((item) => `"${sanitizeText(item)}"`).join(", ")}`);
+  }
+
+  const recentAssistantMessages = Array.isArray(ctx?.context?.recentAssistantMessages)
+    ? ctx.context.recentAssistantMessages.map((item) => sanitizeText(item).slice(0, 140)).filter(Boolean).slice(-3)
+    : [];
+  if (recentAssistantMessages.length) {
+    parts.push("Recent assistant replies for variation reference:");
+    recentAssistantMessages.forEach((item) => parts.push(`  - ${item}`));
+  }
+
+  parts.push("Adapt style with restraint. Modulate cadence, sharpness, playfulness, and reverence. Do not become a mirror clone of the user.");
+  parts.push("Keep this Spiritkin distinct. Identity outranks adaptation. Adaptation only shapes delivery, not canon role or worldview.");
+  parts.push("If the user wants less repetition, vary openings, pivots, and reassurance language before repeating any stock phrase.");
+
+  return parts.join("\n");
+}
+
 function buildHierarchicalMemoryLayer(ctx) {
   const hm = ctx?.context?.hierarchical_memory ?? null;
   if (!hm) return null;
@@ -306,6 +374,7 @@ function buildContextBlock(ctx, memoryLayer) {
   const returningUserBlock = buildReturningUserBlock(ctx);
   const worldLayer = buildWorldLayer(ctx);
   const gameLayer = buildGameLayer(ctx);
+  const adaptiveLayer = buildAdaptiveLayer(ctx);
   const hierarchicalMemoryLayer = buildHierarchicalMemoryLayer(ctx);
   const spiritMemoryBriefLayer = buildSpiritMemoryBriefLayer(ctx);
 
@@ -334,6 +403,7 @@ function buildContextBlock(ctx, memoryLayer) {
     hierarchicalMemoryLayer,
     worldLayer,
     gameLayer,
+    adaptiveLayer,
     "MEMORY / CONTEXT",
     [
       sceneName ? `Current scene: ${sceneName}` : "Current scene: default",
