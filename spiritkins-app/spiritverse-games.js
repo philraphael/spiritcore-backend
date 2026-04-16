@@ -56,8 +56,19 @@ function resolveGameTheme(type, overrideTheme) {
   return gameTheme;
 }
 
-function themeVarsToStyle(theme) {
-  return Object.entries(theme?.cssVars || {})
+function cssUrlValue(url) {
+  if (!url) return "none";
+  return `url("${String(url).replace(/"/g, '\\"')}")`;
+}
+
+function themeVarsToStyle(theme, assetUrls = {}) {
+  const vars = {
+    ...(theme?.cssVars || {}),
+    "--game-room-art": cssUrlValue(assetUrls.roomUrl),
+    "--game-board-art": cssUrlValue(assetUrls.boardUrl),
+    "--game-card-art": cssUrlValue(assetUrls.cardUrl)
+  };
+  return Object.entries(vars)
     .map(([key, value]) => `${key}: ${value}`)
     .join("; ");
 }
@@ -74,8 +85,8 @@ function buildAssetDataAttributes(type, theme) {
   const fallbackAsset = assets.fallback || null;
   const attrs = [
     ["data-asset-root", assets.sourceRoot],
-    ["data-asset-board", boardAsset?.sourcePath || ""],
-    ["data-asset-room", roomAsset?.sourcePath || ""],
+    ["data-asset-board", boardAsset?.publicPath || boardAsset?.sourcePath || ""],
+    ["data-asset-room", roomAsset?.publicPath || roomAsset?.sourcePath || ""],
     ["data-asset-fallback", fallbackAsset?.fallbackKey || fallbackAsset?.renderer || ""]
   ];
   return attrs
@@ -88,8 +99,15 @@ function withThemeFrame(content, type, theme, extraClass = "") {
   const classes = ["sv-theme-shell", `sv-theme-${type}`];
   if (extraClass) classes.push(extraClass);
   const assetAttrs = buildAssetDataAttributes(type, theme);
+  const boardAsset = resolveGameAsset(type, "board");
+  const roomAsset = resolveGameAsset(type, "room");
+  const cardAsset = resolveGameAsset(type, "cards");
   return `
-    <div class="${classes.join(" ")}" data-game-theme="${type}" data-associated-spiritkin="${theme.associatedSpiritkin}" ${assetAttrs} style="${themeVarsToStyle(theme)}">
+    <div class="${classes.join(" ")}" data-game-theme="${type}" data-associated-spiritkin="${theme.associatedSpiritkin}" ${assetAttrs} style="${themeVarsToStyle(theme, {
+      boardUrl: boardAsset?.publicPath,
+      roomUrl: roomAsset?.publicPath,
+      cardUrl: cardAsset?.publicPath
+    })}">
       ${content}
     </div>
   `;
@@ -152,12 +170,14 @@ const GrandStage = {
     const boardAsset = resolveGameAsset(gameType, "board");
     const roomAsset = resolveGameAsset(gameType, "room");
     const fallbackAsset = assetPackage?.fallback || null;
-    if (boardAsset?.sourcePath) overlay.dataset.assetBoard = boardAsset.sourcePath;
-    if (roomAsset?.sourcePath) overlay.dataset.assetRoom = roomAsset.sourcePath;
+    if (boardAsset?.publicPath || boardAsset?.sourcePath) overlay.dataset.assetBoard = boardAsset?.publicPath || boardAsset.sourcePath;
+    if (roomAsset?.publicPath || roomAsset?.sourcePath) overlay.dataset.assetRoom = roomAsset?.publicPath || roomAsset.sourcePath;
     if (fallbackAsset?.fallbackKey || fallbackAsset?.renderer) overlay.dataset.assetFallback = fallbackAsset?.fallbackKey || fallbackAsset?.renderer;
     for (const [key, value] of Object.entries(theme.cssVars || {})) {
       overlay.style.setProperty(key, value);
     }
+    overlay.style.setProperty("--game-board-art", cssUrlValue(boardAsset?.publicPath));
+    overlay.style.setProperty("--game-room-art", cssUrlValue(roomAsset?.publicPath));
     
     overlay.innerHTML = `
       <div class="game-fullscreen-header">

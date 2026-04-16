@@ -37,3 +37,11 @@ Rules:
 - do not replace this structure with one-off generated paths in app code
 - manifest references live in `spiritkins-app/data/gameAssetManifest.js`
 - runtime CSS/SVG renderers remain valid fallbacks until premium art is added here
+
+Current rollout state:
+
+- named placeholder source files now exist for every shipped game's board and room slot
+- Spirit Cards also has named placeholder source files for its card back, frame, and founder set slots
+- these placeholder files are intentionally not final art
+- runtime lookup should resolve through the manifest and serve files from `/app/game-theme-assets/...`
+- future premium art should replace placeholder files by filling the exact named source slots tracked in `ASSET_INVENTORY.md`

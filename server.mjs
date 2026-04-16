@@ -47,6 +47,7 @@ const __dirname = path.dirname(__filename);
 const OPERATOR_CONSOLE_DIR = path.join(__dirname, "operator-console");
 const USER_APP_DIR = path.join(__dirname, "spiritkins-app");
 const WORLD_ART_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "photos");
+const GAME_THEME_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "Game_Themes");
 
 const PORT    = config.port;
 const USE_LLM = String(process.env.USE_LLM || "false").toLowerCase() === "true";
@@ -85,6 +86,15 @@ function safeLimit(n, min, max, fallback) {
   const x = Number(n);
   if (!Number.isFinite(x)) return fallback;
   return Math.max(min, Math.min(max, x));
+}
+
+function getStaticAssetMimeType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".svg") return "image/svg+xml";
+  if (ext === ".png") return "image/png";
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".webp") return "image/webp";
+  return "application/octet-stream";
 }
 
 function sendError(reply, httpStatus, code, message, details, request_id) {
@@ -234,6 +244,26 @@ app.get("/app/data/:asset", async (req, reply) => {
   const filePath = path.join(USER_APP_DIR, "data", asset);
   const content = await readFile(filePath, "utf8");
   return reply.type("text/javascript; charset=utf-8").send(content);
+});
+
+app.get("/app/game-theme-assets/*", async (req, reply) => {
+  const requested = String(req.params["*"] || "").replace(/\\/g, "/");
+  if (!requested || requested.includes("..")) {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
+
+  const resolvedPath = path.resolve(GAME_THEME_ASSET_DIR, requested);
+  const normalizedRoot = `${path.resolve(GAME_THEME_ASSET_DIR)}${path.sep}`;
+  if (!resolvedPath.startsWith(normalizedRoot)) {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
+
+  try {
+    const content = await readFile(resolvedPath);
+    return reply.type(getStaticAssetMimeType(resolvedPath)).send(content);
+  } catch (_err) {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
 });
 
 // Serve portrait images from public/portraits

@@ -200,11 +200,32 @@
 
 /* ---- GAME BOARD CONTAINER ---- */
 .game-board-container {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
   padding: 8px 0;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.game-board-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(6, 10, 18, 0.22), rgba(6, 10, 18, 0.44)),
+    var(--game-board-art, none);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.game-board-container > * {
+  position: relative;
+  z-index: 1;
 }
 
 .sv-theme-shell {
@@ -220,6 +241,9 @@
   --game-piece-spirit: #9ec9de;
   --game-glow: rgba(214, 192, 141, 0.18);
   --game-shadow: rgba(2, 6, 12, 0.62);
+  --game-room-art: none;
+  --game-board-art: none;
+  --game-card-art: none;
   position: relative;
   display: grid;
   gap: 12px;
@@ -228,8 +252,12 @@
   border-radius: 22px;
   border: 1px solid rgba(255,255,255,0.08);
   background:
+    linear-gradient(180deg, rgba(4, 7, 14, 0.58), rgba(4, 7, 14, 0.74)),
+    var(--game-room-art, none),
     radial-gradient(circle at top, var(--game-accent-soft) 0%, transparent 48%),
     linear-gradient(180deg, var(--game-surface-top) 0%, var(--game-surface-bottom) 100%);
+  background-size: cover, cover, auto, auto;
+  background-position: center, center, center, center;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.06),
     0 18px 36px var(--game-shadow),
@@ -277,8 +305,12 @@
   position: fixed;
   inset: 0;
   background:
+    linear-gradient(180deg, rgba(4, 7, 14, 0.62), rgba(4, 7, 14, 0.82)),
+    var(--game-room-art, none),
     radial-gradient(circle at top, var(--game-accent-soft, rgba(214, 192, 141, 0.16)) 0%, transparent 40%),
     radial-gradient(circle at center, rgba(15, 25, 45, 0.98) 0%, rgba(5, 8, 16, 1) 100%);
+  background-size: cover, cover, auto, auto;
+  background-position: center, center, center, center;
   z-index: 2000;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
@@ -453,6 +485,19 @@
   min-height: 0;
   min-width: 0;
   overflow: auto;
+}
+
+.game-fullscreen-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(6, 10, 18, 0.2), rgba(6, 10, 18, 0.38)),
+    var(--game-board-art, none);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.32;
+  pointer-events: none;
 }
 
 /* Spiritkin Sidebar in Grand Stage */
