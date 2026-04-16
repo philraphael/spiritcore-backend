@@ -56,6 +56,7 @@ export const interactRoutes = async (app) => {
             spiritkinName: result.spiritkin ?? spiritkin?.name ?? "unknown",
             input,
             source: "interact",
+            currentFeature: context?.activeTab ?? context?.currentFeature ?? context?.feature ?? null,
           }).catch(() => {});
         }
         return result;

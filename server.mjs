@@ -27,6 +27,7 @@ import { createAnalyticsService } from "./src/services/analyticsService.mjs";
 import { createFeedbackService }  from "./src/services/feedbackService.mjs";
 import { createIssueReportService } from "./src/services/issueReportService.mjs";
 import { analyticsRoutes }        from "./src/routes/analytics.mjs";
+import { issueRoutes }            from "./src/routes/issues.mjs";
 // ── Phase F: Production hardening ───────────────────────────────────────────
 import { validateConfig, config } from "./src/config.mjs";
 import { getPinoOptions, setAppLogger } from "./src/logger.mjs";
@@ -599,6 +600,10 @@ await app.register(analyticsRoutes, {
   feedbackService,
   analyticsService,
   supabase: container.supabase,
+});
+
+await app.register(issueRoutes, {
+  issueReportService,
 });
 
 await app.register(conversationRoutes, {
