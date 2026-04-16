@@ -122,18 +122,41 @@ function buildAdaptiveStrength(entry, referenceTime = nowIso()) {
   const type = entry?.type || "";
   const contradictionPenalty = clamp01(entry?.meta?.contradiction_penalty, 0);
   const reinforcementBoost = clamp01(entry?.meta?.reinforcement_boost, 0);
+  const contradictionCount = Math.max(0, Number(entry?.meta?.contradiction_count ?? entry?.contradictionCount ?? 0));
+  const baseConfidence = clamp01(entry?.meta?.confidence_score ?? entry?.confidenceScore ?? entry?.confidence, 0.65);
   let correctionFlex = type === MEMORY_TYPES.CORRECTION
     ? Math.max(0.28, 1 - (contradictionPenalty * 0.75) + (reinforcementBoost * 0.2))
     : 1;
   if (STABLE_MEMORY_TYPES.has(type) && type !== MEMORY_TYPES.CORRECTION) correctionFlex = Math.max(correctionFlex, 0.92);
 
   const adaptiveWeight = clamp01((decay.effectiveDecay * correctionFlex), type === MEMORY_TYPES.CORRECTION ? 0.38 : 0.2);
+  const confidenceScore = clamp01(
+    (baseConfidence * 0.62) +
+    (Math.min(entry?.reuseCount || 0, 6) / 6 * 0.16) +
+    (reinforcementBoost * 0.16) -
+    (contradictionPenalty * 0.2) -
+    (Math.min(contradictionCount / 4, 1) * 0.08) -
+    ((1 - decay.effectiveDecay) * 0.1),
+    baseConfidence
+  );
+  const reinforcementTrend =
+    reinforcementBoost > contradictionPenalty + 0.1 ? "increasing" :
+    contradictionPenalty > reinforcementBoost + 0.12 ? "decreasing" :
+    "stable";
+  const trustClass =
+    confidenceScore >= 0.78 ? "high" :
+    confidenceScore >= 0.52 ? "medium" :
+    "low";
   return {
     ...decay,
     contradictionPenalty,
+    contradictionCount,
     reinforcementBoost,
     correctionFlex,
     adaptiveWeight,
+    confidenceScore,
+    reinforcementTrend,
+    trustClass,
   };
 }
 
@@ -144,6 +167,7 @@ function buildMetadata(entry, conversationId = null) {
     normalized_summary: normalizeSummary(entry.normalizedSummary || entry.content || ""),
     source: entry.source || "interaction_extract",
     confidence: clamp01(entry.confidence, 0.7),
+    confidence_score: clamp01(entry.confidenceScore ?? entry.confidence, 0.7),
     importance: clamp01(entry.importance, 0.5),
     recency_score: clamp01(entry.recencyScore, 1),
     reuse_count: Math.max(0, Number(entry.reuseCount || 0)),
@@ -156,6 +180,8 @@ function buildMetadata(entry, conversationId = null) {
     conversation_id: conversationId ?? entry.conversationId ?? null,
     related_people: normalizeTags(entry.relatedPeople),
     related_topics: normalizeTags(entry.relatedTopics),
+    contradiction_count: Math.max(0, Number(entry.contradictionCount || 0)),
+    reinforcement_trend: entry.reinforcementTrend || "stable",
     supporting_context: entry.supportingContext ? String(entry.supportingContext).slice(0, 300) : null,
     engine_version: "structured_memory_v1",
   };
@@ -171,6 +197,7 @@ function createEntry(type, summary, options = {}) {
     normalizedSummary,
     source: options.source || "interaction_extract",
     confidence: clamp01(options.confidence, 0.72),
+    confidenceScore: clamp01(options.confidenceScore ?? options.confidence, 0.72),
     importance: clamp01(options.importance, 0.5),
     recencyScore: clamp01(options.recencyScore, 1),
     reuseCount: Math.max(0, Number(options.reuseCount || 0)),
@@ -182,6 +209,8 @@ function createEntry(type, summary, options = {}) {
     emotionalWeight: clamp01(options.emotionalWeight, 0),
     relatedPeople: normalizeTags(options.relatedPeople),
     relatedTopics: normalizeTags(options.relatedTopics),
+    contradictionCount: Math.max(0, Number(options.contradictionCount || 0)),
+    reinforcementTrend: options.reinforcementTrend || "stable",
     supportingContext: options.supportingContext || null,
     retentionState: options.retentionState || "active",
   };
@@ -199,6 +228,7 @@ function mergeEntries(entries) {
     map.set(key, {
       ...current,
       confidence: Math.max(current.confidence, entry.confidence),
+      confidenceScore: Math.max(current.confidenceScore || current.confidence, entry.confidenceScore || entry.confidence),
       importance: Math.max(current.importance, entry.importance),
       correctionPriority: Math.max(current.correctionPriority, entry.correctionPriority),
       emotionalWeight: Math.max(current.emotionalWeight, entry.emotionalWeight),
@@ -206,6 +236,7 @@ function mergeEntries(entries) {
       tags: normalizeTags([...(current.tags || []), ...(entry.tags || [])]),
       relatedPeople: normalizeTags([...(current.relatedPeople || []), ...(entry.relatedPeople || [])]),
       relatedTopics: normalizeTags([...(current.relatedTopics || []), ...(entry.relatedTopics || [])]),
+      contradictionCount: Math.max(current.contradictionCount || 0, entry.contradictionCount || 0),
     });
   }
   return [...map.values()];
@@ -440,6 +471,7 @@ export function normalizeStructuredMemoryRow(row) {
     normalizedSummary: meta.normalized_summary || content,
     source: meta.source || "unknown",
     confidence: clamp01(meta.confidence, 0.6),
+    confidenceScore: clamp01(meta.confidence_score, clamp01(meta.confidence, 0.6)),
     importance: clamp01(meta.importance, 0.5),
     recencyScore: clamp01(meta.recency_score, 0.5),
     reuseCount: Math.max(0, Number(meta.reuse_count || 0)),
@@ -453,7 +485,9 @@ export function normalizeStructuredMemoryRow(row) {
     relatedPeople: normalizeTags(meta.related_people),
     relatedTopics: normalizeTags(meta.related_topics),
     contradictionPenalty: clamp01(meta.contradiction_penalty, 0),
+    contradictionCount: Math.max(0, Number(meta.contradiction_count || 0)),
     reinforcementBoost: clamp01(meta.reinforcement_boost, 0),
+    reinforcementTrend: String(meta.reinforcement_trend || "stable"),
     meta,
   };
 }
@@ -477,18 +511,22 @@ export function rankMemoryEntry(entry, { queryText = "", contextTags = [] } = {}
   const correctionBoost = entry.type === MEMORY_TYPES.CORRECTION
     ? Math.max(0.25, adaptiveStrength.correctionFlex)
     : (entry.correctionPriority * adaptiveStrength.adaptiveWeight);
+  const confidenceBoost = adaptiveStrength.confidenceScore * 0.16;
+  const confidencePenalty = adaptiveStrength.trustClass === "low" ? 0.1 : 0;
   const premiumBoost = entry.premiumRetentionEligible ? 0.08 : 0;
   const retentionPenalty = entry.retentionState === "archived" ? 0.35 : entry.retentionState === "cool" ? 0.12 : 0;
 
   const score =
     ((entry.importance * adaptiveStrength.adaptiveWeight) * 0.28) +
-    ((entry.confidence * adaptiveStrength.adaptiveWeight) * 0.18) +
+    (((entry.confidenceScore || entry.confidence) * adaptiveStrength.adaptiveWeight) * 0.18) +
     (recency * 0.16) +
     (relevance * 0.18) +
     (entry.emotionalWeight * 0.1) +
     (reuseBoost * 0.04) +
     (correctionBoost * 0.14) +
+    confidenceBoost +
     premiumBoost -
+    confidencePenalty -
     retentionPenalty;
 
   return {
@@ -498,6 +536,9 @@ export function rankMemoryEntry(entry, { queryText = "", contextTags = [] } = {}
     correctionBoost,
     adaptiveWeight: Number(adaptiveStrength.adaptiveWeight.toFixed(4)),
     contradictionPenalty: Number(adaptiveStrength.contradictionPenalty.toFixed(4)),
+    confidenceScore: Number(adaptiveStrength.confidenceScore.toFixed(4)),
+    reinforcementTrend: adaptiveStrength.reinforcementTrend,
+    trustClass: adaptiveStrength.trustClass,
   };
 }
 
@@ -549,6 +590,7 @@ export function createStructuredMemoryService({ supabase, bus }) {
       const meta = {
         ...existing.meta,
         confidence: Math.max(normalized.confidence, entry.confidence),
+        confidence_score: clamp01(Math.max(numberOrDefault(existing.meta?.confidence_score, normalized.confidenceScore || normalized.confidence), entry.confidenceScore || entry.confidence) + 0.03, normalized.confidenceScore || normalized.confidence),
         importance: Math.max(normalized.importance, entry.importance),
         recency_score: 1,
         reuse_count: normalized.reuseCount + 1,
@@ -562,6 +604,8 @@ export function createStructuredMemoryService({ supabase, bus }) {
         retention_state: normalized.retentionState === "archived" ? "cool" : normalized.retentionState,
         contradiction_penalty: Math.max(0, numberOrDefault(existing.meta?.contradiction_penalty, 0) * 0.92),
         reinforcement_boost: clamp01(Math.max(numberOrDefault(existing.meta?.reinforcement_boost, 0), 0.16)),
+        contradiction_count: Math.max(0, Number(existing.meta?.contradiction_count || normalized.contradictionCount || 0)),
+        reinforcement_trend: "increasing",
       };
       await updateRowMeta(existing.id, meta);
       bus?.emit?.("structured_memory.updated", { userId: safeUserId, type: entry.type });
@@ -601,6 +645,9 @@ export function createStructuredMemoryService({ supabase, bus }) {
       actions.push(updateRowMeta(row.id, {
         ...(row.meta || {}),
         contradiction_penalty: clamp01(numberOrDefault(row.meta?.contradiction_penalty, 0) + delta),
+        contradiction_count: Math.max(0, Number(row.meta?.contradiction_count || 0) + 1),
+        confidence_score: clamp01(numberOrDefault(row.meta?.confidence_score, row.meta?.confidence || 0.7) - (delta * 0.22), row.meta?.confidence || 0.7),
+        reinforcement_trend: "decreasing",
         recency_score: clamp01((numberOrDefault(row.meta?.recency_score, 0.6) * 0.96), 0.2),
       }));
     }
@@ -722,12 +769,15 @@ export function createStructuredMemoryService({ supabase, bus }) {
         last_referenced_at: nowIso(),
         reinforcement_boost: clamp01(numberOrDefault(row.meta?.reinforcement_boost, 0) + 0.08),
         contradiction_penalty: Math.max(0, numberOrDefault(row.meta?.contradiction_penalty, 0) * 0.94),
+        confidence_score: clamp01(numberOrDefault(row.meta?.confidence_score, entry.confidenceScore || entry.confidence) + 0.025, entry.confidenceScore || entry.confidence),
+        reinforcement_trend: "increasing",
       });
     }));
 
     return ranked.map(({ entry, ranking }) => ({
       ...entry,
       ranking,
+      trustClass: ranking.trustClass,
     }));
   }
 

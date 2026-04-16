@@ -107,6 +107,7 @@ export function createResponseEngine() {
         const content = String(entry?.content || "").trim();
         const lower = content.toLowerCase();
         let score = numberOrDefault(entry?.ranking?.score, 0);
+        const trustClass = String(entry?.ranking?.trustClass || "medium");
         if (bucket === "correction") score += 3.9 + (numberOrDefault(entry?.ranking?.correctionBoost, entry?.correctionPriority || 0) * 1.6);
         if (bucket === "preference") score += 2;
         if (type === "gameplay_tendency") score += gameMode ? 3.5 : -1.8;
@@ -117,8 +118,10 @@ export function createResponseEngine() {
         if (gameMode && type === "gameplay_tendency") score += 1.4;
         if (!gameMode && type === "gameplay_tendency") score -= 0.6;
         if (type === "correction" && numberOrDefault(entry?.ranking?.contradictionPenalty, 0) > 0.32) score -= 1.8;
+        if (trustClass === "high") score += 1.2;
+        if (trustClass === "low") score -= 2.4;
         if (content && terms && lower.split(/\W+/).some((token) => token.length > 3 && terms.includes(token))) score += 1.2;
-        return { bucket, type, content, score, entry };
+        return { bucket, type, content, score, entry, trustClass };
       })
       .sort((a, b) => b.score - a.score);
 
@@ -159,7 +162,8 @@ export function createResponseEngine() {
     const text = String(output || "").trim();
     if (!text || !signals.length) return text;
     const callbackSignal = signals.find((signal) =>
-      ["respect_preference", "spiritual_preference", "tone_preference", "gameplay_tendency", "milestone", "emotional_anchor"].includes(signal.type)
+      ["respect_preference", "spiritual_preference", "tone_preference", "gameplay_tendency", "milestone", "emotional_anchor"].includes(signal.type) &&
+      signal.trustClass === "high"
     );
     if (!callbackSignal) return text;
 
@@ -231,6 +235,7 @@ export function createResponseEngine() {
         type: signal.type,
         bucket: signal.bucket,
         score: Number(signal.score.toFixed(3)),
+        trustClass: signal.trustClass,
         content: signal.content.slice(0, 120),
       })),
     };
