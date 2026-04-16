@@ -7,7 +7,7 @@
  */
 
 export async function adminRoutes(fastify, opts) {
-  const { supabase, messageService, registry } = opts;
+  const { supabase, messageService, registry, issueReportService } = opts;
 
   // ── GET /v1/admin/conversations/recent ──────────────────────────────────────
   fastify.get("/v1/admin/conversations/recent", async (req, reply) => {
@@ -65,6 +65,30 @@ export async function adminRoutes(fastify, opts) {
       };
     } catch (err) {
       return reply.code(500).send({ ok: false, error: "DB_ERROR", message: err.message });
+    }
+  });
+
+  fastify.get("/v1/admin/issues/recent", async (_req, reply) => {
+    if (!issueReportService) {
+      return reply.code(503).send({ ok: false, error: "SERVICE_UNAVAILABLE", message: "Issue report service unavailable." });
+    }
+    try {
+      const reports = await issueReportService.listRecent({ limit: 100 });
+      return { ok: true, reports };
+    } catch (err) {
+      return reply.code(500).send({ ok: false, error: "ISSUE_REPORTS_ERROR", message: err.message });
+    }
+  });
+
+  fastify.get("/v1/admin/issues/digest", async (_req, reply) => {
+    if (!issueReportService) {
+      return reply.code(503).send({ ok: false, error: "SERVICE_UNAVAILABLE", message: "Issue report service unavailable." });
+    }
+    try {
+      const digest = await issueReportService.getDigest();
+      return { ok: true, digest };
+    } catch (err) {
+      return reply.code(500).send({ ok: false, error: "ISSUE_DIGEST_ERROR", message: err.message });
     }
   });
 }

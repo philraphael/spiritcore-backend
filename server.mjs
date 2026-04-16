@@ -25,6 +25,7 @@ import { adminRoutes }           from "./src/routes/admin.mjs";
 // -- Analytics & Feedback Layer
 import { createAnalyticsService } from "./src/services/analyticsService.mjs";
 import { createFeedbackService }  from "./src/services/feedbackService.mjs";
+import { createIssueReportService } from "./src/services/issueReportService.mjs";
 import { analyticsRoutes }        from "./src/routes/analytics.mjs";
 // ── Phase F: Production hardening ───────────────────────────────────────────
 import { validateConfig, config } from "./src/config.mjs";
@@ -575,8 +576,10 @@ app.decorate("orchestrator", container.orchestrator);
 // -- Analytics & Feedback services (non-blocking, safe to fail)
 const analyticsService = createAnalyticsService({ supabase: container.supabase });
 const feedbackService  = createFeedbackService({ supabase: container.supabase, analyticsService });
+const issueReportService = createIssueReportService({ supabase: container.supabase, logger: app.log });
 app.decorate("analyticsService", analyticsService);
 app.decorate("feedbackService",  feedbackService);
+app.decorate("issueReportService", issueReportService);
 
 // Wire the app logger into the service-layer logger (Phase F)
 setAppLogger(app.log);
@@ -611,6 +614,7 @@ await app.register(adminRoutes, {
   messageService: container.messageService,
   conversationService: container.conversationService,
   registry: container.registry,
+  issueReportService,
 });
 
 await app.register(gameRoutes, {

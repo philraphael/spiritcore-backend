@@ -48,6 +48,16 @@ export const interactRoutes = async (app) => {
             traceId:        result.traceId ?? null,
           });
         }
+
+        if (app.issueReportService) {
+          app.issueReportService.captureFromInteraction({
+            userId,
+            conversationId: result.metadata?.conversationId ?? conversationId ?? null,
+            spiritkinName: result.spiritkin ?? spiritkin?.name ?? "unknown",
+            input,
+            source: "interact",
+          }).catch(() => {});
+        }
         return result;
       } catch (err) {
         if (app.analyticsService) {
