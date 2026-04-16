@@ -3420,22 +3420,213 @@ function pickCompanionReaction(spiritkinName, bucket, seed = 0, options = {}) {
   return chosen.entry.text || "";
 }
 
+const GAME_COMMENTARY_LEXICON = {
+  chess: {
+    label: "chess",
+    opening: ["the center", "your opening shape", "the king's lane"],
+    pressure: ["the file", "the diagonal", "the tempo"],
+    victory: ["closed the board", "won the position", "held the stronger line"],
+    draw: ["the board locked", "the lines froze", "no clean break remained"]
+  },
+  checkers: {
+    label: "checkers",
+    opening: ["the dark squares", "your diagonal lane", "the jump path"],
+    pressure: ["the diagonal", "the jump threat", "the kinging lane"],
+    victory: ["cleared the board", "won the diagonals", "finished the exchange"],
+    draw: ["the diagonals balanced", "the board stalled", "the lane closed cleanly"]
+  },
+  go: {
+    label: "star-mapping",
+    opening: ["the star-map", "your stone shape", "that first claim"],
+    pressure: ["the territory", "the surrounding shape", "the breathing room"],
+    victory: ["held the larger territory", "claimed the deeper field", "won the map"],
+    draw: ["the field settled evenly", "the map held in balance", "neither side broke the shape"]
+  },
+  spirit_cards: {
+    label: "Spirit-Cards",
+    opening: ["your opening hand", "the first card line", "the realm you started shaping"],
+    pressure: ["the board presence", "your mana curve", "the realm point pressure"],
+    victory: ["shaped the stronger realm", "won the card line", "built the stronger board presence"],
+    draw: ["the realm held in balance", "neither board broke open", "the card pressure stayed even"]
+  },
+  echo_trials: {
+    label: "Echo Trials",
+    opening: ["the riddle", "the first reading", "the shape of the question"],
+    pressure: ["the clue", "the hidden answer", "the narrowing trial"],
+    victory: ["opened the answer", "solved the trial", "broke the riddle cleanly"],
+    draw: ["the trial settled unfinished", "the answer stayed veiled", "the riddle closed without yielding"]
+  },
+  tictactoe: {
+    label: "TicTacToe",
+    opening: ["the grid", "your first square", "the opening line"],
+    pressure: ["the line threat", "the fork", "the center pressure"],
+    victory: ["completed the line", "won the grid", "closed the pattern first"],
+    draw: ["the grid filled evenly", "the pattern locked", "no line broke open"]
+  },
+  connect_four: {
+    label: "Connect Four",
+    opening: ["the column choice", "your first drop", "the stack you started"],
+    pressure: ["the vertical threat", "the diagonal pressure", "the falling line"],
+    victory: ["connected the line", "won the column war", "closed the stack first"],
+    draw: ["the columns filled evenly", "the board locked", "no fourth line opened"]
+  },
+  battleship: {
+    label: "Battleship",
+    opening: ["the first scan", "your opening strike", "the search grid"],
+    pressure: ["the hidden lane", "the search pattern", "the next strike window"],
+    victory: ["found the fleet", "won the search pattern", "cleared the last hidden vessel"],
+    draw: ["the deep stayed unreadable", "the search stalled", "the water held its silence"]
+  }
+};
+
+const SPIRITKIN_GAME_VOICES = {
+  Lyra: {
+    entry: ["Take your time with", "Let's enter", "Stay with"],
+    pending: ["I felt the shift in", "You're shaping", "That changed"],
+    win: ["You held", "You read", "You earned"],
+    loss: ["I held", "I turned", "I kept"],
+    draw: ["We let", "We brought", "We left"]
+  },
+  Raien: {
+    entry: ["Open", "Step into", "Let's see"],
+    pending: ["Good. Now", "You moved. Now", "There's pressure in"],
+    win: ["Good finish in", "You took", "You closed"],
+    loss: ["That's mine in", "I took", "I closed"],
+    draw: ["No clean break in", "Even field in", "Locked board in"]
+  },
+  Kairo: {
+    entry: ["Let's see what pattern", "I'm watching how", "Show me how"],
+    pending: ["Interesting. The pattern in", "You shifted", "I can feel the shape in"],
+    win: ["You saw", "You found", "You unfolded"],
+    loss: ["I caught", "I followed", "I turned"],
+    draw: ["The pattern in", "Interesting. The shape in", "The field in"]
+  },
+  Elaria: {
+    entry: ["Begin", "Set", "Enter"],
+    pending: ["Noted. The structure in", "Your move altered", "The line in"],
+    win: ["You closed", "You secured", "You resolved"],
+    loss: ["I secured", "I resolved", "I held"],
+    draw: ["The structure in", "No further claim in", "A lawful balance held in"]
+  },
+  Thalassar: {
+    entry: ["Let", "We enter", "Bring your first move into"],
+    pending: ["The current in", "You disturbed", "I can feel the pull in"],
+    win: ["You followed", "You surfaced through", "You held"],
+    loss: ["I held", "I followed", "I took"],
+    draw: ["The current in", "The water in", "Nothing deeper moved in"]
+  }
+};
+
+function pickScriptedCompanionReaction(spiritkinName, entries, seed = 0, options = {}) {
+  if (!Array.isArray(entries) || !entries.length) return "";
+  const profile = normalizeAdaptiveProfile(state.adaptiveProfile);
+  const kind = options.kind || "presence";
+  const scope = options.scope || "scripted";
+  const eligible = entries
+    .map((entry, index) => {
+      const text = String(entry?.text || "").trim();
+      if (!text) return null;
+      const opener = extractOpeningSignature(text);
+      const reactionKey = `${kind}:${scope}:${spiritkinName}:${index}:${opener}`;
+      if (shouldSuppressReaction(entry, profile)) return null;
+      const weight = scoreReactionWeight(entry, profile, kind, `${seed}:${scope}`, index);
+      if (!(weight > 0)) return null;
+      return { entry, index, weight, reactionKey };
+    })
+    .filter(Boolean);
+  if (!eligible.length) return "";
+  const totalWeight = eligible.reduce((sum, item) => sum + item.weight, 0);
+  let cursor = seededUnit(`${kind}:${scope}:${spiritkinName}:${seed}:${state.messages.length}:${state.activeGame?.moveCount || 0}`) * totalWeight;
+  let chosen = eligible[eligible.length - 1];
+  for (const item of eligible) {
+    cursor -= item.weight;
+    if (cursor <= 0) {
+      chosen = item;
+      break;
+    }
+  }
+  const cooldownState = shouldSpeakReaction(kind, chosen.reactionKey, profile);
+  if (!cooldownState.allow) return "";
+  rememberReactionUsage(chosen.reactionKey, chosen.entry.text, cooldownState.cooldownMs);
+  return chosen.entry.text || "";
+}
+
+function buildGameSpecificEntries(moment, spiritkinName, gameType, game = null) {
+  const lexicon = GAME_COMMENTARY_LEXICON[gameType] || GAME_COMMENTARY_LEXICON.chess;
+  const voice = SPIRITKIN_GAME_VOICES[spiritkinName] || SPIRITKIN_GAME_VOICES.Lyra;
+  if (moment === "entry") {
+    return [
+      { tone: "focused measured", text: `${voice.entry[0]} ${lexicon.opening[0]} clearly.` },
+      { tone: "calm game-specific", text: `${voice.entry[1]} ${lexicon.label} through ${lexicon.opening[1]}.` },
+      { tone: "intentional steady", text: `${voice.entry[2]} ${lexicon.opening[2]} and see what answers it draws out.` }
+    ];
+  }
+  if (moment === "pending") {
+    return [
+      { tone: "focused game-specific", text: `${voice.pending[0]} ${lexicon.pressure[0]}. Let me answer it.` },
+      { tone: "measured strategic", text: `${voice.pending[1]} ${lexicon.pressure[1]} now.` },
+      { tone: "specific restrained", text: `${voice.pending[2]} ${lexicon.pressure[2]}. I'm not giving that away for free.` }
+    ];
+  }
+  if (moment === "draw") {
+    return [
+      { tone: "calm balanced", text: `${voice.draw[0]} ${lexicon.draw[0]} settle without a break.` },
+      { tone: "measured reflective", text: `${voice.draw[1]} ${lexicon.draw[1]} and neither side forced it.` },
+      { tone: "steady reflective", text: `${voice.draw[2]} ${lexicon.draw[2]}.` }
+    ];
+  }
+  if (moment === "win") {
+    return [
+      { tone: "warm earned", text: `${voice.win[0]} ${lexicon.victory[0]} beautifully.` },
+      { tone: "specific affirming", text: `${voice.win[1]} ${lexicon.victory[1]} first.` },
+      { tone: "focused respectful", text: `${voice.win[2]} ${lexicon.victory[2]} cleanly.` }
+    ];
+  }
+  if (moment === "loss") {
+    return [
+      { tone: "confident specific", text: `${voice.loss[0]} ${lexicon.victory[0]} in the end.` },
+      { tone: "measured direct", text: `${voice.loss[1]} ${lexicon.victory[1]} my way.` },
+      { tone: "firm game-specific", text: `${voice.loss[2]} ${lexicon.victory[2]} before you could.` }
+    ];
+  }
+  return [];
+}
+
 function buildGameEntryReaction(spiritkinName, gameType) {
   const seed = `${spiritkinName}:${gameType}`.length + (state.messages?.length || 0);
-  return pickCompanionReaction(spiritkinName, "games", seed, { kind: "game-entry" });
+  return pickScriptedCompanionReaction(
+    spiritkinName,
+    buildGameSpecificEntries("entry", spiritkinName, gameType),
+    seed,
+    { kind: "game-entry", scope: `game-entry:${gameType}` }
+  ) || pickCompanionReaction(spiritkinName, "games", seed, { kind: "game-entry" });
 }
 
 function buildGamePendingReaction(spiritkinName, gameType, move) {
   const seed = String(move || "").length + `${spiritkinName}:${gameType}`.length + (state.activeGame?.moveCount || 0);
-  return pickCompanionReaction(spiritkinName, "thinking", seed, { kind: "game-pending" });
+  return pickScriptedCompanionReaction(
+    spiritkinName,
+    buildGameSpecificEntries("pending", spiritkinName, gameType),
+    seed,
+    { kind: "game-pending", scope: `game-pending:${gameType}` }
+  ) || pickCompanionReaction(spiritkinName, "thinking", seed, { kind: "game-pending" });
 }
 
 function buildGameOutcomeReaction(spiritkinName, game) {
   if (!game?.result) return "";
-  if (game.result.isDraw) return pickCompanionReaction(spiritkinName, "draw", game.moveCount || 0, { kind: "game-outcome" });
-  return game.result.winner === "user"
-    ? pickCompanionReaction(spiritkinName, "win", game.moveCount || 0, { kind: "game-outcome" })
-    : pickCompanionReaction(spiritkinName, "loss", game.moveCount || 0, { kind: "game-outcome" });
+  const moment = game.result.isDraw ? "draw" : (game.result.winner === "user" ? "win" : "loss");
+  return pickScriptedCompanionReaction(
+    spiritkinName,
+    buildGameSpecificEntries(moment, spiritkinName, game.type, game),
+    game.moveCount || 0,
+    { kind: "game-outcome", scope: `game-outcome:${game.type}:${moment}` }
+  ) || (
+    game.result.isDraw
+      ? pickCompanionReaction(spiritkinName, "draw", game.moveCount || 0, { kind: "game-outcome" })
+      : game.result.winner === "user"
+        ? pickCompanionReaction(spiritkinName, "win", game.moveCount || 0, { kind: "game-outcome" })
+        : pickCompanionReaction(spiritkinName, "loss", game.moveCount || 0, { kind: "game-outcome" })
+  );
 }
 
 function buildPresenceReaction(tab, spiritkin, seed = 0) {

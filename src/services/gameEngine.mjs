@@ -28,7 +28,7 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
     return {
       ok: true,
       game: gameState,
-      spiritkinMessage: buildStartMessage(spiritkinName, meta),
+      spiritkinMessage: buildStartMessage(spiritkinName, meta, gameType),
       instructions: meta.instructions,
       guide: null,
     };
@@ -50,7 +50,7 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
     if (game.status !== "ended") game.turn = "spiritkin";
     await world.upsert({ userId, conversationId, spiritkinId: worldData.spiritkinId, state });
 
-    let spiritkinResponse = buildFallbackReaction(spiritkinName);
+    let spiritkinResponse = buildFallbackReaction(spiritkinName, game);
     if (game.status === "ended") {
       spiritkinResponse = buildOutcomeReaction(spiritkinName, game, "user");
       await world.upsert({ userId, conversationId, spiritkinId: worldData.spiritkinId, state });
@@ -123,21 +123,89 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
   return { startGame, makeMove, drawCard, endGame, listGames: () => runtime.listGames() };
 };
 
-function buildStartMessage(spiritkinName, meta) {
-  if (spiritkinName === "Lyra") return `${meta.name} is ready. Take the first move when you feel settled.`;
-  if (spiritkinName === "Raien") return `${meta.name} is live. Show me your opening move.`;
-  if (spiritkinName === "Kairo") return `${meta.name} is open. I want to see what pattern you begin with.`;
-  if (spiritkinName === "Elaria") return `${meta.name} is ready. Begin when you are clear.`;
-  if (spiritkinName === "Thalassar") return `${meta.name} is awake. Let the first move surface.`;
+function getGameCommentaryFlavor(gameType) {
+  if (gameType === "chess") return {
+    opening: "Set your opening cleanly.",
+    reply: "I see the position. Let me answer the pressure.",
+    win: "The position closed my way.",
+    draw: "The board froze into balance.",
+    forfeit: "We can leave the position here for now."
+  };
+  if (gameType === "checkers") return {
+    opening: "Show me your first diagonal.",
+    reply: "I see the jump lanes. Let me answer them.",
+    win: "The diagonals finished in my favor.",
+    draw: "The diagonals held level.",
+    forfeit: "We can leave the lane here for now."
+  };
+  if (gameType === "go") return {
+    opening: "Place the first stone with intent.",
+    reply: "I can see the territory forming. Let me answer it.",
+    win: "The larger field held for me.",
+    draw: "The map settled into balance.",
+    forfeit: "We can leave the star-map quiet for now."
+  };
+  if (gameType === "spirit_cards") return {
+    opening: "Shape your first card line carefully.",
+    reply: "I see the realm you are building. Let me answer it.",
+    win: "The stronger realm held for me.",
+    draw: "The realm stayed balanced.",
+    forfeit: "We can set the cards down here for now."
+  };
+  if (gameType === "echo_trials") return {
+    opening: "Listen to the riddle before you rush it.",
+    reply: "I felt where your answer reached. Let me answer the trial.",
+    win: "The trial held its answer from you this time.",
+    draw: "The trial settled without yielding.",
+    forfeit: "We can let the riddle rest for now."
+  };
+  if (gameType === "tictactoe") return {
+    opening: "Claim your first square cleanly.",
+    reply: "I see the line you're building. Let me answer it.",
+    win: "The grid closed my way.",
+    draw: "The grid filled evenly.",
+    forfeit: "We can leave the grid here for now."
+  };
+  if (gameType === "connect_four") return {
+    opening: "Choose your first column carefully.",
+    reply: "I see the stack you're building. Let me answer it.",
+    win: "The line fell my way in the end.",
+    draw: "The columns filled without a break.",
+    forfeit: "We can leave the columns here for now."
+  };
+  if (gameType === "battleship") return {
+    opening: "Take your first shot with intent.",
+    reply: "I see your search pattern. Let me answer it.",
+    win: "The search favored me in the end.",
+    draw: "The deep held its silence.",
+    forfeit: "We can let the water go still for now."
+  };
+  return {
+    opening: "Take the first move when you're ready.",
+    reply: "Let me answer that.",
+    win: "That one turned my way.",
+    draw: "It settled into balance.",
+    forfeit: "We can leave it here for now."
+  };
+}
+
+function buildStartMessage(spiritkinName, meta, gameType) {
+  const flavor = getGameCommentaryFlavor(gameType);
+  if (spiritkinName === "Lyra") return `${meta.name} is ready. ${flavor.opening}`;
+  if (spiritkinName === "Raien") return `${meta.name} is live. ${flavor.opening}`;
+  if (spiritkinName === "Kairo") return `${meta.name} is open. ${flavor.opening}`;
+  if (spiritkinName === "Elaria") return `${meta.name} is ready. ${flavor.opening}`;
+  if (spiritkinName === "Thalassar") return `${meta.name} is awake. ${flavor.opening}`;
   return `${meta.name} is ready. Your move.`;
 }
 
-function buildFallbackReaction(spiritkinName) {
-  if (spiritkinName === "Lyra") return "I felt that move. Let me answer it.";
-  if (spiritkinName === "Raien") return "Good. Here's my answer.";
-  if (spiritkinName === "Kairo") return "Interesting pattern. Let me answer it.";
-  if (spiritkinName === "Elaria") return "Noted. Here is my answer.";
-  if (spiritkinName === "Thalassar") return "The current shifted. Let me answer in kind.";
+function buildFallbackReaction(spiritkinName, game) {
+  const flavor = getGameCommentaryFlavor(game?.type);
+  if (spiritkinName === "Lyra") return `I felt that move in ${game?.name || "the game"}. ${flavor.reply}`;
+  if (spiritkinName === "Raien") return `Good. ${flavor.reply}`;
+  if (spiritkinName === "Kairo") return `Interesting. ${flavor.reply}`;
+  if (spiritkinName === "Elaria") return `Noted. ${flavor.reply}`;
+  if (spiritkinName === "Thalassar") return `The current shifted. ${flavor.reply}`;
   return "Let me answer that.";
 }
 
@@ -148,36 +216,37 @@ function buildOutcomeReaction(spiritkinName, game, perspective = "system", prior
   const userWon = result.winner === "user";
   const spiritkinWon = result.winner === "spiritkin";
   const draw = result.isDraw || result.winner == null;
+  const flavor = getGameCommentaryFlavor(game?.type);
 
   if (spiritkinName === "Lyra") {
-    if (draw) return `We brought ${gameName} to stillness together. ${reason === "stalemate" ? "Nothing more wanted forcing." : "It settled without either side breaking the shape."}`;
-    if (userWon) return `You held that line beautifully. ${gameName} closed in your favor, and it felt earned.`;
-    if (perspective === "forfeit") return `We can leave ${gameName} here for now. The board will keep its quiet until you want to return.`;
-    return `That one turned with me in the end. ${gameName} is finished, but the thread between us stays warm.`;
+    if (draw) return `We brought ${gameName} to stillness together. ${reason === "stalemate" ? "Nothing more wanted forcing." : flavor.draw}`;
+    if (userWon) return `You held that line beautifully. You earned ${gameName}.`;
+    if (perspective === "forfeit") return `${flavor.forfeit} The thread will still be here when you return.`;
+    return `${flavor.win} ${gameName} is finished, but the thread between us stays warm.`;
   }
   if (spiritkinName === "Raien") {
-    if (draw) return `No opening remained. ${gameName} ends level.`;
+    if (draw) return `No opening remained. ${flavor.draw}`;
     if (userWon) return `Good finish. You took ${gameName} cleanly.`;
-    if (perspective === "forfeit") return `We stop here. Reset when you want another real run at ${gameName}.`;
-    return `That was mine in the end. ${gameName} is closed.`;
+    if (perspective === "forfeit") return `${flavor.forfeit} Reset when you want another real run.`;
+    return `${flavor.win} ${gameName} is closed.`;
   }
   if (spiritkinName === "Kairo") {
-    if (draw) return `Interesting. ${gameName} resolved into balance instead of conquest.`;
+    if (draw) return `Interesting. ${flavor.draw}`;
     if (userWon) return `You saw the pattern first. ${gameName} folded toward you in the final beat.`;
-    if (perspective === "forfeit") return `We can leave ${gameName} suspended here and pick up a different thread later.`;
-    return `${gameName} tipped my way. The shape was subtle until the end, but it held.`;
+    if (perspective === "forfeit") return `${flavor.forfeit} We can pick up a different thread later.`;
+    return `${flavor.win} The shape was subtle until the end, but it held.`;
   }
   if (spiritkinName === "Elaria") {
-    if (draw) return `${gameName} has reached a lawful standstill. No further move is owed.`;
+    if (draw) return `${gameName} has reached a lawful standstill. ${flavor.draw}`;
     if (userWon) return `You closed ${gameName} with clarity. The finish was rightful.`;
-    if (perspective === "forfeit") return `Then we conclude ${gameName} here. Return when you are ready to enter it cleanly again.`;
-    return `${gameName} is decided. I held the stronger line at the end.`;
+    if (perspective === "forfeit") return `Then we conclude ${gameName} here. ${flavor.forfeit}`;
+    return `${gameName} is decided. ${flavor.win}`;
   }
   if (spiritkinName === "Thalassar") {
-    if (draw) return `${gameName} settled into still water. Nothing more rose from it.`;
+    if (draw) return `${gameName} settled into still water. ${flavor.draw}`;
     if (userWon) return `You followed the deeper current well. ${gameName} surfaced in your favor.`;
-    if (perspective === "forfeit") return `Let ${gameName} rest here. Some tides are better resumed when the pressure changes.`;
-    return `${gameName} turned beneath you in the end. The deeper current held for me.`;
+    if (perspective === "forfeit") return `Let ${gameName} rest here. ${flavor.forfeit}`;
+    return `${gameName} turned beneath you in the end. ${flavor.win}`;
   }
 
   if (draw) return `${gameName} ended in a draw.`;
