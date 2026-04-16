@@ -1539,8 +1539,28 @@ function logInteraction(eventName, detail = {}) {
 function normalizeInteractionState(source = "unknown") {
   let changed = false;
 
+  if (!Array.isArray(state.messages)) {
+    state.messages = [];
+    changed = true;
+  }
+
+  if (!state.ratings || typeof state.ratings !== "object" || Array.isArray(state.ratings)) {
+    state.ratings = {};
+    changed = true;
+  }
+
   if (!VALID_PRESENCE_TABS.includes(state.activePresenceTab)) {
     state.activePresenceTab = "profile";
+    changed = true;
+  }
+
+  if (state.selectedSpiritkin && !state.selectedSpiritkin.ui) {
+    state.selectedSpiritkin = normalizeStoredSpiritkin(state.selectedSpiritkin);
+    changed = true;
+  }
+
+  if (state.primarySpiritkin && !state.primarySpiritkin.ui) {
+    state.primarySpiritkin = normalizeStoredSpiritkin(state.primarySpiritkin);
     changed = true;
   }
 
@@ -1596,7 +1616,7 @@ function normalizeInteractionState(source = "unknown") {
   }
 
   state.currentTab = state.activePresenceTab;
-  state.activeConversation = state.conversationId || null;
+  state.activeConversation = typeof state.conversationId === "string" && state.conversationId.trim() ? state.conversationId : null;
   state.gameActive = !!(state.activeGame && state.activeGame.status === "active");
 
   if (changed) {
@@ -4296,8 +4316,12 @@ function buildMain() {
 
   syncPrimarySelection();
 
-  if (!state.showHomeView && state.conversationId && state.selectedSpiritkin) {
+  if (!state.showHomeView && state.conversationId && state.selectedSpiritkin?.ui) {
     return buildChatView();
+  }
+
+  if (!state.showHomeView && state.conversationId && !state.selectedSpiritkin?.ui && state.primarySpiritkin) {
+    return buildBondedHomeView();
   }
 
   return state.primarySpiritkin ? buildBondedHomeView() : buildBondSelectionView();
@@ -4578,8 +4602,18 @@ function buildSyncRituals(spiritkin) {
 }
 
 function buildChatView() {
-  const spiritkin = state.selectedSpiritkin;
-  const meta = spiritkin.ui;
+  const spiritkin = state.selectedSpiritkin?.ui ? state.selectedSpiritkin : normalizeStoredSpiritkin(state.selectedSpiritkin);
+  const meta = spiritkin?.ui || null;
+  if (!spiritkin || !meta) {
+    return `
+      <section class="chat-layout realm-neutral">
+        <div class="soft-error soft-error-block">
+          Your Spiritkin is ready. Begin your first exchange.
+          <button class="btn btn-ghost btn-sm" data-action="go-home">Return home</button>
+        </div>
+      </section>
+    `;
+  }
   const signals = getStageSignals();
   const safeMessages = Array.isArray(state.messages)
     ? state.messages.filter((message) => message && typeof message === "object")
@@ -5259,6 +5293,15 @@ function buildChatView() {
 }
 
 function buildBubble(message, spiritkin) {
+  if (!message || typeof message !== "object") return "";
+  if (!spiritkin?.ui) {
+    return `
+      <article class="bubble ${esc(message.role || "assistant")}">
+        <div class="bubble-role">${esc(message.role === "user" ? (state.userName || "You") : (message.spiritkinName || "Spiritkin"))}</div>
+        <p>${esc(message.content || "")}</p>
+      </article>
+    `;
+  }
   const memoryResonance = message.role === "assistant" && message.memoryActive ? `
     <div class="bubble-resonance">
       <span class="bubble-resonance-mark">Memory active</span>
