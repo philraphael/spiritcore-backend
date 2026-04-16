@@ -91,4 +91,30 @@ export async function adminRoutes(fastify, opts) {
       return reply.code(500).send({ ok: false, error: "ISSUE_DIGEST_ERROR", message: err.message });
     }
   });
+
+  fastify.get("/v1/admin/issues/repair-packets", async (req, reply) => {
+    if (!issueReportService) {
+      return reply.code(503).send({ ok: false, error: "SERVICE_UNAVAILABLE", message: "Issue report service unavailable." });
+    }
+    try {
+      const limit = Math.min(Number(req.query?.limit ?? 25), 100);
+      const packets = await issueReportService.getRepairPackets({ limit });
+      return { ok: true, packets };
+    } catch (err) {
+      return reply.code(500).send({ ok: false, error: "REPAIR_PACKETS_ERROR", message: err.message });
+    }
+  });
+
+  fastify.get("/v1/admin/issues/repair-handoff", async (req, reply) => {
+    if (!issueReportService) {
+      return reply.code(503).send({ ok: false, error: "SERVICE_UNAVAILABLE", message: "Issue report service unavailable." });
+    }
+    try {
+      const limit = Math.min(Number(req.query?.limit ?? 25), 100);
+      const handoff = await issueReportService.getRepairHandoffDigest({ limit });
+      return { ok: true, handoff };
+    } catch (err) {
+      return reply.code(500).send({ ok: false, error: "REPAIR_HANDOFF_ERROR", message: err.message });
+    }
+  });
 }

@@ -275,6 +275,86 @@ function summarizeGroup(group = []) {
   };
 }
 
+function clusterIssueReports(reports = []) {
+  return Object.values(
+    (reports || []).reduce((acc, report) => {
+      const key = report.grouped_key || `${report.classification}:${report.context?.current_feature || "general_app"}`;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(report);
+      return acc;
+    }, {})
+  )
+    .map((group) => group.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || ""))))
+    .sort((a, b) => {
+      const severityScore = { high: 3, medium: 2, low: 1 };
+      const scoreA = (a.length * 10) + (severityScore[a[0]?.severity] || 0);
+      const scoreB = (b.length * 10) + (severityScore[b[0]?.severity] || 0);
+      return scoreB - scoreA;
+    });
+}
+
+function buildReproductionHints(group = [], report = {}) {
+  const probableArea = report.repair_summary?.probable_area || report.context?.current_feature || "general_app";
+  const lines = [
+    `Start in feature area: ${probableArea}.`,
+  ];
+
+  if (report.context?.source_context) lines.push(`Observed from source context: ${report.context.source_context}.`);
+  if (report.context?.related_spiritkin) lines.push(`Related Spiritkin in reports: ${report.context.related_spiritkin}.`);
+  if (/\bmic|microphone|voice|speech|audio\b/i.test(report.raw_report || "")) {
+    lines.push("Exercise voice or microphone flow and watch for repeated disconnects or state resets.");
+  }
+  if (/\b(game|board|move|turn|ai|load)\b/i.test(report.raw_report || "")) {
+    lines.push("Open the game surface, start a session, and verify first-load plus move/render behavior.");
+  }
+  if (group.length > 1) {
+    lines.push(`Cross-check against ${group.length} similar report${group.length === 1 ? "" : "s"} in the same cluster.`);
+  }
+
+  return uniqueStrings(lines, 6);
+}
+
+function buildRepairPacket(group = []) {
+  const primary = group[0];
+  if (!primary) return null;
+
+  return {
+    issue_id: primary.id,
+    cluster_key: primary.grouped_key || null,
+    summary: primary.repair_summary?.owner_digest_line || primary.summary || summarizeText(primary.raw_report, 140),
+    category: primary.classification || "bug",
+    severity: primary.severity || "low",
+    confidence: clamp01(
+      group.reduce((sum, item) => sum + Number(item.confidence || 0), 0) / Math.max(group.length, 1),
+      clamp01(primary.confidence, 0.5)
+    ),
+    reproduction_hints: buildReproductionHints(group, primary),
+    feature_context: {
+      probable_area: primary.repair_summary?.probable_area || primary.context?.current_feature || "general_app",
+      current_feature: primary.context?.current_feature || null,
+      source_context: primary.context?.source_context || null,
+      related_spiritkin: primary.context?.related_spiritkin || null,
+    },
+    recent_related_reports: group.slice(0, 5).map((report) => ({
+      id: report.id,
+      created_at: report.created_at,
+      summary: report.repair_summary?.owner_digest_line || report.summary || summarizeText(report.raw_report, 120),
+      confidence: report.confidence,
+      severity: report.severity,
+      route: report.route,
+    })),
+    recommended_next_action:
+      primary.route === "repair_queue"
+        ? "Owner review, then convert into a Codex sandbox repair brief if confirmed."
+        : "Owner review before any workflow escalation.",
+    governance: {
+      autonomous_patch_allowed: false,
+      autonomous_deploy_allowed: false,
+      owner_approval_required: true,
+    },
+  };
+}
+
 export function createIssueReportService({ supabase, logger = console }) {
   const memoryStore = [];
 
@@ -420,14 +500,7 @@ export function createIssueReportService({ supabase, logger = console }) {
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
-    const groupedRecurringIssues = Object.values(
-      reports.reduce((acc, report) => {
-        const key = report.grouped_key || `${report.classification}:${report.context?.current_feature || "general_app"}`;
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(report);
-        return acc;
-      }, {})
-    )
+    const groupedRecurringIssues = clusterIssueReports(reports)
       .filter((group) => group.length > 1)
       .sort((a, b) => {
         const scoreA = (a.length * 10) + (a[0]?.severity === "high" ? 5 : 0);
@@ -523,11 +596,70 @@ export function createIssueReportService({ supabase, logger = console }) {
     };
   }
 
+  async function getRepairPackets({ limit = 25 } = {}) {
+    const reports = await listRecent({ limit: Math.max(Number(limit) || 25, 100) });
+    return clusterIssueReports(
+      reports.filter((report) => report.route === "repair_queue" || report.risk_tier === "repair_candidate")
+    )
+      .map(buildRepairPacket)
+      .filter(Boolean)
+      .slice(0, Math.min(Number(limit) || 25, 100));
+  }
+
+  async function getRepairHandoffDigest({ limit = 25 } = {}) {
+    const packets = await getRepairPackets({ limit: Math.max(Number(limit) || 25, 50) });
+    const recurringBugs = packets.slice(0, 10).map((packet) => ({
+      cluster_key: packet.cluster_key,
+      issue_id: packet.issue_id,
+      summary: packet.summary,
+      severity: packet.severity,
+      confidence: packet.confidence,
+      probable_area: packet.feature_context?.probable_area || "general_app",
+      related_reports: packet.recent_related_reports.length,
+      recommended_next_action: packet.recommended_next_action,
+    }));
+    const severityScore = { high: 3, medium: 2, low: 1 };
+    const highestSeverityIssues = [...packets]
+      .sort((a, b) => {
+        const scoreA = (severityScore[a.severity] || 0) * 10 + a.confidence;
+        const scoreB = (severityScore[b.severity] || 0) * 10 + b.confidence;
+        return scoreB - scoreA;
+      })
+      .slice(0, 10);
+    const newestIssues = [...packets]
+      .sort((a, b) => String(b.recent_related_reports?.[0]?.created_at || "").localeCompare(String(a.recent_related_reports?.[0]?.created_at || "")))
+      .slice(0, 10);
+    const systemAreas = packets.reduce((acc, packet) => {
+      const key = packet.feature_context?.probable_area || "general_app";
+      if (!acc[key]) acc[key] = { probable_area: key, complaints: 0, clusters: 0 };
+      acc[key].clusters += 1;
+      acc[key].complaints += packet.recent_related_reports.length;
+      return acc;
+    }, {});
+
+    return {
+      generated_at: nowIso(),
+      governance: {
+        autonomous_patch_allowed: false,
+        autonomous_deploy_allowed: false,
+        owner_approval_required: true,
+      },
+      total_repair_packets: packets.length,
+      top_recurring_bugs: recurringBugs,
+      highest_severity_issues: highestSeverityIssues,
+      newly_emerging_issues: newestIssues,
+      repeat_complaints_by_system_area: Object.values(systemAreas).sort((a, b) => b.complaints - a.complaints),
+      repair_packets: packets,
+    };
+  }
+
   return {
     buildIssueClassification,
     reportIssue,
     captureFromInteraction,
     listRecent,
     getDigest,
+    getRepairPackets,
+    getRepairHandoffDigest,
   };
 }
