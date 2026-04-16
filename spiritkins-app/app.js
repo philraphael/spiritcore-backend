@@ -150,6 +150,7 @@ let _recognition = null;
 let _recognitionRunId = 0;
 let _recognitionStopRequested = false;
 let _lastVoiceSubmission = { text: "", at: 0 };
+let _lastUserSubmission = { text: "", at: 0, source: "" };
 let _voiceAwaitingUserTurn = false;
 let _voiceTurnCaptureAfterAudio = false;
 
@@ -2649,7 +2650,12 @@ async function sendMessage(overrideText) {
   syncPrimarySelection();
   const text = (overrideText ?? state.input).trim();
   if (!text || state.loadingReply) return;
+  if (isDuplicateUserSubmission(text)) return;
   clearVoiceTurnCapture();
+  if (state.voiceListening) {
+    stopListening();
+  }
+  markUserSubmission(text, overrideText === undefined ? "text" : "voice");
   updateAdaptiveProfileFromUserText(text);
   state.showCrownGateHome = false;
   state.showHomeView = false;
@@ -3768,7 +3774,7 @@ function maybeAutoOpenGameMic() {
     if (state.voiceMuted || state.voiceListening || state.gameLoading) return;
     if (getAutoMicTurnKey(state.activeGame) !== turnKey) return;
     try {
-      startListening();
+      startListening({ source: "auto-turn" });
     } catch (_) {}
   }, 120);
 }
@@ -3810,6 +3816,20 @@ function clearVoiceTurnCapture() {
   _voiceTurnCaptureAfterAudio = false;
 }
 
+function markUserSubmission(text, source = "unknown") {
+  _lastUserSubmission = {
+    text: String(text || "").trim(),
+    at: Date.now(),
+    source
+  };
+}
+
+function isDuplicateUserSubmission(text, windowMs = 1800) {
+  const normalized = String(text || "").trim();
+  if (!normalized) return false;
+  return _lastUserSubmission.text === normalized && (Date.now() - _lastUserSubmission.at) < windowMs;
+}
+
 function setVoiceWaitingStatus(message = "I'm here when you're ready. Tap the mic or type to continue.") {
   state.statusText = message;
   state.statusError = false;
@@ -3836,7 +3856,7 @@ function scheduleVoiceLoop(delay = 350) {
   _voiceLoopTimer = window.setTimeout(() => {
     if (!shouldKeepVoiceLoopActive() || !_voiceAwaitingUserTurn || _recognition || _audioPlaying) return;
     try {
-      startListening();
+      startListening({ source: "auto-turn" });
     } catch (_) {}
   }, Math.max(250, delay));
 }
@@ -5699,7 +5719,7 @@ async function onClick(event) {
         state.statusText = "Voice mode enabled.";
         state.statusError = false;
         render();
-        if (!_recognition && !state.voiceMuted) startListening();
+        if (!_recognition && !state.voiceMuted) startListening({ source: "voice-mode-enable" });
       });
     } else {
       state.voiceMode = true;
@@ -5707,7 +5727,7 @@ async function onClick(event) {
       state.statusText = "Voice mode enabled.";
       state.statusError = false;
       render();
-      if (!_recognition && !state.voiceMuted) startListening();
+      if (!_recognition && !state.voiceMuted) startListening({ source: "voice-mode-enable" });
     }
     return;
   }
@@ -5716,7 +5736,7 @@ async function onClick(event) {
     state.voiceMuted = !state.voiceMuted;
     localStorage.setItem("sk_voice_muted", state.voiceMuted ? "1" : "0");
     if (state.voiceMuted) stopListening();
-    if (!state.voiceMuted && state.voiceMode && !_recognition) startListening();
+    if (!state.voiceMuted && state.voiceMode && !_recognition) startListening({ source: "unmute" });
     render();
     return;
   }
@@ -5748,7 +5768,7 @@ async function onClick(event) {
     if (state.voiceListening) {
       stopListening();
     } else {
-      startListening();
+      startListening({ source: "manual-toggle" });
     }
     return;
   }
@@ -6169,7 +6189,8 @@ async function onClick(event) {
   }
 }
 
-function startListening() {
+function startListening(options = {}) {
+  const { source = "manual" } = options;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
     state.statusText = "Voice input is not supported in this browser. Try Chrome.";
@@ -6187,6 +6208,7 @@ function startListening() {
   }
 
   clearVoiceLoopTimer();
+  _voiceAwaitingUserTurn = true;
   _voiceTurnCaptureAfterAudio = false;
   const recognition = new SpeechRecognition();
   const runId = ++_recognitionRunId;
@@ -6203,6 +6225,7 @@ function startListening() {
     state.voiceListening = true;
     state.statusText = "Listening… Speak now.";
     state.statusError = false;
+    console.info("[Voice] listening-started", { source });
     render();
   };
 
@@ -6218,6 +6241,11 @@ function startListening() {
     const now = Date.now();
     if (_lastVoiceSubmission.text === transcript && (now - _lastVoiceSubmission.at) < 1500) return;
     _lastVoiceSubmission = { text: transcript, at: now };
+    if (isDuplicateUserSubmission(transcript)) {
+      stopListening();
+      setVoiceWaitingStatus();
+      return;
+    }
     stopListening();
     sendMessage(transcript);
   };
@@ -6231,6 +6259,9 @@ function startListening() {
     const stopRequested = _recognitionStopRequested;
     _recognitionStopRequested = false;
     if (!stopRequested && event.error !== "aborted") {
+      if (_voiceAwaitingUserTurn && shouldKeepVoiceLoopActive()) {
+        setVoiceWaitingStatus("Listening ended before a usable transcript. Tap the mic or type to continue.");
+      }
       render();
       return;
     }
@@ -6254,7 +6285,8 @@ function startListening() {
       clearVoiceTurnCapture();
       return;
     }
-    clearVoiceTurnCapture();
+    _recognition = null;
+    state.voiceListening = false;
     if (!state.loadingReply && !state.convError) {
       setVoiceWaitingStatus();
     }
