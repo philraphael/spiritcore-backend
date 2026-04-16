@@ -6,6 +6,17 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function currentUtcDayBounds() {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return {
+    startIso: start.toISOString(),
+    endIso: end.toISOString()
+  };
+}
+
 function clamp01(value, fallback = 0) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
@@ -388,6 +399,31 @@ export function createIssueReportService({ supabase, logger = console }) {
     }
   }
 
+  async function countRecentUserReportsToday(userId) {
+    if (!userId) return 0;
+    const { startIso, endIso } = currentUtcDayBounds();
+    try {
+      const { count, error } = await supabase
+        .from("issue_reports")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", String(userId))
+        .eq("source", "user_report")
+        .gte("created_at", startIso)
+        .lt("created_at", endIso);
+      if (error) throw error;
+      if (!Number.isFinite(count)) throw new Error("issue report count unavailable");
+      return Number(count || 0);
+    } catch (_) {
+      return memoryStore.filter((record) => (
+        String(record.user_id || "") === String(userId) &&
+        record.source === "user_report" &&
+        typeof record.created_at === "string" &&
+        record.created_at >= startIso &&
+        record.created_at < endIso
+      )).length;
+    }
+  }
+
   async function reportIssue({
     userId = null,
     conversationId = null,
@@ -398,6 +434,13 @@ export function createIssueReportService({ supabase, logger = console }) {
     sourceContext = null,
     currentFeature = null,
   }) {
+    if (source === "user_report" && userId) {
+      const reportsToday = await countRecentUserReportsToday(userId);
+      if (reportsToday >= 3) {
+        throw new Error("You have reached the beta report limit for today. You can send up to 3 reports per day.");
+      }
+    }
+
     const classification = buildIssueClassification(input, {
       userId,
       conversationId,

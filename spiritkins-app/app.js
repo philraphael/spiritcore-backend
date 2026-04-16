@@ -8,6 +8,7 @@ const UID_KEY = "sv.uid.v5";
 const RATINGS_KEY = "sv.ratings.v5";
 const PRIMARY_KEY = "sv.primary.v5";
 const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
+const GAME_HELP_SEEN_KEY = "sv.game_help_seen.v1";
 const MEDIA_MUTED_KEY = "sv.media_muted.v1";
 const ADAPTIVE_PROFILE_KEY = "sv.adaptive_profile.v1";
 const CROWN_GATE_HOLD_MS = 1500;
@@ -1137,6 +1138,8 @@ const state = {
   gameInput: "",                 // move input field value
   gameSpiritkinMessage: null,    // last Spiritkin commentary on a game move
   gameInstructions: null,        // instructions for the current game type
+  gameHelpOpen: false,
+  gameHelpSeen: readJson(GAME_HELP_SEEN_KEY, {}),
   gameLoading: false,            // loading state for game moves
   pendingGameType: null,         // game currently opening
   issueReporterOpen: false,
@@ -3231,6 +3234,10 @@ async function startGameSession(gameType) {
     state.statusText = "Game started.";
     state.statusError = false;
     state.gameActive = true;
+    state.gameHelpOpen = !state.gameHelpSeen?.[gameType];
+    if (!state.gameHelpSeen?.[gameType]) {
+      markGameHelpSeen(gameType);
+    }
 
     if (SpiritverseGames && SpiritverseGames.reset) {
       SpiritverseGames.reset();
@@ -3275,6 +3282,69 @@ function buildGameOutcomeSummary(game, spiritkinName) {
     return { headline: `${spiritkinName} Won`, detail: result.label || `${spiritkinName} finished the game cleanly.` };
   }
   return { headline: "Game Complete", detail: result.label || "The game is complete." };
+}
+
+function getGameHelpContent(gameType, instructions = "") {
+  const guides = {
+    chess: {
+      objective: "Pressure the Spiritkin king until it has no legal escape.",
+      basicMove: "Tap one of your white pieces, then tap a highlighted destination square.",
+      winCondition: "Checkmate wins. If neither side can force progress, the board resolves to a draw."
+    },
+    checkers: {
+      objective: "Remove every opposing piece or leave the Spiritkin with no move.",
+      basicMove: "Tap one of your white pieces, then tap a highlighted dark square to move or jump.",
+      winCondition: "Capture the full opposing set or lock the board in your favor."
+    },
+    go: {
+      objective: "Place stones to claim more territory than your companion.",
+      basicMove: "Tap any open intersection on the star-map board to place your next stone.",
+      winCondition: "The larger controlled territory at the end wins the round."
+    },
+    spirit_cards: {
+      objective: "Build more realm power than your companion by playing your hand efficiently.",
+      basicMove: "Use Draw to refill your hand, then tap a card in your hand to play it.",
+      winCondition: "Keep building stronger board presence and realm points than the Spiritkin."
+    },
+    echo_trials: {
+      objective: "Solve the riddle before your attempts run out.",
+      basicMove: "Read the riddle, enter your answer in the field, and submit your guess.",
+      winCondition: "A correct answer clears the trial. Running out of attempts ends it."
+    },
+    tictactoe: {
+      objective: "Claim three aligned marks before your companion does.",
+      basicMove: "Tap any empty square once to place your mark.",
+      winCondition: "Three in a row wins. A full board with no line is a draw."
+    },
+    connect_four: {
+      objective: "Connect four of your stars before the Spiritkin connects theirs.",
+      basicMove: "Tap any column header or cell in that column to drop your next piece.",
+      winCondition: "The first four-in-a-row horizontally, vertically, or diagonally wins."
+    },
+    battleship: {
+      objective: "Find every hidden Spiritkin vessel before yours are found.",
+      basicMove: "Tap an unguessed cell on the 5x5 search grid to fire a shot.",
+      winCondition: "Reveal the full opposing fleet first."
+    }
+  };
+  const guide = guides[gameType] || {
+    objective: instructions || "Complete the current Spiritverse challenge.",
+    basicMove: "Use the active board controls to make your move.",
+    winCondition: "Fulfill the challenge conditions before your companion does."
+  };
+  return {
+    ...guide,
+    instructions: instructions || guide.basicMove
+  };
+}
+
+function markGameHelpSeen(gameType) {
+  if (!gameType) return;
+  state.gameHelpSeen = {
+    ...(state.gameHelpSeen || {}),
+    [gameType]: true
+  };
+  writeJson(GAME_HELP_SEEN_KEY, state.gameHelpSeen);
 }
 
 function render() {
@@ -4388,6 +4458,39 @@ function buildChatView() {
               ` : `
                 <div class="active-game-panel">
                   ${(() => {
+                    const help = getGameHelpContent(state.activeGame.type, state.gameInstructions);
+                    return `
+                      <div class="game-help-panel ${state.gameHelpOpen ? 'open' : ''}">
+                        <div class="game-help-header">
+                          <div>
+                            <div class="game-help-label">How To Play</div>
+                            <div class="game-help-title">${esc(state.activeGame.name || state.activeGame.type)}</div>
+                          </div>
+                          <button class="btn btn-ghost btn-xs" data-action="${state.gameHelpOpen ? 'dismiss-game-help' : 'toggle-game-help'}">
+                            ${state.gameHelpOpen ? 'Hide help' : 'Show help'}
+                          </button>
+                        </div>
+                        ${state.gameHelpOpen ? `
+                          <div class="game-help-grid">
+                            <div class="game-help-card">
+                              <div class="game-help-card-label">Objective</div>
+                              <p>${esc(help.objective)}</p>
+                            </div>
+                            <div class="game-help-card">
+                              <div class="game-help-card-label">Basic Move</div>
+                              <p>${esc(help.basicMove)}</p>
+                            </div>
+                            <div class="game-help-card">
+                              <div class="game-help-card-label">Win Condition</div>
+                              <p>${esc(help.winCondition)}</p>
+                            </div>
+                          </div>
+                          ${help.instructions ? `<p class="game-help-instructions">${esc(help.instructions)}</p>` : ''}
+                        ` : ''}
+                      </div>
+                    `;
+                  })()}
+                  ${(() => {
                     const outcome = buildGameOutcomeSummary(state.activeGame, spiritkin.name);
                     return outcome ? `
                       <div class="game-outcome-banner ${state.activeGame.result?.isDraw ? 'draw' : state.activeGame.result?.winner === 'user' ? 'win' : 'loss'}">
@@ -5308,6 +5411,18 @@ async function onClick(event) {
     return;
   }
 
+  if (action === "toggle-game-help") {
+    state.gameHelpOpen = !state.gameHelpOpen;
+    render();
+    return;
+  }
+
+  if (action === "dismiss-game-help") {
+    state.gameHelpOpen = false;
+    render();
+    return;
+  }
+
   if (action === "clear-finished-game") {
     if (SpiritverseGames && SpiritverseGames.reset) {
       SpiritverseGames.reset();
@@ -5315,6 +5430,7 @@ async function onClick(event) {
     state.activeGame = null;
     state.gameSpiritkinMessage = null;
     state.gameInstructions = null;
+    state.gameHelpOpen = false;
     state.gameEchoGuide = null;
     state.gameInput = "";
     render();

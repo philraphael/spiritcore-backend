@@ -18,6 +18,63 @@
   gap: 10px;
 }
 
+.game-help-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.game-help-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.game-help-label,
+.game-help-card-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(236,245,255,0.58);
+}
+
+.game-help-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f3efe6;
+  margin-top: 2px;
+}
+
+.game-help-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.game-help-card {
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(7, 14, 24, 0.32);
+}
+
+.game-help-card p,
+.game-help-instructions {
+  margin: 6px 0 0;
+  color: #d4dee8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.game-help-instructions {
+  padding: 10px 12px 0;
+}
+
 .game-panel-header {
   display: flex;
   align-items: center;
@@ -202,6 +259,15 @@
   padding: 18px;
 }
 
+.board-standard {
+  width: min(100%, 520px);
+}
+
+.board-grand {
+  width: min(78vmin, 860px);
+  max-width: calc(100vw - 420px);
+}
+
 /* ============================================================
    GRAND STAGE — Fullscreen Premium Experience
    ============================================================ */
@@ -213,10 +279,10 @@
     radial-gradient(circle at center, rgba(15, 25, 45, 0.98) 0%, rgba(5, 8, 16, 1) 100%);
   z-index: 2000;
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
   grid-template-rows: 60px 1fr;
   animation: stageIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
+  overflow: auto;
 }
 
 @keyframes stageIn {
@@ -376,8 +442,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: clamp(18px, 4vw, 40px);
   perspective: 1200px; /* Crucial for 3D look */
+  min-height: 0;
 }
 
 /* Spiritkin Sidebar in Grand Stage */
@@ -443,15 +510,16 @@
    ============================================================ */
 .board-3d-wrap {
   transform-style: preserve-3d;
-  transform: rotateX(25deg) rotateZ(-5deg); /* Isometric tilt */
+  transform: rotateX(16deg) rotateZ(-3deg); /* Keep some depth without crushing usability */
   transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 
     -20px 40px 60px rgba(0,0,0,0.8),
     0 0 100px var(--game-glow);
+  max-width: min(100%, 92vw);
 }
 
 .board-3d-wrap:hover {
-  transform: rotateX(20deg) rotateZ(-2deg) translateY(-10px);
+  transform: rotateX(14deg) rotateZ(-2deg) translateY(-6px);
 }
 
 /* Chess 3D pieces */
@@ -526,7 +594,7 @@
   grid-template-columns: repeat(8, 1fr);
   grid-template-rows: repeat(8, 1fr);
   width: 100%;
-  max-width: 340px;
+  max-width: min(100%, 520px);
   aspect-ratio: 1;
   border-radius: 4px;
   overflow: hidden;
@@ -634,7 +702,7 @@
   grid-template-columns: repeat(8, 1fr);
   grid-template-rows: repeat(8, 1fr);
   width: 100%;
-  max-width: 340px;
+  max-width: min(100%, 520px);
   aspect-ratio: 1;
 }
 
@@ -643,7 +711,7 @@
   grid-template-columns: repeat(13, 1fr);
   grid-template-rows: repeat(13, 1fr);
   width: 100%;
-  max-width: 340px;
+  max-width: min(100%, 620px);
   aspect-ratio: 1;
   background: #deb887;
 }
@@ -741,7 +809,12 @@
   flex-direction: column;
   gap: 1rem;
   padding: 0.5rem;
-  height: 100%;
+  width: min(100%, 920px);
+  margin: 0 auto;
+}
+
+.spirit-cards-grand {
+  min-height: min(78vh, 920px);
 }
 
 .spiritkin-area,
@@ -764,7 +837,7 @@
 
 .spirit-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 0.75rem;
 }
 
@@ -776,6 +849,16 @@
   transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
   border: 1px solid rgba(255,255,255,0.08);
   box-shadow: 0 12px 22px rgba(0,0,0,0.2);
+  min-height: 154px;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  text-align: left;
+}
+
+.spirit-card-glyph {
+  font-size: 1.2rem;
+  opacity: 0.9;
 }
 
 .spirit-card-player {
@@ -835,6 +918,17 @@
   font-size: 0.8rem;
 }
 
+.spirit-cards-status,
+.spirit-cards-boardline {
+  display: grid;
+  gap: 12px;
+}
+
+.spirit-cards-boardline {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
 .cards-hand {
   display: flex;
   gap: 10px;
@@ -864,15 +958,21 @@
 .echo-trials-container {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1rem;
   padding: 1rem;
+  width: min(100%, 820px);
   min-height: 100%;
   justify-content: center;
   align-items: center;
 }
 
+.echo-trials-grand {
+  min-height: min(78vh, 900px);
+  justify-content: flex-start;
+}
+
 .riddle-box {
-  width: min(100%, 520px);
+  width: min(100%, 720px);
   background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
   border: 1px solid var(--game-accent-soft);
   border-radius: 18px;
@@ -932,7 +1032,7 @@
 }
 .echo-riddle-text {
   font-family: 'Cormorant Garamond', serif;
-  font-size: 1.4rem;
+  font-size: clamp(1.1rem, 2vw, 1.45rem);
   font-style: italic;
   color: #f2dba0;
   margin-bottom: 30px;
@@ -968,4 +1068,54 @@
 .echo-submit-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 16px 26px rgba(0,0,0,0.24), 0 0 18px var(--game-glow);
+}
+
+@media (max-width: 1180px) {
+  .game-fullscreen-overlay {
+    grid-template-columns: 1fr;
+    grid-template-rows: 60px auto auto;
+  }
+
+  .game-fullscreen-header {
+    grid-column: 1;
+  }
+
+  .game-fullscreen-sidebar {
+    border-left: 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    max-height: 34vh;
+  }
+
+  .board-grand {
+    max-width: calc(100vw - 72px);
+  }
+}
+
+@media (max-width: 860px) {
+  .game-help-grid,
+  .spirit-cards-boardline {
+    grid-template-columns: 1fr;
+  }
+
+  .board-3d-wrap,
+  .board-3d-wrap:hover {
+    transform: none;
+  }
+
+  .game-fullscreen-stage {
+    perspective: none;
+  }
+
+  .spirit-cards-grid {
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  }
+
+  .echo-answer-row {
+    flex-direction: column;
+  }
+
+  .echo-submit-btn,
+  .spirit-cards-draw-btn {
+    width: 100%;
+  }
 }
