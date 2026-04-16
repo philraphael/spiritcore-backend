@@ -634,6 +634,122 @@ function normalizeGameTheme(theme) {
   return ["crown", "veil", "ember", "astral", "abyssal"].includes(mapped) ? mapped : "crown";
 }
 
+const GAME_NAME_OVERRIDES = {
+  chess: "Celestial Chess",
+  checkers: "Veil Checkers",
+  go: "Star-Mapping (Go)",
+  spirit_cards: "Spirit-Cards",
+  echo_trials: "Echo Trials",
+  tictactoe: "TicTacToe of Echoes",
+  connect_four: "Connect Four Constellations",
+  battleship: "Abyssal Battleship"
+};
+
+function buildDefaultGameData(type) {
+  switch (type) {
+    case "chess":
+      return { fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", lastMove: null };
+    case "checkers":
+      return { board: Array(32).fill(null), lastMove: null };
+    case "go":
+      return { board: Array(13 * 13).fill(null), lastMove: null };
+    case "spirit_cards":
+      return {
+        hand: [],
+        deck: [],
+        discard: [],
+        board: [],
+        spiritkinHand: [],
+        spiritkinDeck: [],
+        spiritkinDiscard: [],
+        mana: 5,
+        spiritkinMana: 5,
+        realmPoints: { user: 0, spiritkin: 0 }
+      };
+    case "echo_trials":
+      return { riddle: "A riddle awaits...", answer: "", attempts: 0, maxAttempts: 3 };
+    case "tictactoe":
+      return { board: Array(9).fill(null), winner: null, lastMove: null };
+    case "connect_four":
+      return { board: Array(42).fill(null), winner: null, lastMove: null };
+    case "battleship":
+      return {
+        size: 5,
+        userTargets: [],
+        spiritkinTargets: [],
+        userGuesses: [],
+        spiritkinGuesses: [],
+        hits: { user: [], spiritkin: [] },
+        winner: null,
+        lastMove: null
+      };
+    default:
+      return {};
+  }
+}
+
+function normalizeGameData(type, data) {
+  const base = buildDefaultGameData(type);
+  const source = data && typeof data === "object" && !Array.isArray(data) ? data : {};
+  const merged = { ...base, ...source };
+
+  if (type === "checkers") {
+    merged.board = Array.isArray(source.board) ? source.board.slice(0, 32) : base.board;
+    if (merged.board.length < 32) merged.board = merged.board.concat(Array(32 - merged.board.length).fill(null));
+  } else if (type === "go") {
+    merged.board = Array.isArray(source.board) ? source.board.slice(0, 169) : base.board;
+    if (merged.board.length < 169) merged.board = merged.board.concat(Array(169 - merged.board.length).fill(null));
+  } else if (type === "tictactoe") {
+    merged.board = Array.isArray(source.board) ? source.board.slice(0, 9) : base.board;
+    if (merged.board.length < 9) merged.board = merged.board.concat(Array(9 - merged.board.length).fill(null));
+  } else if (type === "connect_four") {
+    merged.board = Array.isArray(source.board) ? source.board.slice(0, 42) : base.board;
+    if (merged.board.length < 42) merged.board = merged.board.concat(Array(42 - merged.board.length).fill(null));
+  } else if (type === "spirit_cards") {
+    merged.hand = Array.isArray(source.hand) ? source.hand.filter(Boolean) : [];
+    merged.deck = Array.isArray(source.deck) ? source.deck.filter(Boolean) : [];
+    merged.discard = Array.isArray(source.discard) ? source.discard.filter(Boolean) : [];
+    merged.board = Array.isArray(source.board) ? source.board.filter(Boolean) : [];
+    merged.spiritkinHand = Array.isArray(source.spiritkinHand) ? source.spiritkinHand.filter(Boolean) : [];
+    merged.spiritkinDeck = Array.isArray(source.spiritkinDeck) ? source.spiritkinDeck.filter(Boolean) : [];
+    merged.spiritkinDiscard = Array.isArray(source.spiritkinDiscard) ? source.spiritkinDiscard.filter(Boolean) : [];
+    merged.realmPoints = source.realmPoints && typeof source.realmPoints === "object"
+      ? {
+          user: Number(source.realmPoints.user || 0),
+          spiritkin: Number(source.realmPoints.spiritkin || 0)
+        }
+      : base.realmPoints;
+  } else if (type === "battleship") {
+    merged.userGuesses = Array.isArray(source.userGuesses) ? source.userGuesses.filter(Number.isInteger) : [];
+    merged.spiritkinGuesses = Array.isArray(source.spiritkinGuesses) ? source.spiritkinGuesses.filter(Number.isInteger) : [];
+    merged.hits = source.hits && typeof source.hits === "object"
+      ? {
+          user: Array.isArray(source.hits.user) ? source.hits.user.filter(Number.isInteger) : [],
+          spiritkin: Array.isArray(source.hits.spiritkin) ? source.hits.spiritkin.filter(Number.isInteger) : []
+        }
+      : base.hits;
+  }
+
+  return merged;
+}
+
+function normalizeActiveGame(game) {
+  if (!game || typeof game !== "object" || Array.isArray(game)) return null;
+  const type = String(game.type || "").trim();
+  if (!type) return null;
+  return {
+    ...game,
+    type,
+    name: game.name || GAME_NAME_OVERRIDES[type] || type.replace(/_/g, " "),
+    status: game.status === "ended" ? "ended" : "active",
+    turn: game.turn === "spiritkin" ? "spiritkin" : "user",
+    moveCount: Number.isFinite(game.moveCount) ? game.moveCount : 0,
+    history: Array.isArray(game.history) ? game.history.filter(Boolean) : [],
+    result: game.result && typeof game.result === "object" ? game.result : null,
+    data: normalizeGameData(type, game.data)
+  };
+}
+
 function getOrCreateUid() {
   let id = localStorage.getItem(UID_KEY);
   if (!id) {
@@ -1591,6 +1707,20 @@ function normalizeInteractionState(source = "unknown") {
     state.gameInstructions = null;
     state.gameEchoGuide = null;
     changed = true;
+  }
+
+  if (state.activeGame) {
+    const normalizedGame = normalizeActiveGame(state.activeGame);
+    if (!normalizedGame) {
+      state.activeGame = null;
+      state.gameSpiritkinMessage = null;
+      state.gameInstructions = null;
+      state.gameEchoGuide = null;
+      changed = true;
+    } else if (JSON.stringify(normalizedGame) !== JSON.stringify(state.activeGame)) {
+      state.activeGame = normalizedGame;
+      changed = true;
+    }
   }
 
   if (state.spiritCoreWelcoming) {
@@ -3470,14 +3600,14 @@ async function executeGameMove(move, options = {}) {
     const data = await res.json();
 
     if (data.ok) {
-      state.activeGame = data.game;
+      state.activeGame = normalizeActiveGame(data.game);
       const resolvedGameReply =
         data.spiritkinMessage ||
-        buildGameOutcomeReaction(state.selectedSpiritkin.name, data.game) ||
-        (data.game?.status === "active" ? buildPresenceTabNarration("games", state.selectedSpiritkin, getBondStateForSpiritkin(state.selectedSpiritkin.name).currentBond, null, null) : "");
+        buildGameOutcomeReaction(state.selectedSpiritkin.name, state.activeGame) ||
+        (state.activeGame?.status === "active" ? buildPresenceTabNarration("games", state.selectedSpiritkin, getBondStateForSpiritkin(state.selectedSpiritkin.name).currentBond, null, null) : "");
       state.gameSpiritkinMessage = resolvedGameReply || null;
-      state.statusText = data.game?.status === "ended"
-        ? (data.game?.result?.label || "Game complete.")
+      state.statusText = state.activeGame?.status === "ended"
+        ? (state.activeGame?.result?.label || "Game complete.")
         : (addUserMessage ? "Move accepted." : "");
       state.statusError = false;
 
@@ -3532,6 +3662,12 @@ async function startGameSession(gameType) {
   if (!gameType || state.gameLoading) return false;
   let spokenGameMessageId = null;
   try {
+    if (!state.selectedSpiritkin?.name) {
+      state.statusText = "Choose a bonded Spiritkin before starting a game.";
+      state.statusError = true;
+      render();
+      return false;
+    }
     state.pendingGameType = gameType;
     state.activePresenceTab = "games";
     state.showHomeView = false;
@@ -3565,7 +3701,7 @@ async function startGameSession(gameType) {
       return false;
     }
 
-    state.activeGame = data.game;
+    state.activeGame = normalizeActiveGame(data.game);
     const resolvedGameReply = data.spiritkinMessage || buildGameEntryReaction(state.selectedSpiritkin.name, gameType);
     state.gameSpiritkinMessage = resolvedGameReply || null;
     state.gameInstructions = data.instructions || null;

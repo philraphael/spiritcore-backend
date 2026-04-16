@@ -224,6 +224,9 @@ const GrandStage = {
       'echo-trials': '📜 Echo Trials',
       echo_trials: '📜 Echo Trials'
     };
+    titles.tictactoe = titles.tictactoe || 'TicTacToe of Echoes';
+    titles.connect_four = titles.connect_four || 'Connect Four Constellations';
+    titles.battleship = titles.battleship || 'Abyssal Battleship';
     return titles[type] || 'Spiritverse Game';
   }
 };
@@ -250,7 +253,7 @@ function parseFEN(fen) {
   return board;
 }
 
-function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, onSquareClick, isExpanded = false, theme = resolveGameTheme("chess")) {
+function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, onSquareClick, isExpanded = false, theme = resolveGameTheme("chess"), isInteractive = true) {
   const board = parseFEN(fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
   const files = ['a','b','c','d','e','f','g','h'];
   const themeId = theme.boardVariant || 'crown';
@@ -266,7 +269,7 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
     </div>`;
   }
 
-  html += `<div class="chess-board chess-theme-${themeId} ${isExpanded ? 'board-3d board-grand' : 'board-standard'}" id="chess-board">`;
+  html += `<div class="chess-board chess-theme-${themeId} ${isExpanded ? 'board-3d board-grand' : 'board-standard'} ${isInteractive ? '' : 'board-locked'}" id="chess-board">`;
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
       const sq = files[file] + (8 - rank);
@@ -285,7 +288,7 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
       const themePieces = CHESS_PIECE_THEMES[themeId] || CHESS_PIECE_THEMES['crown'];
       const pieceSvg = pieceKey && themePieces[pieceKey] ? themePieces[pieceKey] : '';
 
-      html += `<div class="${cellClass}" data-sq="${sq}" data-action="chess-square-click">`;
+      html += `<div class="${cellClass}" data-sq="${sq}" ${isInteractive ? 'data-action="chess-square-click"' : ''}>`;
       if (isValidMove && !piece) html += `<div class="chess-move-dot"></div>`;
       if (pieceSvg) html += `<div class="chess-piece ${piece.color === 'w' ? 'piece-white' : 'piece-black'}" data-sq="${sq}">${pieceSvg}</div>`;
       if (isValidMove && piece) html += `<div class="chess-capture-ring"></div>`;
@@ -335,7 +338,7 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
 // ============================================================
 // CHECKERS ENGINE & RENDERER
 // ============================================================
-function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, onSquareClick, isExpanded = false, theme = resolveGameTheme("checkers")) {
+function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, onSquareClick, isExpanded = false, theme = resolveGameTheme("checkers"), isInteractive = true) {
   const board = boardArray || Array(32).fill(null);
   
   let html = '';
@@ -345,7 +348,7 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, o
     </div>`;
   }
 
-  html += `<div class="checkers-board ${isExpanded ? 'board-grand' : 'board-standard'}">`;
+  html += `<div class="checkers-board ${isExpanded ? 'board-grand' : 'board-standard'} ${isInteractive ? '' : 'board-locked'}">`;
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
       const isLight = (rank + file) % 2 === 0;
@@ -362,7 +365,7 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, o
       if (isSelected) cellClass += ' checkers-selected';
       if (isValid) cellClass += ' checkers-valid';
 
-      html += `<div class="${cellClass}" data-sq="${sqIndex}" data-action="checkers-square-click">`;
+      html += `<div class="${cellClass}" data-sq="${sqIndex}" ${isInteractive ? 'data-action="checkers-square-click"' : ''}>`;
       if (piece) {
         const isKing = piece.includes('king');
         const colorClass = piece.includes('white') ? 'piece-user' : 'piece-spiritkin';
@@ -409,7 +412,7 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, o
 // ============================================================
 // GO (STAR-MAPPING) RENDERER
 // ============================================================
-function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpanded = false, theme = resolveGameTheme("go")) {
+function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpanded = false, theme = resolveGameTheme("go"), isInteractive = true) {
   const size = 13;
   const board = boardArray || Array(size * size).fill(null);
 
@@ -420,7 +423,7 @@ function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpande
     </div>`;
   }
 
-  html += `<div class="go-board ${isExpanded ? 'board-grand' : 'board-standard'}" style="grid-template-columns: repeat(${size}, 1fr); grid-template-rows: repeat(${size}, 1fr);">`;
+  html += `<div class="go-board ${isExpanded ? 'board-grand' : 'board-standard'} ${isInteractive ? '' : 'board-locked'}" style="grid-template-columns: repeat(${size}, 1fr); grid-template-rows: repeat(${size}, 1fr);">`;
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size; c++) {
       const idx = r * size + c;
@@ -433,7 +436,7 @@ function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpande
       if (c === 0) cellClass += ' go-edge-l';
       if (c === size - 1) cellClass += ' go-edge-r';
 
-      html += `<div class="${cellClass}" data-idx="${idx}" data-action="go-square-click">
+      html += `<div class="${cellClass}" data-idx="${idx}" ${isInteractive ? 'data-action="go-square-click"' : ''}>
         <div class="go-line-h"></div>
         <div class="go-line-v"></div>
         <div class="go-hover-indicator"></div>`;
@@ -472,6 +475,109 @@ function getGamePayload(gameData) {
     return gameData.data;
   }
   return gameData || {};
+}
+
+function buildFallbackPayload(type) {
+  switch (type) {
+    case 'chess':
+      return { fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', lastMove: null };
+    case 'checkers':
+      return { board: Array(32).fill(null), lastMove: null };
+    case 'go':
+      return { board: Array(13 * 13).fill(null), lastMove: null };
+    case 'spirit_cards':
+      return {
+        hand: [],
+        deck: [],
+        discard: [],
+        board: [],
+        spiritkinHand: [],
+        spiritkinDeck: [],
+        spiritkinDiscard: [],
+        mana: 5,
+        spiritkinMana: 5,
+        realmPoints: { user: 0, spiritkin: 0 }
+      };
+    case 'echo_trials':
+      return { riddle: 'A riddle awaits...', answer: '', attempts: 0, maxAttempts: 3 };
+    case 'tictactoe':
+      return { board: Array(9).fill(null), winner: null, lastMove: null };
+    case 'connect_four':
+      return { board: Array(42).fill(null), winner: null, lastMove: null };
+    case 'battleship':
+      return {
+        size: 5,
+        userGuesses: [],
+        spiritkinGuesses: [],
+        hits: { user: [], spiritkin: [] },
+        winner: null,
+        lastMove: null
+      };
+    default:
+      return {};
+  }
+}
+
+function normalizeSizedArray(source, size) {
+  const next = Array.isArray(source) ? source.slice(0, size) : [];
+  if (next.length < size) next.push(...Array(size - next.length).fill(null));
+  return next;
+}
+
+function normalizePayloadForView(type, payload = {}) {
+  const base = buildFallbackPayload(type);
+  const normalized = { ...base, ...(payload && typeof payload === 'object' ? payload : {}) };
+
+  if (type === 'checkers') {
+    normalized.board = normalizeSizedArray(payload.board, 32);
+  } else if (type === 'go') {
+    normalized.board = normalizeSizedArray(payload.board, 13 * 13);
+  } else if (type === 'tictactoe') {
+    normalized.board = normalizeSizedArray(payload.board, 9);
+  } else if (type === 'connect_four') {
+    normalized.board = normalizeSizedArray(payload.board, 42);
+  } else if (type === 'spirit_cards') {
+    normalized.hand = Array.isArray(payload.hand) ? payload.hand.filter(Boolean) : [];
+    normalized.deck = Array.isArray(payload.deck) ? payload.deck.filter(Boolean) : [];
+    normalized.discard = Array.isArray(payload.discard) ? payload.discard.filter(Boolean) : [];
+    normalized.board = Array.isArray(payload.board) ? payload.board.filter(Boolean) : [];
+    normalized.spiritkinHand = Array.isArray(payload.spiritkinHand) ? payload.spiritkinHand.filter(Boolean) : [];
+    normalized.spiritkinDeck = Array.isArray(payload.spiritkinDeck) ? payload.spiritkinDeck.filter(Boolean) : [];
+    normalized.spiritkinDiscard = Array.isArray(payload.spiritkinDiscard) ? payload.spiritkinDiscard.filter(Boolean) : [];
+    normalized.realmPoints = payload.realmPoints && typeof payload.realmPoints === 'object'
+      ? {
+          user: Number(payload.realmPoints.user || 0),
+          spiritkin: Number(payload.realmPoints.spiritkin || 0)
+        }
+      : base.realmPoints;
+  } else if (type === 'battleship') {
+    normalized.userGuesses = Array.isArray(payload.userGuesses) ? payload.userGuesses.filter(Number.isInteger) : [];
+    normalized.spiritkinGuesses = Array.isArray(payload.spiritkinGuesses) ? payload.spiritkinGuesses.filter(Number.isInteger) : [];
+    normalized.hits = payload.hits && typeof payload.hits === 'object'
+      ? {
+          user: Array.isArray(payload.hits.user) ? payload.hits.user.filter(Number.isInteger) : [],
+          spiritkin: Array.isArray(payload.hits.spiritkin) ? payload.hits.spiritkin.filter(Number.isInteger) : []
+        }
+      : base.hits;
+  }
+
+  return normalized;
+}
+
+function normalizeGameForView(gameData) {
+  if (!gameData || typeof gameData !== 'object') return null;
+  const type = String(gameData.type || '').trim();
+  if (!type) return null;
+  const payload = normalizePayloadForView(type, getGamePayload(gameData));
+  return {
+    ...gameData,
+    type,
+    name: gameData.name || GrandStage.getGameTitle(type).replace(/^[^\s]+\s/, ''),
+    status: gameData.status === 'ended' ? 'ended' : 'active',
+    turn: gameData.turn === 'spiritkin' ? 'spiritkin' : 'user',
+    history: Array.isArray(gameData.history) ? gameData.history.filter(Boolean) : [],
+    data: payload
+  };
 }
 
 function normalizeLastMove(type, lastMove) {
@@ -516,28 +622,30 @@ export const SpiritverseGames = {
 
   render(container, gameData, spiritkinName, commentary, onMoveSubmit, theme) {
     if (!theme) theme = 'crown';
-    if (!gameData || !gameData.type) return;
-    const type = gameData.type;
+    const safeGame = normalizeGameForView(gameData);
+    if (!safeGame || !safeGame.type) return;
+    const type = safeGame.type;
     const gameTheme = resolveGameTheme(type, theme);
-    const payload = getGamePayload(gameData);
-    const viewPayload = { ...payload, status: gameData.status, result: gameData.result };
-    const gameCommentary = commentary || gameData.commentary || "Your move.";
-    const history = gameData.history || [];
-    const chessFen = payload.fen || gameData.fen;
-    const board = payload.board || gameData.board;
-    const lastMove = normalizeLastMove(type, payload.lastMove || gameData.lastMove);
+    const payload = safeGame.data;
+    const viewPayload = { ...payload, status: safeGame.status, result: safeGame.result, turn: safeGame.turn };
+    const gameCommentary = commentary || safeGame.commentary || "Your move.";
+    const history = safeGame.history || [];
+    const chessFen = payload.fen || safeGame.fen;
+    const board = payload.board || safeGame.board;
+    const lastMove = normalizeLastMove(type, payload.lastMove || safeGame.lastMove);
+    const isInteractive = safeGame.status === 'active' && safeGame.turn === 'user';
 
     const renderFn = (target, isExp) => {
       switch (type) {
         case 'chess':
           renderChessBoard(target, chessFen, this.chess.selectedSquare, this.chess.validMoves, lastMove, (sq) => {
             this.handleChessSquareClick(sq, chessFen, onMoveSubmit);
-          }, isExp, gameTheme);
+          }, isExp, gameTheme, isInteractive);
           break;
         case 'checkers':
           renderCheckersBoard(target, board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
             this.handleCheckersSquareClick(sq, board, 'white', onMoveSubmit);
-          }, isExp, gameTheme);
+          }, isExp, gameTheme, isInteractive);
           break;
         case 'go':
           renderGoBoard(target, board, lastMove, (idx) => {
@@ -545,7 +653,7 @@ export const SpiritverseGames = {
             const r = Math.floor(idx / size);
             const c = idx % size;
             onMoveSubmit(`${String.fromCharCode(65 + c)}${size - r}`);
-          }, isExp, gameTheme);
+          }, isExp, gameTheme, isInteractive);
           break;
         case 'spirit_cards':
           this.renderSpiritCards(target, viewPayload, onMoveSubmit, isExp, gameTheme);
@@ -576,27 +684,29 @@ export const SpiritverseGames = {
 
   expand(gameData, spiritkinName, onMoveSubmit, theme) {
     if (!theme) theme = 'crown';
-    if (!gameData || !gameData.type) return;
-    const type = gameData.type;
+    const safeGame = normalizeGameForView(gameData);
+    if (!safeGame || !safeGame.type) return;
+    const type = safeGame.type;
     const gameTheme = resolveGameTheme(type, theme);
-    const payload = getGamePayload(gameData);
-    const viewPayload = { ...payload, status: gameData.status, result: gameData.result };
-    const commentary = gameData.commentary || "I'm ready. Show me what you've got.";
-    const history = gameData.history || [];
-    const chessFen = payload.fen || gameData.fen;
-    const board = payload.board || gameData.board;
-    const lastMove = normalizeLastMove(type, payload.lastMove || gameData.lastMove);
+    const payload = safeGame.data;
+    const viewPayload = { ...payload, status: safeGame.status, result: safeGame.result, turn: safeGame.turn };
+    const commentary = safeGame.commentary || "I'm ready. Show me what you've got.";
+    const history = safeGame.history || [];
+    const chessFen = payload.fen || safeGame.fen;
+    const board = payload.board || safeGame.board;
+    const lastMove = normalizeLastMove(type, payload.lastMove || safeGame.lastMove);
+    const isInteractive = safeGame.status === 'active' && safeGame.turn === 'user';
     const renderFn = (target, isExp) => {
       switch (type) {
         case 'chess':
           renderChessBoard(target, chessFen, this.chess.selectedSquare, this.chess.validMoves, lastMove, (sq) => {
             this.handleChessSquareClick(sq, chessFen, onMoveSubmit);
-          }, isExp, gameTheme);
+          }, isExp, gameTheme, isInteractive);
           break;
         case 'checkers':
           renderCheckersBoard(target, board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
             this.handleCheckersSquareClick(sq, board, 'white', onMoveSubmit);
-          }, isExp, gameTheme);
+          }, isExp, gameTheme, isInteractive);
           break;
         case 'go':
           renderGoBoard(target, board, lastMove, (idx) => {
@@ -604,7 +714,7 @@ export const SpiritverseGames = {
             const r = Math.floor(idx / size);
             const c = idx % size;
             onMoveSubmit(`${String.fromCharCode(65 + c)}${size - r}`);
-          }, isExp, gameTheme);
+          }, isExp, gameTheme, isInteractive);
           break;
         case 'spirit_cards':
           this.renderSpiritCards(target, viewPayload, onMoveSubmit, isExp, gameTheme);
@@ -646,6 +756,7 @@ export const SpiritverseGames = {
     const board = gameData.board || [];
     const spiritkinHand = gameData.spiritkinHand || [];
     const realmPoints = gameData.realmPoints || { user: 0, spiritkin: 0 };
+    const isUsersTurn = gameData.status !== 'ended' && gameData.turn === 'user';
     const userBoard = board.filter((entry) => entry?.owner === "user");
     const spiritkinBoard = board.filter((entry) => entry?.owner === "spiritkin");
     const root = resolveTarget(container);
@@ -656,7 +767,7 @@ export const SpiritverseGames = {
         <div class="spiritkin-area">
           <div class="spirit-cards-zone-label">Spiritkin Presence</div>
           <div class="spirit-cards-grid">
-            ${spiritkinHand.map((card, i) => `
+            ${spiritkinHand.length ? spiritkinHand.map((card, i) => `
               <div class="spirit-card-tile spirit-card-spiritkin" data-spirit-card="${i}">
                 <div class="spirit-card-glyph">${spiritCardGlyph(card)}</div>
                 <div class="spirit-card-name">${card.name}</div>
@@ -692,7 +803,7 @@ export const SpiritverseGames = {
               <div class="game-help-card-label">Board Presence</div>
               <p>${board.length ? `${board.length} card${board.length === 1 ? '' : 's'} are in play. Reach 15 realm points first.` : 'No cards are in play yet. Draw or play a card to begin shaping the realm.'}</p>
             </div>
-            <button class="echo-submit-btn spirit-cards-draw-btn" data-action="cards-draw" ${gameData.status === 'ended' ? 'disabled' : ''}>Draw a Card</button>
+            <button class="echo-submit-btn spirit-cards-draw-btn" data-action="cards-draw" ${!isUsersTurn ? 'disabled' : ''}>Draw a Card</button>
           </div>
         </div>
 
@@ -726,18 +837,18 @@ export const SpiritverseGames = {
         <div class="player-hand">
           <div class="spirit-cards-zone-label">Your Hand</div>
           <div class="spirit-cards-grid">
-            ${hand.map((card, i) => `
-              <button class="spirit-card-tile spirit-card-player" data-action="cards-play-card" data-card-idx="${i}" ${gameData.status === 'ended' ? 'disabled' : ''}>
+            ${hand.length ? hand.map((card, i) => `
+              <button class="spirit-card-tile spirit-card-player" data-action="cards-play-card" data-card-idx="${i}" ${!isUsersTurn ? 'disabled' : ''}>
                 <div class="spirit-card-glyph">${spiritCardGlyph(card)}</div>
                 <div class="spirit-card-name">${card.name}</div>
                 <div class="spirit-card-meta">Cost ${card.cost} • Power ${card.power}</div>
                 <div class="spirit-card-meta">${card.type}</div>
               </button>
-            `).join('')}
+            `).join('') : `<div class="spirit-cards-hint">${isUsersTurn ? 'Your hand is empty. Draw a card to continue.' : 'Waiting for the Spiritkin to answer the board.'}</div>`}
           </div>
         </div>
         
-        <div class="spirit-cards-hint">Tap a card to play it. Use Draw if you need more options in hand.</div>
+        <div class="spirit-cards-hint">${isUsersTurn ? 'Tap a card to play it. Use Draw if you need more options in hand.' : 'The Spiritkin is resolving the board. Your next hand opens when the turn returns.'}</div>
       </div>
     `;
     
@@ -758,6 +869,7 @@ export const SpiritverseGames = {
     const riddle = gameData.riddle || "A riddle awaits...";
     const attempts = gameData.attempts || 0;
     const maxAttempts = gameData.maxAttempts || 3;
+    const isUsersTurn = gameData.status !== 'ended' && gameData.turn === 'user';
     const root = resolveTarget(container);
     if (!root) return;
     
@@ -770,13 +882,13 @@ export const SpiritverseGames = {
           <div class="echo-attempt-pips">
             ${Array.from({length: maxAttempts}).map((_, i) => `
               <div class="echo-attempt-pip ${i < attempts ? 'used' : 'available'}"></div>
-            `).join('')}
+            `).join('') : `<div class="spirit-cards-hint">Your companion is gathering their next draw.</div>`}
           </div>
           <div class="echo-attempt-copy">Attempts: ${attempts}/${maxAttempts}</div>
           
           <div class="echo-answer-row">
-            <input type="text" class="echo-answer-input" data-action="echo-input-change" value="${escapeAttribute(this.echoAnswer || '')}" placeholder="Your answer..." />
-            <button class="echo-submit-btn" data-action="echo-submit-direct" ${gameData.status === 'ended' ? 'disabled' : ''}>Submit</button>
+            <input type="text" class="echo-answer-input" data-action="echo-input-change" value="${escapeAttribute(this.echoAnswer || '')}" placeholder="${isUsersTurn ? 'Your answer...' : 'Waiting for the next trial turn...'}" ${!isUsersTurn ? 'disabled' : ''} />
+            <button class="echo-submit-btn" data-action="echo-submit-direct" ${!isUsersTurn ? 'disabled' : ''}>Submit</button>
           </div>
         </div>
       </div>
@@ -815,18 +927,19 @@ export const SpiritverseGames = {
     const board = gameData.board || Array(9).fill(null);
     const winner = gameData.winner || null;
     const finished = Boolean(gameData.result || winner || board.every(Boolean));
+    const isUsersTurn = !finished && gameData.turn === 'user';
     const root = resolveTarget(container);
     if (!root) return;
     const html = `
       <div class="sv-mini-game sv-ttt">
         <div class="sv-mini-grid sv-ttt-grid">
           ${board.map((cell, idx) => `
-            <button class="sv-mini-cell ttt-cell ${cell === 'X' ? 'mark-user' : cell === 'O' ? 'mark-spiritkin' : ''}" data-action="ttt-cell-click" data-idx="${idx}" ${cell || finished ? "disabled" : ""}>
+            <button class="sv-mini-cell ttt-cell ${cell === 'X' ? 'mark-user' : cell === 'O' ? 'mark-spiritkin' : ''}" data-action="ttt-cell-click" data-idx="${idx}" ${cell || !isUsersTurn ? "disabled" : ""}>
               ${cell || ""}
             </button>
           `).join('')}
         </div>
-        <div class="sv-mini-caption">${gameData.result?.isDraw ? 'The grid resolved into a draw.' : winner ? `${winner === 'X' ? 'You' : 'Spiritkin'} aligned the line.` : 'Claim three in a line.'}</div>
+        <div class="sv-mini-caption">${gameData.result?.isDraw ? 'The grid resolved into a draw.' : winner ? `${winner === 'X' ? 'You' : 'Spiritkin'} aligned the line.` : (isUsersTurn ? 'Claim three in a line.' : 'The Spiritkin is answering your last mark.')}</div>
       </div>
     `;
     root.innerHTML = withThemeFrame(html, 'tictactoe', theme, isExpanded ? 'sv-theme-expanded' : '');
@@ -841,12 +954,13 @@ export const SpiritverseGames = {
   renderConnectFour(container, gameData, onMoveSubmit, isExpanded, theme = resolveGameTheme("connect_four")) {
     const board = gameData.board || Array(42).fill(null);
     const finished = Boolean(gameData.result || gameData.winner || !board.includes(null));
+    const isUsersTurn = !finished && gameData.turn === 'user';
     const root = resolveTarget(container);
     if (!root) return;
     const html = `
       <div class="sv-mini-game sv-connect4">
         <div class="sv-connect4-head">
-          ${Array.from({ length: 7 }, (_, col) => `<button class="sv-connect4-drop" data-action="connect4-column-click" data-col="${col}" ${finished ? "disabled" : ""}>Drop</button>`).join('')}
+          ${Array.from({ length: 7 }, (_, col) => `<button class="sv-connect4-drop" data-action="connect4-column-click" data-col="${col}" ${!isUsersTurn ? "disabled" : ""}>Drop</button>`).join('')}
         </div>
         <div class="sv-connect4-grid">
           ${board.map((cell, idx) => `<button class="sv-mini-cell connect4-cell ${cell === 'U' ? 'user' : cell === 'S' ? 'spiritkin' : ''}" data-action="connect4-column-click" data-col="${idx % 7}" ${finished ? "disabled" : ""}>${cell === 'U' ? '●' : cell === 'S' ? '◉' : ''}</button>`).join('')}
@@ -879,6 +993,60 @@ export const SpiritverseGames = {
           }).join('')}
         </div>
         <div class="sv-mini-caption">${gameData.winner ? `${gameData.winner === 'user' ? 'You' : 'Spiritkin'} found every hidden vessel.` : 'Search the deep grid for the hidden fleet.'}</div>
+      </div>
+    `;
+    root.innerHTML = withThemeFrame(html, 'battleship', theme, isExpanded ? 'sv-theme-expanded' : '');
+    if (isExpanded) {
+      bindClicks(root, '[data-action="battleship-cell-click"]', (element) => {
+        const idx = element.dataset.idx;
+        if (idx !== undefined && !element.disabled) onMoveSubmit(String(idx));
+      });
+    }
+  },
+
+  renderConnectFour(container, gameData, onMoveSubmit, isExpanded, theme = resolveGameTheme("connect_four")) {
+    const board = gameData.board || Array(42).fill(null);
+    const finished = Boolean(gameData.result || gameData.winner || !board.includes(null));
+    const isUsersTurn = !finished && gameData.turn === 'user';
+    const root = resolveTarget(container);
+    if (!root) return;
+    const html = `
+      <div class="sv-mini-game sv-connect4">
+        <div class="sv-connect4-head">
+          ${Array.from({ length: 7 }, (_, col) => `<button class="sv-connect4-drop" data-action="connect4-column-click" data-col="${col}" ${!isUsersTurn ? "disabled" : ""}>Drop</button>`).join('')}
+        </div>
+        <div class="sv-connect4-grid">
+          ${board.map((cell, idx) => `<button class="sv-mini-cell connect4-cell ${cell === 'U' ? 'user' : cell === 'S' ? 'spiritkin' : ''}" data-action="connect4-column-click" data-col="${idx % 7}" ${!isUsersTurn ? "disabled" : ""}>${cell === 'U' ? '●' : cell === 'S' ? '◉' : ''}</button>`).join('')}
+        </div>
+        <div class="sv-mini-caption">${gameData.result?.isDraw ? 'The board filled into a draw.' : gameData.winner ? `${gameData.winner === 'U' ? 'You' : 'Spiritkin'} connected four.` : (isUsersTurn ? 'Drop a star into any column.' : 'The Spiritkin is reading the column structure.')}</div>
+      </div>
+    `;
+    root.innerHTML = withThemeFrame(html, 'connect_four', theme, isExpanded ? 'sv-theme-expanded' : '');
+    if (isExpanded) {
+      bindClicks(root, '[data-action="connect4-column-click"]', (element) => {
+        const col = element.dataset.col;
+        if (col !== undefined && !element.disabled) onMoveSubmit(String(col));
+      });
+    }
+  },
+
+  renderBattleship(container, gameData, onMoveSubmit, isExpanded, theme = resolveGameTheme("battleship")) {
+    const guesses = new Set(gameData.userGuesses || []);
+    const hits = new Set(gameData.hits?.user || []);
+    const finished = Boolean(gameData.result || gameData.winner);
+    const isUsersTurn = !finished && gameData.turn === 'user';
+    const root = resolveTarget(container);
+    if (!root) return;
+    const html = `
+      <div class="sv-mini-game sv-battleship">
+        <div class="sv-battleship-grid">
+          ${Array.from({ length: 25 }, (_, idx) => {
+            const guessed = guesses.has(idx);
+            const hit = hits.has(idx);
+            return `<button class="sv-mini-cell battleship-cell ${hit ? 'hit' : guessed ? 'miss' : ''}" data-action="battleship-cell-click" data-idx="${idx}" ${guessed || !isUsersTurn ? "disabled" : ""}>${hit ? '✦' : guessed ? '•' : ''}</button>`;
+          }).join('')}
+        </div>
+        <div class="sv-mini-caption">${gameData.winner ? `${gameData.winner === 'user' ? 'You' : 'Spiritkin'} found every hidden vessel.` : (isUsersTurn ? 'Search the deep grid for the hidden fleet.' : 'The deep grid is shifting while the Spiritkin answers your last strike.')}</div>
       </div>
     `;
     root.innerHTML = withThemeFrame(html, 'battleship', theme, isExpanded ? 'sv-theme-expanded' : '');

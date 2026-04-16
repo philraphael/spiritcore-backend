@@ -255,7 +255,9 @@
 }
 
 .sv-theme-expanded {
-  min-width: min(72vw, 760px);
+  width: min(100%, 960px);
+  min-width: min(100%, 760px);
+  max-width: 100%;
   padding: 18px;
 }
 
@@ -264,8 +266,8 @@
 }
 
 .board-grand {
-  width: min(78vmin, 860px);
-  max-width: calc(100vw - 420px);
+  width: min(84vmin, 860px);
+  max-width: min(100%, calc(100vw - 420px), calc(100vh - 180px));
 }
 
 /* ============================================================
@@ -283,6 +285,7 @@
   grid-template-rows: 60px 1fr;
   animation: stageIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 @keyframes stageIn {
@@ -331,6 +334,8 @@
   gap: 10px;
   width: 100%;
   align-items: center;
+  max-width: min(100%, 760px);
+  margin: 0 auto;
 }
 
 .sv-mini-caption {
@@ -354,6 +359,7 @@
   font-size: 1.2rem;
   transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, background 0.22s ease;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 16px rgba(0,0,0,0.22);
+  min-width: 0;
 }
 
 .sv-mini-cell:hover:not(:disabled) {
@@ -445,6 +451,8 @@
   padding: clamp(18px, 4vw, 40px);
   perspective: 1200px; /* Crucial for 3D look */
   min-height: 0;
+  min-width: 0;
+  overflow: auto;
 }
 
 /* Spiritkin Sidebar in Grand Stage */
@@ -509,6 +517,9 @@
    3D ISOMETRIC BOARD STYLES
    ============================================================ */
 .board-3d-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
   transform-style: preserve-3d;
   transform: rotateX(16deg) rotateZ(-3deg); /* Keep some depth without crushing usability */
   transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
@@ -516,6 +527,16 @@
     -20px 40px 60px rgba(0,0,0,0.8),
     0 0 100px var(--game-glow);
   max-width: min(100%, 92vw);
+}
+
+.board-locked .chess-cell,
+.board-locked .checkers-cell,
+.board-locked .go-cell {
+  cursor: default;
+}
+
+.board-locked .go-hover-indicator {
+  display: none;
 }
 
 .board-3d-wrap:hover {
@@ -815,6 +836,7 @@
 
 .spirit-cards-grand {
   min-height: min(78vh, 920px);
+  align-content: start;
 }
 
 .spiritkin-area,
@@ -837,7 +859,7 @@
 
 .spirit-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
   gap: 0.75rem;
 }
 
@@ -968,7 +990,7 @@
   padding: 1rem;
   width: min(100%, 820px);
   min-height: 100%;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
 }
 
@@ -982,7 +1004,7 @@
   background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
   border: 1px solid var(--game-accent-soft);
   border-radius: 18px;
-  padding: 2rem;
+  padding: clamp(1.1rem, 2.8vw, 2rem);
   text-align: center;
   box-shadow: 0 16px 32px rgba(0,0,0,0.2), 0 0 24px var(--game-glow);
 }
@@ -1026,6 +1048,7 @@
 .echo-answer-row {
   display: flex;
   gap: 0.5rem;
+  align-items: stretch;
 }
 
 .echo-trials-arena {
@@ -1053,7 +1076,7 @@
   color: #fff;
   font-family: 'Manrope', sans-serif;
   font-size: 14px;
-  margin-bottom: 20px;
+  margin-bottom: 0;
   outline: none;
   transition: border-color 0.3s;
 }
@@ -1093,6 +1116,7 @@
   }
 
   .board-grand {
+    width: min(92vw, 720px);
     max-width: calc(100vw - 72px);
   }
 }
