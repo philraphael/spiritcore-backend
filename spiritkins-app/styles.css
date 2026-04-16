@@ -5167,7 +5167,11 @@ button[data-action="begin-quest"]:active,
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: saturate(1.05) contrast(1.04);
+  object-position: center center;
+  filter: none;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  image-rendering: auto;
 }
 
 .entry-gate-scrim,
