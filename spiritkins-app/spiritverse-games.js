@@ -613,6 +613,9 @@ export const SpiritverseGames = {
     const mana = gameData.mana || 5;
     const board = gameData.board || [];
     const spiritkinHand = gameData.spiritkinHand || [];
+    const realmPoints = gameData.realmPoints || { user: 0, spiritkin: 0 };
+    const userBoard = board.filter((entry) => entry?.owner === "user");
+    const spiritkinBoard = board.filter((entry) => entry?.owner === "spiritkin");
     const root = resolveTarget(container);
     if (!root) return;
     
@@ -642,12 +645,49 @@ export const SpiritverseGames = {
               <div class="mana-value">${gameData.spiritkinMana || 5}/5</div>
             </div>
           </div>
+          <div class="mana-display spirit-cards-score">
+            <div class="mana-stat">
+              <div class="mana-label">Your Realm Points</div>
+              <div class="mana-value">${realmPoints.user || 0}</div>
+            </div>
+            <div class="mana-stat">
+              <div class="mana-label">Spiritkin Realm Points</div>
+              <div class="mana-value">${realmPoints.spiritkin || 0}</div>
+            </div>
+          </div>
           <div class="spirit-cards-boardline">
             <div class="game-help-card">
               <div class="game-help-card-label">Board Presence</div>
-              <p>${board.length ? `${board.length} card${board.length === 1 ? '' : 's'} in play.` : 'No cards are in play yet. Draw or play a card to begin shaping the realm.'}</p>
+              <p>${board.length ? `${board.length} card${board.length === 1 ? '' : 's'} are in play. Reach 15 realm points first.` : 'No cards are in play yet. Draw or play a card to begin shaping the realm.'}</p>
             </div>
             <button class="echo-submit-btn spirit-cards-draw-btn" data-action="cards-draw" ${gameData.status === 'ended' ? 'disabled' : ''}>Draw a Card</button>
+          </div>
+        </div>
+
+        <div class="spirit-cards-board-columns">
+          <div class="player-hand">
+            <div class="spirit-cards-zone-label">Your Field</div>
+            <div class="spirit-cards-grid">
+              ${userBoard.length ? userBoard.map((card) => `
+                <div class="spirit-card-tile spirit-card-player">
+                  <div class="spirit-card-glyph">${spiritCardGlyph(card)}</div>
+                  <div class="spirit-card-name">${card.name}</div>
+                  <div class="spirit-card-meta">${card.type} • Power ${card.power}</div>
+                </div>
+              `).join('') : `<div class="spirit-cards-hint">Your field is empty.</div>`}
+            </div>
+          </div>
+          <div class="spiritkin-area">
+            <div class="spirit-cards-zone-label">Spiritkin Field</div>
+            <div class="spirit-cards-grid">
+              ${spiritkinBoard.length ? spiritkinBoard.map((card) => `
+                <div class="spirit-card-tile spirit-card-spiritkin">
+                  <div class="spirit-card-glyph">${spiritCardGlyph(card)}</div>
+                  <div class="spirit-card-name">${card.name}</div>
+                  <div class="spirit-card-meta">${card.type} • Power ${card.power}</div>
+                </div>
+              `).join('') : `<div class="spirit-cards-hint">Spiritkin field is empty.</div>`}
+            </div>
           </div>
         </div>
         

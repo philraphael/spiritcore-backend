@@ -924,6 +924,12 @@
   gap: 12px;
 }
 
+.spirit-cards-board-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .spirit-cards-boardline {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -1093,7 +1099,8 @@
 
 @media (max-width: 860px) {
   .game-help-grid,
-  .spirit-cards-boardline {
+  .spirit-cards-boardline,
+  .spirit-cards-board-columns {
     grid-template-columns: 1fr;
   }
 

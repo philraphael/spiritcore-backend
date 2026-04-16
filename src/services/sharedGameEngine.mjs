@@ -27,7 +27,19 @@ const GAME_REGISTRY = {
     instructions: "Play cards to gain Realm Points or challenge the Spiritkin's board.",
     createData: () => {
       const deck = generateCardDeck();
-      return { hand: deck.splice(0, 5), deck, discard: [], board: [], spiritkinHand: generateCardDeck().splice(0, 5), mana: 5, spiritkinMana: 5 };
+      const spiritkinDeck = generateCardDeck();
+      return {
+        hand: deck.splice(0, 5),
+        deck,
+        discard: [],
+        board: [],
+        spiritkinHand: spiritkinDeck.splice(0, 5),
+        spiritkinDeck,
+        spiritkinDiscard: [],
+        mana: 5,
+        spiritkinMana: 5,
+        realmPoints: { user: 0, spiritkin: 0 },
+      };
     },
   },
   echo_trials: {
@@ -134,7 +146,16 @@ export function createSharedGameRuntime() {
     if (game.type === "tictactoe") return chooseTicTacToeMove(game.data.board, player === "user" ? "X" : "O");
     if (game.type === "connect_four") return String(firstPlayableColumn(game.data.board));
     if (game.type === "battleship") return String(firstUnguessedCell(game.data, player));
-    if (game.type === "spirit_cards") return "draw";
+    if (game.type === "spirit_cards") {
+      const hand = player === "user" ? (game.data.hand || []) : (game.data.spiritkinHand || []);
+      const mana = player === "user" ? Number(game.data.mana || 0) : Number(game.data.spiritkinMana || 0);
+      const playable = hand
+        .filter((card) => Number(card?.cost || 0) <= mana)
+        .sort((a, b) => Number(b?.power || 0) - Number(a?.power || 0))[0];
+      if (playable?.name) return `play:${playable.name}`;
+      const deck = player === "user" ? (game.data.deck || []) : (game.data.spiritkinDeck || []);
+      return deck.length ? "draw" : null;
+    }
     if (game.type === "echo_trials") return null;
     return null;
   }
@@ -341,18 +362,36 @@ function applyBattleshipMove(game, move, player) {
 function applyEchoTrialsMove(game, move) {
   const answer = String(move || "").trim().toLowerCase();
   game.data.attempts = Number(game.data.attempts || 0) + 1;
-  if (answer === game.data.answer) game.status = "ended";
-  if (game.data.attempts >= game.data.maxAttempts) game.status = "ended";
+  if (answer === game.data.answer) {
+    setOutcome(game, {
+      winner: "user",
+      reason: "riddle-solved",
+      label: "You solved the Echo Trial."
+    });
+  } else if (game.data.attempts >= game.data.maxAttempts) {
+    setOutcome(game, {
+      winner: "spiritkin",
+      reason: "attempts-exhausted",
+      label: "The Echo Trial closed before the right answer surfaced."
+    });
+  }
   game.data.lastMove = answer;
   return true;
 }
 
 function applySpiritCardsMove(game, move, player) {
+  const handKey = player === "user" ? "hand" : "spiritkinHand";
+  const deckKey = player === "user" ? "deck" : "spiritkinDeck";
+  const discardKey = player === "user" ? "discard" : "spiritkinDiscard";
+  const manaKey = player === "user" ? "mana" : "spiritkinMana";
+  const opponentManaKey = player === "user" ? "spiritkinMana" : "mana";
+  const owner = player === "user" ? "user" : "spiritkin";
+  const pointKey = owner;
+
   if (move === "draw") {
-    const deck = game.data.deck || [];
+    const deck = game.data[deckKey] || [];
     const drawn = deck.shift();
     if (drawn) {
-      const handKey = player === "user" ? "hand" : "spiritkinHand";
       game.data[handKey].push(drawn);
       game.data.lastMove = move;
       return true;
@@ -360,7 +399,43 @@ function applySpiritCardsMove(game, move, player) {
     return false;
   }
   if (/^play[:_]/.test(move)) {
+    const cardName = String(move).slice(5).trim().toLowerCase();
+    const hand = Array.isArray(game.data[handKey]) ? game.data[handKey] : [];
+    const cardIndex = hand.findIndex((card) => String(card?.name || "").trim().toLowerCase() === cardName);
+    if (cardIndex === -1) return false;
+    const card = hand[cardIndex];
+    const availableMana = Number(game.data[manaKey] || 0);
+    const cost = Number(card?.cost || 0);
+    if (cost > availableMana) return false;
+
+    hand.splice(cardIndex, 1);
+    game.data[discardKey] = Array.isArray(game.data[discardKey]) ? game.data[discardKey] : [];
+    game.data[discardKey].push(card);
+    game.data.board = Array.isArray(game.data.board) ? game.data.board : [];
+    game.data.board.push({
+      owner,
+      cardId: card.id,
+      name: card.name,
+      type: card.type,
+      cost,
+      power: Number(card?.power || 0),
+    });
+    game.data.realmPoints = game.data.realmPoints && typeof game.data.realmPoints === "object"
+      ? game.data.realmPoints
+      : { user: 0, spiritkin: 0 };
+    game.data.realmPoints[pointKey] = Number(game.data.realmPoints[pointKey] || 0) + Number(card?.power || 0);
+    game.data[manaKey] = Math.max(0, availableMana - cost);
+    game.data[opponentManaKey] = 5;
     game.data.lastMove = move;
+    if (game.data.realmPoints[pointKey] >= 15) {
+      setOutcome(game, {
+        winner: owner,
+        reason: "realm-points",
+        label: owner === "user"
+          ? "You shaped the stronger realm and won Spirit-Cards."
+          : "Your Spiritkin shaped the stronger realm and won Spirit-Cards."
+      });
+    }
     return true;
   }
   return false;
