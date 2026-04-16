@@ -106,7 +106,7 @@ const GrandStage = {
         <div class="gs-sidebar-section">
           <div class="gs-sidebar-label">Presence</div>
           <div class="gs-commentary-bubble">
-            <div class="gs-commentary-text" id="gs-commentary">"The board is set, Traveler. Let us see where the resonance leads."</div>
+            <div class="gs-commentary-text" id="gs-commentary">"I'm ready. Make your move."</div>
           </div>
         </div>
         <div class="gs-sidebar-section">
@@ -406,7 +406,7 @@ export const SpiritverseGames = {
     const gameTheme = resolveGameTheme(type, theme);
     const payload = getGamePayload(gameData);
     const viewPayload = { ...payload, status: gameData.status, result: gameData.result };
-    const gameCommentary = commentary || gameData.commentary || "The board is yours.";
+    const gameCommentary = commentary || gameData.commentary || "Your move.";
     const history = gameData.history || [];
     const chessFen = payload.fen || gameData.fen;
     const board = payload.board || gameData.board;
@@ -466,7 +466,7 @@ export const SpiritverseGames = {
     const gameTheme = resolveGameTheme(type, theme);
     const payload = getGamePayload(gameData);
     const viewPayload = { ...payload, status: gameData.status, result: gameData.result };
-    const commentary = gameData.commentary || "The board is set. Let us see where the resonance leads.";
+    const commentary = gameData.commentary || "I'm ready. Show me what you've got.";
     const history = gameData.history || [];
     const chessFen = payload.fen || gameData.fen;
     const board = payload.board || gameData.board;

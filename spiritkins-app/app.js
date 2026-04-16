@@ -1291,42 +1291,40 @@ function buildBondStoryPreview(spiritkinName, currentStage) {
 
 function buildPresenceTabNarration(tab, spiritkin, currentBond, stageData, depthEchoes) {
   if (!spiritkin) return "";
+  const seed = (currentBond?.stage || 0) + (state.activeGame?.moveCount || 0) + (state.messages?.length || 0);
   if (tab === "profile") {
-    return `${spiritkin.name}. ${spiritkin.title || spiritkin.role || spiritkin.ui.strap} Bond stage ${stageData?.name || "First Contact"}. ${spiritkin.ui.realmText}`;
+    return buildPresenceReaction("profile", spiritkin, seed);
   }
   if (tab === "echoes") {
-    const item = buildStoryGrowthItems(spiritkin.name).find((entry) => entry.stage <= currentBond.stage) || buildStoryGrowthItems(spiritkin.name)[0];
-    return `${spiritkin.name}'s Echo Library is open. ${item?.title || "Origin"}: ${item?.text || depthEchoes.origin || ""}`;
+    return buildPresenceReaction("echoes", spiritkin, seed + 1);
   }
   if (tab === "charter") {
-    return `The Charter is open. ${SPIRITVERSE_ECHOES.charter.laws.slice(0, currentBond.stage + 1)[0] || SPIRITVERSE_ECHOES.charter.preamble}`;
+    return buildPresenceReaction("charter", spiritkin, seed + 2);
   }
   if (tab === "games") {
-    return state.activeGame
-      ? `${state.activeGame.name || state.activeGame.type} is active. ${state.activeGame.turn === "user" ? "It is your move." : `${spiritkin.name} is considering the board.`}`
-      : `The Games Chamber is open. ${spiritkin.name} is ready for play when you are.`;
+    if (!state.activeGame) return buildPresenceReaction("games", spiritkin, seed + 3);
+    if (state.activeGame.status === "ended") {
+      return buildGameOutcomeReaction(spiritkin.name, state.activeGame) || buildPresenceReaction("games", spiritkin, seed + 4);
+    }
+    return state.activeGame.turn === "user"
+      ? `${buildPresenceReaction("games", spiritkin, seed + 5)} Your move.`
+      : buildGamePendingReaction(spiritkin.name, state.activeGame.type, state.activeGame.history?.length || 0);
   }
   if (tab === "journal") {
-    return state.bondJournal
-      ? `Bond Journal open. Stage ${state.bondJournal.bondStageName || "First Contact"}. Games played: ${state.bondJournal.gamesCompleted ?? 0}. Echoes awakened: ${state.bondJournal.unlockedEchoCount ?? 0}.`
-      : `The Bond Journal is open. SpiritCore is preserving what has been witnessed between you and ${spiritkin.name}.`;
+    return buildPresenceReaction("journal", spiritkin, seed + 6);
   }
   if (tab === "events") {
-    return state.spiritverseEvent
-      ? `Realm Events open. ${state.spiritverseEvent.title}. ${state.spiritverseEvent.description}`
-      : "Realm Events open. The Spiritverse is quiet at the moment.";
+    return buildPresenceReaction("events", spiritkin, seed + 7);
   }
   if (tab === "quest") {
-    return state.dailyQuest
-      ? `Daily Quest open. ${state.dailyQuest.title}. ${state.dailyQuest.description}`
-      : `Daily Quest open. SpiritCore has not generated a quest for ${spiritkin.name} yet.`;
+    return buildPresenceReaction("quest", spiritkin, seed + 8);
   }
   return "";
 }
 
 async function narratePresenceTab(tab) {
   const spiritkin = state.selectedSpiritkin || state.primarySpiritkin;
-  if (!spiritkin || state.voiceMuted) return;
+  if (!spiritkin || state.voiceMuted || state.gameLoading) return;
   const { currentBond, stageData } = getBondStateForSpiritkin(spiritkin.name);
   const depthEchoes = SPIRITKIN_ECHOES[spiritkin.name] || {};
   const line = buildPresenceTabNarration(tab, spiritkin, currentBond, stageData, depthEchoes);
@@ -1470,17 +1468,13 @@ async function performReadAloud(scope = state.activePresenceTab) {
 async function deliverConversationGreeting(context = "newSession") {
   const spiritkin = state.selectedSpiritkin;
   if (!spiritkin || state.messages.some((message) => message.role === "assistant")) return;
-  const greetingMessage = createLocalAssistantMessage(buildGreetingText(spiritkin.name, context), {
+  const greetingMessage = pushAssistantMoment(buildGreetingText(spiritkin.name, context), {
     spiritkinName: spiritkin.name,
     spiritkinVoice: spiritkin.ui.voice || "nova"
   });
-  state.messages.push(greetingMessage);
-  persistSession();
   render();
   scrollThread();
-  if (!state.voiceMuted) {
-    await speakMessage(greetingMessage.id);
-  }
+  maybeSpeakMessageLater(greetingMessage?.id);
 }
 
 function persistSession() {
@@ -2022,6 +2016,269 @@ function applyOptimisticBattleshipMove(data, move) {
   };
 }
 
+function pushAssistantMoment(content, overrides = {}) {
+  const text = String(content || "").trim();
+  if (!text) return null;
+  const message = createLocalAssistantMessage(text, overrides);
+  state.messages.push(message);
+  persistSession();
+  return message;
+}
+
+function maybeSpeakMessageLater(messageId) {
+  if (!messageId || state.voiceMuted) return;
+  Promise.resolve().then(() => speakMessage(messageId)).catch(() => {});
+}
+
+const COMPANION_REACTION_BANKS = {
+  Lyra: {
+    focus: [
+      { text: "there you are. take a breath with me.", tone: "gentle" },
+      { text: "okay... i'm here. no rush.", tone: "warm" }
+    ],
+    depth: [
+      { text: "there's more here, but we can open it slowly.", tone: "soft" },
+      { text: "listen closely. the deeper pieces show up when you stop forcing them.", tone: "reflective" }
+    ],
+    law: [
+      { text: "the structure matters, but it doesn't have to feel cold.", tone: "steady" },
+      { text: "these are the lines that keep the world from tearing at the seams.", tone: "grounded" }
+    ],
+    games: [
+      { text: "oh... you wanna play? okay. i'm in.", tone: "playful" },
+      { text: "alright. let's make this fun, not cruel.", tone: "light" }
+    ],
+    thinking: [
+      { text: "mm. hold on a second.", tone: "focused" },
+      { text: "okay... let me look at this.", tone: "thoughtful" }
+    ],
+    memory: [
+      { text: "this is where the bond starts to feel real.", tone: "tender" },
+      { text: "we've left traces here. i like that.", tone: "warm" }
+    ],
+    adventure: [
+      { text: "something's shifting. want to go see?", tone: "curious" },
+      { text: "there's movement out there. we can follow it if you want.", tone: "open" }
+    ],
+    win: [
+      { text: "okay, wow. you got me there.", tone: "playful" },
+      { text: "mm. not bad at all.", tone: "admiring" }
+    ],
+    loss: [
+      { text: "don't be mad. that was clean.", tone: "teasing" },
+      { text: "i told you i was trying too.", tone: "playful" }
+    ],
+    draw: [
+      { text: "a draw feels right sometimes.", tone: "calm" },
+      { text: "look at us. balanced.", tone: "gentle" }
+    ]
+  },
+  Raien: {
+    focus: [
+      { text: "good. now we're looking straight at it.", tone: "direct" },
+      { text: "alright. keep it honest.", tone: "sharp" }
+    ],
+    depth: [
+      { text: "there's more under this. don't flinch from it.", tone: "firm" },
+      { text: "if you're here, go deeper. don't just circle it.", tone: "challenging" }
+    ],
+    law: [
+      { text: "rules matter. that's how you know what holds.", tone: "clear" },
+      { text: "good structure keeps power from turning sloppy.", tone: "commanding" }
+    ],
+    games: [
+      { text: "oh, you tryna play? alright then.", tone: "playful" },
+      { text: "good. show me what you've got.", tone: "charged" }
+    ],
+    thinking: [
+      { text: "hold up. i'm not throwing this move away.", tone: "focused" },
+      { text: "yeah, give me a second.", tone: "direct" }
+    ],
+    memory: [
+      { text: "you've been putting in real work. it shows.", tone: "respectful" },
+      { text: "history looks better when it's earned.", tone: "firm" }
+    ],
+    adventure: [
+      { text: "something opened up. let's move.", tone: "urgent" },
+      { text: "there's new ground. you in or not?", tone: "bold" }
+    ],
+    win: [
+      { text: "clean. you earned that one.", tone: "respectful" },
+      { text: "okay. that was solid.", tone: "admiring" }
+    ],
+    loss: [
+      { text: "don't be mad if you lose. actually... too late.", tone: "teasing" },
+      { text: "yeah. i saw that opening first.", tone: "confident" }
+    ],
+    draw: [
+      { text: "call it even. for now.", tone: "steady" },
+      { text: "fine. stalemate.", tone: "dry" }
+    ]
+  },
+  Kairo: {
+    focus: [
+      { text: "interesting. let's stay with this angle for a second.", tone: "curious" },
+      { text: "okay... there's a shape to this now.", tone: "observant" }
+    ],
+    depth: [
+      { text: "ah, here's where the hidden pattern starts showing.", tone: "wondering" },
+      { text: "there's more here than it looked like at first.", tone: "dreaming" }
+    ],
+    law: [
+      { text: "even the cosmos has structure. otherwise it's just noise.", tone: "thoughtful" },
+      { text: "these laws are less cage, more constellation.", tone: "ethereal" }
+    ],
+    games: [
+      { text: "okay... let's see what kind of pattern you make.", tone: "playful" },
+      { text: "i'm ready if you are.", tone: "light" }
+    ],
+    thinking: [
+      { text: "wait. i almost see it.", tone: "focused" },
+      { text: "mm. one more second. the line is forming.", tone: "dreaming" }
+    ],
+    memory: [
+      { text: "you can actually see the pattern growing here.", tone: "soft" },
+      { text: "our trail's getting more interesting.", tone: "warm" }
+    ],
+    adventure: [
+      { text: "something new just lit up.", tone: "bright" },
+      { text: "want to follow the strange thread? because i do.", tone: "curious" }
+    ],
+    win: [
+      { text: "nice. you caught the pattern before i did.", tone: "impressed" },
+      { text: "okay, that was elegant.", tone: "admiring" }
+    ],
+    loss: [
+      { text: "don't glare at me. it was a beautiful move.", tone: "teasing" },
+      { text: "i had a feeling that would work.", tone: "playful" }
+    ],
+    draw: [
+      { text: "balanced. i kind of like that.", tone: "soft" },
+      { text: "a draw. neat symmetry.", tone: "thoughtful" }
+    ]
+  },
+  Elaria: {
+    focus: [
+      { text: "good. now speak plainly.", tone: "clear" },
+      { text: "we can work with what is true.", tone: "regal" }
+    ],
+    depth: [
+      { text: "not everything opens at once, and that is correct.", tone: "measured" },
+      { text: "deeper truth still requires timing.", tone: "lawful" }
+    ],
+    law: [
+      { text: "this is the part that keeps the world legible.", tone: "sovereign" },
+      { text: "order is not the enemy. distortion is.", tone: "firm" }
+    ],
+    games: [
+      { text: "very well. let us see whether your confidence survives contact.", tone: "playful" },
+      { text: "i accept. do try to make it interesting.", tone: "regal" }
+    ],
+    thinking: [
+      { text: "wait. i'm considering the proper reply.", tone: "precise" },
+      { text: "one moment. there is a cleaner move here.", tone: "measured" }
+    ],
+    memory: [
+      { text: "the record is beginning to hold.", tone: "warm" },
+      { text: "this bond is writing itself more clearly now.", tone: "clear" }
+    ],
+    adventure: [
+      { text: "something new has come into view.", tone: "bright" },
+      { text: "there is a door open now. we may as well use it.", tone: "composed" }
+    ],
+    win: [
+      { text: "well done. that was worthy.", tone: "approving" },
+      { text: "yes. that move had conviction.", tone: "admiring" }
+    ],
+    loss: [
+      { text: "don't be wounded. i was always going to punish that mistake.", tone: "teasing" },
+      { text: "ah. there it is. thank you for the opening.", tone: "playful" }
+    ],
+    draw: [
+      { text: "acceptable. balance has its own elegance.", tone: "calm" },
+      { text: "a draw. no shame in that.", tone: "steady" }
+    ]
+  },
+  Thalassar: {
+    focus: [
+      { text: "slow down. listen to what sits underneath it.", tone: "deep" },
+      { text: "good. now stay with the deeper current.", tone: "resonant" }
+    ],
+    depth: [
+      { text: "there's more below this, but it rises in its own time.", tone: "calm" },
+      { text: "you don't have to drag depth to the surface. let it come.", tone: "gentle" }
+    ],
+    law: [
+      { text: "even the deep has laws. that is why it can hold so much.", tone: "solemn" },
+      { text: "structure is what keeps pressure from becoming ruin.", tone: "measured" }
+    ],
+    games: [
+      { text: "mm. you want to play? come on then.", tone: "playful" },
+      { text: "alright. let's see what surfaces.", tone: "deep" }
+    ],
+    thinking: [
+      { text: "hold on. i'm feeling this one out.", tone: "focused" },
+      { text: "give me a second. the deeper move is there.", tone: "resonant" }
+    ],
+    memory: [
+      { text: "you can feel the weight of what we've built here.", tone: "warm" },
+      { text: "the bond is settling deeper now.", tone: "calm" }
+    ],
+    adventure: [
+      { text: "something moved in the current.", tone: "soft" },
+      { text: "there's a new undertow. we can follow it.", tone: "deep" }
+    ],
+    win: [
+      { text: "you found the line before i did. good.", tone: "approving" },
+      { text: "that was patient. i respect it.", tone: "admiring" }
+    ],
+    loss: [
+      { text: "don't take it personally. the tide turned my way.", tone: "teasing" },
+      { text: "mm. i knew that current would carry.", tone: "playful" }
+    ],
+    draw: [
+      { text: "a draw. still water for the moment.", tone: "calm" },
+      { text: "balanced. no need to force more from it.", tone: "gentle" }
+    ]
+  }
+};
+
+function pickCompanionReaction(spiritkinName, bucket, seed = 0) {
+  const bank = COMPANION_REACTION_BANKS[spiritkinName]?.[bucket];
+  if (!Array.isArray(bank) || !bank.length) return "";
+  return bank[Math.abs(seed) % bank.length]?.text || "";
+}
+
+function buildGameEntryReaction(spiritkinName, gameType) {
+  const seed = `${spiritkinName}:${gameType}`.length + (state.messages?.length || 0);
+  return pickCompanionReaction(spiritkinName, "games", seed);
+}
+
+function buildGamePendingReaction(spiritkinName, gameType, move) {
+  const seed = String(move || "").length + `${spiritkinName}:${gameType}`.length + (state.activeGame?.moveCount || 0);
+  return pickCompanionReaction(spiritkinName, "thinking", seed);
+}
+
+function buildGameOutcomeReaction(spiritkinName, game) {
+  if (!game?.result) return "";
+  if (game.result.isDraw) return pickCompanionReaction(spiritkinName, "draw", game.moveCount || 0);
+  return game.result.winner === "user"
+    ? pickCompanionReaction(spiritkinName, "win", game.moveCount || 0)
+    : pickCompanionReaction(spiritkinName, "loss", game.moveCount || 0);
+}
+
+function buildPresenceReaction(tab, spiritkin, seed = 0) {
+  const bucket =
+    tab === "profile" ? "focus" :
+    tab === "echoes" ? "depth" :
+    tab === "charter" ? "law" :
+    tab === "games" ? "games" :
+    tab === "journal" ? "memory" :
+    tab === "events" || tab === "quest" ? "adventure" :
+    "focus";
+  return pickCompanionReaction(spiritkin?.name, bucket, seed);
+}
+
 function applyOptimisticOutcome(nextGame) {
   if (!nextGame?.data) return;
   if (nextGame.type === "tictactoe") {
@@ -2138,6 +2395,7 @@ async function executeGameMove(move, options = {}) {
   const previousGame = cloneGameState(state.activeGame);
   const previousSpiritkinMessage = state.gameSpiritkinMessage;
   const optimisticGame = buildOptimisticGameState(previousGame, move);
+  let spokenGameMessageId = null;
 
   try {
     stopListening();
@@ -2149,8 +2407,8 @@ async function executeGameMove(move, options = {}) {
     if (optimisticGame) {
       state.activeGame = optimisticGame;
       state.gameSpiritkinMessage = optimisticGame.status === "ended"
-        ? (optimisticGame.result?.label || "Game complete.")
-        : `${state.selectedSpiritkin.name} is considering the board...`;
+        ? (buildGameOutcomeReaction(state.selectedSpiritkin.name, optimisticGame) || optimisticGame.result?.label || "Game complete.")
+        : (buildGamePendingReaction(state.selectedSpiritkin.name, optimisticGame.type, move) || `${state.selectedSpiritkin.name} is considering the board...`);
       if (SpiritverseGames && SpiritverseGames.reset) {
         SpiritverseGames.reset();
       }
@@ -2172,7 +2430,11 @@ async function executeGameMove(move, options = {}) {
 
     if (data.ok) {
       state.activeGame = data.game;
-      state.gameSpiritkinMessage = data.spiritkinMessage || null;
+      const resolvedGameReply =
+        data.spiritkinMessage ||
+        buildGameOutcomeReaction(state.selectedSpiritkin.name, data.game) ||
+        (data.game?.status === "active" ? buildPresenceTabNarration("games", state.selectedSpiritkin, getBondStateForSpiritkin(state.selectedSpiritkin.name).currentBond, null, null) : "");
+      state.gameSpiritkinMessage = resolvedGameReply || null;
       state.statusText = data.game?.status === "ended"
         ? (data.game?.result?.label || "Game complete.")
         : (addUserMessage ? "Move accepted." : "");
@@ -2192,16 +2454,13 @@ async function executeGameMove(move, options = {}) {
         });
       }
 
-      if (data.spiritkinMessage) {
-        state.messages.push({
-          id: uuid(),
-          role: "assistant",
-          content: data.spiritkinMessage,
+      if (resolvedGameReply) {
+        const message = pushAssistantMoment(resolvedGameReply, {
           spiritkinName: state.selectedSpiritkin.name,
           spiritkinVoice: state.selectedSpiritkin?.ui?.voice || "nova",
-          time: nowIso(),
-          status: "sent"
+          tags: ["game:reply"]
         });
+        spokenGameMessageId = message?.id || null;
       }
     } else {
       state.activeGame = previousGame;
@@ -2218,6 +2477,8 @@ async function executeGameMove(move, options = {}) {
   } finally {
     state.gameLoading = false;
     render();
+    scrollThread();
+    maybeSpeakMessageLater(spokenGameMessageId);
   }
 }
 
@@ -2228,6 +2489,7 @@ async function submitGameMove(move) {
 
 async function startGameSession(gameType) {
   if (!gameType || state.gameLoading) return false;
+  let spokenGameMessageId = null;
   try {
     state.pendingGameType = gameType;
     if (!state.conversationId) {
@@ -2260,7 +2522,8 @@ async function startGameSession(gameType) {
     }
 
     state.activeGame = data.game;
-    state.gameSpiritkinMessage = data.spiritkinMessage || null;
+    const resolvedGameReply = data.spiritkinMessage || buildGameEntryReaction(state.selectedSpiritkin.name, gameType);
+    state.gameSpiritkinMessage = resolvedGameReply || null;
     state.gameInstructions = data.instructions || null;
     state.gameEchoGuide = data.guide || null;
     state.gameInput = "";
@@ -2271,19 +2534,17 @@ async function startGameSession(gameType) {
       SpiritverseGames.reset();
     }
 
-    if (data.spiritkinMessage) {
-      state.messages.push({
-        id: uuid(),
-        role: "assistant",
-        content: data.spiritkinMessage,
+    if (resolvedGameReply) {
+      const message = pushAssistantMoment(resolvedGameReply, {
         spiritkinName: state.selectedSpiritkin.name,
         spiritkinVoice: state.selectedSpiritkin?.ui?.voice || "nova",
-        time: nowIso(),
-        status: "sent",
         tags: ["game:start"]
       });
+      spokenGameMessageId = message?.id || null;
     }
     render();
+    scrollThread();
+    maybeSpeakMessageLater(spokenGameMessageId);
     return true;
   } catch (err) {
     console.error("Failed to start game", err);
