@@ -35,12 +35,35 @@ const MILESTONE_PHRASES = [
   "i forgive",
 ];
 
+const STABLE_MEMORY_TYPES = new Set([
+  MEMORY_TYPES.CORRECTION,
+  MEMORY_TYPES.MILESTONE,
+  MEMORY_TYPES.EMOTIONAL_ANCHOR,
+  MEMORY_TYPES.RELATIONSHIP_FACT,
+]);
+
+const SOFT_DECAY_MEMORY_TYPES = new Set([
+  MEMORY_TYPES.PREFERENCE,
+  MEMORY_TYPES.AVERSION,
+  MEMORY_TYPES.TONE_PREFERENCE,
+  MEMORY_TYPES.GAMEPLAY_TENDENCY,
+  MEMORY_TYPES.SPIRITUAL_PREFERENCE,
+  MEMORY_TYPES.RESPECT_PREFERENCE,
+  MEMORY_TYPES.RECURRING_TOPIC,
+  MEMORY_TYPES.RECURRING_PERSON,
+]);
+
 function clamp01(value, fallback = 0) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   if (number < 0) return 0;
   if (number > 1) return 1;
   return number;
+}
+
+function numberOrDefault(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
 }
 
 function normalizeTags(tags) {
@@ -55,6 +78,63 @@ function normalizeSummary(text) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 280);
+}
+
+function inferToneShiftSignals(text) {
+  const lower = String(text || "").toLowerCase();
+  return {
+    playful: /\b(lol|lmao|haha|banter|tease me|talk your shit|trash talk|come at me|don't go easy|play to win)\b/.test(lower),
+    calm: /\b(calm|gentle|soft|easy|keep it smooth|keep it respectful|keep it clean)\b/.test(lower),
+    spiritual: /\b(god|jesus|faith|prayer|church|spiritual|holy|sacred|religious)\b/.test(lower),
+    direct: /\b(be direct|be honest|tell me plainly|keep it straight)\b/.test(lower),
+  };
+}
+
+function computeDecayProfile(entry, referenceTime = nowIso()) {
+  const type = entry?.type || "";
+  const ageDays = entry?.createdAt ? Math.max(0, daysBetween(entry.createdAt, referenceTime)) : 180;
+  const lastReferencedAgeDays = entry?.lastReferencedAt ? Math.max(0, daysBetween(entry.lastReferencedAt, referenceTime)) : ageDays;
+  const reuseFactor = Math.min((entry?.reuseCount || 0) / 6, 1);
+  const stableType = STABLE_MEMORY_TYPES.has(type);
+  const softDecayType = SOFT_DECAY_MEMORY_TYPES.has(type);
+
+  let decayFloor = stableType ? 0.72 : softDecayType ? 0.34 : 0.5;
+  let decaySpeed = stableType ? 260 : softDecayType ? 75 : 150;
+  if (type === MEMORY_TYPES.CORRECTION) {
+    decayFloor = 0.58;
+    decaySpeed = 110;
+  }
+
+  const ageDecay = Math.exp(-ageDays / decaySpeed);
+  const freshnessRecovery = Math.exp(-lastReferencedAgeDays / Math.max(25, decaySpeed / 2));
+  const effectiveDecay = Math.max(decayFloor, ageDecay + (reuseFactor * 0.18) + (freshnessRecovery * 0.12));
+
+  return {
+    ageDays,
+    lastReferencedAgeDays,
+    reuseFactor,
+    effectiveDecay: clamp01(effectiveDecay, stableType ? 0.78 : decayFloor),
+  };
+}
+
+function buildAdaptiveStrength(entry, referenceTime = nowIso()) {
+  const decay = computeDecayProfile(entry, referenceTime);
+  const type = entry?.type || "";
+  const contradictionPenalty = clamp01(entry?.meta?.contradiction_penalty, 0);
+  const reinforcementBoost = clamp01(entry?.meta?.reinforcement_boost, 0);
+  let correctionFlex = type === MEMORY_TYPES.CORRECTION
+    ? Math.max(0.28, 1 - (contradictionPenalty * 0.75) + (reinforcementBoost * 0.2))
+    : 1;
+  if (STABLE_MEMORY_TYPES.has(type) && type !== MEMORY_TYPES.CORRECTION) correctionFlex = Math.max(correctionFlex, 0.92);
+
+  const adaptiveWeight = clamp01((decay.effectiveDecay * correctionFlex), type === MEMORY_TYPES.CORRECTION ? 0.38 : 0.2);
+  return {
+    ...decay,
+    contradictionPenalty,
+    reinforcementBoost,
+    correctionFlex,
+    adaptiveWeight,
+  };
 }
 
 function buildMetadata(entry, conversationId = null) {
@@ -372,6 +452,8 @@ export function normalizeStructuredMemoryRow(row) {
     retentionState: meta.retention_state || "active",
     relatedPeople: normalizeTags(meta.related_people),
     relatedTopics: normalizeTags(meta.related_topics),
+    contradictionPenalty: clamp01(meta.contradiction_penalty, 0),
+    reinforcementBoost: clamp01(meta.reinforcement_boost, 0),
     meta,
   };
 }
@@ -388,17 +470,19 @@ export function rankMemoryEntry(entry, { queryText = "", contextTags = [] } = {}
   const text = `${entry.normalizedSummary} ${(entry.tags || []).join(" ")} ${(entry.relatedTopics || []).join(" ")}`.toLowerCase();
   const matches = terms.filter((term) => text.includes(term)).length;
   const relevance = terms.length ? matches / Math.max(terms.length, 1) : 0.35;
-  const ageDays = entry.createdAt ? Math.max(0, daysBetween(entry.createdAt, nowIso())) : 365;
-  const freshness = Math.max(0.05, 1 - Math.min(ageDays / 120, 0.95));
-  const recency = clamp01((entry.recencyScore * 0.6) + (freshness * 0.4), freshness);
+  const adaptiveStrength = buildAdaptiveStrength(entry);
+  const freshness = Math.max(0.05, 1 - Math.min(adaptiveStrength.ageDays / 120, 0.95));
+  const recency = clamp01((entry.recencyScore * 0.45) + (freshness * 0.25) + (adaptiveStrength.adaptiveWeight * 0.3), freshness);
   const reuseBoost = Math.min(entry.reuseCount / 5, 1);
-  const correctionBoost = entry.type === MEMORY_TYPES.CORRECTION ? 1 : entry.correctionPriority;
+  const correctionBoost = entry.type === MEMORY_TYPES.CORRECTION
+    ? Math.max(0.25, adaptiveStrength.correctionFlex)
+    : (entry.correctionPriority * adaptiveStrength.adaptiveWeight);
   const premiumBoost = entry.premiumRetentionEligible ? 0.08 : 0;
   const retentionPenalty = entry.retentionState === "archived" ? 0.35 : entry.retentionState === "cool" ? 0.12 : 0;
 
   const score =
-    (entry.importance * 0.28) +
-    (entry.confidence * 0.18) +
+    ((entry.importance * adaptiveStrength.adaptiveWeight) * 0.28) +
+    ((entry.confidence * adaptiveStrength.adaptiveWeight) * 0.18) +
     (recency * 0.16) +
     (relevance * 0.18) +
     (entry.emotionalWeight * 0.1) +
@@ -412,6 +496,8 @@ export function rankMemoryEntry(entry, { queryText = "", contextTags = [] } = {}
     relevance,
     recency,
     correctionBoost,
+    adaptiveWeight: Number(adaptiveStrength.adaptiveWeight.toFixed(4)),
+    contradictionPenalty: Number(adaptiveStrength.contradictionPenalty.toFixed(4)),
   };
 }
 
@@ -474,6 +560,8 @@ export function createStructuredMemoryService({ supabase, bus }) {
         related_people: normalizeTags([...(normalized.relatedPeople || []), ...(entry.relatedPeople || [])]),
         premium_retention_eligible: normalized.premiumRetentionEligible || Boolean(entry.premiumRetentionEligible),
         retention_state: normalized.retentionState === "archived" ? "cool" : normalized.retentionState,
+        contradiction_penalty: Math.max(0, numberOrDefault(existing.meta?.contradiction_penalty, 0) * 0.92),
+        reinforcement_boost: clamp01(Math.max(numberOrDefault(existing.meta?.reinforcement_boost, 0), 0.16)),
       };
       await updateRowMeta(existing.id, meta);
       bus?.emit?.("structured_memory.updated", { userId: safeUserId, type: entry.type });
@@ -494,6 +582,31 @@ export function createStructuredMemoryService({ supabase, bus }) {
     }
     bus?.emit?.("structured_memory.written", { userId: safeUserId, type: entry.type });
     return { ok: true, id: data?.id ?? null };
+  }
+
+  async function softenContradictedCorrections({ userId, spiritkinId = null, userText = "" }) {
+    const shifts = inferToneShiftSignals(userText);
+    const rows = await listStructuredRows({ userId, spiritkinId, limit: 80, includeArchived: true });
+    const correctionRows = rows.filter((row) => row?.meta?.memory_type === MEMORY_TYPES.CORRECTION);
+    const actions = [];
+
+    for (const row of correctionRows) {
+      const content = String(row.content || "").toLowerCase();
+      let delta = 0;
+      if (/teas|cocky|rude/.test(content) && shifts.playful) delta = 0.24;
+      if (/repeat|repetit|phrase/.test(content) && /haha|lol/.test(String(userText || "").toLowerCase())) delta = Math.max(delta, 0.08);
+      if (/cleaner|cuss|swear|respectful/.test(content) && shifts.playful && !shifts.calm && !shifts.spiritual) delta = Math.max(delta, 0.05);
+      if (!delta) continue;
+
+      actions.push(updateRowMeta(row.id, {
+        ...(row.meta || {}),
+        contradiction_penalty: clamp01(numberOrDefault(row.meta?.contradiction_penalty, 0) + delta),
+        recency_score: clamp01((numberOrDefault(row.meta?.recency_score, 0.6) * 0.96), 0.2),
+      }));
+    }
+
+    await Promise.allSettled(actions);
+    return { ok: true, softened: actions.length };
   }
 
   async function applyRetention({ userId, spiritkinId = null }) {
@@ -552,6 +665,7 @@ export function createStructuredMemoryService({ supabase, bus }) {
     if (!userId || !userText) return { ok: false, count: 0 };
 
     const retention = await applyRetention({ userId, spiritkinId });
+    await softenContradictedCorrections({ userId, spiritkinId, userText });
     const baseEntries = extractStructuredMemories({
       userText,
       spiritkinResponse,
@@ -606,6 +720,8 @@ export function createStructuredMemoryService({ supabase, bus }) {
         reuse_count: entry.reuseCount + 1,
         recency_score: 1,
         last_referenced_at: nowIso(),
+        reinforcement_boost: clamp01(numberOrDefault(row.meta?.reinforcement_boost, 0) + 0.08),
+        contradiction_penalty: Math.max(0, numberOrDefault(row.meta?.contradiction_penalty, 0) * 0.94),
       });
     }));
 
@@ -656,6 +772,7 @@ export function createStructuredMemoryService({ supabase, bus }) {
     retrieveRelevantMemories,
     buildContextSnapshot,
     applyRetention,
+    softenContradictedCorrections,
     normalizeStructuredMemoryRow,
     rankMemoryEntry,
     MEMORY_TYPES,

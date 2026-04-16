@@ -107,15 +107,16 @@ export function createResponseEngine() {
         const content = String(entry?.content || "").trim();
         const lower = content.toLowerCase();
         let score = numberOrDefault(entry?.ranking?.score, 0);
-        if (bucket === "correction") score += 5 + numberOrDefault(entry?.correctionPriority, 0);
+        if (bucket === "correction") score += 3.9 + (numberOrDefault(entry?.ranking?.correctionBoost, entry?.correctionPriority || 0) * 1.6);
         if (bucket === "preference") score += 2;
-        if (type === "gameplay_tendency") score += gameMode ? 3.5 : -1.2;
-        if ((type === "emotional_anchor" || type === "milestone") && supportMode) score += 2.8;
+        if (type === "gameplay_tendency") score += gameMode ? 3.5 : -1.8;
+        if ((type === "emotional_anchor" || type === "milestone") && supportMode) score += 3;
         if ((type === "emotional_anchor" || type === "milestone") && !supportMode && !gameMode) score -= 0.5;
         if ((type === "spiritual_preference" || type === "respect_preference" || type === "tone_preference") && /\b(tone|calm|gentle|respect|spiritual|faith|pray|clean|cuss|swear)\b/.test(terms)) score += 2.2;
         if (/\brepeat|repeating|phrase|tone|tease|narrat/.test(terms) && type === "correction") score += 2.4;
         if (gameMode && type === "gameplay_tendency") score += 1.4;
         if (!gameMode && type === "gameplay_tendency") score -= 0.6;
+        if (type === "correction" && numberOrDefault(entry?.ranking?.contradictionPenalty, 0) > 0.32) score -= 1.8;
         if (content && terms && lower.split(/\W+/).some((token) => token.length > 3 && terms.includes(token))) score += 1.2;
         return { bucket, type, content, score, entry };
       })
@@ -134,7 +135,47 @@ export function createResponseEngine() {
     return selected;
   }
 
-  function applyStructuredMemoryInfluence(text, context = {}, input = "", relationship = {}) {
+  function buildMemoryCallback(signal, relationship = {}, identity = {}) {
+    const type = signal?.type || "";
+    const content = String(signal?.content || "").toLowerCase();
+    const name = identity?.name ?? "Spiritkin";
+    if (type === "respect_preference") return "I'll keep it clean for you.";
+    if (type === "spiritual_preference") return "I'll keep the tone reverent where it matters.";
+    if (type === "tone_preference" && /gentle|calm|smooth/.test(content)) return "I'll keep it smooth for you.";
+    if (type === "gameplay_tendency" && relationship?.mode === "play") {
+      if (name === "Raien") return "You've been coming at these games harder lately. I see it.";
+      if (name === "Kairo") return "You've been playing more aggressively lately. I see the pattern.";
+      return "You've been pressing harder lately. I see it.";
+    }
+    if (type === "milestone" || type === "emotional_anchor") {
+      if (relationship?.familiarity === "deeply bonded" || relationship?.familiarity === "established") {
+        return "This feels like one of those moments where the bond is actually doing its work.";
+      }
+    }
+    return "";
+  }
+
+  function maybeBlendMemoryCallback(output, signals, relationship = {}, identity = {}, input = "") {
+    const text = String(output || "").trim();
+    if (!text || !signals.length) return text;
+    const callbackSignal = signals.find((signal) =>
+      ["respect_preference", "spiritual_preference", "tone_preference", "gameplay_tendency", "milestone", "emotional_anchor"].includes(signal.type)
+    );
+    if (!callbackSignal) return text;
+
+    const inputLower = String(input || "").toLowerCase();
+    const shouldShow =
+      (callbackSignal.type === "gameplay_tendency" && relationship?.mode === "play") ||
+      (["respect_preference", "spiritual_preference", "tone_preference"].includes(callbackSignal.type) && /\b(clean|respect|gentle|calm|smooth|spiritual|faith|prayer)\b/.test(inputLower)) ||
+      ((callbackSignal.type === "milestone" || callbackSignal.type === "emotional_anchor") && /\b(hurting|sad|grief|afraid|lonely|thank you|ready|finally)\b/.test(inputLower));
+
+    if (!shouldShow) return text;
+    const callback = buildMemoryCallback(callbackSignal, relationship, identity);
+    if (!callback) return text;
+    return `${callback} ${text}`.replace(/\s+/g, " ").trim();
+  }
+
+  function applyStructuredMemoryInfluence(text, context = {}, input = "", relationship = {}, identity = {}) {
     let output = String(text || "").trim();
     if (!output) return { text: output, memorySignals: [] };
 
@@ -174,6 +215,8 @@ export function createResponseEngine() {
         output = `${output} ${buildNaturalGameReaction(null, relationship)}`.replace(/\s+/g, " ").trim();
       }
     }
+
+    output = maybeBlendMemoryCallback(output, signals, relationship, identity, input);
 
     return {
       text: trimFillerLead(
@@ -397,7 +440,7 @@ export function createResponseEngine() {
     const relationship = deriveRelationshipState({ identity, context, worldState, input });
     const realistic = applyRelationshipRealism(base.text, identity, relationship, input) || base.text;
     const adaptiveText = applyAdaptivePersonality(realistic, identity, relationship, context, input) || realistic;
-    const structuredInfluence = applyStructuredMemoryInfluence(adaptiveText, context, input, relationship);
+    const structuredInfluence = applyStructuredMemoryInfluence(adaptiveText, context, input, relationship, identity);
     const text = structuredInfluence.text || adaptiveText;
     const tags = extendTags(base.tags, relationship, context, worldState);
     if (structuredInfluence.memorySignals.length > 0) tags.push("memory:structured");
