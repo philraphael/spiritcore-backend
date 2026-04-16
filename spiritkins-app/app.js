@@ -932,6 +932,7 @@ const state = {
   gameSpiritkinMessage: null,    // last Spiritkin commentary on a game move
   gameInstructions: null,        // instructions for the current game type
   gameLoading: false,            // loading state for game moves
+  pendingGameType: null,         // game currently opening
   // Phase 6: Shared Spiritverse Events
   spiritverseEvent: null,        // current active Spiritverse event
   spiritverseEventNext: null,    // time until next event
@@ -2226,8 +2227,17 @@ async function submitGameMove(move) {
 }
 
 async function startGameSession(gameType) {
-  if (!state.conversationId || !gameType) return false;
+  if (!gameType || state.gameLoading) return false;
   try {
+    state.pendingGameType = gameType;
+    if (!state.conversationId) {
+      await beginConversation();
+      if (!state.conversationId) {
+        state.statusText = "Open a bonded conversation before starting a game.";
+        state.statusError = true;
+        return false;
+      }
+    }
     state.statusText = `Starting ${gameType}...`;
     state.gameLoading = true;
     render();
@@ -2283,6 +2293,7 @@ async function startGameSession(gameType) {
     return false;
   } finally {
     state.gameLoading = false;
+    state.pendingGameType = null;
     render();
   }
 }
@@ -2354,7 +2365,7 @@ function getAutoMicTurnKey(game) {
 }
 
 function maybeAutoOpenGameMic() {
-  if (state.voiceMode) return;
+  return;
   const turnKey = getAutoMicTurnKey(state.activeGame);
   if (!turnKey) {
     state.autoMicTurnKey = null;
@@ -2374,14 +2385,7 @@ function maybeAutoOpenGameMic() {
 }
 
 function shouldKeepVoiceLoopActive() {
-  return state.voiceMode
-    && !state.voiceMuted
-    && state.entryAccepted
-    && state.onboardingComplete
-    && !state.crownGateOpening
-    && !state.spiritverseTrailerActive
-    && !state.spiritCoreWelcoming
-    && !state.showCrownGateHome;
+  return false;
 }
 
 function enforceEntryVoiceSilence() {
@@ -2413,12 +2417,7 @@ function clearVoiceLoopTimer() {
 
 function scheduleVoiceLoop(delay = 350) {
   clearVoiceLoopTimer();
-  if (!shouldKeepVoiceLoopActive() || _recognition || state.loadingReply || _audioPlaying) return;
-  _voiceLoopTimer = window.setTimeout(() => {
-    _voiceLoopTimer = null;
-    if (!shouldKeepVoiceLoopActive() || _recognition || state.loadingReply || _audioPlaying) return;
-    startListening();
-  }, delay);
+  return;
 }
 
 function buildApp() {
@@ -3253,11 +3252,11 @@ function buildChatView() {
                     { id: "connect_four", name: "Connect Four Constellations", icon: "\u25CF", desc: "Drop stars and connect four first" },
                     { id: "battleship", name: "Abyssal Battleship", icon: "\u2693", desc: "Trade hidden strikes across the deep grid" }
                   ].map(game => `
-                    <button class="ritual-card ${esc(meta.cls)}" data-action="start-game" data-game="${game.id}">
+                    <button class="ritual-card ${esc(meta.cls)} ${state.pendingGameType === game.id ? 'loading' : ''}" data-action="start-game" data-game="${game.id}" ${state.gameLoading ? "disabled" : ""}>
                       <span class="ritual-icon">${game.icon}</span>
                       <div class="ritual-copy">
-                        <strong>${esc(game.name)}</strong>
-                        <span>${esc(game.desc)}</span>
+                        <strong>${esc(state.pendingGameType === game.id ? `Opening ${game.name}...` : game.name)}</strong>
+                        <span>${esc(state.pendingGameType === game.id ? "Preparing the board..." : game.desc)}</span>
                       </div>
                     </button>
                   `).join('')}
@@ -3973,18 +3972,18 @@ async function onClick(event) {
       ctx.resume().then(() => {
         state.voiceMode = true;
         localStorage.setItem("sk_voice_mode", "1");
-        state.statusText = "Voice mode enabled. Continuous channel opening…";
+        state.statusText = "Voice mode enabled.";
         state.statusError = false;
         render();
-        scheduleVoiceLoop(0);
+        if (!_recognition && !state.voiceMuted) startListening();
       });
     } else {
       state.voiceMode = true;
       localStorage.setItem("sk_voice_mode", "1");
-      state.statusText = "Voice mode enabled. Continuous channel opening…";
+      state.statusText = "Voice mode enabled.";
       state.statusError = false;
       render();
-      scheduleVoiceLoop(0);
+      if (!_recognition && !state.voiceMuted) startListening();
     }
     return;
   }
@@ -3992,8 +3991,8 @@ async function onClick(event) {
   if (action === "toggle-mute") {
     state.voiceMuted = !state.voiceMuted;
     localStorage.setItem("sk_voice_muted", state.voiceMuted ? "1" : "0");
-    if (!state.voiceMuted && state.voiceMode) scheduleVoiceLoop(0);
     if (state.voiceMuted) stopListening();
+    if (!state.voiceMuted && state.voiceMode && !_recognition) startListening();
     render();
     return;
   }
@@ -4111,6 +4110,7 @@ async function onClick(event) {
   }
 
   if (action === "start-game") {
+    if (state.gameLoading) return;
     const gameType = element.dataset.game;
     await startGameSession(gameType);
     return;
@@ -4429,7 +4429,7 @@ function startListening() {
   const runId = ++_recognitionRunId;
   _recognitionStopRequested = false;
   _recognition = recognition;
-  recognition.continuous = false;
+  recognition.continuous = true;
   recognition.interimResults = false;
   recognition.lang = "en-US";
 
@@ -4445,21 +4445,14 @@ function startListening() {
 
   recognition.onresult = (event) => {
     if (!isActiveRun()) return;
-    const transcript = String(event.results?.[0]?.[0]?.transcript || "").trim();
+    const result = event.results?.[event.resultIndex];
+    const transcript = String(result?.[0]?.transcript || "").trim();
+    if (!result?.isFinal) return;
     state.input = transcript;
-    state.voiceListening = false;
-    _recognition = null;
-    _recognitionStopRequested = false;
     render();
-    if (!transcript) {
-      if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(450);
-      return;
-    }
+    if (!transcript) return;
     const now = Date.now();
-    if (_lastVoiceSubmission.text === transcript && (now - _lastVoiceSubmission.at) < 1500) {
-      if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(450);
-      return;
-    }
+    if (_lastVoiceSubmission.text === transcript && (now - _lastVoiceSubmission.at) < 1500) return;
     _lastVoiceSubmission = { text: transcript, at: now };
     sendMessage(transcript);
   };
@@ -4474,7 +4467,6 @@ function startListening() {
     _recognitionStopRequested = false;
     if (!stopRequested && event.error !== "aborted") {
       render();
-      if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(700);
       return;
     }
     state.statusText = "";
@@ -4493,7 +4485,6 @@ function startListening() {
     }
     _recognitionStopRequested = false;
     if (stopRequested) return;
-    if (shouldKeepVoiceLoopActive()) scheduleVoiceLoop(450);
   };
 
   recognition.start();
@@ -4524,7 +4515,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 800);
   // Restore voice mode if previously enabled (requires prior user gesture)
   if (state.voiceMode && state.onboardingComplete) {
-    setTimeout(() => { try { scheduleVoiceLoop(0); } catch(e) {} }, 1500);
+    setTimeout(() => { try { if (!_recognition && !state.voiceMuted) startListening(); } catch(e) {} }, 1500);
   }
   const root = document.getElementById("root");
   root.addEventListener("input", onInput);
@@ -4551,14 +4542,6 @@ async function playAudio(buffer) {
   try {
     _audioPlaying = true;
     clearVoiceLoopTimer();
-    if (_recognition) {
-      _recognitionStopRequested = true;
-      const recognition = _recognition;
-      _recognition = null;
-      try {
-        recognition.stop();
-      } catch (_) {}
-    }
     // Stop any currently playing audio
     if (_currentAudio instanceof HTMLAudioElement) {
       _currentAudio.pause();

@@ -4997,6 +4997,13 @@ button:disabled {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
+.ritual-card.loading,
+.ritual-card:disabled {
+  opacity: 0.72;
+  cursor: wait;
+  transform: none;
+}
+
 /* Spiritkin-specific accent colors for ritual cards */
 .ritual-card.lyra {
   border-color: rgba(232, 180, 216, 0.2);

@@ -131,7 +131,7 @@ export function createSharedGameRuntime() {
     }
     if (game.type === "checkers") return "11-15";
     if (game.type === "go") return "G7";
-    if (game.type === "tictactoe") return String(game.data.board.findIndex((cell) => cell == null));
+    if (game.type === "tictactoe") return chooseTicTacToeMove(game.data.board, player === "user" ? "X" : "O");
     if (game.type === "connect_four") return String(firstPlayableColumn(game.data.board));
     if (game.type === "battleship") return String(firstUnguessedCell(game.data, player));
     if (game.type === "spirit_cards") return "draw";
@@ -171,6 +171,31 @@ export function createSharedGameRuntime() {
     buildPrompt,
     describeOutcome,
   };
+}
+
+function chooseTicTacToeMove(board, marker) {
+  const enemy = marker === "X" ? "O" : "X";
+  const open = board.map((cell, idx) => cell == null ? idx : -1).filter((idx) => idx !== -1);
+  if (!open.length) return null;
+
+  for (const idx of open) {
+    const trial = [...board];
+    trial[idx] = marker;
+    if (detectLineWinner(trial) === marker) return String(idx);
+  }
+
+  for (const idx of open) {
+    const trial = [...board];
+    trial[idx] = enemy;
+    if (detectLineWinner(trial) === enemy) return String(idx);
+  }
+
+  if (board[4] == null) return "4";
+
+  const corners = [0, 2, 6, 8].filter((idx) => board[idx] == null);
+  if (corners.length) return String(corners[0]);
+
+  return String(open[0]);
 }
 
 function buildGameToneInstruction(gameType, spiritkinName) {

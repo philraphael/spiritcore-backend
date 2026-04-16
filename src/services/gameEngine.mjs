@@ -58,19 +58,30 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
     }
 
     if (game.status !== "ended") {
-      const result = await orchestrator.interact({
-        userId,
-        conversationId,
-        input: runtime.buildPrompt(game, normalizedMove, spiritkinName),
-        spiritkin: { name: spiritkinName },
-        context: { isGameMove: true, gameType: game.type, activeGame: game }
-      });
+      let result = null;
+      try {
+        result = await orchestrator.interact({
+          userId,
+          conversationId,
+          input: runtime.buildPrompt(game, normalizedMove, spiritkinName),
+          spiritkin: { name: spiritkinName },
+          context: { isGameMove: true, gameType: game.type, activeGame: game }
+        });
+      } catch (_) {
+        result = null;
+      }
 
       spiritkinResponse = result?.message || spiritkinResponse;
       let spiritkinMove = runtime.extractMove(spiritkinResponse, game.type) || runtime.chooseFallbackMove(game, "spiritkin");
       if (spiritkinMove && runtime.applySpiritkinMove(game, spiritkinMove)) {
         game.history.push({ player: "spiritkin", move: spiritkinMove, timestamp: new Date().toISOString() });
         game.moveCount++;
+      } else if (game.status !== "ended") {
+        spiritkinMove = runtime.chooseFallbackMove(game, "spiritkin");
+        if (spiritkinMove && runtime.applySpiritkinMove(game, spiritkinMove)) {
+          game.history.push({ player: "spiritkin", move: spiritkinMove, timestamp: new Date().toISOString() });
+          game.moveCount++;
+        }
       }
 
       if (game.status === "ended") {
