@@ -13,6 +13,7 @@ const ADAPTIVE_PROFILE_KEY = "sv.adaptive_profile.v1";
 const CROWN_GATE_HOLD_MS = 1500;
 const ENTRY_TRANSITION_MS = 1400;
 const SPIRITGATE_VIDEO_FAILSAFE_MS = 9000;
+const SPIRITGATE_TRAILER_FAILSAFE_MS = 18000;
 const SPIRITCORE_WELCOME_VOICE = "nova";
 const SPIRITCORE_WELCOME_TEXT = `Welcome…
 
@@ -58,6 +59,7 @@ import { SpiritverseGames } from "./spiritverse-games.js";
 // RevealAnimation will be loaded as a separate module
 let revealAnimationInstance = null;
 let spiritGateFallbackTimer = null;
+let spiritGateArrivalFallbackTimer = null;
 let spiritGateActiveAttemptId = 0;
 
 const DEFAULT_PROMPTS = [
@@ -1260,6 +1262,13 @@ function clearSpiritGateFallback() {
   }
 }
 
+function clearSpiritGateArrivalFallback() {
+  if (spiritGateArrivalFallbackTimer) {
+    window.clearTimeout(spiritGateArrivalFallbackTimer);
+    spiritGateArrivalFallbackTimer = null;
+  }
+}
+
 function failSpiritGateEntry(message, error, detail = {}) {
   const reason = error instanceof Error ? error.message : error;
   console.error("[SpiritGate] entry failure", { message, reason, ...detail });
@@ -1277,6 +1286,19 @@ function armSpiritGateFallback(source) {
     logSpiritGate("failsafe-transition", { source });
     completeCrownGateEntry({ skipped: true, source: `${source}:failsafe`, force: true });
   }, SPIRITGATE_VIDEO_FAILSAFE_MS);
+}
+
+function armSpiritGateArrivalFallback(source) {
+  clearSpiritGateArrivalFallback();
+  const attemptId = spiritGateActiveAttemptId;
+  spiritGateArrivalFallbackTimer = window.setTimeout(() => {
+    if (attemptId !== spiritGateActiveAttemptId) return;
+    if (!state.spiritverseTrailerActive || state.spiritCoreWelcoming || state.onboardingComplete) return;
+    logSpiritGate("arrival-failsafe-transition", { source });
+    beginSpiritCoreWelcome().catch((error) => {
+      failSpiritGateEntry("SpiritGate arrival failed. Refresh and try again.", error, { source });
+    });
+  }, SPIRITGATE_TRAILER_FAILSAFE_MS);
 }
 
 function syncEntryCinematics() {
@@ -1312,10 +1334,36 @@ function syncEntryCinematics() {
 
   const trailerVideo = document.querySelector("[data-entry-video='trailer']");
   if (trailerVideo) {
-    trailerVideo.onended = () => { beginSpiritCoreWelcome().catch(() => {}); };
+    trailerVideo.onended = () => {
+      clearSpiritGateArrivalFallback();
+      logSpiritGate("arrival-video-ended", { currentTime: trailerVideo.currentTime, duration: trailerVideo.duration || null });
+      beginSpiritCoreWelcome().catch((error) => {
+        failSpiritGateEntry("SpiritGate arrival failed. Refresh and try again.", error, { source: "arrival-video-ended" });
+      });
+    };
+    trailerVideo.onerror = () => {
+      clearSpiritGateArrivalFallback();
+      logSpiritGate("arrival-video-error", { mediaError: trailerVideo.error?.message || trailerVideo.error?.code || "unknown" });
+      beginSpiritCoreWelcome().catch((error) => {
+        failSpiritGateEntry("SpiritGate arrival failed. Refresh and try again.", error, { source: "arrival-video-error" });
+      });
+    };
     if (state.spiritverseTrailerActive) {
+      armSpiritGateArrivalFallback("arrival-video-playback");
       const playAttempt = trailerVideo.play?.();
-      if (playAttempt?.catch) playAttempt.catch(() => {});
+      if (playAttempt?.catch) {
+        playAttempt.catch((error) => {
+          logSpiritGate("arrival-video-play-rejected", { reason: error?.message || "unknown" });
+          beginSpiritCoreWelcome().catch((welcomeError) => {
+            failSpiritGateEntry("SpiritGate arrival failed. Refresh and try again.", welcomeError, {
+              source: "arrival-video-play-rejected",
+              reason: error?.message || "unknown",
+            });
+          });
+        });
+      }
+    } else {
+      clearSpiritGateArrivalFallback();
     }
   }
 }
@@ -1874,6 +1922,7 @@ function openCrownGate() {
     persistEntryConsent();
   }
   clearSpiritGateFallback();
+  clearSpiritGateArrivalFallback();
   spiritGateActiveAttemptId += 1;
   state.crownGateOpening = true;
   state.showCrownGateHome = false;
@@ -1894,6 +1943,7 @@ function completeCrownGateEntry({ skipped = false, source = "unspecified", force
   }
   logSpiritGate("entry-completing", { skipped, source, force });
   clearSpiritGateFallback();
+  clearSpiritGateArrivalFallback();
   spiritGateActiveAttemptId += 1;
   state.crownGateOpening = false;
   state.entryVideoStarted = false;
@@ -1931,6 +1981,7 @@ function completeCrownGateEntry({ skipped = false, source = "unspecified", force
 
 async function beginSpiritCoreWelcome() {
   if (state.spiritCoreWelcoming) return;
+  clearSpiritGateArrivalFallback();
   state.spiritverseTrailerActive = false;
   state.spiritCoreWelcoming = true;
   state.statusText = "SpiritCore is welcoming you...";
@@ -1954,6 +2005,7 @@ async function beginSpiritCoreWelcome() {
 function goHome() {
   syncPrimarySelection();
   clearSpiritGateFallback();
+  clearSpiritGateArrivalFallback();
   spiritGateActiveAttemptId += 1;
   state.showCrownGateHome = true;
   state.entryAccepted = false;
@@ -4566,7 +4618,11 @@ function onInput(event) {
   }
   if (!field) return;
   if (field === "entry-name") state.userNameDraft = event.target.value;
-  if (field === "entry-consent") state.consentChecked = !!event.target.checked;
+  if (field === "entry-consent") {
+    state.consentChecked = !!event.target.checked;
+    render();
+    return;
+  }
   if (field === "issue-report-text") state.issueReportText = event.target.value;
   if (field === "issue-report-context") state.issueReportContextNote = event.target.value;
   if (field === "chat-input") {
@@ -4580,6 +4636,8 @@ async function onClick(event) {
   const element = event.target.closest("[data-action]");
   if (!element) return;
   const action = element.dataset.action;
+
+  try {
 
   if (action === "noop") return;
 
@@ -4864,6 +4922,7 @@ async function onClick(event) {
 
   if (action === "skip-gate") {
     logSpiritGate("entry-clicked", { action: "skip-gate" });
+    const firstTimeVisitor = isFirstTimeVisitor();
     if (requiresEntryConsent() && !state.consentChecked) {
       logSpiritGate("entry-blocked-consent", { action: "skip-gate" });
       state.statusText = "Accept the entry consent to continue into the Spiritverse.";
@@ -4875,6 +4934,10 @@ async function onClick(event) {
     if (state.userName) localStorage.setItem(NAME_KEY, state.userName);
     if (state.consentChecked && !state.consentAccepted) {
       persistEntryConsent();
+    }
+    if (firstTimeVisitor) {
+      markOnboardingComplete();
+      logSpiritGate("skip-bypassed-first-run-cinematics", {});
     }
     clearSpiritGateFallback();
     completeCrownGateEntry({ skipped: true, source: "skip-gate", force: true });
@@ -5277,6 +5340,12 @@ async function onClick(event) {
       render();
     }
     return;
+  }
+  } catch (error) {
+    console.error("[Interaction] click handler failure", { action, error: error?.message || error });
+    state.statusText = `Interaction failed while handling ${action}.`;
+    state.statusError = true;
+    render();
   }
 }
 
