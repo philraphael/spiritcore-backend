@@ -4569,32 +4569,33 @@ function buildChatView() {
               // Map emotion tone to mood variant
               const tone = (signals.emotionTone || "").toLowerCase();
               let moodText = realmEchoes.description;
+              const moods = realmEchoes.moods || {};
               
               if (spiritkin.name === "Lyra") {
-                if (tone.includes("peace") || tone.includes("still")) moodText = realmEchoes.moods.peaceful;
-                else if (tone.includes("tender") || tone.includes("warm")) moodText = realmEchoes.moods.tender;
-                else if (tone.includes("heavy") || tone.includes("sad")) moodText = realmEchoes.moods.heavy;
-                else if (tone.includes("hope") || tone.includes("bright")) moodText = realmEchoes.moods.hopeful;
+                if (tone.includes("peace") || tone.includes("still")) moodText = moods.peaceful || moodText;
+                else if (tone.includes("tender") || tone.includes("warm")) moodText = moods.tender || moodText;
+                else if (tone.includes("heavy") || tone.includes("sad")) moodText = moods.heavy || moodText;
+                else if (tone.includes("hope") || tone.includes("bright")) moodText = moods.hopeful || moodText;
               } else if (spiritkin.name === "Raien") {
-                if (tone.includes("charge") || tone.includes("electric")) moodText = realmEchoes.moods.charged;
-                else if (tone.includes("resolve") || tone.includes("clear")) moodText = realmEchoes.moods.resolved;
-                else if (tone.includes("protect") || tone.includes("safe")) moodText = realmEchoes.moods.protective;
-                else if (tone.includes("fierce") || tone.includes("strong")) moodText = realmEchoes.moods.fierce;
+                if (tone.includes("charge") || tone.includes("electric")) moodText = moods.charged || moodText;
+                else if (tone.includes("resolve") || tone.includes("clear")) moodText = moods.resolved || moodText;
+                else if (tone.includes("protect") || tone.includes("safe")) moodText = moods.protective || moodText;
+                else if (tone.includes("fierce") || tone.includes("strong")) moodText = moods.fierce || moodText;
               } else if (spiritkin.name === "Kairo") {
-                if (tone.includes("wonder") || tone.includes("curious")) moodText = realmEchoes.moods.wondering;
-                else if (tone.includes("expand") || tone.includes("vast")) moodText = realmEchoes.moods.expansive;
-                else if (tone.includes("search") || tone.includes("seek")) moodText = realmEchoes.moods.searching;
-                else if (tone.includes("illum") || tone.includes("light")) moodText = realmEchoes.moods.illuminated;
+                if (tone.includes("wonder") || tone.includes("curious")) moodText = moods.wondering || moodText;
+                else if (tone.includes("expand") || tone.includes("vast")) moodText = moods.expansive || moodText;
+                else if (tone.includes("search") || tone.includes("seek")) moodText = moods.searching || moodText;
+                else if (tone.includes("illum") || tone.includes("light")) moodText = moods.illuminated || moodText;
               } else if (spiritkin.name === "Elaria") {
-                if (tone.includes("truth") || tone.includes("clear")) moodText = realmEchoes.moods.illuminated;
-                else if (tone.includes("permission") || tone.includes("law")) moodText = realmEchoes.moods.lawful;
-                else if (tone.includes("warm") || tone.includes("tender")) moodText = realmEchoes.moods.tender;
-                else if (tone.includes("wake") || tone.includes("ready")) moodText = realmEchoes.moods.awakening;
+                if (tone.includes("truth") || tone.includes("clear")) moodText = moods.illuminated || moodText;
+                else if (tone.includes("permission") || tone.includes("law")) moodText = moods.lawful || moodText;
+                else if (tone.includes("warm") || tone.includes("tender")) moodText = moods.tender || moodText;
+                else if (tone.includes("wake") || tone.includes("ready")) moodText = moods.awakening || moodText;
               } else if (spiritkin.name === "Thalassar") {
-                if (tone.includes("deep") || tone.includes("heavy")) moodText = realmEchoes.moods.deep;
-                else if (tone.includes("calm") || tone.includes("still")) moodText = realmEchoes.moods.calm;
-                else if (tone.includes("echo") || tone.includes("reson")) moodText = realmEchoes.moods.resonant;
-                else if (tone.includes("surface") || tone.includes("rise")) moodText = realmEchoes.moods.surfacing;
+                if (tone.includes("deep") || tone.includes("heavy")) moodText = moods.deep || moodText;
+                else if (tone.includes("calm") || tone.includes("still")) moodText = moods.calm || moodText;
+                else if (tone.includes("echo") || tone.includes("reson")) moodText = moods.resonant || moodText;
+                else if (tone.includes("surface") || tone.includes("rise")) moodText = moods.surfacing || moodText;
               }
               
               return `
