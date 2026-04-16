@@ -3664,47 +3664,67 @@ function markGameHelpSeen(gameType) {
 function render() {
   const root = document.getElementById("root");
   if (!root) return;
-  normalizeInteractionState("render");
-  enforceEntryVoiceSilence();
-  root.innerHTML = buildApp();
-  syncMountedMedia({ attemptPlay: false });
-  syncEntryCinematics();
-  if (!state.voiceMode) maybeAutoOpenGameMic();
-
-  // Handle RevealAnimation lifecycle
-  if (state.customSpiritkinRevealed && state.generatedSpiritkin) {
-    if (!revealAnimationInstance) {
-      const palette = state.generatedSpiritkin.ui.palette || { primary: "#2a1a4e", secondary: "#6a3a8e", glow: "#c080ff" };
-      revealAnimationInstance = new RevealAnimation("reveal-canvas", palette);
-      revealAnimationInstance.start();
+  try {
+    normalizeInteractionState("render");
+    enforceEntryVoiceSilence();
+    root.innerHTML = buildApp();
+    syncMountedMedia({ attemptPlay: false });
+    syncEntryCinematics();
+    if (!state.voiceMode) maybeAutoOpenGameMic();
+    if (typeof window.__svMarkBootReady === "function") {
+      window.__svMarkBootReady();
     }
-  } else {
-    if (revealAnimationInstance) {
-      revealAnimationInstance.stop();
-      revealAnimationInstance = null;
+
+    // Handle RevealAnimation lifecycle
+    if (state.customSpiritkinRevealed && state.generatedSpiritkin) {
+      if (!revealAnimationInstance) {
+        const palette = state.generatedSpiritkin.ui.palette || { primary: "#2a1a4e", secondary: "#6a3a8e", glow: "#c080ff" };
+        revealAnimationInstance = new RevealAnimation("reveal-canvas", palette);
+        revealAnimationInstance.start();
+      }
+    } else {
+      if (revealAnimationInstance) {
+        revealAnimationInstance.stop();
+        revealAnimationInstance = null;
+      }
     }
-  }
 
-  const textarea = root.querySelector("textarea[data-field='chat-input']");
-  if (textarea) {
-    textarea.value = state.input;
-    textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
-  }
+    const textarea = root.querySelector("textarea[data-field='chat-input']");
+    if (textarea) {
+      textarea.value = state.input;
+      textarea.style.height = "auto";
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+    }
 
-  // Render visual game board after DOM update
-  if (state.activeGame && SpiritverseGames) {
-    requestAnimationFrame(() => {
-      const spiritkin = state.selectedSpiritkin;
-      SpiritverseGames.render(
-        'spiritverse-game-board',
-        state.activeGame,
-        spiritkin ? spiritkin.name : 'Spiritkin',
-        state.gameSpiritkinMessage,
-        (move) => submitGameMove(move),
-        state.pieceTheme
-      );
-    });
+    // Render visual game board after DOM update
+    if (state.activeGame && SpiritverseGames) {
+      requestAnimationFrame(() => {
+        const spiritkin = state.selectedSpiritkin;
+        SpiritverseGames.render(
+          'spiritverse-game-board',
+          state.activeGame,
+          spiritkin ? spiritkin.name : 'Spiritkin',
+          state.gameSpiritkinMessage,
+          (move) => submitGameMove(move),
+          state.pieceTheme
+        );
+      });
+    }
+  } catch (error) {
+    console.error("[Spiritverse Render Failure]", error);
+    root.innerHTML = `
+      <section class="entry-screen" style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;">
+        <div class="panel-card" style="max-width:560px;text-align:left;">
+          <div class="panel-label">Boot Failure</div>
+          <h2 style="margin-top:8px;">Spiritverse could not render.</h2>
+          <p>The client hit a render-time failure before the app surface became interactive.</p>
+          <p style="opacity:0.78;">Open the browser console for the exact error trace.</p>
+        </div>
+      </section>
+    `;
+    if (typeof window.__svMarkBootReady === "function") {
+      window.__svMarkBootReady();
+    }
   }
 }
 
@@ -6221,36 +6241,57 @@ function stopListening() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  installGlobalInteractionDiagnostics();
-  bootstrapRetentionExperience();
-  logInteraction("boot", { rootReady: !!document.getElementById("root") });
-  render();
-  fetchSpiritkins();
-  // Phase 6 & 7: Load Spiritverse events and daily quest after spiritkins load
-  setTimeout(() => {
-    fetchSpiritverseEvent();
-    fetchDailyQuest();
-  }, 800);
-  const root = document.getElementById("root");
-  root.addEventListener("input", onInput);
-  root.addEventListener("click", onClick);
-  logInteraction("root-listeners-attached", { target: "#root" });
-  root.addEventListener("keydown", (event) => {
-    if (event.target.dataset.field === "chat-input" && event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      sendMessage();
-    }
-    // Enter key in game move input submits the move
-    if (event.target.dataset.action === "game-input-change" && event.key === "Enter") {
-      event.preventDefault();
-      const move = state.gameInput?.trim();
-      if (move && state.conversationId && state.activeGame) {
-        // Trigger submit-game-move by simulating a click on the submit button
-        const submitBtn = document.querySelector("[data-action='submit-game-move']");
-        if (submitBtn && !submitBtn.disabled) submitBtn.click();
+  try {
+    installGlobalInteractionDiagnostics();
+    bootstrapRetentionExperience();
+    logInteraction("boot", { rootReady: !!document.getElementById("root") });
+    render();
+    fetchSpiritkins();
+    // Phase 6 & 7: Load Spiritverse events and daily quest after spiritkins load
+    setTimeout(() => {
+      fetchSpiritverseEvent();
+      fetchDailyQuest();
+    }, 800);
+    const root = document.getElementById("root");
+    if (!root) throw new Error("Boot failed: #root element was not found.");
+    root.addEventListener("input", onInput);
+    root.addEventListener("click", onClick);
+    logInteraction("root-listeners-attached", { target: "#root" });
+    root.addEventListener("keydown", (event) => {
+      if (event.target.dataset.field === "chat-input" && event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
       }
+      // Enter key in game move input submits the move
+      if (event.target.dataset.action === "game-input-change" && event.key === "Enter") {
+        event.preventDefault();
+        const move = state.gameInput?.trim();
+        if (move && state.conversationId && state.activeGame) {
+          // Trigger submit-game-move by simulating a click on the submit button
+          const submitBtn = document.querySelector("[data-action='submit-game-move']");
+          if (submitBtn && !submitBtn.disabled) submitBtn.click();
+        }
+      }
+    });
+  } catch (error) {
+    console.error("[Spiritverse Boot Failure]", error);
+    const root = document.getElementById("root");
+    if (root) {
+      root.innerHTML = `
+        <section class="entry-screen" style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;">
+          <div class="panel-card" style="max-width:560px;text-align:left;">
+            <div class="panel-label">Boot Failure</div>
+            <h2 style="margin-top:8px;">Spiritverse could not finish loading.</h2>
+            <p>A startup error stopped the client before the interface became interactive.</p>
+            <p style="opacity:0.78;">Open the browser console for the exact boot trace.</p>
+          </div>
+        </section>
+      `;
     }
-  });
+    if (typeof window.__svMarkBootReady === "function") {
+      window.__svMarkBootReady();
+    }
+  }
 });
 
 async function playAudio(buffer) {

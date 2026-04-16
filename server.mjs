@@ -227,7 +227,7 @@ app.get("/app/:asset", async (req, reply) => {
 
 app.get("/app/data/:asset", async (req, reply) => {
   const { asset } = req.params;
-  if (!["spiritverseCanon.js", "gameThemes.js"].includes(asset)) {
+  if (!["spiritverseCanon.js", "gameThemes.js", "gameAssetManifest.js"].includes(asset)) {
     return reply.code(404).send({ ok: false, error: "Not found" });
   }
 

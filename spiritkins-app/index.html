@@ -12,11 +12,101 @@
     />
     <link rel="stylesheet" href="/app/styles.css?t=20260416213000" />
     <link rel="stylesheet" href="/app/spiritverse-games.css?t=20260416202000" />
+    <style>
+      .sv-boot-fallback {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: radial-gradient(circle at top, rgba(48, 64, 92, 0.35), rgba(5, 8, 16, 0.96) 58%);
+        color: #f4efe3;
+        z-index: 9999;
+      }
+      .sv-boot-fallback.visible { display: flex; }
+      .sv-boot-fallback-card {
+        width: min(560px, 100%);
+        padding: 28px;
+        border-radius: 22px;
+        background: rgba(12, 16, 28, 0.88);
+        border: 1px solid rgba(242, 219, 160, 0.18);
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.42);
+        font-family: "Manrope", system-ui, sans-serif;
+      }
+      .sv-boot-fallback-card h1 {
+        margin: 0 0 10px;
+        font-family: "Cormorant Garamond", serif;
+        font-size: 2rem;
+        line-height: 1.05;
+      }
+      .sv-boot-fallback-card p {
+        margin: 0 0 12px;
+        line-height: 1.65;
+        color: rgba(244, 239, 227, 0.82);
+      }
+      .sv-boot-fallback-detail {
+        margin-top: 14px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.04);
+        color: rgba(244, 239, 227, 0.72);
+        font-size: 0.9rem;
+        word-break: break-word;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="sv-boot-fallback" class="sv-boot-fallback" aria-live="polite">
+      <div class="sv-boot-fallback-card">
+        <div style="font-size:0.74rem;letter-spacing:0.14em;text-transform:uppercase;color:#f2dba0;margin-bottom:8px;">Spiritverse Boot</div>
+        <h1>Spiritverse could not finish loading.</h1>
+        <p>The app shell loaded, but the client boot sequence failed before the interface became interactive.</p>
+        <p>Refresh once. If this continues, the console now includes the boot error for diagnosis.</p>
+        <div id="sv-boot-fallback-detail" class="sv-boot-fallback-detail">Waiting for boot diagnostics…</div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        const root = document.getElementById("root");
+        const fallback = document.getElementById("sv-boot-fallback");
+        const detail = document.getElementById("sv-boot-fallback-detail");
+        let bootReady = false;
+
+        function showFallback(reason) {
+          if (bootReady) return;
+          fallback.classList.add("visible");
+          detail.textContent = reason || "Unknown boot failure.";
+        }
+
+        window.__svMarkBootReady = function () {
+          bootReady = true;
+          fallback.classList.remove("visible");
+        };
+
+        window.addEventListener("error", function (event) {
+          const message = event?.error?.stack || event?.message || "Unhandled boot error.";
+          console.error("[Spiritverse Boot Failure]", event?.error || event);
+          showFallback(message);
+        });
+
+        window.addEventListener("unhandledrejection", function (event) {
+          const reason = event?.reason?.stack || event?.reason?.message || String(event?.reason || "Unhandled promise rejection during boot.");
+          console.error("[Spiritverse Boot Rejection]", event?.reason || event);
+          showFallback(reason);
+        });
+
+        window.setTimeout(function () {
+          const hasRenderableContent = root && root.childElementCount > 0 && root.textContent.trim().length > 0;
+          if (!bootReady && !hasRenderableContent) {
+            showFallback("Boot timeout: the app module did not render a visible surface.");
+          }
+        }, 3200);
+      })();
+    </script>
     <script type="module" src="/app/spiritverse-games.js?t=20260416224500"></script>
     <script type="module" src="/app/reveal-animation.js?t=20260403235400"></script>
-    <script type="module" src="/app/app.js?t=20260416213000"></script>
+    <script type="module" src="/app/app.js?t=20260416232500"></script>
   </body>
 </html>
