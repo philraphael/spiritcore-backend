@@ -793,7 +793,7 @@ export const SpiritverseGames = {
                 <div class="spirit-card-name">${card.name}</div>
                 <div class="spirit-card-meta">${card.type} • Power ${card.power}</div>
               </div>
-            `).join('')}
+            `).join('') : `<div class="spirit-cards-hint">Your companion is gathering their next draw.</div>`}
           </div>
         </div>
         
