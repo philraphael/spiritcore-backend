@@ -2073,6 +2073,12 @@ function normalizeInteractionState(source = "unknown") {
     changed = true;
   }
 
+  const sanitizedMessages = state.messages.filter((message) => message && typeof message === "object");
+  if (sanitizedMessages.length !== state.messages.length) {
+    state.messages = sanitizedMessages;
+    changed = true;
+  }
+
   if (!state.ratings || typeof state.ratings !== "object" || Array.isArray(state.ratings)) {
     state.ratings = {};
     changed = true;
@@ -2158,8 +2164,29 @@ function normalizeInteractionState(source = "unknown") {
     changed = true;
   }
 
+  const normalizedConversationId = typeof state.conversationId === "string" && state.conversationId.trim()
+    ? state.conversationId.trim()
+    : null;
+  const normalizedConversationSpiritkin = state.selectedSpiritkin?.ui
+    ? state.selectedSpiritkin
+    : (state.primarySpiritkin?.ui ? state.primarySpiritkin : normalizeStoredSpiritkin(state.selectedSpiritkin || state.primarySpiritkin));
+  const nextActiveConversation = {
+    id: normalizedConversationId,
+    messages: state.messages,
+    spiritkin: normalizedConversationSpiritkin || null,
+  };
+
   state.currentTab = state.activePresenceTab;
-  state.activeConversation = typeof state.conversationId === "string" && state.conversationId.trim() ? state.conversationId : null;
+  if (
+    !state.activeConversation ||
+    typeof state.activeConversation !== "object" ||
+    state.activeConversation.id !== nextActiveConversation.id ||
+    state.activeConversation.spiritkin?.name !== nextActiveConversation.spiritkin?.name ||
+    state.activeConversation.messages !== nextActiveConversation.messages
+  ) {
+    state.activeConversation = nextActiveConversation;
+    changed = true;
+  }
   state.gameActive = !!(state.activeGame && state.activeGame.status === "active");
 
   if (changed) {
@@ -5483,13 +5510,28 @@ function buildChatView() {
       </section>
     `;
   }
+  const activeConversation = state.activeConversation && typeof state.activeConversation === "object"
+    ? state.activeConversation
+    : { id: null, messages: [], spiritkin: null };
   const signals = getStageSignals();
-  const safeMessages = Array.isArray(state.messages)
-    ? state.messages.filter((message) => message && typeof message === "object")
+  const safeMessages = Array.isArray(activeConversation.messages)
+    ? activeConversation.messages.filter((message) => message && typeof message === "object")
     : [];
+  if (!activeConversation.id && safeMessages.length === 0 && !state.loadingReply) {
+    return `
+      <section class="chat-layout ${esc(meta.cls)}">
+        <div class="soft-error soft-error-block">
+          Your Spiritkin is ready. Begin your first exchange.
+        </div>
+      </section>
+    `;
+  }
   const failed = [...safeMessages].reverse().find((message) => message.role === "user" && message.status === "failed");
   const showPrompts = safeMessages.length === 0 && !state.loadingReply;
   const activeGameType = state.activeGame?.type || null;
+  const safeSpiritverseEventType = typeof state.spiritverseEvent?.type === "string" ? state.spiritverseEvent.type : "event";
+  const safeDailyQuestType = typeof state.dailyQuest?.type === "string" ? state.dailyQuest.type : "quest";
+  const safeWhisperType = typeof state.engagementWhisper?.type === "string" ? state.engagementWhisper.type : "return";
 
   // Echoes & Charter Logic
   const { currentBond, stageData } = getBondStateForSpiritkin(spiritkin.name);
@@ -5871,7 +5913,7 @@ function buildChatView() {
                 <div class="sv-event-card sv-event-${esc(state.spiritverseEvent.color)}">
                   <div class="sv-event-header">
                     <span class="sv-event-icon">${esc(state.spiritverseEvent.icon)}</span>
-                    <div class="sv-event-type-badge">${esc(state.spiritverseEvent.type.replace(/_/g, ' '))}</div>
+                    <div class="sv-event-type-badge">${esc(safeSpiritverseEventType.replace(/_/g, ' '))}</div>
                   </div>
                   <div class="sv-event-title">${esc(state.spiritverseEvent.title)}</div>
                   <p class="sv-event-description">${esc(state.spiritverseEvent.description)}</p>
@@ -5907,7 +5949,7 @@ function buildChatView() {
                 <div class="sv-quest-card sv-quest-${esc(meta.cls)}">
                   <div class="sv-quest-header">
                     <span class="sv-quest-icon">${esc(state.dailyQuest.icon || '◎')}</span>
-                    <div class="sv-quest-type-badge">${esc((state.dailyQuest.type || 'quest').replace(/_/g, ' '))}</div>
+                    <div class="sv-quest-type-badge">${esc(safeDailyQuestType.replace(/_/g, ' '))}</div>
                   </div>
                   <div class="sv-quest-title">${esc(state.dailyQuest.title)}</div>
                   <p class="sv-quest-description">${esc(state.dailyQuest.description)}</p>
@@ -6025,8 +6067,8 @@ function buildChatView() {
         </div>
 
         ${state.showWhisperBanner && state.engagementWhisper ? `
-          <div class="whisper-banner ${esc(state.engagementWhisper.type || 'return')}" data-action="dismiss-whisper">
-            <div class="whisper-banner-icon">${state.engagementWhisper.type === 'milestone' ? '✦' : state.engagementWhisper.type === 'echoes' ? '◈' : '◎'}</div>
+          <div class="whisper-banner ${esc(safeWhisperType)}" data-action="dismiss-whisper">
+            <div class="whisper-banner-icon">${safeWhisperType === 'milestone' ? '✦' : safeWhisperType === 'echoes' ? '◈' : '◎'}</div>
             <div class="whisper-banner-body">
               <div class="whisper-banner-label">${esc(spiritkin.name)} whispers</div>
               <p class="whisper-banner-text">${esc(state.engagementWhisper.text)}</p>
