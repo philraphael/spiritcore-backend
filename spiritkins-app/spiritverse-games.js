@@ -902,7 +902,7 @@ export const SpiritverseGames = {
           <div class="echo-attempt-pips">
             ${Array.from({length: maxAttempts}).map((_, i) => `
               <div class="echo-attempt-pip ${i < attempts ? 'used' : 'available'}"></div>
-            `).join('') : `<div class="spirit-cards-hint">Your companion is gathering their next draw.</div>`}
+            `).join('')}
           </div>
           <div class="echo-attempt-copy">Attempts: ${attempts}/${maxAttempts}</div>
           
