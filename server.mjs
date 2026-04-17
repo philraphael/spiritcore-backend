@@ -48,6 +48,7 @@ const OPERATOR_CONSOLE_DIR = path.join(__dirname, "operator-console");
 const USER_APP_DIR = path.join(__dirname, "spiritkins-app");
 const WORLD_ART_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "photos");
 const GAME_THEME_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "Game_Themes");
+const SPIRITVERSE_APP_BUILD = "20260417023000";
 
 const PORT    = config.port;
 const USE_LLM = String(process.env.USE_LLM || "false").toLowerCase() === "true";
@@ -204,6 +205,8 @@ app.get("/operator/:asset", async (req, reply) => {
 
 app.get("/app", async (_req, reply) => {
   const html = await readFile(path.join(USER_APP_DIR, "index.html"), "utf8");
+  reply.header("Cache-Control", "no-store, max-age=0, must-revalidate");
+  reply.header("X-Spiritverse-Build", SPIRITVERSE_APP_BUILD);
   return reply.type("text/html; charset=utf-8").send(html);
 });
 
@@ -232,6 +235,8 @@ app.get("/app/:asset", async (req, reply) => {
   const filePath = path.join(USER_APP_DIR, asset);
   const content = await readFile(filePath, "utf8");
   const mime = asset.endsWith(".js") ? "text/javascript; charset=utf-8" : (asset.endsWith(".css") ? "text/css; charset=utf-8" : "application/octet-stream");
+  reply.header("Cache-Control", "no-store, max-age=0, must-revalidate");
+  reply.header("X-Spiritverse-Build", SPIRITVERSE_APP_BUILD);
   return reply.type(mime).send(content);
 });
 
@@ -243,6 +248,8 @@ app.get("/app/data/:asset", async (req, reply) => {
 
   const filePath = path.join(USER_APP_DIR, "data", asset);
   const content = await readFile(filePath, "utf8");
+  reply.header("Cache-Control", "no-store, max-age=0, must-revalidate");
+  reply.header("X-Spiritverse-Build", SPIRITVERSE_APP_BUILD);
   return reply.type("text/javascript; charset=utf-8").send(content);
 });
 
