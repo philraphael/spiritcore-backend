@@ -2997,11 +2997,14 @@ function setPrimarySpiritkin(spiritkin) {
 
 function openCrownGate() {
   if (state.crownGateOpening || state.entryTransitioning) {
+    console.info("[SpiritGate] enter-click-blocked", { reason: "reentrant-open", snapshot: getInteractionStateSnapshot() });
     logSpiritGate("entry-blocked-reentrant-open", {});
     return;
   }
+  console.info("[SpiritGate] enter-click-fired", getInteractionStateSnapshot());
   logSpiritGate("entry-clicked", { action: "continue" });
   if (requiresEntryConsent() && !state.consentChecked) {
+    console.info("[SpiritGate] enter-click-blocked", { reason: "consent-required", snapshot: getInteractionStateSnapshot() });
     logSpiritGate("entry-blocked-consent", { action: "continue" });
     state.statusText = "Accept the entry consent to continue into the Spiritverse.";
     state.statusError = true;
@@ -3023,6 +3026,7 @@ function openCrownGate() {
   state.entryTransitioning = false;
   state.spiritverseTrailerActive = false;
   state.spiritCoreWelcoming = false;
+  console.info("[SpiritGate] route-video-start", { action: "continue", snapshot: getInteractionStateSnapshot() });
   console.info("Gate video start", getInteractionStateSnapshot());
   setMediaMuted(false);
   state.statusText = "The Crown Gate is opening...";
@@ -5068,6 +5072,7 @@ function buildCrownGateEntry() {
   const media = getMediaToggleState(state.mediaMuted);
   const returning = !isFirstTimeVisitor();
   const needsConsent = requiresEntryConsent();
+  const consentBlocked = needsConsent && !state.consentChecked;
   return `
     <section class="entry-screen entry-screen-gate ${state.entryVideoStarted ? "is-playing" : ""}">
       <div class="entry-gate-video">
@@ -5137,13 +5142,18 @@ function buildCrownGateEntry() {
             </div>
           `}
           <div class="entry-action-rail">
-            <button class="entry-skip-btn" data-action="skip-gate" ${needsConsent && !state.consentChecked ? "disabled" : ""}>Skip</button>
+            <button class="entry-skip-btn ${consentBlocked ? "is-guarded" : ""}" data-action="skip-gate" ${state.crownGateOpening ? "disabled" : ""} aria-disabled="${consentBlocked ? "true" : "false"}">Skip</button>
             <div class="entry-cta">
-              <button class="btn btn-primary btn-wide entry-main-cta" data-action="continue" ${needsConsent && !state.consentChecked ? "disabled" : ""}>
+              <button class="btn btn-primary btn-wide entry-main-cta ${consentBlocked ? "is-guarded" : ""}" data-action="continue" ${state.crownGateOpening ? "disabled" : ""} aria-disabled="${consentBlocked ? "true" : "false"}">
                 ${state.crownGateOpening ? "Opening the SpiritGate..." : "Enter the SpiritVerse"}
               </button>
             </div>
           </div>
+          ${state.statusText ? `
+            <div class="entry-status ${state.statusError ? "is-error" : ""}">
+              ${esc(state.statusText)}
+            </div>
+          ` : ""}
         </div>
       </div>
     </section>
@@ -6641,9 +6651,11 @@ async function onClick(event) {
   }
 
   if (action === "skip-gate") {
+    console.info("[SpiritGate] skip-click-fired", getInteractionStateSnapshot());
     logSpiritGate("entry-clicked", { action: "skip-gate" });
     const firstTimeVisitor = isFirstTimeVisitor();
     if (requiresEntryConsent() && !state.consentChecked) {
+      console.info("[SpiritGate] skip-click-blocked", { reason: "consent-required", snapshot: getInteractionStateSnapshot() });
       logSpiritGate("entry-blocked-consent", { action: "skip-gate" });
       state.statusText = "Accept the entry consent to continue into the Spiritverse.";
       state.statusError = true;
@@ -6660,6 +6672,7 @@ async function onClick(event) {
       logSpiritGate("skip-bypassed-first-run-cinematics", {});
     }
     clearSpiritGateFallback();
+    console.info("[SpiritGate] route-video-start", { action: "skip-gate", snapshot: getInteractionStateSnapshot() });
     completeCrownGateEntry({ skipped: true, source: "skip-gate", force: true });
     return;
   }
