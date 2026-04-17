@@ -6323,9 +6323,31 @@ function onInput(event) {
 }
 
 async function onClick(event) {
+  const clickTarget = event.target;
+  const spiritGateTarget = clickTarget?.closest?.(".entry-screen, .entry-card, .entry-main-cta, .entry-skip-btn, [data-action='continue'], [data-action='skip-gate']");
+  const targetDiagnostics = {
+    tag: clickTarget?.tagName || null,
+    className: typeof clickTarget?.className === "string" ? clickTarget.className : null,
+    targetAction: clickTarget?.dataset?.action || null
+  };
+  if (spiritGateTarget) {
+    console.info("[SpiritGate] click-target", targetDiagnostics);
+  }
   const element = event.target.closest("[data-action]");
-  if (!element) return;
+  if (!element) {
+    if (spiritGateTarget) {
+      console.info("[SpiritGate] click-no-action-resolved", targetDiagnostics);
+    }
+    return;
+  }
   const action = element.dataset.action;
+  if (action === "continue" || action === "skip-gate" || spiritGateTarget) {
+    console.info("[SpiritGate] click-action-resolved", {
+      action,
+      tag: element.tagName || null,
+      className: typeof element.className === "string" ? element.className : null
+    });
+  }
   const before = getInteractionStateSnapshot();
   logInteraction("click-dispatched", { action, before });
 
@@ -7231,7 +7253,14 @@ function stopListening() {
   render();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+let _spiritverseBootInitialized = false;
+
+function initializeSpiritverseApp() {
+  if (_spiritverseBootInitialized) {
+    logInteraction("boot-skipped", { reason: "already-initialized" });
+    return;
+  }
+  _spiritverseBootInitialized = true;
   try {
     installGlobalInteractionDiagnostics();
     bootstrapRetentionExperience();
@@ -7283,7 +7312,13 @@ document.addEventListener("DOMContentLoaded", () => {
       window.__svMarkBootReady();
     }
   }
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initializeSpiritverseApp, { once: true });
+} else {
+  initializeSpiritverseApp();
+}
 
 async function playAudio(buffer) {
   try {
@@ -8158,14 +8193,4 @@ const _wellnessInterval = setInterval(checkWellnessNudge, 60 * 1000); // check e
 // ── Initialize the application ──────────────────────────────────────────────
 // Make render globally accessible
 window.render = render;
-
-document.addEventListener('DOMContentLoaded', () => {
-  render();
-});
-
-// Also render immediately in case DOMContentLoaded has already fired
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', render);
-} else {
-  render();
-}
+window.initializeSpiritverseApp = initializeSpiritverseApp;
