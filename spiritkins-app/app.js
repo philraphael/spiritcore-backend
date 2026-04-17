@@ -62,7 +62,45 @@ const BOND_LEVELS = [
 ];
 
 import { spiritkins as CANON_SPIRITKINS, realms as CANON_REALMS, charter as CANON_CHARTER, echoes as CANON_ECHOES, governance as CANON_GOVERNANCE, world as CANON_WORLD, bondStages as CANON_BOND_STAGES } from "./data/spiritverseCanon.js";
-import { SpiritverseGames } from "./spiritverse-games.js";
+
+function createSpiritverseGamesFallback() {
+  return {
+    available: false,
+    echoAnswer: "",
+    reset() {},
+    render(targetId) {
+      const target = typeof document !== "undefined" ? document.getElementById(targetId) : null;
+      if (target) {
+        target.innerHTML = `
+          <div class="panel-card" style="padding:20px;text-align:left;">
+            <div class="panel-label">Games Unavailable</div>
+            <p style="margin:8px 0 0;">The games module failed to load. Core Spiritverse features remain available while games recover.</p>
+          </div>
+        `;
+      }
+    },
+    expand(...args) {
+      const targetId = typeof args[0] === "string" ? args[0] : null;
+      if (targetId) this.render(targetId);
+    },
+    handleChessSquareClick() {},
+    handleCheckersSquareClick() {}
+  };
+}
+
+let SpiritverseGames = createSpiritverseGamesFallback();
+try {
+  const spiritverseGamesModule = await import("./spiritverse-games.js");
+  if (spiritverseGamesModule?.SpiritverseGames) {
+    SpiritverseGames = spiritverseGamesModule.SpiritverseGames;
+    SpiritverseGames.available = true;
+  } else {
+    console.error("[Spiritverse Games Boot] Module loaded without SpiritverseGames export.");
+  }
+} catch (error) {
+  console.error("[Spiritverse Games Boot] Failed to load games module. Continuing without games.", error);
+  window.__svGamesModuleError = error;
+}
 
 // RevealAnimation will be loaded as a separate module
 let revealAnimationInstance = null;
