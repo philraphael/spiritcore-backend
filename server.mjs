@@ -48,7 +48,7 @@ const OPERATOR_CONSOLE_DIR = path.join(__dirname, "operator-console");
 const USER_APP_DIR = path.join(__dirname, "spiritkins-app");
 const WORLD_ART_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "photos");
 const GAME_THEME_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "Game_Themes");
-const SPIRITVERSE_APP_BUILD = "20260417025000";
+const SPIRITVERSE_APP_BUILD = "20260417033000";
 
 const PORT    = config.port;
 const USE_LLM = String(process.env.USE_LLM || "false").toLowerCase() === "true";
