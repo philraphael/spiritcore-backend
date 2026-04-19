@@ -108,6 +108,7 @@ let spiritGateArrivalPlaybackSafetyTimer = null;
 let spiritGateActiveAttemptId = 0;
 let spiritGateTransitionRevealTimer = null;
 let spiritGateTransitionRouteTimer = null;
+const VOICE_GUIDANCE_KEY = "sk_voice_guidance_dismissed";
 
 const CANON_SPIRITKIN_MAP = Object.fromEntries(CANON_SPIRITKINS.map((spiritkin) => [spiritkin.name, spiritkin]));
 const SPIRITVERSE_ECHOES = {
@@ -241,6 +242,19 @@ function canUseVoiceInteraction() {
   if (!state.selectedSpiritkin || !state.conversationId) return false;
   if (state.loadingConv || state.loadingReply) return false;
   return true;
+}
+
+function supportsSpeechRecognition() {
+  return typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
+function isConstrainedGameType(gameType) {
+  return String(gameType || "").trim().toLowerCase() === "go";
+}
+
+function dismissVoiceGuidance() {
+  state.voiceGuidanceDismissed = true;
+  localStorage.setItem(VOICE_GUIDANCE_KEY, "1");
 }
 
 function getSpiritkinSelectionContext(spiritkinName) {
@@ -1861,6 +1875,8 @@ const state = {
   voiceMuted: localStorage.getItem("sk_voice_muted") === "1",
   voiceListening: false,
   voiceMode: localStorage.getItem("sk_voice_mode") === "1", // Always-on mic mode
+  voiceGuidanceDismissed: localStorage.getItem(VOICE_GUIDANCE_KEY) === "1",
+  voiceTranscriptPreview: "",
   pendingVoiceResume: false,
   // Premium: Custom Spiritkin Matching
   surveyOpen: false,
@@ -1897,6 +1913,7 @@ const state = {
   gameHelpFirstRun: false,
   gameHelpSeen: readJson(GAME_HELP_SEEN_KEY, {}),
   gameLoading: false,            // loading state for game moves
+  gameFeedback: null,
   pendingGameType: null,         // game currently opening
   issueReporterOpen: false,
   issueReportText: "",
@@ -3282,7 +3299,7 @@ function resolveReadAloudPayload(scope = state.activePresenceTab) {
     if (!state.activeGame) {
       return {
         voice: spiritkin.ui.voice || "nova",
-        text: `The Games Chamber is quiet. You can begin Celestial Chess, Veil Checkers, Star Mapping, Spirit Cards, Echo Trials, TicTacToe of Echoes, Connect Four Constellations, or Abyssal Battleship with ${spiritkin.name}.`
+        text: `The Games Chamber is quiet. You can begin Celestial Chess, Veil Checkers, Spirit Cards, Echo Trials, TicTacToe of Echoes, Connect Four Constellations, or Abyssal Battleship with ${spiritkin.name}.`
       };
     }
     const lastMoves = summarizeEntries((state.activeGame.history || []).slice(-3).map((entry) => {
@@ -3620,8 +3637,8 @@ function openCrownGate() {
   console.info("Gate video start", getInteractionStateSnapshot());
   armSpiritGatePlaybackSafety("gate-route-start");
   state.statusText = state.mediaMuted
-    ? "The Crown Gate is opening. Sound is currently muted."
-    : "The Crown Gate is opening...";
+    ? "The Crown Gate opens around you. Sound is resting until you invite it in."
+    : "The Crown Gate opens around you...";
   state.statusError = false;
   normalizeInteractionState("openCrownGate");
   render();
@@ -3667,7 +3684,7 @@ function completeCrownGateEntry({ skipped = false, source = "unspecified", force
   state.crownGateOpening = false;
   state.entryVideoStarted = false;
   state.entryTransitioning = !!skipped;
-  state.statusText = skipped ? "Passing through the Crown Gate..." : "The threshold is settling...";
+  state.statusText = skipped ? "Crossing the threshold..." : "The world is settling around you...";
   state.statusError = false;
   render();
 
@@ -3886,6 +3903,9 @@ async function sendMessage(overrideText) {
   if (!text || state.loadingReply) return;
   if (isDuplicateUserSubmission(text)) return;
   cleanupSpeechLifecycle("send-message", { renderOnFinish: false, clearStatus: false });
+  if (overrideText !== undefined) {
+    state.voiceTranscriptPreview = text;
+  }
   markUserSubmission(text, overrideText === undefined ? "text" : "voice");
   updateAdaptiveProfileFromUserText(text);
   state.showCrownGateHome = false;
@@ -4008,6 +4028,9 @@ async function sendMessage(overrideText) {
     });
   }
   state.loadingReply = false;
+  if (overrideText !== undefined) {
+    state.voiceTranscriptPreview = "";
+  }
   render();
   scrollThread();
 }
@@ -4952,6 +4975,11 @@ async function executeGameMove(move, options = {}) {
     stopListening();
     state.gameLoading = true;
     state.gameInput = "";
+    state.gameFeedback = {
+      phase: "sending",
+      text: `Move placed. ${state.selectedSpiritkin?.name || "Spiritkin"} is reading the board...`,
+      move: String(move),
+    };
     setAuthoritativeTurnPhase("processing", {
       isSpeaking: false,
       isListening: false,
@@ -4991,11 +5019,31 @@ async function executeGameMove(move, options = {}) {
         throw new Error("Game state was not committed.");
       }
       state.activeGame = canonicalGame;
+      const latestHistory = Array.isArray(canonicalGame?.history) && canonicalGame.history.length
+        ? canonicalGame.history[canonicalGame.history.length - 1]
+        : null;
       const resolvedGameReply =
         data.spiritkinMessage ||
         buildGameOutcomeReaction(state.selectedSpiritkin.name, state.activeGame) ||
         (state.activeGame?.status === "active" ? buildPresenceTabNarration("games", state.selectedSpiritkin, getBondStateForSpiritkin(state.selectedSpiritkin.name).currentBond, null, null) : "");
       state.gameSpiritkinMessage = resolvedGameReply || null;
+      state.gameFeedback = state.activeGame?.status === "ended"
+        ? {
+            phase: "complete",
+            text: state.activeGame?.result?.label || "The board has settled.",
+            move: latestHistory?.move || null,
+          }
+        : latestHistory?.player === "spiritkin"
+          ? {
+              phase: "reply",
+              text: `${state.selectedSpiritkin?.name || "Spiritkin"} answered the board.`,
+              move: latestHistory.move || null,
+            }
+          : {
+              phase: "ready",
+              text: "Move accepted. The board is ready for you.",
+              move: null,
+            };
       state.statusText = state.activeGame?.status === "ended"
         ? (state.activeGame?.result?.label || "Game complete.")
         : (addUserMessage ? "Move accepted." : "");
@@ -5042,6 +5090,11 @@ async function executeGameMove(move, options = {}) {
     } else {
       state.activeGame = previousGame;
       state.gameSpiritkinMessage = previousSpiritkinMessage;
+      state.gameFeedback = {
+        phase: "error",
+        text: data.message || "Move failed. Try that turn again.",
+        move: String(move),
+      };
       state.statusText = data.message || "Move failed.";
       state.statusError = true;
       setAuthoritativeTurnPhase("complete", {
@@ -5059,6 +5112,11 @@ async function executeGameMove(move, options = {}) {
     console.error("Failed to submit game move", err);
     state.activeGame = previousGame;
     state.gameSpiritkinMessage = previousSpiritkinMessage;
+    state.gameFeedback = {
+      phase: "error",
+      text: "Move failed. The board stayed where it was.",
+      move: String(move),
+    };
     state.statusText = "Move failed — please try again.";
     state.statusError = true;
     setAuthoritativeTurnPhase("complete", {
@@ -5092,6 +5150,12 @@ async function startGameSession(gameType) {
     selectedSpiritkin: state.selectedSpiritkin?.name || null,
   });
   try {
+    if (isConstrainedGameType(gameType)) {
+      state.statusText = "Star-Mapping is not in live rotation yet. Territory scoring and completion are still being finished.";
+      state.statusError = false;
+      render();
+      return false;
+    }
     if (!state.selectedSpiritkin?.name) {
       state.statusText = "Choose a bonded Spiritkin before starting a game.";
       state.statusError = true;
@@ -5112,6 +5176,11 @@ async function startGameSession(gameType) {
     }
     state.statusText = `Starting ${gameType}...`;
     state.gameLoading = true;
+    state.gameFeedback = {
+      phase: "sending",
+      text: `Opening ${gameType.replace("_", " ")}. Setting the board...`,
+      move: null,
+    };
     render();
     const res = await fetch(`${API}/v1/games/start`, {
       method: "POST",
@@ -5137,6 +5206,13 @@ async function startGameSession(gameType) {
     state.gameInstructions = data.instructions || null;
     state.gameEchoGuide = data.guide || null;
     state.gameInput = "";
+    state.gameFeedback = {
+      phase: "ready",
+      text: state.activeGame?.turn === "user"
+        ? "Board ready. Your first move is live."
+        : `${state.selectedSpiritkin.name} is opening the game.`,
+      move: null,
+    };
     state.statusText = "Game started.";
     state.statusError = false;
     state.gameActive = true;
@@ -5174,6 +5250,11 @@ async function startGameSession(gameType) {
     return true;
   } catch (err) {
     console.error("Failed to start game", err);
+    state.gameFeedback = {
+      phase: "error",
+      text: "The game did not open cleanly.",
+      move: null,
+    };
     state.statusText = "Failed to start game.";
     state.statusError = true;
     logGameDebug("start-game-error", {
@@ -5221,11 +5302,11 @@ function getGameHelpContent(gameType, instructions = "") {
       winCondition: "Capture the full opposing set or lock the board in your favor."
     },
     go: {
-      whatItIs: "A star-mapping form of Go played on a 13x13 constellation grid.",
-      objective: "Place stones to claim more territory than your companion.",
-      basicMove: "Tap any open intersection on the star-map board to place your next stone.",
-      feedback: "Look at the last placed stone, the commentary line, and the board spread to track how territory is shifting.",
-      winCondition: "The larger controlled territory at the end wins the round."
+      whatItIs: "A preview build of Star-Mapping on a 13x13 constellation grid.",
+      objective: "Preview the star-map surface only. Full capture, pass, and scoring rules are not in live rotation yet.",
+      basicMove: "Start one of the live games if you want a full match loop today.",
+      feedback: "Use the board as a visual preview rather than a finished competitive runtime.",
+      winCondition: "Not currently in live rotation."
     },
     spirit_cards: {
       whatItIs: "A lightweight card duel where you build board presence and realm points against your Spiritkin.",
@@ -5281,7 +5362,7 @@ function buildGameTutorialIntro(spiritkinName, gameType, help) {
   const intros = {
     chess: `${spiritkin} opens Celestial Chess with you. Start by selecting a white piece, then follow the highlighted squares. After every move, watch the board and commentary for the answer.`,
     checkers: `${spiritkin} draws the Veil board into focus. Pick a white piece, follow the highlighted landing squares, and watch the move history after each jump or trade.`,
-    go: `${spiritkin} spreads a star-map between you. Place one stone at a time, then read the board shape and commentary to understand how territory is shifting.`,
+    go: `${spiritkin} can still show you the star-map, but Star-Mapping is not currently in live rotation. Use one of the other active games for a full playable match.`,
     spirit_cards: `${spiritkin} lays out the first hand. Watch your mana, play or draw from the visible controls, and check the board row and realm points after each card.`,
     echo_trials: `${spiritkin} presents the trial directly. Read the riddle first, answer in the visible input, and use the response plus remaining attempts as your guide.`,
     tictactoe: `${spiritkin} sets a simple grid between you. Tap one empty square, then watch where the answering mark appears before planning the next line.`,
@@ -5309,7 +5390,7 @@ function render() {
     root.innerHTML = buildApp();
     syncMountedMedia({ attemptPlay: false });
     syncEntryCinematics();
-    if (!state.voiceMode) maybeAutoOpenGameMic();
+    if (state.voiceMode) maybeAutoOpenGameMic();
     if (typeof window.__svMarkBootReady === "function") {
       window.__svMarkBootReady();
     }
@@ -5369,12 +5450,11 @@ function render() {
 }
 
 function getAutoMicTurnKey(game) {
-  if (!game || game.status !== "active" || game.turn !== "user") return null;
+  if (!game || game.status !== "active" || game.turn !== "user" || isConstrainedGameType(game.type)) return null;
   return `${game.type}:${game.moveCount || 0}:${Array.isArray(game.history) ? game.history.length : 0}:${game.turn}`;
 }
 
 function maybeAutoOpenGameMic() {
-  return;
   const turnKey = getAutoMicTurnKey(state.activeGame);
   if (!turnKey) {
     state.autoMicTurnKey = null;
@@ -5486,6 +5566,7 @@ function cleanupSpeechLifecycle(reason = "unspecified", options = {}) {
   }
 
   state.voiceListening = false;
+  state.voiceTranscriptPreview = "";
   stopCurrentAudioPlayback();
   setAuthoritativeTurnPhase(preserveResumeHint ? "complete" : "idle", {
     isSpeaking: false,
@@ -6451,6 +6532,12 @@ function buildChatView() {
   const safeSpiritverseEventType = typeof state.spiritverseEvent?.type === "string" ? state.spiritverseEvent.type : "event";
   const safeDailyQuestType = typeof state.dailyQuest?.type === "string" ? state.dailyQuest.type : "quest";
   const safeWhisperType = typeof state.engagementWhisper?.type === "string" ? state.engagementWhisper.type : "return";
+  const voiceSupported = supportsSpeechRecognition();
+  const showVoiceGuidance = !state.voiceGuidanceDismissed && !state.voiceListening && !state.loadingReply;
+  const goPreviewOnly = activeGameType === "go";
+  const voicePreview = String(state.voiceTranscriptPreview || "").trim();
+  const showVoicePreview = !!(state.voiceListening || voicePreview);
+  const gameFeedback = state.activeGame ? state.gameFeedback : null;
 
   // Echoes & Charter Logic
   const { currentBond, stageData } = getBondStateForSpiritkin(spiritkin.name);
@@ -6688,17 +6775,17 @@ function buildChatView() {
                   ${[
                     { id: "chess", name: "Celestial Chess", icon: "\u265F", desc: "Classic strategy on a celestial board" },
                     { id: "checkers", name: "Veil Checkers", icon: "\uD83C\uDFF1", desc: "Light against shadow across the Veil" },
-                    { id: "go", name: "Star-Mapping (Go)", icon: "\uD83C\uDF0C", desc: "Place stones on a living star chart" },
+                    { id: "go", name: "Star-Mapping (Go)", icon: "\uD83C\uDF0C", desc: "Preview only — not in live rotation while scoring is unfinished", previewOnly: true },
                     { id: "spirit_cards", name: "Spirit-Cards", icon: "\uD83C\uDCCF", desc: "Spiritverse trading card game" },
                     { id: "echo_trials", name: "Echo Trials", icon: "\uD83D\uDD14", desc: "Echoes riddles from the deep Spiritverse" },
                     { id: "tictactoe", name: "TicTacToe of Echoes", icon: "\u25A6", desc: "Quick pattern duel with your companion" },
                     { id: "connect_four", name: "Connect Four Constellations", icon: "\u25CF", desc: "Drop stars and connect four first" },
                     { id: "battleship", name: "Abyssal Battleship", icon: "\u2693", desc: "Trade hidden strikes across the deep grid" }
                   ].map(game => `
-                    <button class="ritual-card ${esc(meta.cls)} ${state.pendingGameType === game.id ? 'loading' : ''}" data-action="start-game" data-game="${game.id}" ${state.gameLoading ? "disabled" : ""}>
+                    <button class="ritual-card ${esc(meta.cls)} ${state.pendingGameType === game.id ? 'loading' : ''} ${game.previewOnly ? 'preview-only' : ''}" data-action="start-game" data-game="${game.id}" ${(state.gameLoading || game.previewOnly) ? "disabled" : ""}>
                       <span class="ritual-icon">${game.icon}</span>
                       <div class="ritual-copy">
-                        <strong>${esc(state.pendingGameType === game.id ? `Opening ${game.name}...` : game.name)}</strong>
+                        <strong>${esc(game.previewOnly ? `${game.name} — preview only` : (state.pendingGameType === game.id ? `Opening ${game.name}...` : game.name))}</strong>
                         <span>${esc(state.pendingGameType === game.id ? "Preparing the board..." : game.desc)}</span>
                       </div>
                     </button>
@@ -6767,6 +6854,12 @@ function buildChatView() {
                       </div>
                     ` : '';
                   })()}
+                  ${goPreviewOnly ? `
+                    <div class="game-truth-banner">
+                      <div class="game-truth-label">Preview only</div>
+                      <p>Star-Mapping is currently shown as a read-only preview. Capture, pass, territory scoring, and final completion are not in live rotation yet.</p>
+                    </div>
+                  ` : ""}
                   <div class="game-panel-header">
                     <div class="game-panel-title">
                       <span class="game-panel-icon">${
@@ -6797,6 +6890,17 @@ function buildChatView() {
                         : `${esc(spiritkin.name)} is thinking...`}
                   </div>
 
+                  ${gameFeedback ? `
+                    <div class="game-feedback-strip ${esc(gameFeedback.phase || "ready")}">
+                      <div class="game-feedback-label">${state.gameLoading ? `${esc(spiritkin.name)} is thinking` : "Board feedback"}</div>
+                      <div class="game-feedback-body">
+                        ${state.gameLoading ? `<span class="typing-dots subtle"><span></span><span></span><span></span></span>` : ""}
+                        <span>${esc(gameFeedback.text || "")}</span>
+                        ${gameFeedback.move ? `<strong>${esc(gameFeedback.move)}</strong>` : ""}
+                      </div>
+                    </div>
+                  ` : ''}
+
                   ${state.gameSpiritkinMessage ? `
                     <div class="game-spiritkin-commentary">
                       <div class="game-commentary-label">${esc(spiritkin.name)}</div>
@@ -6805,11 +6909,11 @@ function buildChatView() {
                   ` : ''}
 
                   <!-- Visual game board — rendered by SpiritverseGames after DOM update -->
-                  <div class="game-board-container">
+                  <div class="game-board-container ${state.gameLoading ? 'is-thinking' : ''}">
                     <div id="spiritverse-game-board"></div>
                   </div>
                   
-                  ${state.activeGame && state.activeGame.status === 'active' ? `
+                  ${state.activeGame && state.activeGame.status === 'active' && !goPreviewOnly ? `
                     <div class="game-controls">
                       <button class="game-expand-btn" data-action="expand-game">
                         <span class="expand-icon">⛶</span> Grand Stage
@@ -7065,6 +7169,32 @@ function buildChatView() {
           <div class="retry-banner">
             <span>Message not delivered. Retry within the same bonded conversation.</span>
             <button class="btn btn-ghost btn-sm" data-action="retry">Retry</button>
+          </div>
+        ` : ""}
+
+        ${showVoiceGuidance ? `
+          <div class="voice-guide-card ${voiceSupported ? "" : "unsupported"}">
+            <div class="voice-guide-head">
+              <div>
+                <div class="voice-guide-label">Voice input</div>
+                <div class="voice-guide-title">Speak from the mic button beside the message box</div>
+              </div>
+              <button class="btn btn-ghost btn-xs" data-action="dismiss-voice-guidance">Dismiss</button>
+            </div>
+            <p>Your spoken words use the same conversation flow as typing. Tap the <strong>🎤</strong> button to start a turn, or enable continuous voice when you want hands-free follow-up.</p>
+            <p>${voiceSupported
+              ? "The first tap can trigger your browser microphone prompt. If access is blocked, re-enable the microphone for this site in your browser settings and then tap the mic again."
+              : "This browser does not expose live speech recognition here. Voice input works best in current Chrome-class browsers."}</p>
+          </div>
+        ` : ""}
+
+        ${showVoicePreview ? `
+          <div class="voice-live-chip ${state.voiceListening ? "listening" : "captured"}">
+            <div class="voice-live-label">${state.voiceListening ? "Listening..." : "Captured voice turn"}</div>
+            <div class="voice-live-body">
+              ${state.voiceListening ? `<span class="typing-dots subtle"><span></span><span></span><span></span></span>` : ""}
+              <span>${esc(voicePreview || "Speak when you're ready.")}</span>
+            </div>
           </div>
         ` : ""}
 
@@ -7579,6 +7709,7 @@ async function onClick(event) {
     if (ctx.state === 'suspended') {
       ctx.resume().then(() => {
         state.voiceMode = true;
+        dismissVoiceGuidance();
         localStorage.setItem("sk_voice_mode", "1");
         state.statusText = "Voice mode enabled.";
         state.statusError = false;
@@ -7587,6 +7718,7 @@ async function onClick(event) {
       });
     } else {
       state.voiceMode = true;
+      dismissVoiceGuidance();
       localStorage.setItem("sk_voice_mode", "1");
       state.statusText = "Voice mode enabled.";
       state.statusError = false;
@@ -7632,11 +7764,18 @@ async function onClick(event) {
     return;
   }
   if (action === "toggle-mic") {
+    dismissVoiceGuidance();
     if (state.voiceListening) {
       stopListening();
     } else {
       startListening({ source: "manual-toggle" });
     }
+    return;
+  }
+
+  if (action === "dismiss-voice-guidance") {
+    dismissVoiceGuidance();
+    render();
     return;
   }
 
@@ -8048,13 +8187,14 @@ function startListening(options = {}) {
   }
 
   clearVoiceLoopTimer();
+  state.voiceTranscriptPreview = "";
   setVoiceTurnRuntimeState({ awaitingUserTurn: true, captureAfterAudio: false });
   const recognition = new SpeechRecognition();
   const runId = ++_recognitionRunId;
   _recognitionStopRequested = false;
   _recognition = recognition;
   recognition.continuous = true;
-  recognition.interimResults = false;
+  recognition.interimResults = true;
   recognition.lang = "en-US";
 
   const isActiveRun = () => _recognition === recognition && runId === _recognitionRunId;
@@ -8086,8 +8226,19 @@ function startListening(options = {}) {
     if (!isActiveRun()) return;
     const result = event.results?.[event.resultIndex];
     const transcript = String(result?.[0]?.transcript || "").trim();
-    if (!result?.isFinal) return;
+    const preview = Array.from(event.results || [])
+      .slice(event.resultIndex)
+      .map((entry) => String(entry?.[0]?.transcript || "").trim())
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    state.voiceTranscriptPreview = preview || transcript;
+    if (!result?.isFinal) {
+      render();
+      return;
+    }
     state.input = transcript;
+    state.voiceTranscriptPreview = transcript;
     render();
     if (!transcript) return;
     setVoiceTurnRuntimeState({ awaitingUserTurn: false, captureAfterAudio: false });
@@ -8110,6 +8261,10 @@ function startListening(options = {}) {
       return;
     }
     stopListening();
+    state.voiceTranscriptPreview = transcript;
+    state.statusText = `Heard: "${transcript}"`;
+    state.statusError = false;
+    render();
     sendMessage(transcript);
   };
 
@@ -8137,6 +8292,7 @@ function startListening(options = {}) {
     });
     state.statusText = `Voice error: ${event.error}. Tap 🎤 to try again.`;
     state.statusError = true;
+    state.voiceTranscriptPreview = "";
     _recognition = null;
     const stopRequested = _recognitionStopRequested;
     _recognitionStopRequested = false;
@@ -8176,6 +8332,7 @@ function startListening(options = {}) {
     }
     _recognition = null;
     state.voiceListening = false;
+    state.voiceTranscriptPreview = "";
     setAuthoritativeTurnPhase("complete", {
       isSpeaking: false,
       isListening: false,
@@ -8199,6 +8356,7 @@ function startListening(options = {}) {
   } catch (error) {
     _recognition = null;
     state.voiceListening = false;
+    state.voiceTranscriptPreview = "";
     state.statusText = `Voice input could not start: ${error.message}`;
     state.statusError = true;
     clearVoiceTurnCapture();

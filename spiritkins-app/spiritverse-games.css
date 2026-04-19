@@ -139,6 +139,58 @@
   padding: 10px 12px;
   margin-bottom: 4px;
 }
+
+.game-feedback-strip {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  animation: bubble-in 0.22s ease;
+}
+
+.game-feedback-strip.sending {
+  border-color: rgba(242, 219, 160, 0.26);
+  background: rgba(242, 219, 160, 0.08);
+}
+
+.game-feedback-strip.reply,
+.game-feedback-strip.complete {
+  border-color: rgba(130, 183, 217, 0.28);
+  background: rgba(130, 183, 217, 0.08);
+}
+
+.game-feedback-strip.error {
+  border-color: rgba(255, 128, 128, 0.32);
+  background: rgba(255, 128, 128, 0.08);
+}
+
+.game-feedback-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.66;
+}
+
+.game-feedback-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-primary, #f0e8d8);
+}
+
+.game-feedback-body strong {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
 .game-commentary-label {
   font-size: 10px;
   font-weight: 700;
@@ -208,6 +260,17 @@
   padding: 8px 0;
   border-radius: 18px;
   overflow: hidden;
+}
+
+.game-board-container.is-thinking::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(242, 219, 160, 0.12);
+  box-shadow: 0 0 24px rgba(242, 219, 160, 0.08) inset;
+  pointer-events: none;
+  animation: pulse-glow 1.35s ease-in-out infinite;
 }
 
 .game-board-container::before {
