@@ -21,6 +21,8 @@ import {
   RETENTION_STATE_KEY,
   RETENTION_TELEMETRY_KEY,
   SESSION_KEY,
+  SPIRITKIN_CREATOR_DRAFT_KEY,
+  SPIRITKIN_CREATOR_LIBRARY_KEY,
   SPIRITCORE_WELCOME_TEXT,
   SPIRITCORE_WELCOME_VOICE,
   SPIRITGATE_POST_COPY_SETTLE_MS,
@@ -60,6 +62,7 @@ import {
 } from "./app-helpers.js";
 import { spiritkins as CANON_SPIRITKINS, realms as CANON_REALMS, charter as CANON_CHARTER, echoes as CANON_ECHOES, governance as CANON_GOVERNANCE, world as CANON_WORLD, bondStages as CANON_BOND_STAGES } from "./data/spiritverseCanon.js";
 import { resolveGameAssetUrl } from "./data/gameAssetManifest.js";
+import { createPendingCreatorMediaSlots, getSpiritkinMediaConfig, SPIRITKIN_CREATOR_FOUNDATION } from "./data/spiritkinRuntimeConfig.js";
 
 function createSpiritverseGamesFallback() {
   return {
@@ -256,6 +259,129 @@ function isConstrainedGameType(gameType) {
 function dismissVoiceGuidance() {
   state.voiceGuidanceDismissed = true;
   localStorage.setItem(VOICE_GUIDANCE_KEY, "1");
+}
+
+function toSpiritkinSlug(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "custom-spiritkin";
+}
+
+function loadCreatorDraft() {
+  const raw = readJson(SPIRITKIN_CREATOR_DRAFT_KEY, null);
+  if (!raw || typeof raw !== "object") return null;
+  const answers = raw.answers && typeof raw.answers === "object" ? raw.answers : {};
+  return {
+    draftId: raw.draftId ? String(raw.draftId) : uuid(),
+    answers,
+    restoredAt: raw.restoredAt ? normalizeTimestamp(raw.restoredAt, null) : null,
+  };
+}
+
+function persistCreatorDraft() {
+  const hasAnswers = Object.values(state.surveyAnswers || {}).some((value) => String(value || "").trim());
+  if (!hasAnswers) {
+    localStorage.removeItem(SPIRITKIN_CREATOR_DRAFT_KEY);
+    return;
+  }
+  const current = loadCreatorDraft();
+  writeJson(SPIRITKIN_CREATOR_DRAFT_KEY, {
+    draftId: current?.draftId || uuid(),
+    answers: { ...state.surveyAnswers },
+    restoredAt: nowIso(),
+  });
+}
+
+function clearCreatorDraft() {
+  localStorage.removeItem(SPIRITKIN_CREATOR_DRAFT_KEY);
+}
+
+function recordCreatorLibraryEntry(spiritkin, status = "generated") {
+  if (!spiritkin || typeof spiritkin !== "object") return;
+  const stored = readJson(SPIRITKIN_CREATOR_LIBRARY_KEY, []);
+  const current = Array.isArray(stored) ? stored : [];
+  const entry = {
+    id: spiritkin.id || spiritkin.creatorFoundation?.draftId || uuid(),
+    name: spiritkin.name || "Custom Spiritkin",
+    status,
+    createdAt: nowIso(),
+    assetBasePath: spiritkin.creatorFoundation?.assetBasePath || null,
+    mediaSlots: spiritkin.creatorFoundation?.mediaSlots || createPendingCreatorMediaSlots(null),
+  };
+  const deduped = current.filter((item) => item?.id !== entry.id);
+  writeJson(SPIRITKIN_CREATOR_LIBRARY_KEY, [entry, ...deduped].slice(0, 24));
+}
+
+function attachCreatorFoundation(spiritkin, source = "survey_generation") {
+  if (!spiritkin || typeof spiritkin !== "object") return spiritkin;
+  const slug = toSpiritkinSlug(spiritkin.name);
+  const assetBasePath = `${SPIRITKIN_CREATOR_FOUNDATION.runtimeAssetRoot}/${slug}`;
+  return {
+    ...spiritkin,
+    creatorFoundation: {
+      version: SPIRITKIN_CREATOR_FOUNDATION.version,
+      draftId: spiritkin.creatorFoundation?.draftId || uuid(),
+      source,
+      status: spiritkin.creatorFoundation?.status || "generated",
+      assetBasePath,
+      mediaSlots: spiritkin.creatorFoundation?.mediaSlots || createPendingCreatorMediaSlots(assetBasePath),
+    },
+  };
+}
+
+function createCustomSpiritkinRecord(spiritkin) {
+  if (!spiritkin || typeof spiritkin !== "object") return null;
+  const withFoundation = attachCreatorFoundation(spiritkin);
+  const existingUi = withFoundation.ui && typeof withFoundation.ui === "object" ? withFoundation.ui : {};
+  return {
+    id: withFoundation.id || withFoundation.creatorFoundation?.draftId || uuid(),
+    name: withFoundation.name,
+    title: withFoundation.title || withFoundation.archetype,
+    role: withFoundation.role || withFoundation.primaryNeed,
+    essence: Array.isArray(withFoundation.essence)
+      ? withFoundation.essence
+      : [withFoundation.tone, withFoundation.primaryNeed].filter(Boolean),
+    invariant: withFoundation.invariant || withFoundation.tone,
+    tone: withFoundation.tone,
+    growth_axis: withFoundation.growth_axis || withFoundation.primaryNeed,
+    creatorFoundation: withFoundation.creatorFoundation,
+    ui: {
+      cls: existingUi.cls || "custom",
+      symbol: existingUi.symbol || withFoundation.sigil || "Sigil",
+      mood: existingUi.mood || withFoundation.tone || "Custom presence",
+      strap: existingUi.strap || withFoundation.strap || "",
+      ambient: existingUi.ambient || withFoundation.atmosphereLine || "",
+      bondLine: existingUi.bondLine || withFoundation.bondLine || "",
+      realm: existingUi.realm || withFoundation.realm || "Custom Realm",
+      realmText: existingUi.realmText || withFoundation.realmText || "",
+      originStory: existingUi.originStory || withFoundation.originStory || "",
+      atmosphereLine: existingUi.atmosphereLine || withFoundation.atmosphereLine || "",
+      voice: existingUi.voice || withFoundation.voice || "nova",
+      prompts: Array.isArray(existingUi.prompts) && existingUi.prompts.length
+        ? existingUi.prompts
+        : [
+            `Tell me about ${withFoundation.realm || "your realm"}.`,
+            "What do you sense in me right now?",
+            `Help me understand ${withFoundation.primaryNeed || "what I need"}.`,
+          ],
+      svgPalette: existingUi.svgPalette || withFoundation.svgPalette || {},
+      form: existingUi.form || withFoundation.form || "",
+      isCustom: true,
+    },
+  };
+}
+
+function getSurveyDraftStatus() {
+  const draft = loadCreatorDraft();
+  if (!draft) return null;
+  const answerCount = Object.values(draft.answers || {}).filter((value) => String(value || "").trim()).length;
+  if (!answerCount) return null;
+  return {
+    answerCount,
+    label: `Draft saved on this device · ${answerCount} answer${answerCount === 1 ? "" : "s"} captured`,
+  };
 }
 
 function getSpiritkinSelectionContext(spiritkinName) {
@@ -1090,6 +1216,105 @@ function getSpiritkinIntroPrompt(spiritkin) {
   return prompts[spiritkin?.name] || spiritkin?.ui?.loreSnippet || spiritkin?.ui?.originStory || "";
 }
 
+function getSpiritCoreGuidanceModel() {
+  const spiritkin = state.selectedSpiritkin || state.primarySpiritkin || state.pendingBondSpiritkin || null;
+  const firstPrompt = spiritkin?.ui?.prompts?.[0] || DEFAULT_PROMPTS[0];
+  if (state.activeGame?.status === "active") {
+    return {
+      label: "SpiritCore guidance",
+      title: `Stay with ${state.activeGame.name || "the game"} until the move resolves.`,
+      text: "Watch the board, let the turn settle, then return to conversation if you want meaning or reflection around what just happened.",
+      actions: [
+        { action: "expand-game", label: "Focus the game" },
+        { action: "set-presence-tab", tab: "profile", label: "Back to profile" },
+      ],
+    };
+  }
+  if (!state.primarySpiritkin && state.pendingBondSpiritkin) {
+    return {
+      label: "SpiritCore guidance",
+      title: `Meet ${state.pendingBondSpiritkin.name}, then decide deliberately.`,
+      text: "Bond only when the recognition holds. If it does not, keep meeting the others before you choose your primary companion.",
+      actions: [
+        { action: "confirm-primary", label: `Bond with ${state.pendingBondSpiritkin.name}` },
+        { action: "clear-pending-bond", label: "Meet another Spiritkin" },
+      ],
+    };
+  }
+  if (!state.primarySpiritkin) {
+    return {
+      label: "SpiritCore guidance",
+      title: "Meet a founder before you begin the living bond.",
+      text: "Preview each Spiritkin in view, listen for the one who stays steady, then begin from there.",
+      actions: [],
+    };
+  }
+  if (!state.conversationId) {
+    return {
+      label: "SpiritCore guidance",
+      title: `${state.primarySpiritkin.name} is bonded. Open the first channel cleanly.`,
+      text: "Begin the bonded conversation when you want presence, or open games first if shared action feels easier than words.",
+      actions: [
+        { action: "begin", label: `Begin with ${state.primarySpiritkin.name}` },
+        { action: "open-games-hub", label: "Open games" },
+      ],
+    };
+  }
+  if ((state.messages || []).length <= 2) {
+    return {
+      label: "SpiritCore guidance",
+      title: "The bond is live now. Keep the next step close.",
+      text: "Ask anything real, open a game for shared action, or inspect the side panels when you want world context instead of another message.",
+      actions: [
+        { action: "prompt", prompt: firstPrompt, label: "Ask a real question" },
+        { action: "set-presence-tab", tab: "games", label: "Open games" },
+      ],
+    };
+  }
+  if (state.activePresenceTab === "games" && !state.activeGame) {
+    return {
+      label: "SpiritCore guidance",
+      title: "Choose a game when you want action instead of another turn of text.",
+      text: "Games deepen the bond differently: they create shared rhythm, visible turns, and cleaner momentum.",
+      actions: [],
+    };
+  }
+  return {
+    label: "SpiritCore guidance",
+    title: `Stay in free conversation with ${state.primarySpiritkin.name}, then branch only when it adds something real.`,
+    text: "Talk, explore the side panels, play, and return. The loop matters because continuity is what makes the bond feel lived-in.",
+    actions: [
+      { action: "prompt", prompt: firstPrompt, label: "Keep talking" },
+      { action: "set-presence-tab", tab: "journal", label: "Open bond journal" },
+    ],
+  };
+}
+
+function buildSpiritCoreGuidanceCard(extraClass = "") {
+  const guidance = getSpiritCoreGuidanceModel();
+  if (!guidance) return "";
+  const className = ["spiritcore-next-step-card", extraClass].filter(Boolean).join(" ");
+  return `
+    <div class="${className}">
+      <div class="spiritcore-next-step-label">${esc(guidance.label || "SpiritCore guidance")}</div>
+      <h3>${esc(guidance.title || "")}</h3>
+      <p>${esc(guidance.text || "")}</p>
+      ${Array.isArray(guidance.actions) && guidance.actions.length ? `
+        <div class="spiritcore-next-step-actions">
+          ${guidance.actions.map((item) => `
+            <button
+              class="btn btn-ghost btn-sm"
+              data-action="${esc(item.action)}"
+              ${item.tab ? `data-tab="${esc(item.tab)}"` : ""}
+              ${item.prompt ? `data-prompt="${esc(item.prompt)}"` : ""}
+            >${esc(item.label)}</button>
+          `).join("")}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
 function portraitSvg(name) {
   if (name === "Lyra") {
     // Lyra: Celestial Fawn — dark star-mapped coat, luminous rose heart sigil, ethereal antlers with stardust
@@ -1900,6 +2125,7 @@ const state = {
   voiceMode: localStorage.getItem("sk_voice_mode") === "1", // Always-on mic mode
   voiceGuidanceDismissed: localStorage.getItem(VOICE_GUIDANCE_KEY) === "1",
   voiceTranscriptPreview: "",
+  voicePermissionBlocked: false,
   pendingVoiceResume: false,
   // Premium: Custom Spiritkin Matching
   surveyOpen: false,
@@ -1909,6 +2135,7 @@ const state = {
   surveyError: null,
   generatedSpiritkin: null, // The AI-generated Spiritkin profile
   customSpiritkinRevealed: false, // Show reveal screen
+  creatorDraftRestored: false,
   // Onboarding: 10-question guided flow
   onboardingStep: 0,           // 0=not started, 1-10=question, 11=recommendation
   onboardingAnswers: {},       // {q1: 'answer', q2: 'answer', ...}
@@ -6396,7 +6623,10 @@ function buildCrownGateEntry() {
           ` : ""}
         </div>
       </div>
-      ${state.crownGateOpening ? `<button class="entry-live-skip" data-action="skip-gate">Skip Intro</button>` : ""}
+      ${state.crownGateOpening ? `
+        <div class="entry-live-status">Gate sequence active · crossing now</div>
+        <button class="entry-live-skip" data-action="skip-gate">Skip Intro</button>
+      ` : ""}
     </section>
   `;
 }
@@ -6444,6 +6674,7 @@ function buildSpiritCoreWelcome() {
           <span>Begin one bond</span>
           <span>Talk, explore, play, return</span>
         </div>
+        ${buildSpiritCoreGuidanceCard("welcome-guidance")}
       </div>
     </section>
   `;
@@ -6505,6 +6736,8 @@ function buildBondSelectionView() {
         </div>
       </div>
 
+      ${buildSpiritCoreGuidanceCard("selection-guidance")}
+
       <div class="spiritkin-grid">
         ${state.spiritkins.map((spiritkin, index) => buildBondCard(spiritkin, index, false)).join("")}
       </div>
@@ -6558,6 +6791,7 @@ function buildBondedHomeView() {
           </div>
         </div>
       </div>
+      ${buildSpiritCoreGuidanceCard("bonded-home-guidance")}
       ${buildRetentionHomeStrip()}
       ${buildTemporalWorldStrip()}
       ${buildEvolutionHomeStrip(spiritkin)}
@@ -6630,12 +6864,9 @@ function buildResonanceDepth(spiritkinName, cls) {
 
 function buildBondPreview(spiritkin, pending) {
   const essence = Array.isArray(spiritkin.essence) ? spiritkin.essence.slice(0, 3) : [];
-  const introVideoMap = {
-    Lyra: '/videos/lyra_intro.mp4',
-    Raien: '/videos/raien_intro.mp4',
-    Kairo: '/videos/kairo_intro.mp4'
-  };
-  const introVideo = introVideoMap[spiritkin.name];
+  const mediaConfig = getSpiritkinMediaConfig(spiritkin.name);
+  const introVideo = mediaConfig?.introTrailer?.path || null;
+  const introTrailerPending = mediaConfig?.introTrailer?.status === "awaiting_media";
   const selfReveal = getSpiritkinSelfReveal(spiritkin);
   const introPrompt = getSpiritkinIntroPrompt(spiritkin);
   return `
@@ -6666,6 +6897,12 @@ function buildBondPreview(spiritkin, pending) {
             </div>
           </div>
         ` : ''}
+        ${introTrailerPending ? `
+          <div class="spiritkin-media-slot-note">
+            <strong>${esc(mediaConfig.introTrailer.label)}</strong>
+            <span>${esc(`${spiritkin.name}'s self-reveal pipeline is wired and waiting for final trailer media.`)}</span>
+          </div>
+        ` : ""}
         ${buildSigil(spiritkin.ui, "focus", spiritkin.ui.symbol)}
         ${buildPortrait(spiritkin.name, "portrait-focus", spiritkin.ui.cls)}
       </div>
@@ -6808,12 +7045,13 @@ function buildChatView() {
   const safeDailyQuestType = typeof state.dailyQuest?.type === "string" ? state.dailyQuest.type : "quest";
   const safeWhisperType = typeof state.engagementWhisper?.type === "string" ? state.engagementWhisper.type : "return";
   const voiceSupported = supportsSpeechRecognition();
-  const showVoiceGuidance = !state.voiceGuidanceDismissed && !state.voiceListening && !state.loadingReply;
+  const showVoiceGuidance = (!state.voiceGuidanceDismissed || state.voicePermissionBlocked || !voiceSupported) && !state.voiceListening;
   const goPreviewOnly = activeGameType === "go";
   const voicePreview = String(state.voiceTranscriptPreview || "").trim();
   const showVoicePreview = !!(state.voiceListening || voicePreview);
   const gameFeedback = state.activeGame ? state.gameFeedback : null;
   const showFirstLoopGuide = !state.activeGame && safeMessages.length <= 1 && !state.loadingReply;
+  const showSpiritCoreGuidance = !state.loadingReply && !state.showHomeView;
   const chatLayoutClass = `${esc(meta.cls)} ${state.activePresenceTab === "games" && state.activeGame ? "game-focus-mode" : ""}`.trim();
 
   // Echoes & Charter Logic
@@ -7447,6 +7685,8 @@ function buildChatView() {
           </div>
         ` : ""}
 
+        ${showSpiritCoreGuidance ? buildSpiritCoreGuidanceCard("chat-guidance") : ""}
+
         <div class="thread-wrap">
           <div class="thread">
             ${state.messages.length === 0 && !state.loadingReply ? `
@@ -7478,11 +7718,13 @@ function buildChatView() {
             <div class="voice-guide-head">
               <div>
                 <div class="voice-guide-label">Voice input</div>
-                <div class="voice-guide-title">Speak from the mic button beside the message box</div>
+                <div class="voice-guide-title">${state.voicePermissionBlocked ? "Microphone access is blocked right now" : "Speak from the mic button beside the message box"}</div>
               </div>
               <button class="btn btn-ghost btn-xs" data-action="dismiss-voice-guidance">Dismiss</button>
             </div>
-            <p>Your spoken words use the same conversation flow as typing. Tap the <strong>🎤</strong> button to start a turn, or enable continuous voice when you want hands-free follow-up.</p>
+            <p>${state.voicePermissionBlocked
+              ? "SpiritCore could not open the microphone. Allow mic access for this site, then tap the mic again. You can still type below without losing the conversation."
+              : "Your spoken words use the same conversation flow as typing. Tap the <strong>🎤</strong> button to start a turn, or enable continuous voice when you want hands-free follow-up."}</p>
             <p>${voiceSupported
               ? "The first tap can trigger your browser microphone prompt. If access is blocked, re-enable the microphone for this site in your browser settings and then tap the mic again."
               : "This browser does not expose live speech recognition here. Voice input works best in current Chrome-class browsers."}</p>
@@ -7491,7 +7733,7 @@ function buildChatView() {
 
         ${showVoicePreview ? `
           <div class="voice-live-chip ${state.voiceListening ? "listening" : "captured"}">
-            <div class="voice-live-label">${state.voiceListening ? "Listening..." : "Captured voice turn"}</div>
+            <div class="voice-live-label">${state.voiceListening ? "Listening..." : (state.loadingReply ? "Captured. Sending to Spiritkin" : "Captured voice turn")}</div>
             <div class="voice-live-body">
               ${state.voiceListening ? `<span class="typing-dots subtle"><span></span><span></span><span></span></span>` : ""}
               <span>${esc(voicePreview || "Speak when you're ready.")}</span>
@@ -7923,17 +8165,22 @@ async function onClick(event) {
 
   if (action === "bond-with-custom-spiritkin") {
     if (state.generatedSpiritkin) {
+      recordCreatorLibraryEntry(state.generatedSpiritkin, "bonded");
       setPrimarySpiritkin(state.generatedSpiritkin);
+      state.surveyOpen = false;
       state.customSpiritkinRevealed = false;
       state.generatedSpiritkin = null;
+      clearCreatorDraft();
     }
     render();
     return;
   }
 
   if (action === "cancel-custom-spiritkin") {
+    state.surveyOpen = false;
     state.customSpiritkinRevealed = false;
     state.generatedSpiritkin = null;
+    persistCreatorDraft();
     render();
     return;
   }
@@ -8369,17 +8616,22 @@ async function onClick(event) {
 
   // Spiritkin Matching
   if (action === "open-survey") {
+    const draft = loadCreatorDraft();
     state.surveyOpen = true;
-    state.surveyStep = 0;
-    state.surveyAnswers = {};
+    state.surveyStep = draft ? Math.min(Object.keys(draft.answers || {}).length, SURVEY_QUESTIONS.length - 1) : 0;
+    state.surveyAnswers = draft?.answers ? { ...draft.answers } : {};
     state.surveyGenerating = false;
     state.surveyError = null;
     state.generatedSpiritkin = null;
     state.customSpiritkinRevealed = false;
+    state.creatorDraftRestored = !!draft;
+    state.statusText = draft ? "Restored your Spiritkin creator draft." : "Spiritkin creator is ready.";
+    state.statusError = false;
     render();
     return;
   }
   if (action === "close-survey") {
+    persistCreatorDraft();
     state.surveyOpen = false;
     state.surveyStep = 0;
     state.surveyAnswers = {};
@@ -8394,6 +8646,7 @@ async function onClick(event) {
     const question = element.dataset.question;
     const answer = element.dataset.answer;
     state.surveyAnswers[question] = answer;
+    persistCreatorDraft();
     if (state.surveyStep < SURVEY_QUESTIONS.length - 1) {
       state.surveyStep += 1;
     } else {
@@ -8406,6 +8659,7 @@ async function onClick(event) {
   if (action === "survey-back") {
     if (state.surveyStep > 0) {
       state.surveyStep -= 1;
+      persistCreatorDraft();
       render();
     }
     return;
@@ -8429,43 +8683,12 @@ async function onClick(event) {
 
   if (action === "bond-generated-spiritkin") {
     if (state.generatedSpiritkin) {
-      // Convert generated Spiritkin to a bondable format
-      const sk = state.generatedSpiritkin;
-      const customSk = {
-        id: uuid(),
-        name: sk.name,
-        title: sk.archetype,
-        role: sk.primaryNeed,
-        essence: [sk.tone, sk.primaryNeed].filter(Boolean),
-        invariant: sk.tone,
-        tone: sk.tone,
-        growth_axis: sk.primaryNeed,
-        ui: {
-          cls: "custom",
-          symbol: sk.sigil,
-          mood: sk.tone,
-          strap: sk.strap,
-          ambient: sk.atmosphereLine,
-          bondLine: sk.bondLine,
-          realm: sk.realm,
-          realmText: sk.realmText,
-          originStory: sk.originStory,
-          atmosphereLine: sk.atmosphereLine,
-          voice: sk.voice || "nova",
-          prompts: [
-            `Tell me about ${sk.realm}.`,
-            `What do you sense in me right now?`,
-            `Help me understand ${sk.primaryNeed}.`
-          ],
-          svgPalette: sk.svgPalette,
-          form: sk.form,
-          isCustom: true
-        }
-      };
-      setPrimarySpiritkin(customSk);
+      recordCreatorLibraryEntry(state.generatedSpiritkin, "bonded");
+      setPrimarySpiritkin(state.generatedSpiritkin);
       state.surveyOpen = false;
       state.generatedSpiritkin = null;
       state.customSpiritkinRevealed = false;
+      clearCreatorDraft();
       render();
     }
     return;
@@ -8485,6 +8708,7 @@ function startListening(options = {}) {
   const { source = "manual" } = options;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
+    state.voicePermissionBlocked = false;
     state.statusText = "Voice input is not supported in this browser. Try Chrome.";
     state.statusError = true;
     render();
@@ -8500,7 +8724,13 @@ function startListening(options = {}) {
   }
 
   clearVoiceLoopTimer();
+  state.voicePermissionBlocked = false;
   state.voiceTranscriptPreview = "";
+  state.statusText = source === "manual-toggle" || source === "auto-turn"
+    ? "Requesting microphone access..."
+    : "Preparing voice input...";
+  state.statusError = false;
+  render();
   setVoiceTurnRuntimeState({ awaitingUserTurn: true, captureAfterAudio: false });
   const recognition = new SpeechRecognition();
   const runId = ++_recognitionRunId;
@@ -8514,6 +8744,7 @@ function startListening(options = {}) {
 
   recognition.onstart = () => {
     if (!isActiveRun()) return;
+    state.voicePermissionBlocked = false;
     state.voiceListening = true;
     setAuthoritativeTurnPhase("user_input", {
       isSpeaking: false,
@@ -8530,6 +8761,7 @@ function startListening(options = {}) {
     });
     state.statusText = "Listening… Speak now.";
     state.statusError = false;
+    state.statusText = "Listening... Speak now.";
     console.info("[Voice] listening-started", { source });
     logContinuityDebug("listening-started", { source, runId });
     render();
@@ -8575,7 +8807,7 @@ function startListening(options = {}) {
     }
     stopListening();
     state.voiceTranscriptPreview = transcript;
-    state.statusText = `Heard: "${transcript}"`;
+    state.statusText = `Captured: "${transcript}"`;
     state.statusError = false;
     render();
     sendMessage(transcript);
@@ -8590,6 +8822,11 @@ function startListening(options = {}) {
       stopRequested: !!_recognitionStopRequested,
     });
     state.voiceListening = false;
+    state.voicePermissionBlocked = event.error === "not-allowed" || event.error === "service-not-allowed";
+    if (state.voicePermissionBlocked) {
+      state.voiceGuidanceDismissed = false;
+      localStorage.removeItem(VOICE_GUIDANCE_KEY);
+    }
     setAuthoritativeTurnPhase("complete", {
       isSpeaking: false,
       isListening: false,
@@ -8603,7 +8840,9 @@ function startListening(options = {}) {
         turnPhase: "complete",
       },
     });
-    state.statusText = `Voice error: ${event.error}. Tap 🎤 to try again.`;
+    state.statusText = state.voicePermissionBlocked
+      ? "Microphone access was blocked. Allow access for this site, then tap the mic again or type below."
+      : `Voice error: ${event.error}. Tap the mic to try again.`;
     state.statusError = true;
     state.voiceTranscriptPreview = "";
     _recognition = null;
@@ -9173,7 +9412,9 @@ async function generateCustomSpiritkin() {
       throw new Error("Invalid response from Spiritverse.");
     }
 
-    state.generatedSpiritkin = data.spiritkin;
+    state.generatedSpiritkin = createCustomSpiritkinRecord(data.spiritkin);
+    state.creatorDraftRestored = false;
+    recordCreatorLibraryEntry(state.generatedSpiritkin, "generated");
     state.surveyGenerating = false;
     render();
 
@@ -9200,6 +9441,7 @@ function buildPremiumSpiritkinCTA() {
 }
 
 function buildSurveyModal() {
+  const draftStatus = getSurveyDraftStatus();
   if (state.surveyGenerating) {
     return `
       <div class="survey-overlay">
@@ -9263,6 +9505,7 @@ function buildSurveyModal() {
           <div class="survey-label">Spiritkin Matching — Soul Analysis</div>
           <div class="survey-progress-bar"><div class="survey-progress-fill" style="width:${progress}%"></div></div>
           <div class="survey-step-count">${state.surveyStep + 1} of ${SURVEY_QUESTIONS.length}</div>
+          ${draftStatus ? `<div class="survey-draft-status">${esc(draftStatus.label)}</div>` : ""}
         </div>
         <div class="survey-question-wrap">
           <h3 class="survey-question">${esc(q.question)}</h3>
@@ -9324,6 +9567,7 @@ function buildCustomSpiritkinReveal() {
         <div class="reveal-details">
           <p class="reveal-strap">${esc(sk.ui.strap)}</p>
           <p class="reveal-realm">From the ${esc(sk.ui.realm)}</p>
+          <p class="creator-foundation-note">Portrait, intro trailer, and bond-reveal slots are reserved now so premium media can attach later without rebuilding this Spiritkin.</p>
           <button class="btn btn-primary btn-wide" data-action="bond-with-custom-spiritkin">Bond with ${esc(sk.name)}</button>
           <button class="btn btn-ghost btn-sm" data-action="cancel-custom-spiritkin">Not now</button>
         </div>

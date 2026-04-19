@@ -29,6 +29,7 @@ import { createIssueReportService } from "./src/services/issueReportService.mjs"
 import { analyticsRoutes }        from "./src/routes/analytics.mjs";
 import { issueRoutes }            from "./src/routes/issues.mjs";
 import { sessionRoutes }          from "./src/routes/session.mjs";
+import { createPendingCreatorMediaSlots, listRuntimeVideoFiles, SPIRITKIN_CREATOR_FOUNDATION } from "./spiritkins-app/data/spiritkinRuntimeConfig.js";
 // ── Phase F: Production hardening ───────────────────────────────────────────
 import { validateConfig, config } from "./src/config.mjs";
 import { getPinoOptions, setAppLogger } from "./src/logger.mjs";
@@ -338,8 +339,7 @@ app.get("/portraits/:filename", async (req, reply) => {
 // Serve cinematic videos from public/videos
 app.get("/videos/:filename", async (req, reply) => {
   const { filename } = req.params;
-  // Whitelist video filenames to prevent directory traversal
-  const allowedVideos = ["lyra_intro.mp4", "raien_intro.mp4", "kairo_intro.mp4", "welcome_intro.mp4", "gate_entrance_final.mp4"];
+  const allowedVideos = listRuntimeVideoFiles();
   if (!allowedVideos.includes(filename)) {
     return reply.code(404).send({ ok: false, error: "Video not found" });
   }
@@ -831,6 +831,20 @@ Return ONLY valid JSON with this exact structure:
     } catch {
       return sendError(reply, 502, "PARSE_ERROR", "Failed to parse generated Spiritkin.", { raw: content }, req.request_id);
     }
+
+    const slug = String(spiritkin.name || "custom-spiritkin")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "custom-spiritkin";
+    const assetBasePath = `${SPIRITKIN_CREATOR_FOUNDATION.runtimeAssetRoot}/${slug}`;
+    spiritkin.creatorFoundation = {
+      version: SPIRITKIN_CREATOR_FOUNDATION.version,
+      status: "generated",
+      source: "survey_generation",
+      assetBasePath,
+      mediaSlots: createPendingCreatorMediaSlots(assetBasePath),
+    };
 
     return reply.send({ ok: true, spiritkin });
   } catch (e) {
