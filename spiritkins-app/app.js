@@ -5123,11 +5123,11 @@ async function executeGameMove(move, options = {}) {
       const latestHistory = Array.isArray(canonicalGame?.history) && canonicalGame.history.length
         ? canonicalGame.history[canonicalGame.history.length - 1]
         : null;
-      const shouldHoldChessReply =
-        canonicalGame?.type === "chess" &&
+      const shouldHoldRenderedReply =
+        ["chess", "checkers", "connect_four", "tictactoe", "battleship"].includes(canonicalGame?.type) &&
         latestHistory?.player === "spiritkin" &&
         canonicalGame?.status === "active";
-      if (shouldHoldChessReply) {
+      if (shouldHoldRenderedReply) {
         const replyDelayMs = 360 + Math.floor(Math.random() * 180);
         await new Promise((resolve) => window.setTimeout(resolve, replyDelayMs));
       }
@@ -5474,7 +5474,64 @@ function getGameBannerKey(game, channel, gameFeedback, commentary = "") {
 function buildGamePanelClasses(game) {
   const classes = ["active-game-panel"];
   if (game?.type === "chess") classes.push("chess-showcase-panel");
+  if (game?.type === "checkers") classes.push("checkers-showcase-panel");
+  if (game?.type === "connect_four") classes.push("connect4-showcase-panel");
+  if (game?.type === "battleship") classes.push("battleship-showcase-panel");
+  if (game?.type === "tictactoe") classes.push("tictactoe-showcase-panel");
+  if (game?.type === "go") classes.push("go-preview-panel");
   return classes.join(" ");
+}
+
+function buildGameModeHero(game, spiritkinName) {
+  if (!game?.type) return "";
+  const name = spiritkinName || "your Spiritkin";
+  const heroes = {
+    chess: {
+      cls: "chess-mode-hero",
+      kicker: "Premium Showcase",
+      title: "Celestial Chess",
+      copy: `The board holds center. Your move lands first, then ${name} answers in full view.`
+    },
+    checkers: {
+      cls: "checkers-mode-hero",
+      kicker: "Live Match",
+      title: "Veil Checkers",
+      copy: `Each jump, crown, and finish now stays framed in the open while ${name} answers the board.`
+    },
+    connect_four: {
+      cls: "connect4-mode-hero",
+      kicker: "Companion Duel",
+      title: "Connect Four Constellations",
+      copy: `Every token drop lands with visible weight, then ${name} answers the column pattern in sequence.`
+    },
+    battleship: {
+      cls: "battleship-mode-hero",
+      kicker: "Deep Grid",
+      title: "Abyssal Battleship",
+      copy: `The sonar grid stays centered, strike feedback stays readable, and each reply from ${name} resolves in place.`
+    },
+    tictactoe: {
+      cls: "tictactoe-mode-hero",
+      kicker: "Quick Play",
+      title: "TicTacToe of Echoes",
+      copy: `A fast companion duel with immediate mark placement, visible tension, and a clear finish state.`
+    },
+    go: {
+      cls: "go-mode-hero",
+      kicker: "Preview Only",
+      title: "Star-Mapping",
+      copy: `This board remains an intentional preview surface until capture, pass, and scoring are ready for honest live play.`
+    }
+  };
+  const hero = heroes[game.type];
+  if (!hero) return "";
+  return `
+    <div class="game-mode-hero ${esc(hero.cls)}">
+      <div class="game-mode-kicker">${esc(hero.kicker)}</div>
+      <div class="game-mode-title">${esc(hero.title)}</div>
+      <p class="game-mode-copy">${esc(hero.copy)}</p>
+    </div>
+  `;
 }
 
 function getGameHelpContent(gameType, instructions = "") {
@@ -7013,13 +7070,7 @@ function buildChatView() {
                 </div>
               ` : `
                 <div class="${buildGamePanelClasses(state.activeGame)}" data-focus-anchor="game-panel">
-                  ${state.activeGame.type === 'chess' ? `
-                    <div class="game-mode-hero chess-mode-hero">
-                      <div class="game-mode-kicker">Premium Showcase</div>
-                      <div class="game-mode-title">Celestial Chess</div>
-                      <p class="game-mode-copy">The board holds center. Your move lands first, then ${esc(spiritkin.name)} answers in full view.</p>
-                    </div>
-                  ` : ''}
+                  ${buildGameModeHero(state.activeGame, spiritkin.name)}
                   ${(() => {
                     const help = getGameHelpContent(state.activeGame.type, state.gameInstructions);
                     const tutorialIntro = buildGameTutorialIntro(spiritkin.name, state.activeGame.type, help);

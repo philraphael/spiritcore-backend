@@ -489,7 +489,7 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
 // ============================================================
 // CHECKERS ENGINE & RENDERER
 // ============================================================
-function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, onSquareClick, isExpanded = false, theme = resolveGameTheme("checkers"), isInteractive = true) {
+function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, lastMove, onSquareClick, isExpanded = false, theme = resolveGameTheme("checkers"), isInteractive = true) {
   const board = boardArray || Array(32).fill(null);
   
   let html = '';
@@ -499,6 +499,10 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, o
     </div>`;
   }
 
+  html += `<div class="checkers-showcase-meta">
+    <div class="checkers-showcase-kicker">Dragonforge Match</div>
+    <div class="checkers-showcase-copy">${isInteractive ? 'Advance, jump, and crown your line.' : 'The board is holding while the Spiritkin resolves the answer.'}</div>
+  </div>`;
   html += `<div class="checkers-board ${isExpanded ? 'board-grand' : 'board-standard'} ${isInteractive ? '' : 'board-locked'}">`;
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
@@ -511,10 +515,14 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, o
       const piece = sqIndex !== -1 ? board[sqIndex] : null;
       const isSelected = selectedPiece === sqIndex;
       const isValid = validMoves && validMoves.includes(sqIndex);
+      const isLastFrom = sqIndex !== -1 && lastMove && Number(lastMove.from) === sqIndex;
+      const isLastTo = sqIndex !== -1 && lastMove && Number(lastMove.to) === sqIndex;
 
       let cellClass = `checkers-cell ${isLight ? 'checkers-light' : 'checkers-dark'}`;
       if (isSelected) cellClass += ' checkers-selected';
       if (isValid) cellClass += ' checkers-valid';
+      if (isLastFrom) cellClass += ' checkers-last-from';
+      if (isLastTo) cellClass += ' checkers-last-to';
 
       html += `<div class="${cellClass}" data-sq="${sqIndex}" ${isInteractive ? 'data-action="checkers-square-click"' : ''}>`;
       if (piece) {
@@ -537,7 +545,7 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, o
     const expandBtn = target.querySelector('[data-action="checkers-expand"]');
     if (expandBtn) {
       expandBtn.onclick = () => {
-        GrandStage.open('checkers', 'Spiritkin', (c, exp) => renderCheckersBoard(c, boardArray, selectedPiece, validMoves, onSquareClick, exp, theme), theme);
+        GrandStage.open('checkers', 'Spiritkin', (c, exp) => renderCheckersBoard(c, boardArray, selectedPiece, validMoves, lastMove, onSquareClick, exp, theme), theme);
       };
     }
   }
@@ -552,6 +560,7 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, o
         boardArray,
         SpiritverseGames.checkers.selectedPiece,
         SpiritverseGames.checkers.validMoves,
+        lastMove,
         onSquareClick,
         true,
         theme
@@ -752,6 +761,51 @@ function normalizeLastMove(type, lastMove) {
     return null;
   }
 
+  if (type === 'checkers') {
+    if (typeof lastMove === 'object' && Number.isInteger(lastMove.from) && Number.isInteger(lastMove.to)) {
+      return lastMove;
+    }
+    if (typeof lastMove === 'string') {
+      const match = lastMove.match(/^(\d+)-(\d+)$/);
+      if (match) {
+        return {
+          from: Number.parseInt(match[1], 10),
+          to: Number.parseInt(match[2], 10)
+        };
+      }
+    }
+    return null;
+  }
+
+  if (type === 'tictactoe') {
+    if (Number.isInteger(lastMove)) return lastMove;
+    if (typeof lastMove === 'string' && /^\d+$/.test(lastMove)) {
+      const index = Number.parseInt(lastMove, 10);
+      return index >= 0 && index < 9 ? index : null;
+    }
+    return null;
+  }
+
+  if (type === 'connect_four') {
+    if (typeof lastMove === 'object' && Number.isInteger(lastMove.col)) return lastMove;
+    if (Number.isInteger(lastMove)) return { col: lastMove };
+    if (typeof lastMove === 'string' && /^\d+$/.test(lastMove)) {
+      const col = Number.parseInt(lastMove, 10);
+      return col >= 0 && col < 7 ? { col } : null;
+    }
+    return null;
+  }
+
+  if (type === 'battleship') {
+    if (Number.isInteger(lastMove)) return lastMove;
+    if (typeof lastMove === 'object' && Number.isInteger(lastMove.index)) return lastMove.index;
+    if (typeof lastMove === 'string' && /^\d+$/.test(lastMove)) {
+      const index = Number.parseInt(lastMove, 10);
+      return index >= 0 ? index : null;
+    }
+    return null;
+  }
+
   return lastMove;
 }
 
@@ -798,7 +852,7 @@ export const SpiritverseGames = {
           }, isExp, gameTheme, isInteractive);
           break;
         case 'checkers':
-          renderCheckersBoard(target, board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
+          renderCheckersBoard(target, board, this.checkers.selectedPiece, this.checkers.validMoves, lastMove, (sq) => {
             this.handleCheckersSquareClick(sq, board, 'white', onMoveSubmit);
           }, isExp, gameTheme, isInteractive);
           break;
@@ -817,13 +871,13 @@ export const SpiritverseGames = {
           this.renderEchoTrials(target, viewPayload, onMoveSubmit, isExp, gameTheme);
           break;
         case 'tictactoe':
-          this.renderTicTacToe(target, viewPayload, onMoveSubmit, isExp, gameTheme);
+          this.renderTicTacToe(target, { ...viewPayload, lastMove }, onMoveSubmit, isExp, gameTheme);
           break;
         case 'connect_four':
-          this.renderConnectFour(target, viewPayload, onMoveSubmit, isExp, gameTheme);
+          this.renderConnectFour(target, { ...viewPayload, lastMove }, onMoveSubmit, isExp, gameTheme);
           break;
         case 'battleship':
-          this.renderBattleship(target, viewPayload, onMoveSubmit, isExp, gameTheme);
+          this.renderBattleship(target, { ...viewPayload, lastMove }, onMoveSubmit, isExp, gameTheme);
           break;
       }
     };
@@ -859,7 +913,7 @@ export const SpiritverseGames = {
           }, isExp, gameTheme, isInteractive);
           break;
         case 'checkers':
-          renderCheckersBoard(target, board, this.checkers.selectedPiece, this.checkers.validMoves, (sq) => {
+          renderCheckersBoard(target, board, this.checkers.selectedPiece, this.checkers.validMoves, lastMove, (sq) => {
             this.handleCheckersSquareClick(sq, board, 'white', onMoveSubmit);
           }, isExp, gameTheme, isInteractive);
           break;
@@ -878,13 +932,13 @@ export const SpiritverseGames = {
           this.renderEchoTrials(target, viewPayload, onMoveSubmit, isExp, gameTheme);
           break;
         case 'tictactoe':
-          this.renderTicTacToe(target, viewPayload, onMoveSubmit, isExp, gameTheme);
+          this.renderTicTacToe(target, { ...viewPayload, lastMove }, onMoveSubmit, isExp, gameTheme);
           break;
         case 'connect_four':
-          this.renderConnectFour(target, viewPayload, onMoveSubmit, isExp, gameTheme);
+          this.renderConnectFour(target, { ...viewPayload, lastMove }, onMoveSubmit, isExp, gameTheme);
           break;
         case 'battleship':
-          this.renderBattleship(target, viewPayload, onMoveSubmit, isExp, gameTheme);
+          this.renderBattleship(target, { ...viewPayload, lastMove }, onMoveSubmit, isExp, gameTheme);
           break;
         default:
           if (target) target.innerHTML = `<div style="padding:2rem;text-align:center;color:#ccc">Grand Stage not available for this game type.</div>`;
@@ -1087,10 +1141,14 @@ export const SpiritverseGames = {
     if (!root) return;
     const html = `
       <div class="sv-mini-game sv-ttt">
+        <div class="sv-game-meta sv-ttt-meta">
+          <div class="sv-game-kicker">Quick Pattern Duel</div>
+          <div class="sv-game-copy">${isUsersTurn ? 'Place your next echo mark.' : 'The Spiritkin is resolving the next mark.'}</div>
+        </div>
         <div class="sv-mini-grid sv-ttt-grid">
           ${board.map((cell, idx) => `
-            <button class="sv-mini-cell ttt-cell ${cell === 'X' ? 'mark-user' : cell === 'O' ? 'mark-spiritkin' : ''}" data-action="ttt-cell-click" data-idx="${idx}" ${cell || !isUsersTurn ? "disabled" : ""}>
-              ${cell || ""}
+            <button class="sv-mini-cell ttt-cell ${cell === 'X' ? 'mark-user' : cell === 'O' ? 'mark-spiritkin' : ''} ${gameData.lastMove === idx ? 'ttt-last-move' : ''}" data-action="ttt-cell-click" data-idx="${idx}" ${cell || !isUsersTurn ? "disabled" : ""}>
+              ${cell ? `<span class="ttt-token ${cell === 'X' ? 'ttt-token-user' : 'ttt-token-spiritkin'}">${cell}</span>` : ""}
             </button>
           `).join('')}
         </div>
@@ -1163,10 +1221,25 @@ export const SpiritverseGames = {
     const board = gameData.board || Array(42).fill(null);
     const finished = Boolean(gameData.result || gameData.winner || !board.includes(null));
     const isUsersTurn = !finished && gameData.turn === 'user';
+    const lastDropIndex =
+      gameData.lastMove && Number.isInteger(gameData.lastMove.col)
+        ? (() => {
+            const col = gameData.lastMove.col;
+            for (let row = 0; row < 6; row++) {
+              const idx = row * 7 + col;
+              if (board[idx]) return idx;
+            }
+            return null;
+          })()
+        : null;
     const root = resolveTarget(container);
     if (!root) return;
     const html = `
       <div class="sv-mini-game sv-connect4">
+        <div class="sv-game-meta sv-connect4-meta">
+          <div class="sv-game-kicker">Constellation Drop</div>
+          <div class="sv-game-copy">${isUsersTurn ? 'Choose a live column.' : 'The Spiritkin is weighing the constellation lanes.'}</div>
+        </div>
         <div class="sv-connect4-head">
           ${Array.from({ length: 7 }, (_, col) => `<button class="sv-connect4-drop" data-action="connect4-column-click" data-col="${col}" ${!isUsersTurn ? "disabled" : ""}>Drop</button>`).join('')}
         </div>
@@ -1174,11 +1247,11 @@ export const SpiritverseGames = {
           ${board.map((cell, idx) => {
             const token =
               cell === 'U'
-                ? '<span class="connect4-token connect4-token-user" aria-hidden="true"></span>'
+                ? `<span class="connect4-token connect4-token-user ${lastDropIndex === idx ? 'connect4-token-drop' : ''}" aria-hidden="true"></span>`
                 : cell === 'S'
-                  ? '<span class="connect4-token connect4-token-spiritkin" aria-hidden="true"></span>'
+                  ? `<span class="connect4-token connect4-token-spiritkin ${lastDropIndex === idx ? 'connect4-token-drop' : ''}" aria-hidden="true"></span>`
                   : '';
-            return `<button class="sv-mini-cell connect4-cell ${cell === 'U' ? 'user' : cell === 'S' ? 'spiritkin' : ''}" data-action="connect4-column-click" data-col="${idx % 7}" ${!isUsersTurn ? "disabled" : ""}>${token}</button>`;
+            return `<button class="sv-mini-cell connect4-cell ${cell === 'U' ? 'user' : cell === 'S' ? 'spiritkin' : ''} ${lastDropIndex === idx ? 'connect4-last-drop' : ''}" data-action="connect4-column-click" data-col="${idx % 7}" ${!isUsersTurn ? "disabled" : ""}>${token}</button>`;
           }).join('')}
         </div>
         <div class="sv-mini-caption">${gameData.result?.isDraw ? 'The board filled into a draw.' : gameData.winner ? `${gameData.winner === 'U' ? 'You' : 'Spiritkin'} connected four.` : (isUsersTurn ? 'Drop a star into any column.' : 'The Spiritkin is reading the column structure.')}</div>
@@ -1198,10 +1271,22 @@ export const SpiritverseGames = {
     const hits = new Set(gameData.hits?.user || []);
     const finished = Boolean(gameData.result || gameData.winner);
     const isUsersTurn = !finished && gameData.turn === 'user';
+    const totalGuesses = guesses.size;
+    const totalHits = hits.size;
+    const lastStrike = Number.isInteger(gameData.lastMove) ? gameData.lastMove : null;
     const root = resolveTarget(container);
     if (!root) return;
     const html = `
       <div class="sv-mini-game sv-battleship">
+        <div class="sv-battleship-shell">
+          <div class="sv-game-meta sv-battleship-meta">
+            <div class="sv-game-kicker">Forge Sonar</div>
+            <div class="sv-game-copy">${isUsersTurn ? 'Choose one sector to scan.' : 'The Spiritkin is resolving your last strike through the forge mist.'}</div>
+          </div>
+          <div class="sv-battleship-status">
+            <div class="sv-battleship-pill"><strong>${totalHits}</strong><span>Direct hits</span></div>
+            <div class="sv-battleship-pill"><strong>${totalGuesses}</strong><span>Sectors scanned</span></div>
+          </div>
         <div class="sv-battleship-grid">
           ${Array.from({ length: 25 }, (_, idx) => {
             const guessed = guesses.has(idx);
@@ -1209,10 +1294,17 @@ export const SpiritverseGames = {
             return `<button class="sv-mini-cell battleship-cell ${hit ? 'hit' : guessed ? 'miss' : ''}" data-action="battleship-cell-click" data-idx="${idx}" ${guessed || !isUsersTurn ? "disabled" : ""}>${hit ? '✦' : guessed ? '•' : ''}</button>`;
           }).join('')}
         </div>
+        </div>
         <div class="sv-mini-caption">${gameData.winner ? `${gameData.winner === 'user' ? 'You' : 'Spiritkin'} found every hidden vessel.` : (isUsersTurn ? 'Search the deep grid for the hidden fleet.' : 'The deep grid is shifting while the Spiritkin answers your last strike.')}</div>
       </div>
     `;
     root.innerHTML = withThemeFrame(html, 'battleship', theme, isExpanded ? 'sv-theme-expanded' : '');
+    if (Number.isInteger(lastStrike)) {
+      const strikeCell = root.querySelector(`[data-action="battleship-cell-click"][data-idx="${lastStrike}"]`);
+      if (strikeCell) {
+        strikeCell.classList.add('battleship-last-strike');
+      }
+    }
     if (isExpanded) {
       bindClicks(root, '[data-action="battleship-cell-click"]', (element) => {
         const idx = element.dataset.idx;

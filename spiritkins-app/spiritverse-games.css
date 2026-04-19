@@ -40,6 +40,54 @@
     0 0 0 1px rgba(242,219,160,0.05);
 }
 
+.chat-layout.game-focus-mode .active-game-panel.checkers-showcase-panel,
+.chat-layout.game-focus-mode .active-game-panel.connect4-showcase-panel,
+.chat-layout.game-focus-mode .active-game-panel.battleship-showcase-panel,
+.chat-layout.game-focus-mode .active-game-panel.tictactoe-showcase-panel,
+.chat-layout.game-focus-mode .active-game-panel.go-preview-panel {
+  gap: 14px;
+  padding: 18px;
+  border-radius: 26px;
+  box-shadow:
+    0 28px 64px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.chat-layout.game-focus-mode .active-game-panel.checkers-showcase-panel {
+  border-color: rgba(214, 192, 141, 0.18);
+  background:
+    linear-gradient(180deg, rgba(10, 10, 18, 0.76), rgba(10, 10, 18, 0.42)),
+    radial-gradient(circle at top, rgba(214, 192, 141, 0.15), transparent 42%);
+}
+
+.chat-layout.game-focus-mode .active-game-panel.connect4-showcase-panel {
+  border-color: rgba(118, 190, 230, 0.2);
+  background:
+    linear-gradient(180deg, rgba(8, 12, 24, 0.78), rgba(8, 12, 24, 0.4)),
+    radial-gradient(circle at top, rgba(118, 190, 230, 0.15), transparent 42%);
+}
+
+.chat-layout.game-focus-mode .active-game-panel.battleship-showcase-panel {
+  border-color: rgba(106, 163, 205, 0.2);
+  background:
+    linear-gradient(180deg, rgba(6, 14, 22, 0.8), rgba(6, 14, 22, 0.44)),
+    radial-gradient(circle at top, rgba(106, 163, 205, 0.15), transparent 44%);
+}
+
+.chat-layout.game-focus-mode .active-game-panel.tictactoe-showcase-panel {
+  border-color: rgba(134, 205, 168, 0.2);
+  background:
+    linear-gradient(180deg, rgba(7, 16, 16, 0.78), rgba(7, 16, 16, 0.42)),
+    radial-gradient(circle at top, rgba(134, 205, 168, 0.15), transparent 42%);
+}
+
+.chat-layout.game-focus-mode .active-game-panel.go-preview-panel {
+  border-color: rgba(153, 195, 214, 0.18);
+  background:
+    linear-gradient(180deg, rgba(7, 14, 22, 0.78), rgba(7, 14, 22, 0.42)),
+    radial-gradient(circle at top, rgba(153, 195, 214, 0.14), transparent 42%);
+}
+
 .game-mode-hero {
   display: grid;
   gap: 6px;
@@ -56,6 +104,50 @@
     linear-gradient(180deg, rgba(255,248,225,0.06), rgba(255,248,225,0.015)),
     radial-gradient(circle at center top, rgba(214,192,141,0.18), transparent 55%);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 16px 32px rgba(0,0,0,0.18);
+}
+
+.checkers-mode-hero,
+.connect4-mode-hero,
+.battleship-mode-hero,
+.tictactoe-mode-hero,
+.go-mode-hero {
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 16px 32px rgba(0,0,0,0.18);
+}
+
+.checkers-mode-hero {
+  border-color: rgba(214,192,141,0.22);
+  background:
+    linear-gradient(180deg, rgba(255,248,225,0.05), rgba(255,248,225,0.015)),
+    radial-gradient(circle at center top, rgba(214,192,141,0.15), transparent 52%);
+}
+
+.connect4-mode-hero {
+  border-color: rgba(118,190,230,0.22);
+  background:
+    linear-gradient(180deg, rgba(222,244,255,0.06), rgba(222,244,255,0.015)),
+    radial-gradient(circle at center top, rgba(118,190,230,0.18), transparent 54%);
+}
+
+.battleship-mode-hero {
+  border-color: rgba(106,163,205,0.22);
+  background:
+    linear-gradient(180deg, rgba(228,245,255,0.06), rgba(228,245,255,0.014)),
+    radial-gradient(circle at center top, rgba(106,163,205,0.18), transparent 54%);
+}
+
+.tictactoe-mode-hero {
+  border-color: rgba(134,205,168,0.22);
+  background:
+    linear-gradient(180deg, rgba(231,255,241,0.06), rgba(231,255,241,0.016)),
+    radial-gradient(circle at center top, rgba(134,205,168,0.16), transparent 54%);
+}
+
+.go-mode-hero {
+  border-color: rgba(153,195,214,0.22);
+  background:
+    linear-gradient(180deg, rgba(232,245,250,0.06), rgba(232,245,250,0.014)),
+    radial-gradient(circle at center top, rgba(153,195,214,0.16), transparent 54%);
 }
 
 .game-mode-kicker {
@@ -1167,6 +1259,30 @@
   aspect-ratio: 1;
 }
 
+.checkers-showcase-meta,
+.sv-game-meta {
+  width: min(100%, 620px);
+  margin: 0 auto;
+  display: grid;
+  gap: 4px;
+  text-align: center;
+}
+
+.checkers-showcase-kicker,
+.sv-game-kicker {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(236,245,255,0.58);
+}
+
+.checkers-showcase-copy,
+.sv-game-copy {
+  color: #d8e2eb;
+  line-height: 1.55;
+  font-size: 13px;
+}
+
 .go-board {
   display: grid;
   grid-template-columns: repeat(13, 1fr);
@@ -1205,6 +1321,23 @@
 .checkers-selected { background: var(--game-accent-soft) !important; }
 .checkers-valid { cursor: pointer; }
 .checkers-move-dot { width: 25%; height: 25%; border-radius: 50%; background: rgba(0,0,0,0.2); }
+.checkers-last-from::after,
+.checkers-last-to::after {
+  content: "";
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.checkers-last-from::after {
+  border: 2px dashed rgba(255,255,255,0.26);
+}
+
+.checkers-last-to::after {
+  border: 2px solid rgba(242,219,160,0.72);
+  box-shadow: 0 0 18px rgba(242,219,160,0.24);
+}
 
 .checkers-piece {
   width: 80%;
@@ -1218,7 +1351,14 @@
 }
 .piece-user { background: radial-gradient(circle at 30% 30%, var(--game-piece-user), var(--game-accent)); border: 2px solid var(--game-accent); }
 .piece-spiritkin { background: radial-gradient(circle at 30% 30%, var(--game-piece-spirit), var(--game-board-bottom)); border: 2px solid var(--game-secondary); }
-.piece-king { border-width: 4px; box-shadow: 0 0 15px rgba(242,219,160,0.5); }
+.piece-king {
+  border-width: 4px;
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,0.08),
+    0 0 18px rgba(242,219,160,0.45),
+    inset 0 2px 4px rgba(255,255,255,0.24);
+  transform: translateY(-1px) scale(1.02);
+}
 .king-crown { font-size: 18px; color: rgba(255,255,255,0.8); text-shadow: 0 0 5px rgba(0,0,0,0.5); }
 
 /* ---- GO SPECIFIC ---- */
@@ -1246,6 +1386,23 @@
 
 .connect4-token-spiritkin {
   background-image: var(--game-token-spirit, none);
+}
+
+.connect4-token-drop {
+  animation: spiritverseConnect4Drop 0.28s ease-out;
+}
+
+.connect4-last-drop {
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.08),
+    0 0 0 2px rgba(118,190,230,0.32),
+    0 0 20px rgba(118,190,230,0.18);
+}
+
+@keyframes spiritverseConnect4Drop {
+  0% { transform: translateY(-20%) scale(0.92); opacity: 0.28; }
+  65% { transform: translateY(4%) scale(1.04); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 .go-cell {
   position: relative;
@@ -1282,6 +1439,75 @@
   transition: opacity 0.2s;
 }
 .go-cell:hover .go-hover-indicator { opacity: 1; }
+
+.ttt-token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 700;
+  transition: transform 0.22s ease, filter 0.22s ease;
+}
+
+.ttt-token-user {
+  color: var(--game-piece-user);
+  text-shadow: 0 0 16px rgba(242,219,160,0.32);
+}
+
+.ttt-token-spiritkin {
+  color: var(--game-piece-spirit);
+  text-shadow: 0 0 16px rgba(110,138,165,0.26);
+}
+
+.ttt-last-move {
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.08),
+    0 0 0 2px rgba(134,205,168,0.28),
+    0 0 18px rgba(134,205,168,0.18);
+}
+
+.ttt-last-move .ttt-token {
+  animation: spiritverseMoveFlash 0.28s ease;
+}
+
+.sv-battleship-shell {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 620px);
+  margin: 0 auto;
+}
+
+.sv-battleship-status {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.sv-battleship-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.05);
+  color: #d9e6ef;
+  font-size: 12px;
+}
+
+.sv-battleship-pill strong {
+  color: #f2dba0;
+}
+
+.battleship-last-strike {
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.08),
+    0 0 0 2px rgba(106,163,205,0.28),
+    0 0 20px rgba(106,163,205,0.18);
+}
 
 /* ---- SPIRIT-CARDS SPECIFIC ---- */
 .spirit-cards-container {
