@@ -2589,6 +2589,10 @@ function getPostGateRoute() {
   return "selection";
 }
 
+function isIdleSpiritGatePreviewActive() {
+  return !state.entryVideoStarted && !state.crownGateOpening && (state.showCrownGateHome || !state.entryAccepted);
+}
+
 function setMediaMuted(muted, { persist = true, attemptPlay = false } = {}) {
   state.mediaMuted = !!muted;
   if (persist) {
@@ -2610,9 +2614,11 @@ function pauseMountedVideoAudio() {
 function syncMountedMedia({ attemptPlay = false } = {}) {
   const media = getMediaToggleState(state.mediaMuted);
   document.querySelectorAll(".video-player-element").forEach((video) => {
-    video.muted = state.mediaMuted;
-    video.defaultMuted = state.mediaMuted;
-    video.volume = state.mediaMuted ? 0 : 1;
+    const isGatePreview = video.dataset.entryVideo === "gate" && isIdleSpiritGatePreviewActive();
+    const effectiveMuted = isGatePreview && !attemptPlay ? true : state.mediaMuted;
+    video.muted = effectiveMuted;
+    video.defaultMuted = effectiveMuted;
+    video.volume = effectiveMuted ? 0 : 1;
     if (attemptPlay) {
       const playAttempt = video.play?.();
       if (playAttempt?.catch) {
