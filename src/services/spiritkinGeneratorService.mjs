@@ -2,10 +2,12 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { AppError, NotFoundError, ValidationError } from "../errors.mjs";
+import { createTraceLogger } from "../logger.mjs";
 
-const STORE_VERSION = 1;
+const STORE_VERSION = 2;
 const GENERATOR_DIR = path.join(process.cwd(), "runtime_data");
 const STORE_PATH = path.join(GENERATOR_DIR, "spiritkin_generator_foundation_v1.json");
+const GENERATED_RUNTIME_ROOT = "/generated-spiritkins";
 
 const DEFAULT_STORE = {
   version: STORE_VERSION,
@@ -23,6 +25,15 @@ function nowIso() {
 
 function normalizeText(value, max = 240) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+function normalizeNumber(value, fallback, min = null, max = null) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  let result = numeric;
+  if (min !== null) result = Math.max(min, result);
+  if (max !== null) result = Math.min(max, result);
+  return result;
 }
 
 function slugify(value, fallback = "item") {
@@ -45,11 +56,23 @@ function createStoragePaths({ ownerType, ownerId, spiritkinName, mediaKind, slot
   const safeMediaKind = slugify(mediaKind, "media");
   const safeSlot = slugify(slotName, "slot");
   const safeVersion = slugify(versionTag, "v1");
+  const base = `${GENERATED_RUNTIME_ROOT}/${pathOwnerType}/${ownerKey}`;
   return {
-    draft: `/generated-spiritkins/${pathOwnerType}/${ownerKey}/drafts/${safeMediaKind}/${safeSlot}/${safeVersion}`,
-    approved: `/generated-spiritkins/${pathOwnerType}/${ownerKey}/approved/${safeMediaKind}/${safeSlot}/${safeVersion}`,
-    rejected: `/generated-spiritkins/${pathOwnerType}/${ownerKey}/rejected/${safeMediaKind}/${safeSlot}/${safeVersion}`,
+    draft: `${base}/drafts/${safeMediaKind}/${safeSlot}/${safeVersion}`,
+    approved: `${base}/approved/${safeMediaKind}/${safeSlot}/${safeVersion}`,
+    rejected: `${base}/rejected/${safeMediaKind}/${safeSlot}/${safeVersion}`,
   };
+}
+
+function runtimePathToWorkspacePath(runtimePath) {
+  const relative = String(runtimePath || "").replace(/^\/+/, "");
+  return path.join(GENERATOR_DIR, relative);
+}
+
+function chooseSeed(seed) {
+  const numeric = Number(seed);
+  if (Number.isFinite(numeric) && numeric >= 0) return Math.floor(numeric);
+  return Math.floor(Math.random() * 2147483647);
 }
 
 function createImagePromptPackage(spec) {
@@ -62,6 +85,8 @@ function createImagePromptPackage(spec) {
     `${spec.colors.join(", ")} palette`,
     `${spec.moodPersonality} emotional tone`,
     `${spec.rarityTier} rarity presentation`,
+    spec.styleProfile ? `${spec.styleProfile} style profile` : "",
+    spec.seed !== null && spec.seed !== undefined ? `seed locked ${spec.seed}` : "",
   ].filter(Boolean);
   const negatives = [
     "blurry",
@@ -78,32 +103,38 @@ function createImagePromptPackage(spec) {
     structured: {
       positives,
       negatives,
+      styleProfile: spec.styleProfile || null,
+      loraHooks: spec.loraHooks || [],
     },
   };
 }
 
 function createVideoShotList(spec) {
   const introLine = normalizeText(spec.scriptVoiceLine || "", 240);
-  const shots = [
+  const first = Math.max(2, Math.round(spec.durationSec * 0.22));
+  const second = Math.max(2, Math.round(spec.durationSec * 0.34));
+  const third = Math.max(2, Math.round(spec.durationSec * 0.24));
+  const final = Math.max(2, spec.durationSec - (first + second + third));
+  return [
     {
       id: randomUUID(),
       order: 1,
       title: "Arrival frame",
-      durationSec: Math.max(2, Math.round(spec.durationSec * 0.22)),
+      durationSec: first,
       direction: `${spec.shotStyle} opening frame establishing ${spec.trailerType} energy inside ${spec.musicMood}.`,
     },
     {
       id: randomUUID(),
       order: 2,
       title: "Identity reveal",
-      durationSec: Math.max(2, Math.round(spec.durationSec * 0.34)),
+      durationSec: second,
       direction: `Reveal ${spec.spiritkinName} with emphasis on ${spec.attachedAssetSummary || "attached image references"} and ${spec.shotStyle} motion.`,
     },
     {
       id: randomUUID(),
       order: 3,
       title: "Bonded beat",
-      durationSec: Math.max(2, Math.round(spec.durationSec * 0.24)),
+      durationSec: third,
       direction: introLine
         ? `Hold on the spoken beat: "${introLine}".`
         : "Hold a clean identity beat without spoken line while the score carries the mood.",
@@ -112,15 +143,10 @@ function createVideoShotList(spec) {
       id: randomUUID(),
       order: 4,
       title: "Exit or loop handoff",
-      durationSec: Math.max(2, spec.durationSec - (
-        Math.max(2, Math.round(spec.durationSec * 0.22)) +
-        Math.max(2, Math.round(spec.durationSec * 0.34)) +
-        Math.max(2, Math.round(spec.durationSec * 0.24))
-      )),
+      durationSec: final,
       direction: `Resolve into a ${spec.trailerType} ending suitable for ${spec.slotName} attachment.`,
     },
   ];
-  return shots;
 }
 
 function createVideoPromptPackage(spec, shotList) {
@@ -160,10 +186,16 @@ function createOutputRecord({ job, providerConnected = false, storagePaths }) {
     slotName: job.slotName,
     versionTag: job.versionTag,
     providerStatus: providerConnected ? "provider_connected" : "awaiting_provider",
+    providerName: null,
+    providerJobId: null,
     reviewStatus: "pending_review",
     canonical: false,
     runtimeAttached: false,
     artifactPath: null,
+    artifactMetaPath: null,
+    remoteArtifactUrl: null,
+    lastError: null,
+    attemptCount: 0,
     storagePaths,
     createdAt: nowIso(),
     updatedAt: nowIso(),
@@ -177,7 +209,7 @@ function normalizeImageRequest(payload = {}) {
   const ownerType = payload.ownerType === "user_created" ? "user_created" : "canonical";
   const ownerId = normalizeText(payload.ownerId || spiritkinName, 80);
   const slotName = normalizeText(payload.slotName || "portrait", 40);
-  const spec = {
+  return {
     spiritkinName,
     ownerType,
     ownerId,
@@ -194,8 +226,16 @@ function normalizeImageRequest(payload = {}) {
     targetAudience: normalizeText(payload.targetAudience || "internal", 40),
     entitlementGate: normalizeText(payload.entitlementGate || "admin_only", 40),
     sourceAssets: Array.isArray(payload.sourceAssets) ? payload.sourceAssets.map((item) => normalizeText(item, 200)).filter(Boolean).slice(0, 16) : [],
+    styleProfile: normalizeText(payload.styleProfile || "spiritverse_premium", 80),
+    seed: payload.seed === undefined || payload.seed === null || payload.seed === "" ? chooseSeed(null) : chooseSeed(payload.seed),
+    width: normalizeNumber(payload.width, 1024, 512, 2048),
+    height: normalizeNumber(payload.height, 1024, 512, 2048),
+    guidanceScale: normalizeNumber(payload.guidanceScale, 4, 1, 20),
+    steps: normalizeNumber(payload.steps, 28, 8, 80),
+    model: normalizeText(payload.model, 120),
+    loraHooks: Array.isArray(payload.loraHooks) ? payload.loraHooks.map((item) => normalizeText(item, 120)).filter(Boolean).slice(0, 8) : [],
+    execute: payload.execute !== false,
   };
-  return spec;
 }
 
 function normalizeVideoRequest(payload = {}) {
@@ -221,10 +261,25 @@ function normalizeVideoRequest(payload = {}) {
     requestedBy: normalizeText(payload.requestedBy || "command_center", 80),
     targetAudience: normalizeText(payload.targetAudience || "internal", 40),
     entitlementGate: normalizeText(payload.entitlementGate || "admin_only", 40),
+    aspectRatio: normalizeText(payload.aspectRatio || "16:9", 20),
+    seed: payload.seed === undefined || payload.seed === null || payload.seed === "" ? null : chooseSeed(payload.seed),
+    model: normalizeText(payload.model, 120),
+    execute: payload.execute !== false,
   };
 }
 
-export function createSpiritkinGeneratorService({ registry }) {
+function serializeError(error) {
+  return {
+    code: error?.code || "GENERATOR_PROVIDER_ERROR",
+    message: error?.message || "Generator execution failed.",
+    httpCode: error?.httpCode || 500,
+    detail: error?.detail || null,
+    at: nowIso(),
+  };
+}
+
+export function createSpiritkinGeneratorService({ registry, providers = null }) {
+  const logger = createTraceLogger({ stage: "spiritkin_generator" });
   let storeCache = null;
 
   async function ensureStoreLoaded() {
@@ -236,13 +291,14 @@ export function createSpiritkinGeneratorService({ registry }) {
       storeCache = {
         ...DEFAULT_STORE,
         ...parsed,
+        version: STORE_VERSION,
         imageJobs: Array.isArray(parsed.imageJobs) ? parsed.imageJobs : [],
         videoJobs: Array.isArray(parsed.videoJobs) ? parsed.videoJobs : [],
         outputs: Array.isArray(parsed.outputs) ? parsed.outputs : [],
         assignments: parsed.assignments && typeof parsed.assignments === "object" ? parsed.assignments : {},
         reviewLog: Array.isArray(parsed.reviewLog) ? parsed.reviewLog : [],
       };
-    } catch (error) {
+    } catch {
       storeCache = { ...DEFAULT_STORE, updatedAt: nowIso() };
       await persistStore();
     }
@@ -261,6 +317,174 @@ export function createSpiritkinGeneratorService({ registry }) {
     const canonical = await registry.getCanonical(spiritkinName);
     if (!canonical) {
       throw new ValidationError(`No canonical Spiritkin found for "${spiritkinName}".`);
+    }
+  }
+
+  async function writeOutputMetadata({ output, job, providerResult, destination }) {
+    const metadata = {
+      outputId: output.id,
+      jobId: job.id,
+      spiritkinKey: job.spiritkinKey,
+      spiritkinName: job.spiritkinName,
+      slotName: job.slotName,
+      provider: providerResult.provider,
+      providerJobId: providerResult.providerJobId,
+      providerModel: providerResult.model,
+      seed: providerResult.seed,
+      promptPackage: job.promptPackage,
+      negativePromptPackage: job.negativePromptPackage,
+      spec: job.spec,
+      meta: providerResult.meta || {},
+      createdAt: nowIso(),
+    };
+    const metadataPath = `${destination}/metadata.json`;
+    await writeFile(runtimePathToWorkspacePath(metadataPath), JSON.stringify(metadata, null, 2), "utf8");
+    return metadataPath;
+  }
+
+  async function persistProviderArtifact({ job, output, providerResult }) {
+    const destination = output.storagePaths.approved;
+    const destinationDir = runtimePathToWorkspacePath(destination);
+    await mkdir(destinationDir, { recursive: true });
+    const artifactName = `artifact.${providerResult.extension || (job.type === "video" ? "mp4" : "png")}`;
+    const artifactPath = `${destination}/${artifactName}`;
+    await writeFile(runtimePathToWorkspacePath(artifactPath), providerResult.artifactBuffer);
+    const metadataPath = await writeOutputMetadata({ output, job, providerResult, destination });
+    return { artifactPath, metadataPath };
+  }
+
+  function findJobById(store, jobId) {
+    const job = store.imageJobs.find((item) => item.id === jobId) || store.videoJobs.find((item) => item.id === jobId);
+    if (!job) throw new NotFoundError("generator_job", jobId);
+    return job;
+  }
+
+  function findOutputByJobId(store, jobId) {
+    const output = store.outputs.find((item) => item.jobId === jobId);
+    if (!output) throw new NotFoundError("generator_output", jobId);
+    return output;
+  }
+
+  async function executeJob({ jobId, operation = null, requestedBy = "command_center" } = {}) {
+    const store = await ensureStoreLoaded();
+    const job = findJobById(store, jobId);
+    const output = findOutputByJobId(store, jobId);
+    const providerStatus = providers?.getStatus?.() || {
+      image: { configured: false },
+      video: { configured: false },
+    };
+
+    const needsImageProvider = job.type === "image";
+    const providerConfigured = needsImageProvider ? providerStatus.image?.configured : providerStatus.video?.configured;
+    output.attemptCount = Number(output.attemptCount || 0) + 1;
+    output.updatedAt = nowIso();
+    job.updatedAt = nowIso();
+    job.status = providerConfigured ? "queued" : "awaiting_provider";
+    job.providerStatus = providerConfigured ? "queued" : "awaiting_provider";
+    output.providerStatus = providerConfigured ? "queued" : "awaiting_provider";
+    await persistStore();
+
+    if (!providers || !providerConfigured) {
+      const execution = {
+        ok: false,
+        saved: true,
+        attempted: false,
+        error: {
+          code: "GENERATOR_PROVIDER_UNAVAILABLE",
+          message: needsImageProvider
+            ? "No configured image provider. Configure Flux ComfyUI, Flux API, or Leonardo to execute this image job."
+            : "No configured video provider. Configure Runway to execute this video job.",
+          httpCode: 503,
+        },
+      };
+      output.lastError = execution.error;
+      await persistStore();
+      return execution;
+    }
+
+    try {
+      job.status = "processing";
+      job.providerStatus = "processing";
+      output.providerStatus = "processing";
+      await persistStore();
+
+      const executionOperation = operation || (
+        job.type === "image" ? "generateImage" : "generateVideo"
+      );
+      const providerResult = job.type === "image"
+        ? await ({
+            generateImage: providers.generateImage,
+            refineImage: providers.refineImage,
+            upscaleImage: providers.upscaleImage,
+          }[executionOperation] || providers.generateImage)(job.spec, { job, output, promptPackage: job.promptPackage })
+        : await ({
+            generateVideo: providers.generateVideo,
+            extendVideo: providers.extendVideo,
+          }[executionOperation] || providers.generateVideo)({ ...job.spec, shotList: job.shotList }, { job, output, promptPackage: job.promptPackage });
+
+      const persisted = await persistProviderArtifact({ job, output, providerResult });
+      output.providerStatus = "completed";
+      output.providerName = providerResult.provider;
+      output.providerJobId = providerResult.providerJobId;
+      output.artifactPath = persisted.artifactPath;
+      output.artifactMetaPath = persisted.metadataPath;
+      output.remoteArtifactUrl = providerResult.remoteArtifactUrl || null;
+      output.lastError = null;
+      output.updatedAt = nowIso();
+
+      job.status = "completed";
+      job.providerStatus = "completed";
+      job.providerName = providerResult.provider;
+      job.providerJobId = providerResult.providerJobId;
+      job.lastExecution = {
+        requestedBy,
+        operation: executionOperation,
+        provider: providerResult.provider,
+        model: providerResult.model,
+        seed: providerResult.seed,
+        completedAt: nowIso(),
+      };
+      job.updatedAt = nowIso();
+      await persistStore();
+
+      logger.info({
+        jobId: job.id,
+        type: job.type,
+        provider: providerResult.provider,
+        slotName: job.slotName,
+      }, "Generator job completed");
+
+      return {
+        ok: true,
+        attempted: true,
+        operation: executionOperation,
+        job,
+        output,
+      };
+    } catch (error) {
+      const serialized = serializeError(error);
+      job.status = "failed";
+      job.providerStatus = "failed";
+      job.lastExecution = {
+        requestedBy,
+        operation: operation || (job.type === "image" ? "generateImage" : "generateVideo"),
+        failedAt: nowIso(),
+        error: serialized,
+      };
+      job.updatedAt = nowIso();
+      output.providerStatus = "failed";
+      output.lastError = serialized;
+      output.updatedAt = nowIso();
+      await persistStore();
+      logger.error({ jobId: job.id, error: serialized.message, code: serialized.code }, "Generator job failed");
+      return {
+        ok: false,
+        saved: true,
+        attempted: true,
+        job,
+        output,
+        error: serialized,
+      };
     }
   }
 
@@ -291,10 +515,11 @@ export function createSpiritkinGeneratorService({ registry }) {
       negativePromptPackage: promptPackage.structured.negatives,
       createdAt: nowIso(),
       updatedAt: nowIso(),
+      lastExecution: null,
     };
     const output = createOutputRecord({
       job,
-      providerConnected: false,
+      providerConnected: !!providers?.getStatus?.().image?.configured,
       storagePaths: createStoragePaths({
         ownerType: spec.ownerType,
         ownerId: spec.ownerId,
@@ -308,7 +533,12 @@ export function createSpiritkinGeneratorService({ registry }) {
     store.imageJobs.unshift(job);
     store.outputs.unshift(output);
     await persistStore();
-    return { job, output };
+
+    let execution = null;
+    if (spec.execute !== false) {
+      execution = await executeJob({ jobId: job.id, operation: "generateImage", requestedBy: spec.requestedBy });
+    }
+    return { job, output: findOutputByJobId(storeCache, job.id), execution };
   }
 
   async function createVideoJob(payload = {}) {
@@ -340,10 +570,11 @@ export function createSpiritkinGeneratorService({ registry }) {
       shotList,
       createdAt: nowIso(),
       updatedAt: nowIso(),
+      lastExecution: null,
     };
     const output = createOutputRecord({
       job,
-      providerConnected: false,
+      providerConnected: !!providers?.getStatus?.().video?.configured,
       storagePaths: createStoragePaths({
         ownerType: spec.ownerType,
         ownerId: spec.ownerId,
@@ -357,7 +588,12 @@ export function createSpiritkinGeneratorService({ registry }) {
     store.videoJobs.unshift(job);
     store.outputs.unshift(output);
     await persistStore();
-    return { job, output };
+
+    let execution = null;
+    if (spec.execute !== false) {
+      execution = await executeJob({ jobId: job.id, operation: "generateVideo", requestedBy: spec.requestedBy });
+    }
+    return { job, output: findOutputByJobId(storeCache, job.id), execution };
   }
 
   async function listJobs({ type = "all", spiritkinKey = null } = {}) {
@@ -383,9 +619,14 @@ export function createSpiritkinGeneratorService({ registry }) {
     const jobs = await listJobs();
     const reviewQueue = store.outputs.filter((output) => output.reviewStatus === "pending_review");
     const canonicalCount = store.outputs.filter((output) => output.canonical).length;
+    const providersStatus = providers?.getStatus?.() || {
+      image: { configured: false },
+      video: { configured: false },
+    };
     return {
       version: store.version,
       updatedAt: store.updatedAt,
+      providers: providersStatus,
       totals: {
         imageJobs: store.imageJobs.length,
         videoJobs: store.videoJobs.length,
@@ -393,6 +634,7 @@ export function createSpiritkinGeneratorService({ registry }) {
         reviewQueue: reviewQueue.length,
         canonicalOutputs: canonicalCount,
         attachedOutputs: store.outputs.filter((output) => output.runtimeAttached).length,
+        failedOutputs: store.outputs.filter((output) => output.providerStatus === "failed").length,
       },
       recentJobs: jobs.slice(0, 12),
       reviewQueue: reviewQueue.slice(0, 20),
@@ -500,14 +742,28 @@ export function createSpiritkinGeneratorService({ registry }) {
     return output;
   }
 
+  async function retryJob({ jobId, requestedBy = "command_center" } = {}) {
+    return executeJob({ jobId, requestedBy });
+  }
+
+  function getProviderStatus() {
+    return providers?.getStatus?.() || {
+      image: { configured: false },
+      video: { configured: false },
+    };
+  }
+
   return {
     createImageJob,
     createVideoJob,
+    executeJob,
+    retryJob,
     listJobs,
     listSummary,
     getAssignmentsForSpiritkin,
     buildRuntimeMediaProfile,
     reviewOutput,
     setArtifactPath,
+    getProviderStatus,
   };
 }

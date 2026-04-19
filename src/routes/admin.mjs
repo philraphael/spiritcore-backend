@@ -146,6 +146,18 @@ export async function adminRoutes(fastify, opts) {
     }
   });
 
+  fastify.get("/v1/admin/generator/providers/status", { preHandler: requireAdminAccess }, async (_req, reply) => {
+    if (!spiritkinGeneratorService) {
+      return reply.code(503).send({ ok: false, error: "SERVICE_UNAVAILABLE", message: "Spiritkin generator service unavailable." });
+    }
+    try {
+      const providers = spiritkinGeneratorService.getProviderStatus();
+      return { ok: true, providers };
+    } catch (err) {
+      return reply.code(500).send({ ok: false, error: "GENERATOR_PROVIDER_STATUS_ERROR", message: err.message });
+    }
+  });
+
   fastify.post("/v1/admin/generator/image", {
     preHandler: requireAdminAccess,
     schema: {
@@ -165,6 +177,15 @@ export async function adminRoutes(fastify, opts) {
           environment: { type: "string", nullable: true },
           renderStyle: { type: "string", nullable: true },
           rarityTier: { type: "string", nullable: true },
+          styleProfile: { type: "string", nullable: true },
+          seed: { type: "number", nullable: true },
+          width: { type: "number", nullable: true },
+          height: { type: "number", nullable: true },
+          guidanceScale: { type: "number", nullable: true },
+          steps: { type: "number", nullable: true },
+          model: { type: "string", nullable: true },
+          loraHooks: { type: "array", items: { type: "string" }, nullable: true },
+          execute: { type: "boolean", nullable: true },
           targetAudience: { type: "string", nullable: true },
           entitlementGate: { type: "string", nullable: true },
         },
@@ -203,6 +224,10 @@ export async function adminRoutes(fastify, opts) {
           scriptVoiceLine: { type: "string", nullable: true },
           musicMood: { type: "string", nullable: true },
           attachedAssets: { type: "array", items: { type: "string" }, nullable: true },
+          aspectRatio: { type: "string", nullable: true },
+          seed: { type: "number", nullable: true },
+          model: { type: "string", nullable: true },
+          execute: { type: "boolean", nullable: true },
           targetAudience: { type: "string", nullable: true },
           entitlementGate: { type: "string", nullable: true },
         },
@@ -221,6 +246,67 @@ export async function adminRoutes(fastify, opts) {
     } catch (err) {
       const code = err.httpCode ?? 500;
       return reply.code(code).send({ ok: false, error: err.code ?? "GENERATOR_VIDEO_ERROR", message: err.message });
+    }
+  });
+
+  fastify.post("/v1/admin/generator/jobs/:jobId/execute", {
+    preHandler: requireAdminAccess,
+    schema: {
+      params: {
+        type: "object",
+        required: ["jobId"],
+        properties: {
+          jobId: { type: "string", minLength: 1 },
+        },
+      },
+      body: {
+        type: "object",
+        properties: {
+          operation: { type: "string", nullable: true },
+        },
+      },
+    },
+  }, async (req, reply) => {
+    if (!spiritkinGeneratorService) {
+      return reply.code(503).send({ ok: false, error: "SERVICE_UNAVAILABLE", message: "Spiritkin generator service unavailable." });
+    }
+    try {
+      const result = await spiritkinGeneratorService.executeJob({
+        jobId: req.params.jobId,
+        operation: req.body?.operation ?? null,
+        requestedBy: req.adminAccess?.source || "command_center",
+      });
+      return { ok: true, ...result };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({ ok: false, error: err.code ?? "GENERATOR_EXECUTE_ERROR", message: err.message });
+    }
+  });
+
+  fastify.post("/v1/admin/generator/jobs/:jobId/retry", {
+    preHandler: requireAdminAccess,
+    schema: {
+      params: {
+        type: "object",
+        required: ["jobId"],
+        properties: {
+          jobId: { type: "string", minLength: 1 },
+        },
+      },
+    },
+  }, async (req, reply) => {
+    if (!spiritkinGeneratorService) {
+      return reply.code(503).send({ ok: false, error: "SERVICE_UNAVAILABLE", message: "Spiritkin generator service unavailable." });
+    }
+    try {
+      const result = await spiritkinGeneratorService.retryJob({
+        jobId: req.params.jobId,
+        requestedBy: req.adminAccess?.source || "command_center",
+      });
+      return { ok: true, ...result };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({ ok: false, error: err.code ?? "GENERATOR_RETRY_ERROR", message: err.message });
     }
   });
 

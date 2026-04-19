@@ -67,6 +67,57 @@ export const config = {
     baseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
   },
 
+  generator: {
+    image: {
+      flux: {
+        comfyui: {
+          baseUrl: process.env.FLUX_COMFYUI_BASE_URL || "",
+          apiKey: process.env.FLUX_COMFYUI_API_KEY || "",
+          workflowPath: process.env.FLUX_COMFYUI_WORKFLOW_PATH || "",
+          model: process.env.FLUX_COMFYUI_MODEL || "flux-dev",
+          pollIntervalMs: Number(process.env.FLUX_COMFYUI_POLL_INTERVAL_MS || 3000),
+          pollTimeoutMs: Number(process.env.FLUX_COMFYUI_POLL_TIMEOUT_MS || 300000),
+          timeoutMs: Number(process.env.FLUX_COMFYUI_TIMEOUT_MS || 180000),
+        },
+        api: {
+          baseUrl: process.env.FLUX_API_URL || "",
+          apiKey: process.env.FLUX_API_KEY || "",
+          model: process.env.FLUX_API_MODEL || "flux-dev",
+          generatePath: process.env.FLUX_API_GENERATE_PATH || "/v1/images/generate",
+          statusPath: process.env.FLUX_API_STATUS_PATH || "/v1/images/generate",
+          pollIntervalMs: Number(process.env.FLUX_API_POLL_INTERVAL_MS || 3000),
+          pollTimeoutMs: Number(process.env.FLUX_API_POLL_TIMEOUT_MS || 300000),
+          timeoutMs: Number(process.env.FLUX_API_TIMEOUT_MS || 180000),
+        },
+      },
+      leonardo: {
+        baseUrl: process.env.LEONARDO_API_URL || "https://cloud.leonardo.ai/api/rest",
+        apiKey: process.env.LEONARDO_API_KEY || "",
+        model: process.env.LEONARDO_MODEL || "leonardo-diffusion-xl",
+        stylePreset: process.env.LEONARDO_STYLE_PRESET || "SPIRITVERSE_PREMIUM",
+        generatePath: process.env.LEONARDO_GENERATE_PATH || "/v1/generations",
+        statusPath: process.env.LEONARDO_STATUS_PATH || "/v1/generations",
+        pollIntervalMs: Number(process.env.LEONARDO_POLL_INTERVAL_MS || 3000),
+        pollTimeoutMs: Number(process.env.LEONARDO_POLL_TIMEOUT_MS || 300000),
+        timeoutMs: Number(process.env.LEONARDO_TIMEOUT_MS || 180000),
+      },
+    },
+    video: {
+      runway: {
+        baseUrl: process.env.RUNWAY_API_URL || "https://api.dev.runwayml.com",
+        apiKey: process.env.RUNWAY_API_KEY || "",
+        version: process.env.RUNWAY_API_VERSION || "2024-11-06",
+        model: process.env.RUNWAY_MODEL || "gen3a_turbo",
+        generatePath: process.env.RUNWAY_GENERATE_PATH || "/v1/video/generate",
+        extendPath: process.env.RUNWAY_EXTEND_PATH || "/v1/video/extend",
+        statusPath: process.env.RUNWAY_STATUS_PATH || "/v1/tasks",
+        pollIntervalMs: Number(process.env.RUNWAY_POLL_INTERVAL_MS || 4000),
+        pollTimeoutMs: Number(process.env.RUNWAY_POLL_TIMEOUT_MS || 420000),
+        timeoutMs: Number(process.env.RUNWAY_TIMEOUT_MS || 240000),
+      },
+    },
+  },
+
   // Memory lifecycle policy
   memoryPolicy: {
     dormantDays: Number(process.env.MEMORY_DORMANT_DAYS || 30),
@@ -123,6 +174,27 @@ export function validateConfig() {
   if (config.adapterMode !== "local" && !config.openai.apiKey) {
     warnings.push(
       "[SpiritCore] WARNING: ADAPTER_MODE is not 'local' but OPENAI_API_KEY is not set. LLM responses and TTS-backed generation paths will fail until it is configured."
+    );
+  }
+
+  const generatorImageConfigured = !!(
+    (config.generator.image.flux.comfyui.baseUrl && config.generator.image.flux.comfyui.workflowPath) ||
+    (config.generator.image.flux.api.baseUrl && config.generator.image.flux.api.apiKey) ||
+    (config.generator.image.leonardo.baseUrl && config.generator.image.leonardo.apiKey)
+  );
+  const generatorVideoConfigured = !!(
+    config.generator.video.runway.baseUrl && config.generator.video.runway.apiKey
+  );
+
+  if (!generatorImageConfigured) {
+    warnings.push(
+      "[SpiritCore] WARNING: No Spiritkins image generation provider is configured. Generator image jobs will save specs but cannot execute until Flux ComfyUI, Flux API, or Leonardo is configured."
+    );
+  }
+
+  if (!generatorVideoConfigured) {
+    warnings.push(
+      "[SpiritCore] WARNING: No Spiritkins video generation provider is configured. Video jobs will save specs but cannot execute until Runway is configured."
     );
   }
 

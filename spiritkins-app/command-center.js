@@ -289,6 +289,11 @@ function renderGeneratorTab() {
   const assignments = summary?.assignments || {};
   const selectedAssignment = spiritkin ? assignments[spiritkin.name] : null;
   const selectedJobs = spiritkin ? state.generatorJobs.filter((job) => job.spiritkinKey === spiritkin.name) : state.generatorJobs;
+  const providerStatus = summary?.providers || {};
+  const imageProviderLabel = providerStatus?.image?.primary
+    ? `${providerStatus.image.primary}${providerStatus?.image?.fallback ? ` + ${providerStatus.image.fallback}` : ""}`
+    : "not configured";
+  const videoProviderLabel = providerStatus?.video?.primary || "not configured";
 
   return `
     <div class="cc-tab-content">
@@ -297,15 +302,16 @@ function renderGeneratorTab() {
           <div class="cc-section-head">
             <div>
               <h3>Spiritkins Generator Foundation V1</h3>
-              <p class="cc-section-sub">Image and video generation orchestration is live: specs, prompt packages, output slots, review controls, canonical attachments, and version history.</p>
+              <p class="cc-section-sub">Image and video generation orchestration is live: specs, prompt packages, provider execution, stored outputs, review controls, canonical attachments, and version history.</p>
             </div>
-            <div class="cc-governance-pill">Provider integration pending</div>
+            <div class="cc-governance-pill">Image: ${escapeHtml(imageProviderLabel)} | Video: ${escapeHtml(videoProviderLabel)}</div>
           </div>
           <div class="cc-stat-grid">
             <div class="cc-stat-box"><span class="cc-stat-val">${summary?.totals?.imageJobs || 0}</span><span class="cc-stat-label">Image Jobs</span></div>
             <div class="cc-stat-box"><span class="cc-stat-val">${summary?.totals?.videoJobs || 0}</span><span class="cc-stat-label">Video Jobs</span></div>
             <div class="cc-stat-box"><span class="cc-stat-val">${summary?.totals?.reviewQueue || 0}</span><span class="cc-stat-label">Review Queue</span></div>
             <div class="cc-stat-box"><span class="cc-stat-val">${summary?.totals?.attachedOutputs || 0}</span><span class="cc-stat-label">Attached Outputs</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${summary?.totals?.failedOutputs || 0}</span><span class="cc-stat-label">Failed Outputs</span></div>
           </div>
         </section>
 
@@ -321,6 +327,8 @@ function renderGeneratorTab() {
             <label>Environment<input name="environment" value="${escapeHtml(spiritkin?.ui?.realm || "Spiritverse chamber")}" /></label>
             <label>Render style<input name="renderStyle" value="premium spiritverse portrait illustration" /></label>
             <label>Rarity / tier<input name="rarityTier" value="premium" /></label>
+            <label>Style profile<input name="styleProfile" value="spiritverse_premium" /></label>
+            <label>Seed<input type="number" name="seed" value="" placeholder="auto" /></label>
             <label>Slot
               <select name="slotName">
                 <option value="portrait">portrait</option>
@@ -334,6 +342,7 @@ function renderGeneratorTab() {
                 <option value="premium">premium</option>
               </select>
             </label>
+            <label><input type="checkbox" name="executeNow" checked /> Execute immediately if provider is configured</label>
             <button class="btn btn-primary" type="submit">Create image job</button>
           </form>
         </section>
@@ -355,6 +364,7 @@ function renderGeneratorTab() {
             <label>Script / voice line<textarea name="scriptVoiceLine" rows="3">${escapeHtml(spiritkin?.ui?.bondLine || "")}</textarea></label>
             <label>Music mood<input name="musicMood" value="mythic restrained wonder" /></label>
             <label>Attached assets<textarea name="attachedAssets" rows="2" placeholder="/world-art/..., /generated-spiritkins/..."></textarea></label>
+            <label>Seed<input type="number" name="seed" value="" placeholder="auto" /></label>
             <label>Slot
               <select name="slotName">
                 <option value="introTrailer">introTrailer</option>
@@ -368,6 +378,7 @@ function renderGeneratorTab() {
                 <option value="premium">premium</option>
               </select>
             </label>
+            <label><input type="checkbox" name="executeNow" checked /> Execute immediately if provider is configured</label>
             <button class="btn btn-primary" type="submit">Create video job</button>
           </form>
         </section>
@@ -381,7 +392,7 @@ function renderGeneratorTab() {
                   <strong>${escapeHtml(output.spiritkinKey)}</strong>
                   <span class="cc-confidence">${escapeHtml(output.mediaKind)} / ${escapeHtml(output.slotName)}</span>
                 </div>
-                <div class="cc-issue-summary">Output ${escapeHtml(output.id.slice(0, 8))} is waiting for review. Provider state: ${escapeHtml(output.providerStatus)}.</div>
+                <div class="cc-issue-summary">Output ${escapeHtml(output.id.slice(0, 8))} is waiting for review. Provider state: ${escapeHtml(output.providerStatus)}.${output.artifactPath ? ` Artifact: ${escapeHtml(output.artifactPath)}` : ""}</div>
                 <div class="cc-generator-actions">
                   <button class="btn btn-ghost btn-sm" onclick="reviewGeneratorOutput('${output.id}','approve')">Approve</button>
                   <button class="btn btn-ghost btn-sm" onclick="reviewGeneratorOutput('${output.id}','mark_canonical')">Mark canonical</button>
@@ -402,6 +413,7 @@ function renderGeneratorTab() {
                 <strong>${escapeHtml(slotName)}</strong>
                 <span>${escapeHtml(slot.mediaKind)} / ${escapeHtml(slot.reviewStatus)}</span>
                 <span>${slot.canonical ? "canonical" : "non-canonical"} / ${slot.outputId ? escapeHtml(slot.outputId.slice(0, 8)) : "no output"}</span>
+                ${slot.artifactPath ? `<span>${escapeHtml(slot.artifactPath)}</span>` : ""}
               </div>
             `).join("") : '<p class="cc-empty">No runtime media attached yet.</p>'}
           ` : '<p class="cc-empty">Select a Spiritkin to inspect runtime slots.</p>'}
@@ -417,7 +429,12 @@ function renderGeneratorTab() {
                   <span class="cc-confidence">${escapeHtml(job.type)} / ${escapeHtml(job.slotName)}</span>
                 </div>
                 <div class="cc-issue-summary">${escapeHtml(job.promptPackage?.prompt || "Prompt package ready.")}</div>
-                <div class="cc-issue-meta">Audience ${escapeHtml(job.targetAudience)} / Gate ${escapeHtml(job.entitlementGate)} / Status ${escapeHtml(job.status)} / Provider ${escapeHtml(job.providerStatus)}</div>
+                <div class="cc-issue-meta">Audience ${escapeHtml(job.targetAudience)} / Gate ${escapeHtml(job.entitlementGate)} / Status ${escapeHtml(job.status)} / Provider ${escapeHtml(job.providerStatus)}${job.spec?.seed !== null && job.spec?.seed !== undefined ? ` / Seed ${escapeHtml(job.spec.seed)}` : ""}</div>
+                ${job.lastExecution?.error?.message ? `<div class="cc-issue-summary">Last error: ${escapeHtml(job.lastExecution.error.message)}</div>` : ""}
+                <div class="cc-generator-actions">
+                  <button class="btn btn-ghost btn-sm" onclick="executeGeneratorJob('${job.id}','${job.type === "image" ? "generateImage" : "generateVideo"}')">Execute</button>
+                  <button class="btn btn-ghost btn-sm" onclick="retryGeneratorJob('${job.id}')">Retry</button>
+                </div>
               </article>
             `).join("") : '<p class="cc-empty">No generator jobs recorded yet.</p>'}
           </div>
@@ -690,9 +707,12 @@ window.submitImageGenerator = async function submitImageGenerator(event) {
     environment: form.environment.value.trim(),
     renderStyle: form.renderStyle.value.trim(),
     rarityTier: form.rarityTier.value.trim(),
+    styleProfile: form.styleProfile.value.trim(),
+    seed: form.seed.value ? Number(form.seed.value) : undefined,
     slotName: form.slotName.value,
     targetAudience: form.targetAudience.value,
     entitlementGate: form.targetAudience.value === "premium" ? "premium_ready" : "admin_only",
+    execute: !!form.executeNow.checked,
   };
   try {
     const res = await fetch(`${API}/v1/admin/generator/image`, {
@@ -703,7 +723,13 @@ window.submitImageGenerator = async function submitImageGenerator(event) {
     const data = await res.json();
     if (!res.ok || data.ok === false) throw new Error(data.message || "Image job creation failed.");
     await refreshData();
-    alert(`Image job created for ${payload.spiritkinName}. Output slot ${data.output.id.slice(0, 8)} is awaiting provider execution.`);
+    if (data.execution?.ok === false) {
+      alert(`Image job saved for ${payload.spiritkinName}, but execution failed: ${data.execution.error?.message || "Provider unavailable."}`);
+    } else if (data.execution?.ok === true) {
+      alert(`Image job created and executed for ${payload.spiritkinName}. Output ${data.output.id.slice(0, 8)} is ready for review.`);
+    } else {
+      alert(`Image job created for ${payload.spiritkinName}. Output slot ${data.output.id.slice(0, 8)} is awaiting provider execution.`);
+    }
   } catch (error) {
     alert(error.message);
   }
@@ -720,9 +746,11 @@ window.submitVideoGenerator = async function submitVideoGenerator(event) {
     scriptVoiceLine: form.scriptVoiceLine.value.trim(),
     musicMood: form.musicMood.value.trim(),
     attachedAssets: form.attachedAssets.value.split(",").map((item) => item.trim()).filter(Boolean),
+    seed: form.seed.value ? Number(form.seed.value) : undefined,
     slotName: form.slotName.value,
     targetAudience: form.targetAudience.value,
     entitlementGate: form.targetAudience.value === "premium" ? "premium_ready" : "admin_only",
+    execute: !!form.executeNow.checked,
   };
   try {
     const res = await fetch(`${API}/v1/admin/generator/video`, {
@@ -733,7 +761,52 @@ window.submitVideoGenerator = async function submitVideoGenerator(event) {
     const data = await res.json();
     if (!res.ok || data.ok === false) throw new Error(data.message || "Video job creation failed.");
     await refreshData();
-    alert(`Video job created for ${payload.spiritkinName}. Output slot ${data.output.id.slice(0, 8)} is awaiting provider execution.`);
+    if (data.execution?.ok === false) {
+      alert(`Video job saved for ${payload.spiritkinName}, but execution failed: ${data.execution.error?.message || "Provider unavailable."}`);
+    } else if (data.execution?.ok === true) {
+      alert(`Video job created and executed for ${payload.spiritkinName}. Output ${data.output.id.slice(0, 8)} is ready for review.`);
+    } else {
+      alert(`Video job created for ${payload.spiritkinName}. Output slot ${data.output.id.slice(0, 8)} is awaiting provider execution.`);
+    }
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+window.executeGeneratorJob = async function executeGeneratorJob(jobId, operation) {
+  try {
+    const res = await fetch(`${API}/v1/admin/generator/jobs/${jobId}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operation }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.message || "Generator execution failed.");
+    await refreshData();
+    if (data.error?.message) {
+      alert(`Execution failed: ${data.error.message}`);
+      return;
+    }
+    alert(`Execution complete for job ${jobId.slice(0, 8)}.`);
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+window.retryGeneratorJob = async function retryGeneratorJob(jobId) {
+  try {
+    const res = await fetch(`${API}/v1/admin/generator/jobs/${jobId}/retry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.message || "Generator retry failed.");
+    await refreshData();
+    if (data.error?.message) {
+      alert(`Retry failed: ${data.error.message}`);
+      return;
+    }
+    alert(`Retry complete for job ${jobId.slice(0, 8)}.`);
   } catch (error) {
     alert(error.message);
   }

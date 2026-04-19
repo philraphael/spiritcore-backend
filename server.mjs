@@ -50,6 +50,7 @@ const __dirname = path.dirname(__filename);
 const OPERATOR_CONSOLE_DIR = path.join(__dirname, "operator-console");
 const USER_APP_DIR = path.join(__dirname, "spiritkins-app");
 const ACTIVE_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "ACTIVE");
+const GENERATED_SPIRITKIN_DIR = path.join(__dirname, "runtime_data", "generated-spiritkins");
 const ACTIVE_WORLD_ART_DIRS = [
   path.join(ACTIVE_ASSET_DIR, "rooms"),
   path.join(ACTIVE_ASSET_DIR, "concepts")
@@ -315,6 +316,10 @@ app.get("/app/game-concept-assets/*", async (req, reply) => {
 
 app.get("/app/premium-game-assets/*", async (req, reply) => {
   return sendStaticAssetFromRoot(reply, ACTIVE_ASSET_DIR, req.params["*"]);
+});
+
+app.get("/generated-spiritkins/*", async (req, reply) => {
+  return sendStaticAssetFromRoot(reply, GENERATED_SPIRITKIN_DIR, req.params["*"]);
 });
 
 // Serve portrait images from public/portraits

@@ -49,6 +49,7 @@ import { createWorldProgression }       from "./services/worldProgression.mjs";
 import { createResponseEngine }         from "./services/responseEngine.mjs";
 import { createSessionControlService }  from "./services/sessionControlService.mjs";
 import { createSpiritkinGeneratorService } from "./services/spiritkinGeneratorService.mjs";
+import { createSpiritkinGeneratorProviderStack } from "./services/spiritkinGeneratorProviderStack.mjs";
 
 /**
  * Build and return the fully wired service container.
@@ -96,7 +97,11 @@ export function buildContainer() {
     world: worldService,
     registry,
   });
-  const spiritkinGeneratorService = createSpiritkinGeneratorService({ registry });
+  const spiritkinGeneratorProviders = createSpiritkinGeneratorProviderStack({ config });
+  const spiritkinGeneratorService = createSpiritkinGeneratorService({
+    registry,
+    providers: spiritkinGeneratorProviders,
+  });
   const contextService      = createContextService({
     supabase,
     emotionService,
@@ -130,6 +135,7 @@ export function buildContainer() {
     identityGovernor,
     conversationService,
     sessionControlService,
+    spiritkinGeneratorProviders,
     spiritkinGeneratorService,
     contextService,
     emotionService,
@@ -164,6 +170,7 @@ export function buildContainer() {
     identityGovernor,
     conversationService,
     sessionControlService,
+    spiritkinGeneratorProviders,
     spiritkinGeneratorService,
     contextService,
     safetyGovernor,
