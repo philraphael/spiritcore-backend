@@ -679,6 +679,7 @@ await app.register(async (instance) => {
 await app.register(spiritkinRoutes, {
   prefix: "/",
   registry: container.registry,
+  spiritkinGeneratorService: container.spiritkinGeneratorService,
 });
 
 // Analytics & Feedback routes
@@ -713,6 +714,7 @@ await app.register(adminRoutes, {
   conversationService: container.conversationService,
   registry: container.registry,
   issueReportService,
+  spiritkinGeneratorService: container.spiritkinGeneratorService,
 });
 
 await app.register(gameRoutes, {

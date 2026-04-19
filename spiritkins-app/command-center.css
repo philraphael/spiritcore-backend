@@ -401,3 +401,68 @@ body {
   color: var(--cc-text-primary);
   line-height: 1.5;
 }
+
+.cc-generator-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.cc-generator-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--cc-text-secondary);
+  font-size: 0.82rem;
+}
+
+.cc-generator-form input,
+.cc-generator-form textarea,
+.cc-generator-form select {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--cc-bg-secondary);
+  border: 1px solid var(--cc-border);
+  color: #fff;
+  padding: 0.8rem 0.9rem;
+  border-radius: 10px;
+  font: inherit;
+}
+
+.cc-generator-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.cc-generator-item {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--cc-border);
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.cc-generator-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.8rem;
+}
+
+.cc-generator-selected {
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.8rem;
+}
+
+.cc-generator-attachment {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.cc-generator-attachment:last-child {
+  border-bottom: none;
+}
+
+.cc-empty {
+  color: var(--cc-text-secondary);
+}

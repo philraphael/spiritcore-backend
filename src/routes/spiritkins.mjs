@@ -9,7 +9,7 @@
  */
 
 export async function spiritkinRoutes(fastify, opts) {
-  const { registry } = opts;
+  const { registry, spiritkinGeneratorService } = opts;
 
   /**
    * GET /v1/spiritkins
@@ -18,10 +18,16 @@ export async function spiritkinRoutes(fastify, opts) {
   fastify.get("/v1/spiritkins", async (req, reply) => {
     try {
       const spiritkins = await registry.listCanonical();
+      const enriched = spiritkinGeneratorService
+        ? await Promise.all(spiritkins.map(async (spiritkin) => ({
+            ...spiritkin,
+            runtimeMedia: await spiritkinGeneratorService.buildRuntimeMediaProfile(spiritkin.name),
+          })))
+        : spiritkins;
       return {
         ok: true,
-        count: spiritkins.length,
-        spiritkins,
+        count: enriched.length,
+        spiritkins: enriched,
       };
     } catch (err) {
       req.log.error(err, "[spiritkins] listCanonical failed");
@@ -48,7 +54,10 @@ export async function spiritkinRoutes(fastify, opts) {
           message: `No canonical Spiritkin found with name "${name}".`,
         });
       }
-      return { ok: true, spiritkin: identity };
+      const runtimeMedia = spiritkinGeneratorService
+        ? await spiritkinGeneratorService.buildRuntimeMediaProfile(identity.name)
+        : null;
+      return { ok: true, spiritkin: { ...identity, runtimeMedia } };
     } catch (err) {
       req.log.error(err, `[spiritkins] getCanonical failed for name="${name}"`);
       return reply.code(500).send({

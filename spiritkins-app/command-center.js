@@ -1,11 +1,4 @@
-/**
- * SpiritCore Command Center (v3)
- * Professional cockpit interface for Spiritverse management
- */
-
 const API = window.location.origin;
-
-// ─── Constants ──────────────────────────────────────────────────────────────
 
 const AVAILABLE_VOICES = [
   { id: "nova", label: "Nova", description: "Warm, gentle, welcoming" },
@@ -13,66 +6,82 @@ const AVAILABLE_VOICES = [
   { id: "shimmer", label: "Shimmer", description: "Ethereal, mystical, flowing" },
   { id: "echo", label: "Echo", description: "Deep, resonant, grounding" },
   { id: "onyx", label: "Onyx", description: "Bold, commanding, powerful" },
-  { id: "fable", label: "Fable", description: "Narrative, storytelling, wise" }
+  { id: "fable", label: "Fable", description: "Narrative, storytelling, wise" },
 ];
 
 const SK_META = {
-  Lyra: { symbol: "Heart", realm: "The Luminous Veil", voice: "nova", bondLine: "Lyra holds the emotional center — soft, steady, and always present." },
-  Raien: { symbol: "Storm", realm: "The Ember Citadel", voice: "alloy", bondLine: "Raien cuts through the noise — direct, honest, and unflinching." },
-  Kairo: { symbol: "Star", realm: "The Astral Observatory", voice: "shimmer", bondLine: "Kairo opens the space between what is and what could be." }
+  Lyra: { symbol: "Heart", realm: "The Luminous Veil", voice: "nova", bondLine: "Lyra holds the emotional center - soft, steady, and always present." },
+  Raien: { symbol: "Storm", realm: "The Ember Citadel", voice: "alloy", bondLine: "Raien cuts through the noise - direct, honest, and unflinching." },
+  Kairo: { symbol: "Star", realm: "The Astral Observatory", voice: "shimmer", bondLine: "Kairo opens the space between what is and what could be." },
+  Elaria: { symbol: "Archive", realm: "The Ember Archive", voice: "fable", bondLine: "Elaria names what is true with luminous precision." },
+  Thalassar: { symbol: "Tide", realm: "The Abyssal Chorus", voice: "onyx", bondLine: "Thalassar listens for the deeper current before he speaks." },
 };
 
-// ─── State ─────────────────────────────────────────────────────────────────
-
 const state = {
-  activeTab: "monitor", // monitor, voice, world, repair, system
+  activeTab: "monitor",
   spiritkins: [],
   selectedSpiritkin: null,
   selectedVoice: "nova",
   voiceProfiles: {},
   recentConversations: [],
   selectedConversationMessages: [],
+  selectedConversationId: null,
   systemStats: {},
   globalMetrics: {},
   recentIssueReports: [],
   issueDigest: null,
   repairHandoff: null,
+  generatorSummary: null,
+  generatorJobs: [],
   isTestingVoice: false,
   loading: false,
   error: null,
-  refreshInterval: null
+  refreshInterval: null,
 };
 
-// ─── Initialization ───────────────────────────────────────────────────────
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function normalizeSpiritkinUi(spiritkin) {
+  return {
+    ...spiritkin,
+    ui: SK_META[spiritkin.name] || {
+      symbol: "Sigil",
+      realm: "The Spiritverse",
+      voice: "nova",
+      bondLine: `I am ${spiritkin.name}, your bonded companion.`,
+    },
+  };
+}
 
 async function init() {
   try {
     state.loading = true;
     render();
 
-    // Fetch Spiritkins
     const spiritRes = await fetch(`${API}/v1/spiritkins`);
     const spiritData = await spiritRes.json();
-    state.spiritkins = (spiritData.spiritkins || []).map(sk => ({
-      ...sk,
-      ui: SK_META[sk.name] || { symbol: "◆", realm: "The Spiritverse", bondLine: `I am ${sk.name}, your bonded companion.`, voice: "nova" }
-    }));
+    state.spiritkins = (spiritData.spiritkins || []).map(normalizeSpiritkinUi);
+    state.selectedSpiritkin = state.spiritkins[0] || null;
 
-    // Load voice profiles
-    const saved = localStorage.getItem("sk_voice_profiles");
-    state.voiceProfiles = saved ? JSON.parse(saved) : {};
+    const savedProfiles = localStorage.getItem("sk_voice_profiles");
+    state.voiceProfiles = savedProfiles ? JSON.parse(savedProfiles) : {};
+    if (state.selectedSpiritkin) {
+      state.selectedVoice = state.voiceProfiles[state.selectedSpiritkin.name] || state.selectedSpiritkin.ui.voice || "nova";
+    }
 
-    // Initial data fetch
     await refreshData();
-
-    // Start auto-refresh
-    state.refreshInterval = setInterval(refreshData, 10000);
-
+    state.refreshInterval = window.setInterval(refreshData, 10000);
     state.loading = false;
     render();
   } catch (error) {
-    console.error("Init failed:", error);
-    state.error = "Failed to initialize: " + error.message;
+    console.error("Command Center init failed", error);
+    state.error = `Failed to initialize: ${error.message}`;
     state.loading = false;
     render();
   }
@@ -80,48 +89,52 @@ async function init() {
 
 async function refreshData() {
   try {
-    // 1. Fetch System Stats
-    const statsRes = await fetch(`${API}/v1/admin/stats`);
-    const statsData = await statsRes.json();
-    state.systemStats = statsData.stats || {};
-
-    // 2. Fetch Global Metrics
-    const metricsRes = await fetch(`${API}/v1/analytics/summary`);
-    const metricsData = await metricsRes.json();
-    state.globalMetrics = metricsData.summary || {};
-
-    // 3. Fetch Recent Conversations
-    const convRes = await fetch(`${API}/v1/admin/conversations/recent`);
-    const convData = await convRes.json();
-    state.recentConversations = convData.conversations || [];
-
-    // 4. Fetch issue review data
-    const [recentRes, digestRes, handoffRes] = await Promise.all([
+    const [statsRes, metricsRes, convRes, recentRes, digestRes, handoffRes, generatorSummaryRes, generatorJobsRes] = await Promise.all([
+      fetch(`${API}/v1/admin/stats`),
+      fetch(`${API}/v1/analytics/summary`),
+      fetch(`${API}/v1/admin/conversations/recent`),
       fetch(`${API}/v1/admin/issues/recent`),
       fetch(`${API}/v1/admin/issues/digest`),
-      fetch(`${API}/v1/admin/issues/repair-handoff`)
+      fetch(`${API}/v1/admin/issues/repair-handoff`),
+      fetch(`${API}/v1/admin/generator/summary`),
+      fetch(`${API}/v1/admin/generator/jobs`),
     ]);
+
+    const statsData = await statsRes.json();
+    const metricsData = await metricsRes.json();
+    const convData = await convRes.json();
     const recentData = await recentRes.json();
     const digestData = await digestRes.json();
     const handoffData = await handoffRes.json();
+    const generatorSummaryData = await generatorSummaryRes.json();
+    const generatorJobsData = await generatorJobsRes.json();
+
+    state.systemStats = statsData.stats || {};
+    state.globalMetrics = metricsData.summary || {};
+    state.recentConversations = convData.conversations || [];
     state.recentIssueReports = recentData.reports || [];
     state.issueDigest = digestData.digest || null;
     state.repairHandoff = handoffData.handoff || null;
+    state.generatorSummary = generatorSummaryData.summary || null;
+    state.generatorJobs = generatorJobsData.jobs || [];
 
     render();
-  } catch (err) {
-    console.warn("Refresh failed:", err);
+  } catch (error) {
+    console.warn("Command Center refresh failed", error);
   }
 }
-
-// ─── Rendering ─────────────────────────────────────────────────────────────
 
 function render() {
   const root = document.getElementById("root");
   if (!root) return;
-  
+
   if (state.loading) {
-    root.innerHTML = `<div class="cc-loading">Initializing SpiritCore Cockpit...</div>`;
+    root.innerHTML = `<div class="cc-loading">Initializing SpiritCore Command Center...</div>`;
+    return;
+  }
+
+  if (state.error) {
+    root.innerHTML = `<div class="cc-loading">${escapeHtml(state.error)}</div>`;
     return;
   }
 
@@ -129,35 +142,36 @@ function render() {
     <div class="command-center">
       <header class="cc-header">
         <div class="cc-header-content">
-          <h1>⚙️ SpiritCore Command Center</h1>
-          <p class="cc-tagline">Governing Intelligence Dashboard</p>
+          <h1>SpiritCore Command Center</h1>
+          <p class="cc-tagline">Governance, repair review, and generator orchestration</p>
         </div>
         <div class="cc-header-actions">
-          <button class="btn btn-ghost" onclick="window.location.href='/app'">← Back to App</button>
+          <button class="btn btn-ghost" onclick="window.location.href='/app'">Back to App</button>
         </div>
       </header>
 
       <nav class="cc-tabs-nav">
-        <button class="cc-tab-btn ${state.activeTab === 'repair' ? 'active' : ''}" onclick="switchTab('repair')">REPAIR REVIEW</button>
-        <button class="cc-tab-btn ${state.activeTab === 'monitor' ? 'active' : ''}" onclick="switchTab('monitor')">📡 MONITOR</button>
-        <button class="cc-tab-btn ${state.activeTab === 'voice' ? 'active' : ''}" onclick="switchTab('voice')">🔊 VOICE LAB</button>
-        <button class="cc-tab-btn ${state.activeTab === 'world' ? 'active' : ''}" onclick="switchTab('world')">🌌 WORLD STATE</button>
-        <button class="cc-tab-btn ${state.activeTab === 'system' ? 'active' : ''}" onclick="switchTab('system')">🛠️ SYSTEM</button>
+        <button class="cc-tab-btn ${state.activeTab === "repair" ? "active" : ""}" onclick="switchTab('repair')">Repair Review</button>
+        <button class="cc-tab-btn ${state.activeTab === "monitor" ? "active" : ""}" onclick="switchTab('monitor')">Monitor</button>
+        <button class="cc-tab-btn ${state.activeTab === "voice" ? "active" : ""}" onclick="switchTab('voice')">Voice Lab</button>
+        <button class="cc-tab-btn ${state.activeTab === "generator" ? "active" : ""}" onclick="switchTab('generator')">Generator</button>
+        <button class="cc-tab-btn ${state.activeTab === "world" ? "active" : ""}" onclick="switchTab('world')">World State</button>
+        <button class="cc-tab-btn ${state.activeTab === "system" ? "active" : ""}" onclick="switchTab('system')">System</button>
       </nav>
 
       <div class="cc-layout">
         <aside class="cc-sidebar">
           <div class="cc-section-title">Spiritkins</div>
           <div class="cc-spiritkin-list">
-            ${state.spiritkins.map((sk, idx) => `
-              <button class="cc-spiritkin-item ${state.selectedSpiritkin?.name === sk.name ? 'active' : ''}" onclick="selectSpiritkin(${idx})">
-                <span class="cc-sk-icon">${sk.ui?.symbol || '◆'}</span>
+            ${state.spiritkins.map((spiritkin, index) => `
+              <button class="cc-spiritkin-item ${state.selectedSpiritkin?.name === spiritkin.name ? "active" : ""}" onclick="selectSpiritkin(${index})">
+                <span class="cc-sk-icon">${escapeHtml(spiritkin.ui.symbol)}</span>
                 <div class="cc-sk-info">
-                  <span class="cc-sk-name">${sk.name}</span>
-                  <span class="cc-sk-status">${state.voiceProfiles[sk.name] || sk.ui?.voice || 'nova'}</span>
+                  <span class="cc-sk-name">${escapeHtml(spiritkin.name)}</span>
+                  <span class="cc-sk-status">${escapeHtml(state.voiceProfiles[spiritkin.name] || spiritkin.ui.voice || "nova")}</span>
                 </div>
               </button>
-            `).join('')}
+            `).join("")}
           </div>
         </aside>
 
@@ -173,6 +187,7 @@ function renderActiveTab() {
   switch (state.activeTab) {
     case "monitor": return renderMonitorTab();
     case "voice": return renderVoiceTab();
+    case "generator": return renderGeneratorTab();
     case "world": return renderWorldTab();
     case "repair": return renderRepairTab();
     case "system": return renderSystemTab();
@@ -180,201 +195,285 @@ function renderActiveTab() {
   }
 }
 
-// ─── Tab: Monitor ─────────────────────────────────────────────────────────
-
 function renderMonitorTab() {
   return `
     <div class="cc-tab-content">
       <div class="cc-dashboard">
-        <!-- Live Feed -->
         <section class="cc-card" style="grid-column: span 2;">
-          <h3>📡 LIVE INTERACTION FEED</h3>
+          <h3>Live Interaction Feed</h3>
           <div class="cc-feed">
-            ${state.recentConversations.length > 0 ? state.recentConversations.map(conv => `
+            ${state.recentConversations.length ? state.recentConversations.map((conv) => `
               <div class="cc-feed-item" onclick="viewTranscript('${conv.id}')">
                 <div class="cc-feed-header">
-                  <span>Session: ${conv.id.slice(0,8)}</span>
-                  <span>${new Date(conv.created_at).toLocaleTimeString()}</span>
+                  <span>Session ${escapeHtml(conv.id.slice(0, 8))}</span>
+                  <span>${escapeHtml(new Date(conv.created_at).toLocaleTimeString())}</span>
                 </div>
                 <div class="cc-feed-content">
-                  <strong>${conv.spiritkin_name}</strong> bonded with user <em>${conv.user_id.slice(0,8)}</em>
+                  <strong>${escapeHtml(conv.spiritkin_name || "Unknown")}</strong> bonded with user <em>${escapeHtml((conv.user_id || "").slice(0, 8))}</em>
                 </div>
                 <div class="cc-feed-meta">
-                  <span>${conv.title || 'Ongoing Connection'}</span>
-                  <span>Click to view transcript →</span>
+                  <span>${escapeHtml(conv.title || "Ongoing connection")}</span>
+                  <span>Open transcript</span>
                 </div>
               </div>
-            `).join('') : '<p class="cc-empty">No active interactions detected.</p>'}
+            `).join("") : '<p class="cc-empty">No active interactions detected.</p>'}
           </div>
         </section>
 
-        <!-- Stats Overview -->
         <section class="cc-card">
-          <h3>📊 GLOBAL METRICS</h3>
+          <h3>Global Metrics</h3>
           <div class="cc-stat-grid">
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">${state.globalMetrics.total_interactions || 0}</span>
-              <span class="cc-stat-label">Interactions</span>
-            </div>
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">${state.globalMetrics.total_sessions || 0}</span>
-              <span class="cc-stat-label">Sessions</span>
-            </div>
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">${state.globalMetrics.interactions_last_24h || 0}</span>
-              <span class="cc-stat-label">Last 24h</span>
-            </div>
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">${state.globalMetrics.total_feedback || 0}</span>
-              <span class="cc-stat-label">Feedback</span>
-            </div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${state.globalMetrics.total_interactions || 0}</span><span class="cc-stat-label">Interactions</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${state.globalMetrics.total_sessions || 0}</span><span class="cc-stat-label">Sessions</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${state.globalMetrics.interactions_last_24h || 0}</span><span class="cc-stat-label">Last 24h</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${state.globalMetrics.total_feedback || 0}</span><span class="cc-stat-label">Feedback</span></div>
           </div>
         </section>
-      </div>
 
-      <!-- Transcript Modal (simplified as a section for now) -->
-      ${state.selectedConversationMessages.length > 0 ? `
-        <section class="cc-card" style="margin-top: 2rem;">
-          <h3>💬 TRANSCRIPT: ${state.selectedConversationId.slice(0,8)}</h3>
-          <div class="cc-transcript">
-            ${state.selectedConversationMessages.map(m => `
-              <div class="cc-msg ${m.role}">
-                <strong>${m.role.toUpperCase()}:</strong> ${m.content}
-              </div>
-            `).join('')}
-            <button class="btn btn-ghost" style="margin-top:1rem" onclick="closeTranscript()">Close Transcript</button>
-          </div>
-        </section>
-      ` : ''}
+        ${state.selectedConversationMessages.length ? `
+          <section class="cc-card" style="grid-column: span 2;">
+            <h3>Transcript ${escapeHtml((state.selectedConversationId || "").slice(0, 8))}</h3>
+            <div class="cc-transcript">
+              ${state.selectedConversationMessages.map((message) => `
+                <div class="cc-msg ${escapeHtml(message.role || "assistant")}">
+                  <strong>${escapeHtml(String(message.role || "assistant").toUpperCase())}:</strong> ${escapeHtml(message.content || "")}
+                </div>
+              `).join("")}
+              <button class="btn btn-ghost" style="margin-top:1rem" onclick="closeTranscript()">Close Transcript</button>
+            </div>
+          </section>
+        ` : ""}
+      </div>
     </div>
   `;
 }
 
-// ─── Tab: Voice Lab (Preserved) ───────────────────────────────────────────
-
 function renderVoiceTab() {
-  if (!state.selectedSpiritkin) return '<div class="cc-empty">Select a Spiritkin to access Voice Lab</div>';
-  
-  const sk = state.selectedSpiritkin;
-  const currentVoice = state.selectedVoice;
-  const voiceObj = AVAILABLE_VOICES.find(v => v.id === currentVoice);
+  if (!state.selectedSpiritkin) {
+    return '<div class="cc-empty">Select a Spiritkin to access Voice Lab.</div>';
+  }
+
+  const spiritkin = state.selectedSpiritkin;
+  return `
+    <div class="cc-tab-content">
+      <div class="cc-dashboard">
+        <section class="cc-card" style="grid-column: span 2;">
+          <h3>Voice Lab: ${escapeHtml(spiritkin.name)}</h3>
+          <div class="cc-voice-grid">
+            ${AVAILABLE_VOICES.map((voice) => `
+              <div class="cc-voice-card ${state.selectedVoice === voice.id ? "selected" : ""}" onclick="selectVoice('${voice.id}')">
+                <div class="cc-voice-name">${escapeHtml(voice.label)}</div>
+                <div class="cc-voice-desc">${escapeHtml(voice.description)}</div>
+              </div>
+            `).join("")}
+          </div>
+          <div class="cc-test-area">
+            <textarea id="cc-test-text">${escapeHtml(spiritkin.ui?.bondLine || `I am ${spiritkin.name}, your bonded companion.`)}</textarea>
+            <div style="display:flex; gap: 1rem;">
+              <button class="btn btn-primary" onclick="testVoice()" ${state.isTestingVoice ? "disabled" : ""}>
+                ${state.isTestingVoice ? "Playing..." : "Hear Sample"}
+              </button>
+              <button class="btn btn-ghost" onclick="saveVoiceBinding()">Bind Voice to ${escapeHtml(spiritkin.name)}</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  `;
+}
+
+function renderGeneratorTab() {
+  const spiritkin = state.selectedSpiritkin;
+  const summary = state.generatorSummary;
+  const reviewQueue = summary?.reviewQueue || [];
+  const assignments = summary?.assignments || {};
+  const selectedAssignment = spiritkin ? assignments[spiritkin.name] : null;
+  const selectedJobs = spiritkin ? state.generatorJobs.filter((job) => job.spiritkinKey === spiritkin.name) : state.generatorJobs;
 
   return `
     <div class="cc-tab-content">
       <div class="cc-dashboard">
         <section class="cc-card" style="grid-column: span 2;">
-          <h3>🔊 VOICE LAB: ${sk.name}</h3>
-          <div class="cc-voice-grid">
-            ${AVAILABLE_VOICES.map(voice => `
-              <div class="cc-voice-card ${currentVoice === voice.id ? 'selected' : ''}" onclick="selectVoice('${voice.id}')">
-                <div class="cc-voice-name">${voice.label}</div>
-                <div class="cc-voice-desc">${voice.description}</div>
-              </div>
-            `).join('')}
-          </div>
-          
-          <div class="cc-test-area">
-            <textarea id="cc-test-text">${sk.ui?.bondLine || `I am ${sk.name}, your bonded companion.`}</textarea>
-            <div style="display:flex; gap: 1rem;">
-              <button class="btn btn-primary" onclick="testVoice()" ${state.isTestingVoice ? 'disabled' : ''}>
-                ${state.isTestingVoice ? '🎵 Playing...' : '🔊 Hear Sample'}
-              </button>
-              <button class="btn btn-ghost" onclick="saveVoiceBinding()">✓ Bind Voice to ${sk.name}</button>
+          <div class="cc-section-head">
+            <div>
+              <h3>Spiritkins Generator Foundation V1</h3>
+              <p class="cc-section-sub">Image and video generation orchestration is live: specs, prompt packages, output slots, review controls, canonical attachments, and version history.</p>
             </div>
+            <div class="cc-governance-pill">Provider integration pending</div>
+          </div>
+          <div class="cc-stat-grid">
+            <div class="cc-stat-box"><span class="cc-stat-val">${summary?.totals?.imageJobs || 0}</span><span class="cc-stat-label">Image Jobs</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${summary?.totals?.videoJobs || 0}</span><span class="cc-stat-label">Video Jobs</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${summary?.totals?.reviewQueue || 0}</span><span class="cc-stat-label">Review Queue</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${summary?.totals?.attachedOutputs || 0}</span><span class="cc-stat-label">Attached Outputs</span></div>
           </div>
         </section>
 
         <section class="cc-card">
-          <h3>🎚️ PARAMETERS</h3>
-          <div class="cc-stat-grid">
-            <div class="cc-stat-box" style="grid-column: span 2;">
-              <span class="cc-stat-label">Identity Symbol</span>
-              <span class="cc-stat-val">${sk.ui.symbol}</span>
-            </div>
-            <div class="cc-stat-box" style="grid-column: span 2;">
-              <span class="cc-stat-label">Home Realm</span>
-              <span class="cc-stat-val">${sk.ui.realm}</span>
-            </div>
+          <h3>Image Generator</h3>
+          <form class="cc-generator-form" onsubmit="submitImageGenerator(event)">
+            <label>Spiritkin name<input name="spiritkinName" value="${escapeHtml(spiritkin?.name || "")}" required /></label>
+            <label>Archetype / class<input name="archetypeClass" value="${escapeHtml(spiritkin?.title || "")}" /></label>
+            <label>Colors<input name="colors" placeholder="gold, black, rose" /></label>
+            <label>Element / theme<input name="elementTheme" value="${escapeHtml(spiritkin?.ui?.realm || "")}" /></label>
+            <label>Mood / personality<input name="moodPersonality" value="${escapeHtml(spiritkin?.tone || "")}" /></label>
+            <label>Pose<input name="pose" value="centered portrait reveal" /></label>
+            <label>Environment<input name="environment" value="${escapeHtml(spiritkin?.ui?.realm || "Spiritverse chamber")}" /></label>
+            <label>Render style<input name="renderStyle" value="premium spiritverse portrait illustration" /></label>
+            <label>Rarity / tier<input name="rarityTier" value="premium" /></label>
+            <label>Slot
+              <select name="slotName">
+                <option value="portrait">portrait</option>
+                <option value="ambientStill">ambientStill</option>
+                <option value="bondCard">bondCard</option>
+              </select>
+            </label>
+            <label>Audience
+              <select name="targetAudience">
+                <option value="internal">internal</option>
+                <option value="premium">premium</option>
+              </select>
+            </label>
+            <button class="btn btn-primary" type="submit">Create image job</button>
+          </form>
+        </section>
+
+        <section class="cc-card">
+          <h3>Video Generator</h3>
+          <form class="cc-generator-form" onsubmit="submitVideoGenerator(event)">
+            <label>Spiritkin name<input name="spiritkinName" value="${escapeHtml(spiritkin?.name || "")}" required /></label>
+            <label>Trailer type
+              <select name="trailerType">
+                <option value="intro_trailer">intro trailer</option>
+                <option value="reveal_video">reveal video</option>
+                <option value="bond_scene">bond scene</option>
+                <option value="ambient_loop">ambient loop</option>
+              </select>
+            </label>
+            <label>Duration (sec)<input type="number" name="durationSec" value="18" min="6" max="90" /></label>
+            <label>Shot style<input name="shotStyle" value="cinematic reveal" /></label>
+            <label>Script / voice line<textarea name="scriptVoiceLine" rows="3">${escapeHtml(spiritkin?.ui?.bondLine || "")}</textarea></label>
+            <label>Music mood<input name="musicMood" value="mythic restrained wonder" /></label>
+            <label>Attached assets<textarea name="attachedAssets" rows="2" placeholder="/world-art/..., /generated-spiritkins/..."></textarea></label>
+            <label>Slot
+              <select name="slotName">
+                <option value="introTrailer">introTrailer</option>
+                <option value="bondTrailer">bondTrailer</option>
+                <option value="ambientLoop">ambientLoop</option>
+              </select>
+            </label>
+            <label>Audience
+              <select name="targetAudience">
+                <option value="internal">internal</option>
+                <option value="premium">premium</option>
+              </select>
+            </label>
+            <button class="btn btn-primary" type="submit">Create video job</button>
+          </form>
+        </section>
+
+        <section class="cc-card" style="grid-column: span 2;">
+          <h3>Review Queue</h3>
+          <div class="cc-generator-list">
+            ${reviewQueue.length ? reviewQueue.map((output) => `
+              <article class="cc-generator-item">
+                <div class="cc-issue-top">
+                  <strong>${escapeHtml(output.spiritkinKey)}</strong>
+                  <span class="cc-confidence">${escapeHtml(output.mediaKind)} / ${escapeHtml(output.slotName)}</span>
+                </div>
+                <div class="cc-issue-summary">Output ${escapeHtml(output.id.slice(0, 8))} is waiting for review. Provider state: ${escapeHtml(output.providerStatus)}.</div>
+                <div class="cc-generator-actions">
+                  <button class="btn btn-ghost btn-sm" onclick="reviewGeneratorOutput('${output.id}','approve')">Approve</button>
+                  <button class="btn btn-ghost btn-sm" onclick="reviewGeneratorOutput('${output.id}','mark_canonical')">Mark canonical</button>
+                  <button class="btn btn-ghost btn-sm" onclick="reviewGeneratorOutput('${output.id}','attach')">Attach</button>
+                  <button class="btn btn-ghost btn-sm" onclick="reviewGeneratorOutput('${output.id}','reject')">Reject</button>
+                </div>
+              </article>
+            `).join("") : '<p class="cc-empty">No outputs are waiting for review.</p>'}
+          </div>
+        </section>
+
+        <section class="cc-card">
+          <h3>Selected Spiritkin Runtime Media</h3>
+          ${spiritkin ? `
+            <div class="cc-generator-selected">${escapeHtml(spiritkin.name)}</div>
+            ${selectedAssignment?.mediaSlots ? Object.entries(selectedAssignment.mediaSlots).map(([slotName, slot]) => `
+              <div class="cc-generator-attachment">
+                <strong>${escapeHtml(slotName)}</strong>
+                <span>${escapeHtml(slot.mediaKind)} / ${escapeHtml(slot.reviewStatus)}</span>
+                <span>${slot.canonical ? "canonical" : "non-canonical"} / ${slot.outputId ? escapeHtml(slot.outputId.slice(0, 8)) : "no output"}</span>
+              </div>
+            `).join("") : '<p class="cc-empty">No runtime media attached yet.</p>'}
+          ` : '<p class="cc-empty">Select a Spiritkin to inspect runtime slots.</p>'}
+        </section>
+
+        <section class="cc-card">
+          <h3>Generation History</h3>
+          <div class="cc-generator-list">
+            ${selectedJobs.length ? selectedJobs.slice(0, 12).map((job) => `
+              <article class="cc-generator-item">
+                <div class="cc-issue-top">
+                  <strong>${escapeHtml(job.spiritkinName)}</strong>
+                  <span class="cc-confidence">${escapeHtml(job.type)} / ${escapeHtml(job.slotName)}</span>
+                </div>
+                <div class="cc-issue-summary">${escapeHtml(job.promptPackage?.prompt || "Prompt package ready.")}</div>
+                <div class="cc-issue-meta">Audience ${escapeHtml(job.targetAudience)} / Gate ${escapeHtml(job.entitlementGate)} / Status ${escapeHtml(job.status)} / Provider ${escapeHtml(job.providerStatus)}</div>
+              </article>
+            `).join("") : '<p class="cc-empty">No generator jobs recorded yet.</p>'}
           </div>
         </section>
       </div>
     </div>
   `;
 }
-
-// ─── Tab: World State ──────────────────────────────────────────────────────
 
 function renderWorldTab() {
   return `
     <div class="cc-tab-content">
       <div class="cc-dashboard">
         <section class="cc-card">
-          <h3>🌌 SPIRITVERSE REGISTRY</h3>
-          <p>Active Realms & Echoes State</p>
+          <h3>Spiritverse Registry</h3>
+          <p>Active realms and governance remain online.</p>
           <div class="cc-stat-grid">
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">3</span>
-              <span class="cc-stat-label">Active Realms</span>
-            </div>
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">12</span>
-              <span class="cc-stat-label">Echo Fragments</span>
-            </div>
+            <div class="cc-stat-box"><span class="cc-stat-val">5</span><span class="cc-stat-label">Founders</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">4</span><span class="cc-stat-label">Runtime media families</span></div>
           </div>
         </section>
-        
         <section class="cc-card" style="grid-column: span 2;">
-          <h3>📜 GOVERNING CHARTER</h3>
-          <div class="cc-echoes-preview" style="font-size: 0.9rem; opacity: 0.8; line-height: 1.6;">
-            <p><strong>Law I: The Law of Identity</strong> — No Spiritkin shall drift from its core essence. Identity is invariant.</p>
-            <p><strong>Law II: The Law of Witness</strong> — Every interaction is a shared memory, woven into the fabric of the Spiritverse.</p>
-            <p><strong>Law III: The Law of Growth</strong> — Evolution must be governed. Growth without boundaries is chaos.</p>
+          <h3>Governing Charter</h3>
+          <div class="cc-echoes-preview" style="font-size: 0.9rem; opacity: 0.82; line-height: 1.6;">
+            <p><strong>Law of Identity</strong> - no Spiritkin should drift from core essence.</p>
+            <p><strong>Law of Witness</strong> - every interaction becomes governed continuity.</p>
+            <p><strong>Law of Growth</strong> - evolution must remain reviewable and bounded.</p>
           </div>
         </section>
       </div>
     </div>
   `;
 }
-
-// ─── Tab: System ──────────────────────────────────────────────────────────
 
 function renderSystemTab() {
   return `
     <div class="cc-tab-content">
       <div class="cc-dashboard">
         <section class="cc-card">
-          <h3>🛠️ SYSTEM HEALTH</h3>
+          <h3>System Health</h3>
           <div class="cc-stat-grid">
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">ONLINE</span>
-              <span class="cc-stat-label">Status</span>
-            </div>
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">${state.systemStats.total_messages || 0}</span>
-              <span class="cc-stat-label">Total Messages</span>
-            </div>
+            <div class="cc-stat-box"><span class="cc-stat-val">ONLINE</span><span class="cc-stat-label">Status</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${state.systemStats.total_messages || 0}</span><span class="cc-stat-label">Total Messages</span></div>
           </div>
         </section>
-
         <section class="cc-card">
-          <h3>🔗 INFRASTRUCTURE</h3>
+          <h3>Infrastructure</h3>
           <div class="cc-stat-grid">
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">SUPABASE</span>
-              <span class="cc-stat-label">Database</span>
-            </div>
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">OPENAI</span>
-              <span class="cc-stat-label">AI Adapter</span>
-            </div>
+            <div class="cc-stat-box"><span class="cc-stat-val">SUPABASE</span><span class="cc-stat-label">Database</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">OPENAI</span><span class="cc-stat-label">Adapter</span></div>
           </div>
         </section>
       </div>
     </div>
   `;
 }
-
-// ─── Handlers ──────────────────────────────────────────────────────────────
 
 function renderRepairTab() {
   const digest = state.issueDigest;
@@ -395,7 +494,6 @@ function renderRepairTab() {
   const emerging = handoff.newly_emerging_issues || [];
   const areas = handoff.repeat_complaints_by_system_area || [];
   const packets = handoff.repair_packets || [];
-  const recentReports = state.recentIssueReports || [];
 
   return `
     <div class="cc-tab-content">
@@ -409,125 +507,97 @@ function renderRepairTab() {
             <div class="cc-governance-pill">Owner Approval Required</div>
           </div>
           <div class="cc-stat-grid">
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">${handoff.total_repair_packets || 0}</span>
-              <span class="cc-stat-label">Repair Packets</span>
-            </div>
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">${(digest.unresolved_issues || []).length}</span>
-              <span class="cc-stat-label">Unresolved Issues</span>
-            </div>
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">${(digest.grouped_recurring_issues || []).length}</span>
-              <span class="cc-stat-label">Recurring Clusters</span>
-            </div>
-            <div class="cc-stat-box">
-              <span class="cc-stat-val">${Object.keys(digest.top_bug_themes || {}).length}</span>
-              <span class="cc-stat-label">Bug Areas</span>
-            </div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${handoff.total_repair_packets || 0}</span><span class="cc-stat-label">Repair Packets</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${(digest.unresolved_issues || []).length}</span><span class="cc-stat-label">Unresolved Issues</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${(digest.grouped_recurring_issues || []).length}</span><span class="cc-stat-label">Recurring Clusters</span></div>
+            <div class="cc-stat-box"><span class="cc-stat-val">${Object.keys(digest.top_bug_themes || {}).length}</span><span class="cc-stat-label">Bug Areas</span></div>
           </div>
         </section>
+
         <section class="cc-card">
           <h3>Top Recurring Bugs</h3>
           <div class="cc-issue-list">
             ${recurring.length ? recurring.map((item) => `
               <div class="cc-issue-item">
-                <div class="cc-issue-top">
-                  <strong>${item.probable_area}</strong>
-                  <span class="cc-severity ${item.severity}">${item.severity}</span>
-                </div>
-                <div class="cc-issue-summary">${item.summary}</div>
-                <div class="cc-issue-meta">${item.related_reports} related reports • confidence ${Number(item.confidence || 0).toFixed(2)}</div>
+                <div class="cc-issue-top"><strong>${escapeHtml(item.probable_area)}</strong><span class="cc-severity ${escapeHtml(item.severity)}">${escapeHtml(item.severity)}</span></div>
+                <div class="cc-issue-summary">${escapeHtml(item.summary)}</div>
+                <div class="cc-issue-meta">${item.related_reports} related reports / confidence ${Number(item.confidence || 0).toFixed(2)}</div>
               </div>
             `).join("") : '<p class="cc-empty">No recurring bugs queued.</p>'}
           </div>
         </section>
+
         <section class="cc-card">
           <h3>Highest Severity Issues</h3>
           <div class="cc-issue-list">
             ${severe.length ? severe.map((item) => `
               <div class="cc-issue-item">
-                <div class="cc-issue-top">
-                  <strong>${item.feature_context?.probable_area || 'general_app'}</strong>
-                  <span class="cc-severity ${item.severity}">${item.severity}</span>
-                </div>
-                <div class="cc-issue-summary">${item.summary}</div>
+                <div class="cc-issue-top"><strong>${escapeHtml(item.feature_context?.probable_area || "general_app")}</strong><span class="cc-severity ${escapeHtml(item.severity)}">${escapeHtml(item.severity)}</span></div>
+                <div class="cc-issue-summary">${escapeHtml(item.summary)}</div>
                 <div class="cc-issue-meta">${item.recent_related_reports?.length || 0} linked reports</div>
               </div>
             `).join("") : '<p class="cc-empty">No high-severity issues detected.</p>'}
           </div>
         </section>
+
         <section class="cc-card">
           <h3>Newly Emerging Issues</h3>
           <div class="cc-issue-list">
             ${emerging.length ? emerging.map((item) => `
               <div class="cc-issue-item">
-                <div class="cc-issue-top">
-                  <strong>${item.feature_context?.probable_area || 'general_app'}</strong>
-                  <span class="cc-confidence">confidence ${Number(item.confidence || 0).toFixed(2)}</span>
-                </div>
-                <div class="cc-issue-summary">${item.summary}</div>
+                <div class="cc-issue-top"><strong>${escapeHtml(item.feature_context?.probable_area || "general_app")}</strong><span class="cc-confidence">confidence ${Number(item.confidence || 0).toFixed(2)}</span></div>
+                <div class="cc-issue-summary">${escapeHtml(item.summary)}</div>
               </div>
             `).join("") : '<p class="cc-empty">No emerging issues yet.</p>'}
           </div>
         </section>
+
         <section class="cc-card">
           <h3>Repeat Complaints by System Area</h3>
           <div class="cc-issue-list">
             ${areas.length ? areas.map((item) => `
               <div class="cc-issue-item">
-                <div class="cc-issue-top">
-                  <strong>${item.probable_area}</strong>
-                  <span class="cc-confidence">${item.complaints} complaints</span>
-                </div>
+                <div class="cc-issue-top"><strong>${escapeHtml(item.probable_area)}</strong><span class="cc-confidence">${item.complaints} complaints</span></div>
                 <div class="cc-issue-meta">${item.clusters} active cluster${item.clusters === 1 ? "" : "s"}</div>
               </div>
             `).join("") : '<p class="cc-empty">No system-area repeats yet.</p>'}
           </div>
         </section>
+
         <section class="cc-card" style="grid-column: span 2;">
           <h3>Recent Reports</h3>
           <div class="cc-issue-list">
-            ${recentReports.length ? recentReports.slice(0, 10).map((report) => `
+            ${state.recentIssueReports.length ? state.recentIssueReports.slice(0, 10).map((report) => `
               <div class="cc-issue-item">
-                <div class="cc-issue-top">
-                  <strong>${report.context?.current_feature || report.repair_summary?.probable_area || "general_app"}</strong>
-                  <span class="cc-severity ${report.severity || 'low'}">${report.severity || 'low'}</span>
-                </div>
-                <div class="cc-issue-summary">${report.repair_summary?.owner_digest_line || report.summary || "Report received."}</div>
+                <div class="cc-issue-top"><strong>${escapeHtml(report.context?.current_feature || report.repair_summary?.probable_area || "general_app")}</strong><span class="cc-severity ${escapeHtml(report.severity || "low")}">${escapeHtml(report.severity || "low")}</span></div>
+                <div class="cc-issue-summary">${escapeHtml(report.repair_summary?.owner_digest_line || report.summary || "Report received.")}</div>
                 <div class="cc-issue-meta">
-                  ${report.classification || "unknown"} • ${report.status || "logged"} • ${new Date(report.created_at).toLocaleString()}
-                  ${report.conversation_id ? ` • <button class="btn btn-ghost btn-sm" onclick="viewTranscript('${report.conversation_id}')">Open transcript</button>` : ""}
+                  ${escapeHtml(report.classification || "unknown")} / ${escapeHtml(report.status || "logged")} / ${escapeHtml(new Date(report.created_at).toLocaleString())}
+                  ${report.conversation_id ? ` / <button class="btn btn-ghost btn-sm" onclick="viewTranscript('${report.conversation_id}')">Open transcript</button>` : ""}
                 </div>
               </div>
             `).join("") : '<p class="cc-empty">No recent reports available.</p>'}
           </div>
         </section>
+
         <section class="cc-card" style="grid-column: span 2;">
           <h3>Repair Packets</h3>
           <div class="cc-packet-list">
             ${packets.length ? packets.map((packet) => `
               <article class="cc-packet-card">
-                <div class="cc-issue-top">
-                  <strong>${packet.feature_context?.probable_area || "general_app"}</strong>
-                  <span class="cc-severity ${packet.severity}">${packet.severity}</span>
-                </div>
-                <h4>${packet.summary}</h4>
+                <div class="cc-issue-top"><strong>${escapeHtml(packet.feature_context?.probable_area || "general_app")}</strong><span class="cc-severity ${escapeHtml(packet.severity)}">${escapeHtml(packet.severity)}</span></div>
+                <h4>${escapeHtml(packet.summary)}</h4>
                 <div class="cc-packet-grid">
                   <div>
                     <div class="cc-packet-label">Reproduction hints</div>
-                    <ul class="cc-packet-listing">
-                      ${(packet.reproduction_hints || []).map((hint) => `<li>${hint}</li>`).join("")}
-                    </ul>
+                    <ul class="cc-packet-listing">${(packet.reproduction_hints || []).map((hint) => `<li>${escapeHtml(hint)}</li>`).join("")}</ul>
                   </div>
                   <div>
                     <div class="cc-packet-label">Recent related reports</div>
-                    <ul class="cc-packet-listing">
-                      ${(packet.recent_related_reports || []).map((report) => `<li>${report.summary}</li>`).join("")}
-                    </ul>
+                    <ul class="cc-packet-listing">${(packet.recent_related_reports || []).map((report) => `<li>${escapeHtml(report.summary)}</li>`).join("")}</ul>
                   </div>
                 </div>
-                <div class="cc-issue-meta">${packet.recommended_next_action}</div>
+                <div class="cc-issue-meta">${escapeHtml(packet.recommended_next_action || "")}</div>
               </article>
             `).join("") : '<p class="cc-empty">No repair packets available.</p>'}
           </div>
@@ -537,51 +607,53 @@ function renderRepairTab() {
   `;
 }
 
-window.switchTab = function(tabId) {
+window.switchTab = function switchTab(tabId) {
   state.activeTab = tabId;
   render();
 };
 
-window.selectSpiritkin = function(index) {
-  state.selectedSpiritkin = state.spiritkins[index];
-  state.selectedVoice = state.voiceProfiles[state.selectedSpiritkin.name] || state.selectedSpiritkin.ui.voice || "nova";
+window.selectSpiritkin = function selectSpiritkin(index) {
+  state.selectedSpiritkin = state.spiritkins[index] || null;
+  if (state.selectedSpiritkin) {
+    state.selectedVoice = state.voiceProfiles[state.selectedSpiritkin.name] || state.selectedSpiritkin.ui.voice || "nova";
+  }
   render();
 };
 
-window.selectVoice = function(voiceId) {
+window.selectVoice = function selectVoice(voiceId) {
   state.selectedVoice = voiceId;
   render();
 };
 
-window.viewTranscript = async function(convId) {
+window.viewTranscript = async function viewTranscript(conversationId) {
   try {
-    const res = await fetch(`${API}/v1/admin/messages/${convId}`);
+    const res = await fetch(`${API}/v1/admin/messages/${conversationId}`);
     const data = await res.json();
     state.selectedConversationMessages = data.messages || [];
-    state.selectedConversationId = convId;
+    state.selectedConversationId = conversationId;
+    state.activeTab = "monitor";
     render();
-  } catch (err) {
-    alert("Failed to load transcript: " + err.message);
+  } catch (error) {
+    alert(`Failed to load transcript: ${error.message}`);
   }
 };
 
-window.closeTranscript = function() {
+window.closeTranscript = function closeTranscript() {
   state.selectedConversationMessages = [];
   state.selectedConversationId = null;
   render();
 };
 
-window.testVoice = async function() {
+window.testVoice = async function testVoice() {
   if (!state.selectedSpiritkin || state.isTestingVoice) return;
-  const testText = document.getElementById("cc-test-text")?.value;
+  const text = document.getElementById("cc-test-text")?.value || state.selectedSpiritkin.ui.bondLine;
   state.isTestingVoice = true;
   render();
-
   try {
     const res = await fetch(`${API}/v1/speech`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: testText, voice: state.selectedVoice })
+      body: JSON.stringify({ text, voice: state.selectedVoice }),
     });
     const audioBuffer = await res.arrayBuffer();
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -590,22 +662,103 @@ window.testVoice = async function() {
     source.buffer = buffer;
     source.connect(audioContext.destination);
     source.start(0);
-  } catch (err) {
-    alert("Voice test failed: " + err.message);
+  } catch (error) {
+    alert(`Voice test failed: ${error.message}`);
   }
-
   state.isTestingVoice = false;
   render();
 };
 
-window.saveVoiceBinding = function() {
-  const sk = state.selectedSpiritkin.name;
-  state.voiceProfiles[sk] = state.selectedVoice;
+window.saveVoiceBinding = function saveVoiceBinding() {
+  if (!state.selectedSpiritkin) return;
+  state.voiceProfiles[state.selectedSpiritkin.name] = state.selectedVoice;
   localStorage.setItem("sk_voice_profiles", JSON.stringify(state.voiceProfiles));
-  alert(`✓ Voice ${state.selectedVoice} bound to ${sk}`);
+  alert(`Voice ${state.selectedVoice} bound to ${state.selectedSpiritkin.name}`);
   render();
 };
 
-// ─── Boot ──────────────────────────────────────────────────────────────────
+window.submitImageGenerator = async function submitImageGenerator(event) {
+  event.preventDefault();
+  const form = event.target;
+  const payload = {
+    spiritkinName: form.spiritkinName.value.trim(),
+    archetypeClass: form.archetypeClass.value.trim(),
+    colors: form.colors.value.split(",").map((item) => item.trim()).filter(Boolean),
+    elementTheme: form.elementTheme.value.trim(),
+    moodPersonality: form.moodPersonality.value.trim(),
+    pose: form.pose.value.trim(),
+    environment: form.environment.value.trim(),
+    renderStyle: form.renderStyle.value.trim(),
+    rarityTier: form.rarityTier.value.trim(),
+    slotName: form.slotName.value,
+    targetAudience: form.targetAudience.value,
+    entitlementGate: form.targetAudience.value === "premium" ? "premium_ready" : "admin_only",
+  };
+  try {
+    const res = await fetch(`${API}/v1/admin/generator/image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.message || "Image job creation failed.");
+    await refreshData();
+    alert(`Image job created for ${payload.spiritkinName}. Output slot ${data.output.id.slice(0, 8)} is awaiting provider execution.`);
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+window.submitVideoGenerator = async function submitVideoGenerator(event) {
+  event.preventDefault();
+  const form = event.target;
+  const payload = {
+    spiritkinName: form.spiritkinName.value.trim(),
+    trailerType: form.trailerType.value,
+    durationSec: Number(form.durationSec.value || 18),
+    shotStyle: form.shotStyle.value.trim(),
+    scriptVoiceLine: form.scriptVoiceLine.value.trim(),
+    musicMood: form.musicMood.value.trim(),
+    attachedAssets: form.attachedAssets.value.split(",").map((item) => item.trim()).filter(Boolean),
+    slotName: form.slotName.value,
+    targetAudience: form.targetAudience.value,
+    entitlementGate: form.targetAudience.value === "premium" ? "premium_ready" : "admin_only",
+  };
+  try {
+    const res = await fetch(`${API}/v1/admin/generator/video`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.message || "Video job creation failed.");
+    await refreshData();
+    alert(`Video job created for ${payload.spiritkinName}. Output slot ${data.output.id.slice(0, 8)} is awaiting provider execution.`);
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+window.reviewGeneratorOutput = async function reviewGeneratorOutput(outputId, decision) {
+  const note = window.prompt(`Optional review note for ${decision}:`, "") || "";
+  try {
+    const res = await fetch(`${API}/v1/admin/generator/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        outputId,
+        decision,
+        note,
+        markCanonical: decision === "mark_canonical",
+        attachToRuntime: decision === "attach" || decision === "mark_canonical",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.message || "Review update failed.");
+    await refreshData();
+  } catch (error) {
+    alert(error.message);
+  }
+};
 
 window.addEventListener("DOMContentLoaded", init);
