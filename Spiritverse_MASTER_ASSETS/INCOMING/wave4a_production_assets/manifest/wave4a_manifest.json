@@ -1,0 +1,152 @@
+[
+  {
+    "file": "chess/white/chess_white_piece_family_v4a.png",
+    "box": [
+      40,
+      120,
+      560,
+      270
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "chess/dark/chess_dark_piece_family_v4a.png",
+    "box": [
+      560,
+      120,
+      1010,
+      270
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "chess/overlays/chess_overlay_set_v4a.png",
+    "box": [
+      150,
+      250,
+      520,
+      355
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "checkers/light/checkers_piece_family_lightdark_v4a.png",
+    "box": [
+      40,
+      365,
+      540,
+      510
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "checkers/dark/checkers_piece_family_lightdark_v4a.png",
+    "box": [
+      40,
+      365,
+      540,
+      510
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "checkers/overlays/checkers_move_marker_v4a.png",
+    "box": [
+      915,
+      420,
+      1015,
+      510
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "connect4/discs/connect4_disc_family_v4a.png",
+    "box": [
+      560,
+      385,
+      980,
+      500
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "connect4/overlays/connect4_fx_family_v4a.png",
+    "box": [
+      45,
+      565,
+      545,
+      710
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "battleship/ships/battleship_ship_family_v4a.png",
+    "box": [
+      590,
+      545,
+      1010,
+      720
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "battleship/markers/battleship_marker_family_v4a.png",
+    "box": [
+      640,
+      820,
+      1010,
+      965
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "tictactoe/tokens/tictactoe_token_family_v4a.png",
+    "box": [
+      690,
+      820,
+      980,
+      960
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "go/stones/go_stone_family_v4a_left.png",
+    "box": [
+      40,
+      810,
+      315,
+      955
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "go/stones/go_stone_family_v4a_right.png",
+    "box": [
+      775,
+      1080,
+      1010,
+      1235
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "go/overlays/ring_overlay_family_v4a.png",
+    "box": [
+      70,
+      810,
+      615,
+      955
+    ],
+    "note": "derived crop from wave4a master sheet"
+  },
+  {
+    "file": "shared_ui/shared_ui_banner_set_v4a.png",
+    "box": [
+      55,
+      1010,
+      980,
+      1280
+    ],
+    "note": "derived crop from wave4a master sheet"
+  }
+]
