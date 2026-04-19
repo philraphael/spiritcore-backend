@@ -2758,27 +2758,35 @@ function armSpiritGateArrivalPlaybackSafety(source, video) {
 function syncEntryCinematics() {
   const gateVideo = document.querySelector("[data-entry-video='gate']");
   if (gateVideo) {
+    const previewingGate = !state.entryVideoStarted && !state.crownGateOpening && (state.showCrownGateHome || !state.entryAccepted);
     gateVideo.onloadedmetadata = () => {
       if (state.entryVideoStarted && state.crownGateOpening) {
         armSpiritGatePlaybackSafety("gate-video-metadata", gateVideo);
       }
     };
     gateVideo.onplay = () => {
+      if (!state.entryVideoStarted || !state.crownGateOpening) return;
       clearSpiritGateFallback();
       armSpiritGatePlaybackSafety("gate-video-play", gateVideo);
       logSpiritGate("gate-video-play", { currentTime: gateVideo.currentTime, paused: gateVideo.paused });
     };
     gateVideo.onplaying = () => {
+      if (!state.entryVideoStarted || !state.crownGateOpening) return;
       clearSpiritGateFallback();
       armSpiritGatePlaybackSafety("gate-video-playing", gateVideo);
       logSpiritGate("gate-video-playing", { currentTime: gateVideo.currentTime, paused: gateVideo.paused });
     };
     gateVideo.onended = () => {
+      if (!state.entryVideoStarted || !state.crownGateOpening) return;
       clearSpiritGatePlaybackSafetyTimer();
       logSpiritGate("gate-video-ended", { currentTime: gateVideo.currentTime, duration: gateVideo.duration || null });
       completeCrownGateEntry({ source: "gate-video-ended" });
     };
     gateVideo.onerror = () => {
+      if (!state.entryVideoStarted || !state.crownGateOpening) {
+        logSpiritGate("gate-video-preview-error", { mediaError: gateVideo.error?.message || gateVideo.error?.code || "unknown" });
+        return;
+      }
       clearSpiritGatePlaybackSafetyTimer();
       console.error("Gate video failed", { mediaError: gateVideo.error?.message || gateVideo.error?.code || "unknown" });
       logSpiritGate("gate-video-error", { mediaError: gateVideo.error?.message || gateVideo.error?.code || "unknown" });
@@ -2798,8 +2806,20 @@ function syncEntryCinematics() {
     } else {
       clearSpiritGateFallback();
       clearSpiritGateTransitionTimers();
-      gateVideo.pause?.();
-      gateVideo.currentTime = 0;
+      if (previewingGate) {
+        gateVideo.muted = true;
+        gateVideo.defaultMuted = true;
+        gateVideo.playsInline = true;
+        const previewAttempt = gateVideo.play?.();
+        if (previewAttempt?.catch) {
+          previewAttempt.catch((error) => {
+            logSpiritGate("gate-video-preview-play-rejected", { reason: error?.message || "unknown" });
+          });
+        }
+      } else {
+        gateVideo.pause?.();
+        gateVideo.currentTime = 0;
+      }
     }
   } else if (state.entryVideoStarted && state.crownGateOpening) {
     logSpiritGate("gate-video-missing", {});
@@ -5822,9 +5842,11 @@ function buildEntry() {
             <video
               class="video-player-element"
               data-entry-video="gate"
-              ${state.mediaMuted ? "muted" : ""}
+              muted
+              ${!state.entryVideoStarted ? "autoplay loop" : ""}
               playsinline
               preload="auto"
+              poster="/world-art/Spiritverse%20background%20base%20theme.png"
             >
               <source src="/videos/gate_entrance_final.mp4" type="video/mp4">
               Your browser does not support the video tag.
@@ -5911,9 +5933,11 @@ function buildCrownGateEntry() {
             <video
               class="video-player-element"
               data-entry-video="gate"
-              ${state.mediaMuted ? "muted" : ""}
+              muted
+              ${!state.entryVideoStarted ? "autoplay loop" : ""}
               playsinline
               preload="auto"
+              poster="/world-art/Spiritverse%20background%20base%20theme.png"
             >
               <source src="/videos/gate_entrance_final.mp4" type="video/mp4">
               Your browser does not support the video tag.

@@ -5288,6 +5288,10 @@ button[data-action="begin-quest"]:active,
   border-radius: 0;
   max-width: none;
   box-shadow: none;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(242, 219, 160, 0.16), transparent 30%),
+    linear-gradient(180deg, rgba(5, 10, 18, 0.18), rgba(5, 10, 18, 0.84)),
+    url("/world-art/Spiritverse%20background%20base%20theme.png") center/cover no-repeat;
 }
 
 .entry-gate-wrapper .video-player-element,
