@@ -150,33 +150,6 @@ function worldArtUrl(filename) {
   return `/world-art/${encodeURIComponent(filename)}`;
 }
 
-function activeAssetUrl(category, filename) {
-  return `/app/active-assets/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`;
-}
-
-const SPIRITKIN_MEDIA_IMAGES = {
-  Lyra: {
-    portrait: activeAssetUrl("ui", "lyra_portrait.png"),
-    open: activeAssetUrl("ui", "lyra_open.png"),
-    close: activeAssetUrl("ui", "lyra_close.png")
-  },
-  Raien: {
-    open: activeAssetUrl("ui", "raien_open.png"),
-    close: activeAssetUrl("ui", "raien_close.png")
-  },
-  Kairo: {
-    open: activeAssetUrl("ui", "kairo_open.png"),
-    close: activeAssetUrl("ui", "kairo_close.png")
-  }
-};
-
-const SPIRITCORE_MEDIA_IMAGES = {
-  welcomeOpen: activeAssetUrl("ui", "welcome_open.png"),
-  welcomeClose: activeAssetUrl("ui", "welcome_close.png"),
-  hero: activeAssetUrl("ui", "spiritcore-media-hero.png"),
-  foundersComposite: activeAssetUrl("ui", "spiritcore-spiritkins-portraits.png")
-};
-
 function worldArtImage(filename, alt, cls = "", eager = false) {
   return `
     <div class="world-art-frame ${esc(cls)}">
@@ -1577,23 +1550,16 @@ function portraitSvg(name) {
   `;
 }
 
-function buildPortrait(name, size, cls) {
-  const media = SPIRITKIN_MEDIA_IMAGES[name] || null;
+function buildPortrait(name, cls, size) {
+
   const portraitMap = {
-    "Lyra": media?.portrait || media?.close || "",
-    "Raien": media?.close || "",
-    "Kairo": media?.close || "",
+    "Lyra": "/portraits/lyra_portrait.png",
+    "Raien": "/portraits/raien_portrait.png",
+    "Kairo": "/portraits/kairo_portrait.png",
     "Elaria": worldArtUrl(WORLD_ART.elaria),
     "Thalassar": worldArtUrl(WORLD_ART.thalassar)
   };
-  const expressiveMap = {
-    "portrait-focus": media?.open || portraitMap[name] || "",
-    "portrait-hero": media?.open || portraitMap[name] || "",
-    "portrait-card": portraitMap[name] || media?.close || "",
-    "portrait-mini": media?.close || portraitMap[name] || "",
-    "portrait-md": portraitMap[name] || media?.close || ""
-  };
-  const portraitPath = expressiveMap[size] || portraitMap[name] || "";
+  const portraitPath = portraitMap[name] || "";
   const eagerPortrait = size === "portrait-card" || size === "portrait-focus" || size === "portrait-hero";
 
   const portraitContent = portraitPath 
@@ -1673,15 +1639,7 @@ function buildFounderEnsemblePanel(kind = "entry") {
     : "The original sovereign companions of the Spiritverse hold the first five axes of memory, courage, wonder, truth, and depth.";
   return `
     <div class="founder-ensemble-panel ${esc(kind)}">
-      <div class="world-art-frame founder-ensemble-art ${esc(kind)}">
-        <img
-          src="${SPIRITCORE_MEDIA_IMAGES.foundersComposite}"
-          alt="The Five Founding Pillars gathered within the Spiritverse"
-          class="world-art-image"
-          ${kind === "entry" ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"'}
-          onerror="this.style.display='none'; this.parentElement.classList.add('world-art-missing');"
-        />
-      </div>
+      ${worldArtImage(WORLD_ART.ensemble, "The Five Founding Pillars gathered within the Spiritverse", "founder-ensemble-art", kind === "entry")}
       <div class="founder-ensemble-copy">
         <div class="panel-label">${title}</div>
         <p>${sub}</p>
@@ -6502,7 +6460,7 @@ function buildEntry() {
               muted
               playsinline
               preload="auto"
-              poster="${SPIRITCORE_MEDIA_IMAGES.welcomeClose}"
+              poster="/world-art/Spiritverse%20background%20base%20theme.png"
             >
               <source src="/videos/gate_entrance_final.mp4" type="video/mp4">
               Your browser does not support the video tag.
@@ -6592,7 +6550,7 @@ function buildCrownGateEntry() {
               muted
               playsinline
               preload="auto"
-              poster="${SPIRITCORE_MEDIA_IMAGES.welcomeClose}"
+              poster="/world-art/Spiritverse%20background%20base%20theme.png"
             >
               <source src="/videos/gate_entrance_final.mp4" type="video/mp4">
               Your browser does not support the video tag.
@@ -6610,9 +6568,6 @@ function buildCrownGateEntry() {
       <div class="entry-gate-scrim"></div>
       <div class="entry-gate-shell">
         <div class="entry-copy ${state.entryVideoStarted ? "entry-copy-hidden" : ""}">
-          <div class="entry-media-hero">
-            <img src="${SPIRITCORE_MEDIA_IMAGES.welcomeClose}" alt="SpiritGate welcome art" class="entry-media-hero-image" loading="eager" fetchpriority="high" />
-          </div>
           <div class="entry-glyph-wrap">
             <div class="entry-glyph">SC</div>
             <div class="entry-glyph-line">SpiritCore</div>
@@ -6692,12 +6647,9 @@ function buildSpiritverseArrival() {
           <source src="/videos/welcome_intro.mp4" type="video/mp4">
           Your browser does not support the video tag.
         </video>
-      <div class="entry-stage-scrim"></div>
+        <div class="entry-stage-scrim"></div>
       </div>
       <div class="entry-stage-copy">
-        <div class="entry-media-hero">
-          <img src="${SPIRITCORE_MEDIA_IMAGES.welcomeOpen}" alt="Spiritverse arrival art" class="entry-media-hero-image" loading="eager" fetchpriority="high" />
-        </div>
         <div class="panel-label">Spiritverse Arrival</div>
         <h2>The realm is revealing itself.</h2>
         <p>After this reveal, SpiritCore will place the Founding Pillars before you so you can meet one, bond, or keep looking.</p>
@@ -6714,9 +6666,6 @@ function buildSpiritCoreWelcome() {
     <section class="entry-stage-screen spiritcore-welcome-screen">
       <div class="entry-stage-scrim"></div>
       <div class="spiritcore-welcome-copy">
-        <div class="spiritcore-welcome-hero">
-          <img src="${SPIRITCORE_MEDIA_IMAGES.hero}" alt="SpiritCore and the Founding Pillars" class="spiritcore-welcome-hero-image" loading="eager" fetchpriority="high" />
-        </div>
         <div class="panel-label">SpiritCore</div>
         <h2>The realm is now under your witness.</h2>
         <p class="spiritcore-welcome-text">${esc(SPIRITCORE_WELCOME_TEXT)}</p>

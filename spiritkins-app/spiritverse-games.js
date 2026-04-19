@@ -48,21 +48,6 @@ const CHESS_PIECE_THEMES = {
   celestial: CHESS_PIECES
 };
 
-const CHESS_IMAGE_VARIANTS = {
-  wP: "whitePawn",
-  bP: "blackPawn",
-  wR: "whiteRook",
-  bR: "blackRook",
-  wN: "whiteKnight",
-  bN: "blackKnight",
-  wB: "whiteBishop",
-  bB: "blackBishop",
-  wQ: "whiteQueen",
-  bQ: "blackQueen",
-  wK: "whiteKing",
-  bK: "blackKing"
-};
-
 function resolveGameTheme(type, overrideTheme) {
   const gameTheme = getGameTheme(type);
   if (type === "chess" && overrideTheme && CHESS_THEME_OPTIONS.some((option) => option.id === overrideTheme)) {
@@ -342,11 +327,6 @@ function getBoardPieceAtSquare(board, square) {
 function buildChessPieceMarkup(piece, themeId) {
   if (!piece) return "";
   const pieceKey = `${piece.color}${piece.type}`;
-  const imageVariant = CHESS_IMAGE_VARIANTS[pieceKey];
-  const imageAsset = imageVariant ? resolveGameAsset("chess", "pieces", imageVariant) : null;
-  if (imageAsset?.publicPath) {
-    return `<div class="chess-piece chess-piece-image ${piece.color === 'w' ? 'piece-white' : 'piece-black'}"><img src="${escapeAttribute(imageAsset.publicPath)}" alt="${escapeAttribute(pieceKey)}" class="chess-piece-img" loading="lazy" decoding="async" /></div>`;
-  }
   const themePieces = CHESS_PIECE_THEMES[themeId] || CHESS_PIECE_THEMES.crown;
   const pieceSvg = themePieces[pieceKey] || "";
   if (!pieceSvg) return "";
@@ -413,9 +393,6 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
   const board = parseFEN(fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
   const files = ['a','b','c','d','e','f','g','h'];
   const themeId = theme.boardVariant || 'crown';
-  const selectedOverlayUrl = resolveGameAssetUrl('chess', 'overlays', 'selection');
-  const moveOverlayUrl = resolveGameAssetUrl('chess', 'overlays', 'moveGlow');
-  const captureOverlayUrl = resolveGameAssetUrl('chess', 'overlays', 'capture');
 
   let html = '';
   if (!isExpanded) {
@@ -448,21 +425,14 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
       if (isValidMove) cellClass += ' chess-valid-move';
       if (isLastMove) cellClass += ' chess-last-move';
 
-      const pieceMarkup = piece ? buildChessPieceMarkup(piece, themeId) : '';
+      const pieceKey = piece ? `${piece.color}${piece.type}` : null;
+      const themePieces = CHESS_PIECE_THEMES[themeId] || CHESS_PIECE_THEMES['crown'];
+      const pieceSvg = pieceKey && themePieces[pieceKey] ? themePieces[pieceKey] : '';
 
       html += `<div class="${cellClass}" data-sq="${sq}" ${isInteractive ? 'data-action="chess-square-click"' : ''}>`;
-      if (isSelected && selectedOverlayUrl) html += `<div class="chess-square-overlay chess-selected-overlay" style="--overlay-image:url('${escapeAttribute(selectedOverlayUrl)}')"></div>`;
-      if (isValidMove && !piece) {
-        html += moveOverlayUrl
-          ? `<div class="chess-square-overlay chess-valid-overlay" style="--overlay-image:url('${escapeAttribute(moveOverlayUrl)}')"></div>`
-          : `<div class="chess-move-dot"></div>`;
-      }
-      if (pieceMarkup) html += pieceMarkup;
-      if (isValidMove && piece) {
-        html += captureOverlayUrl
-          ? `<div class="chess-square-overlay chess-capture-overlay" style="--overlay-image:url('${escapeAttribute(captureOverlayUrl)}')"></div>`
-          : `<div class="chess-capture-ring"></div>`;
-      }
+      if (isValidMove && !piece) html += `<div class="chess-move-dot"></div>`;
+      if (pieceSvg) html += `<div class="chess-piece ${piece.color === 'w' ? 'piece-white' : 'piece-black'}" data-sq="${sq}">${pieceSvg}</div>`;
+      if (isValidMove && piece) html += `<div class="chess-capture-ring"></div>`;
       html += `</div>`;
     }
   }
@@ -521,11 +491,6 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
 // ============================================================
 function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, lastMove, onSquareClick, isExpanded = false, theme = resolveGameTheme("checkers"), isInteractive = true) {
   const board = boardArray || Array(32).fill(null);
-  const selectedOverlayUrl = resolveGameAssetUrl('checkers', 'overlays', 'selection');
-  const userPieceUrl = resolveGameAssetUrl('checkers', 'pieces', 'user');
-  const spiritPieceUrl = resolveGameAssetUrl('checkers', 'pieces', 'spiritkin');
-  const userKingUrl = resolveGameAssetUrl('checkers', 'pieces', 'userKing') || userPieceUrl;
-  const spiritKingUrl = resolveGameAssetUrl('checkers', 'pieces', 'spiritkinKing') || spiritPieceUrl;
   
   let html = '';
   if (!isExpanded) {
@@ -563,15 +528,10 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, l
       if (piece) {
         const isKing = piece.includes('king');
         const colorClass = piece.includes('white') ? 'piece-user' : 'piece-spiritkin';
-        const pieceUrl = piece.includes('white')
-          ? (isKing ? userKingUrl : userPieceUrl)
-          : (isKing ? spiritKingUrl : spiritPieceUrl);
         html += `<div class="checkers-piece ${colorClass} ${isKing ? 'piece-king' : ''}">
-          ${pieceUrl ? `<img src="${escapeAttribute(pieceUrl)}" alt="${escapeAttribute(piece)}" class="checkers-piece-img" loading="lazy" decoding="async" />` : ''}
-          ${isKing ? '<span class="king-crown">K</span>' : ''}
+          ${isKing ? '<span class="king-crown">♔</span>' : ''}
         </div>`;
       }
-      if (isSelected && selectedOverlayUrl) html += `<div class="checkers-square-overlay" style="--overlay-image:url('${escapeAttribute(selectedOverlayUrl)}')"></div>`;
       if (isValid && !piece) html += `<div class="checkers-move-dot"></div>`;
       html += `</div>`;
     }

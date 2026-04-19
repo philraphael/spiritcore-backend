@@ -1158,54 +1158,10 @@
   pointer-events: none;
 }
 
-.chess-square-overlay,
-.checkers-square-overlay {
-  position: absolute;
-  inset: 6%;
-  background-image: var(--overlay-image);
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.chess-selected-overlay {
-  inset: 3%;
-  opacity: 0.98;
-}
-
-.chess-valid-overlay {
-  inset: 20%;
-  opacity: 0.88;
-}
-
-.chess-capture-overlay {
-  inset: 8%;
-  opacity: 0.94;
-}
-
 .chess-piece {
   width: 90%;
   height: 90%;
   z-index: 5;
-}
-
-.chess-piece-image {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.chess-piece-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  user-select: none;
-  -webkit-user-drag: none;
-  filter:
-    drop-shadow(0 14px 12px rgba(0,0,0,0.52))
-    drop-shadow(0 0 16px rgba(242,219,160,0.12));
 }
 
 .chess-selected .chess-piece {
@@ -1393,15 +1349,6 @@
   justify-content: center;
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-
-.checkers-piece-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  user-select: none;
-  -webkit-user-drag: none;
-  filter: drop-shadow(0 10px 10px rgba(0,0,0,0.34));
-}
 .piece-user {
   background:
     var(--game-token-user, none) center / 72% no-repeat,
@@ -1423,12 +1370,6 @@
   transform: translateY(-1px) scale(1.02);
 }
 .king-crown { font-size: 18px; color: rgba(255,255,255,0.8); text-shadow: 0 0 5px rgba(0,0,0,0.5); }
-
-.checkers-square-overlay {
-  inset: 10%;
-  opacity: 0.92;
-  z-index: 2;
-}
 
 /* ---- GO SPECIFIC ---- */
 .go-board {
