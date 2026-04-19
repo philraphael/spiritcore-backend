@@ -115,6 +115,9 @@
 .game-end-btn:hover { opacity: 1; border-color: rgba(255,80,80,0.5); color: #ff8080; }
 
 .game-turn-badge {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   text-align: center;
   font-size: 11px;
   font-weight: 700;
@@ -123,6 +126,18 @@
   padding: 5px 10px;
   border-radius: 20px;
   margin-bottom: 4px;
+}
+.game-turn-badge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--game-ui-banner, none);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.24;
+  pointer-events: none;
+  z-index: -1;
 }
 .turn-user { background: rgba(78,205,196,0.15); color: #4ecdc4; border: 1px solid rgba(78,205,196,0.3); }
 .turn-spiritkin { background: rgba(130,183,217,0.12); color: #82b7d9; border: 1px solid rgba(130,183,217,0.24); animation: pulse-glow 1.5s infinite; }
@@ -149,6 +164,9 @@
 }
 
 .game-feedback-strip {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   display: grid;
   gap: 6px;
   margin-bottom: 8px;
@@ -157,6 +175,18 @@
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.04);
   animation: bubble-in 0.22s ease;
+}
+.game-feedback-strip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--game-ui-banner, none);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center right 12px;
+  opacity: 0.14;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .game-feedback-strip.sending {
@@ -215,12 +245,27 @@
 }
 
 .game-outcome-banner {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   display: grid;
   gap: 8px;
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.04);
+}
+.game-outcome-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--game-ui-banner, none);
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.22;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .game-outcome-banner.win {
@@ -269,6 +314,17 @@
   border-radius: 18px;
   overflow: hidden;
 }
+.game-board-container::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 16px;
+  background:
+    var(--game-board-fx, none) center / 34% no-repeat,
+    var(--game-ui-frame, none) center / cover no-repeat;
+  opacity: 0.14;
+  pointer-events: none;
+}
 
 .game-board-container.is-thinking::after {
   content: "";
@@ -315,6 +371,12 @@
   --game-room-art: none;
   --game-board-art: none;
   --game-card-art: none;
+  --game-accent-art: none;
+  --game-token-user: none;
+  --game-token-spirit: none;
+  --game-token-accent: none;
+  --game-overlay-fx: none;
+  --game-modal-frame: none;
   position: relative;
   display: grid;
   gap: 12px;
@@ -340,7 +402,10 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent 34%, transparent 66%, rgba(255,255,255,0.03));
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.08), transparent 34%, transparent 66%, rgba(255,255,255,0.03)),
+    var(--game-overlay-fx, none) center / 42% no-repeat;
+  opacity: 0.9;
   pointer-events: none;
 }
 
@@ -350,6 +415,10 @@
   inset: 1px;
   border-radius: 20px;
   border: 1px solid rgba(255,255,255,0.05);
+  background:
+    var(--game-modal-frame, none) center / cover no-repeat,
+    var(--game-accent-art, none) right -12px top 10px / min(38%, 220px) auto no-repeat;
+  opacity: 0.18;
   pointer-events: none;
 }
 
@@ -903,6 +972,25 @@
   border: 10px solid var(--game-board-bottom);
   box-shadow: inset 0 0 50px rgba(0,0,0,0.2), 0 20px 40px rgba(0,0,0,0.4);
   position: relative;
+}
+
+.connect4-token {
+  display: block;
+  width: 86%;
+  height: 86%;
+  margin: auto;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: drop-shadow(0 8px 14px rgba(0,0,0,0.28));
+}
+
+.connect4-token-user {
+  background-image: var(--game-token-user, none);
+}
+
+.connect4-token-spiritkin {
+  background-image: var(--game-token-spirit, none);
 }
 .go-cell {
   position: relative;

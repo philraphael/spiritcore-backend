@@ -1,0 +1,256 @@
+{
+  "source": "a_collection_of_high_quality_3d_rendered_digital.png",
+  "note": "Cropped implementation-ready reference assets from a premium concept sheet. Use as thematic placeholders/reference until isolated transparent renders are generated.",
+  "assets": [
+    {
+      "file": "boards/chess_board_lyra_base.png",
+      "box": [
+        60,
+        20,
+        560,
+        330
+      ],
+      "purpose": "boards"
+    },
+    {
+      "file": "boards/connect4_board_waterfall_base.png",
+      "box": [
+        560,
+        20,
+        1015,
+        340
+      ],
+      "purpose": "boards"
+    },
+    {
+      "file": "boards/checkers_board_dragonforge_base.png",
+      "box": [
+        55,
+        540,
+        470,
+        760
+      ],
+      "purpose": "boards"
+    },
+    {
+      "file": "boards/go_board_aquatic_base.png",
+      "box": [
+        830,
+        940,
+        1015,
+        1085
+      ],
+      "purpose": "boards"
+    },
+    {
+      "file": "ui/chess_check_banner.png",
+      "box": [
+        560,
+        375,
+        935,
+        455
+      ],
+      "purpose": "ui"
+    },
+    {
+      "file": "ui/chess_checkmate_banner.png",
+      "box": [
+        560,
+        470,
+        950,
+        550
+      ],
+      "purpose": "ui"
+    },
+    {
+      "file": "ui/generic_you_won_banner_large.png",
+      "box": [
+        540,
+        575,
+        980,
+        665
+      ],
+      "purpose": "ui"
+    },
+    {
+      "file": "ui/generic_you_lost_banner_large.png",
+      "box": [
+        540,
+        675,
+        980,
+        765
+      ],
+      "purpose": "ui"
+    },
+    {
+      "file": "ui/checkers_you_won_banner.png",
+      "box": [
+        95,
+        980,
+        410,
+        1055
+      ],
+      "purpose": "ui"
+    },
+    {
+      "file": "ui/checkers_you_lost_banner.png",
+      "box": [
+        95,
+        1045,
+        410,
+        1120
+      ],
+      "purpose": "ui"
+    },
+    {
+      "file": "ui/your_move_banner.png",
+      "box": [
+        80,
+        1165,
+        405,
+        1235
+      ],
+      "purpose": "ui"
+    },
+    {
+      "file": "ui/spiritkin_thinking_banner.png",
+      "box": [
+        80,
+        1230,
+        425,
+        1305
+      ],
+      "purpose": "ui"
+    },
+    {
+      "file": "ui/modal_frame_premium.png",
+      "box": [
+        55,
+        1325,
+        445,
+        1518
+      ],
+      "purpose": "ui"
+    },
+    {
+      "file": "tokens/connect4_disc_blue.png",
+      "box": [
+        560,
+        785,
+        680,
+        920
+      ],
+      "purpose": "tokens"
+    },
+    {
+      "file": "tokens/connect4_disc_purple.png",
+      "box": [
+        675,
+        785,
+        800,
+        920
+      ],
+      "purpose": "tokens"
+    },
+    {
+      "file": "tokens/connect4_disc_darkblue.png",
+      "box": [
+        820,
+        785,
+        1015,
+        920
+      ],
+      "purpose": "tokens"
+    },
+    {
+      "file": "tokens/go_stones_set.png",
+      "box": [
+        825,
+        940,
+        1015,
+        1085
+      ],
+      "purpose": "tokens"
+    },
+    {
+      "file": "tokens/tictactoe_tokens_forest_set.png",
+      "box": [
+        705,
+        1130,
+        1015,
+        1230
+      ],
+      "purpose": "tokens"
+    },
+    {
+      "file": "pieces/chess_pieces_set.png",
+      "box": [
+        70,
+        370,
+        590,
+        535
+      ],
+      "purpose": "pieces"
+    },
+    {
+      "file": "pieces/checkers_pieces_set.png",
+      "box": [
+        85,
+        790,
+        495,
+        960
+      ],
+      "purpose": "pieces"
+    },
+    {
+      "file": "fx/portal_beam_fx.png",
+      "box": [
+        530,
+        930,
+        770,
+        1105
+      ],
+      "purpose": "fx"
+    },
+    {
+      "file": "fx/move_highlight_ring.png",
+      "box": [
+        520,
+        280,
+        700,
+        380
+      ],
+      "purpose": "fx"
+    },
+    {
+      "file": "fx/tictactoe_glow_marks.png",
+      "box": [
+        445,
+        1125,
+        715,
+        1275
+      ],
+      "purpose": "fx"
+    },
+    {
+      "file": "ships/battleship_forge_ships_set.png",
+      "box": [
+        495,
+        1320,
+        1015,
+        1515
+      ],
+      "purpose": "ships"
+    },
+    {
+      "file": "concepts/full_asset_sheet_reference.png",
+      "box": [
+        0,
+        0,
+        1024,
+        1536
+      ],
+      "purpose": "concepts"
+    }
+  ]
+}

@@ -66,7 +66,13 @@ function themeVarsToStyle(theme, assetUrls = {}) {
     ...(theme?.cssVars || {}),
     "--game-room-art": cssUrlValue(assetUrls.roomUrl),
     "--game-board-art": cssUrlValue(assetUrls.boardUrl),
-    "--game-card-art": cssUrlValue(assetUrls.cardUrl)
+    "--game-card-art": cssUrlValue(assetUrls.cardUrl),
+    "--game-accent-art": cssUrlValue(assetUrls.accentUrl),
+    "--game-token-user": cssUrlValue(assetUrls.tokenUserUrl),
+    "--game-token-spirit": cssUrlValue(assetUrls.tokenSpiritUrl),
+    "--game-token-accent": cssUrlValue(assetUrls.tokenAccentUrl),
+    "--game-overlay-fx": cssUrlValue(assetUrls.overlayUrl),
+    "--game-modal-frame": cssUrlValue(assetUrls.frameUrl)
   };
   return Object.entries(vars)
     .map(([key, value]) => `${key}: ${value}`)
@@ -102,11 +108,35 @@ function withThemeFrame(content, type, theme, extraClass = "") {
   const boardAsset = resolveGameAsset(type, "board");
   const roomAsset = resolveGameAsset(type, "room");
   const cardAsset = resolveGameAsset(type, "cards");
+  const accentAsset =
+    resolveGameAsset(type, "pieces", theme?.boardVariant || "default") ||
+    resolveGameAsset(type, "pieces", "default") ||
+    resolveGameAsset(type, "pieces", "user") ||
+    resolveGameAsset(type, "pieces", "shipSet") ||
+    cardAsset;
+  const tokenUserAsset = resolveGameAsset(type, "pieces", "user");
+  const tokenSpiritAsset = resolveGameAsset(type, "pieces", "spiritkin");
+  const tokenAccentAsset = resolveGameAsset(type, "pieces", "accent");
+  const overlayAsset =
+    resolveGameAsset(type, "overlays", "moveGlow") ||
+    resolveGameAsset(type, "overlays", "dropTrail") ||
+    resolveGameAsset(type, "overlays", "selection") ||
+    resolveGameAsset(type, "overlays", "winLine") ||
+    resolveGameAsset(type, "overlays", "hoshi") ||
+    resolveGameAsset(type, "overlays", "sonar") ||
+    resolveGameAsset(type, "overlays", "frame");
+  const frameAsset = resolveGameAsset(type, "ui", "frame");
   return `
     <div class="${classes.join(" ")}" data-game-theme="${type}" data-associated-spiritkin="${theme.associatedSpiritkin}" ${assetAttrs} style="${themeVarsToStyle(theme, {
       boardUrl: boardAsset?.publicPath,
       roomUrl: roomAsset?.publicPath,
-      cardUrl: cardAsset?.publicPath
+      cardUrl: cardAsset?.publicPath,
+      accentUrl: accentAsset?.publicPath,
+      tokenUserUrl: tokenUserAsset?.publicPath,
+      tokenSpiritUrl: tokenSpiritAsset?.publicPath,
+      tokenAccentUrl: tokenAccentAsset?.publicPath,
+      overlayUrl: overlayAsset?.publicPath,
+      frameUrl: frameAsset?.publicPath
     })}">
       ${content}
     </div>
@@ -1053,7 +1083,15 @@ export const SpiritverseGames = {
           ${Array.from({ length: 7 }, (_, col) => `<button class="sv-connect4-drop" data-action="connect4-column-click" data-col="${col}" ${!isUsersTurn ? "disabled" : ""}>Drop</button>`).join('')}
         </div>
         <div class="sv-connect4-grid">
-          ${board.map((cell, idx) => `<button class="sv-mini-cell connect4-cell ${cell === 'U' ? 'user' : cell === 'S' ? 'spiritkin' : ''}" data-action="connect4-column-click" data-col="${idx % 7}" ${!isUsersTurn ? "disabled" : ""}>${cell === 'U' ? '●' : cell === 'S' ? '◉' : ''}</button>`).join('')}
+          ${board.map((cell, idx) => {
+            const token =
+              cell === 'U'
+                ? '<span class="connect4-token connect4-token-user" aria-hidden="true"></span>'
+                : cell === 'S'
+                  ? '<span class="connect4-token connect4-token-spiritkin" aria-hidden="true"></span>'
+                  : '';
+            return `<button class="sv-mini-cell connect4-cell ${cell === 'U' ? 'user' : cell === 'S' ? 'spiritkin' : ''}" data-action="connect4-column-click" data-col="${idx % 7}" ${!isUsersTurn ? "disabled" : ""}>${token}</button>`;
+          }).join('')}
         </div>
         <div class="sv-mini-caption">${gameData.result?.isDraw ? 'The board filled into a draw.' : gameData.winner ? `${gameData.winner === 'U' ? 'You' : 'Spiritkin'} connected four.` : (isUsersTurn ? 'Drop a star into any column.' : 'The Spiritkin is reading the column structure.')}</div>
       </div>

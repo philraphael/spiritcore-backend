@@ -50,6 +50,8 @@ const OPERATOR_CONSOLE_DIR = path.join(__dirname, "operator-console");
 const USER_APP_DIR = path.join(__dirname, "spiritkins-app");
 const WORLD_ART_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "photos");
 const GAME_THEME_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "Game_Themes");
+const GAME_CONCEPT_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "spiritverse_game_concept_assets", "spiritverse_game_concepts");
+const PREMIUM_GAME_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "spiritverse_premium_game_asset_pack");
 const SPIRITVERSE_APP_BUILD = "20260417033000";
 
 const PORT = config.port;
@@ -100,6 +102,26 @@ function getStaticAssetMimeType(filePath) {
   if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
   if (ext === ".webp") return "image/webp";
   return "application/octet-stream";
+}
+
+async function sendStaticAssetFromRoot(reply, rootDir, requestedPath) {
+  const requested = String(requestedPath || "").replace(/\\/g, "/");
+  if (!requested || requested.includes("..")) {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
+
+  const resolvedPath = path.resolve(rootDir, requested);
+  const normalizedRoot = `${path.resolve(rootDir)}${path.sep}`;
+  if (!resolvedPath.startsWith(normalizedRoot)) {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
+
+  try {
+    const content = await readFile(resolvedPath);
+    return reply.type(getStaticAssetMimeType(resolvedPath)).send(content);
+  } catch (_err) {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
 }
 
 function setAdminSessionCookie(req, reply) {
@@ -277,23 +299,15 @@ app.get("/app/data/:asset", async (req, reply) => {
 });
 
 app.get("/app/game-theme-assets/*", async (req, reply) => {
-  const requested = String(req.params["*"] || "").replace(/\\/g, "/");
-  if (!requested || requested.includes("..")) {
-    return reply.code(404).send({ ok: false, error: "Not found" });
-  }
+  return sendStaticAssetFromRoot(reply, GAME_THEME_ASSET_DIR, req.params["*"]);
+});
 
-  const resolvedPath = path.resolve(GAME_THEME_ASSET_DIR, requested);
-  const normalizedRoot = `${path.resolve(GAME_THEME_ASSET_DIR)}${path.sep}`;
-  if (!resolvedPath.startsWith(normalizedRoot)) {
-    return reply.code(404).send({ ok: false, error: "Not found" });
-  }
+app.get("/app/game-concept-assets/*", async (req, reply) => {
+  return sendStaticAssetFromRoot(reply, GAME_CONCEPT_ASSET_DIR, req.params["*"]);
+});
 
-  try {
-    const content = await readFile(resolvedPath);
-    return reply.type(getStaticAssetMimeType(resolvedPath)).send(content);
-  } catch (_err) {
-    return reply.code(404).send({ ok: false, error: "Not found" });
-  }
+app.get("/app/premium-game-assets/*", async (req, reply) => {
+  return sendStaticAssetFromRoot(reply, PREMIUM_GAME_ASSET_DIR, req.params["*"]);
 });
 
 // Serve portrait images from public/portraits

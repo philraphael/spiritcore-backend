@@ -59,6 +59,7 @@ import {
   uuid
 } from "./app-helpers.js";
 import { spiritkins as CANON_SPIRITKINS, realms as CANON_REALMS, charter as CANON_CHARTER, echoes as CANON_ECHOES, governance as CANON_GOVERNANCE, world as CANON_WORLD, bondStages as CANON_BOND_STAGES } from "./data/spiritverseCanon.js";
+import { resolveGameAssetUrl } from "./data/gameAssetManifest.js";
 
 function createSpiritverseGamesFallback() {
   return {
@@ -5386,6 +5387,50 @@ function buildGameOutcomeSummary(game, spiritkinName) {
   return { headline: "Game Complete", detail: result.label || "The game is complete." };
 }
 
+function cssAssetUrl(url) {
+  if (!url) return "";
+  return `url("${String(url).replace(/"/g, '\\"')}")`;
+}
+
+function buildInlineStyle(styleMap = {}) {
+  return Object.entries(styleMap)
+    .filter(([, value]) => value)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("; ");
+}
+
+function getGameUiAssets(gameType) {
+  if (!gameType) return null;
+  return {
+    yourMove: resolveGameAssetUrl(gameType, "ui", "yourMove"),
+    thinking: resolveGameAssetUrl(gameType, "ui", "thinking"),
+    win: resolveGameAssetUrl(gameType, "ui", "win"),
+    loss: resolveGameAssetUrl(gameType, "ui", "loss"),
+    check: resolveGameAssetUrl(gameType, "ui", "check"),
+    checkmate: resolveGameAssetUrl(gameType, "ui", "checkmate"),
+    frame: resolveGameAssetUrl(gameType, "ui", "frame"),
+    moveFx:
+      resolveGameAssetUrl(gameType, "overlays", "moveGlow") ||
+      resolveGameAssetUrl(gameType, "overlays", "dropTrail") ||
+      resolveGameAssetUrl(gameType, "overlays", "selection") ||
+      resolveGameAssetUrl(gameType, "overlays", "winLine") ||
+      resolveGameAssetUrl(gameType, "overlays", "hoshi") ||
+      resolveGameAssetUrl(gameType, "overlays", "sonar") ||
+      resolveGameAssetUrl(gameType, "overlays", "frame")
+  };
+}
+
+function buildGameChromeStyle(gameType, options = {}) {
+  const assets = getGameUiAssets(gameType);
+  if (!assets) return "";
+  const style = buildInlineStyle({
+    "--game-ui-banner": cssAssetUrl(options.bannerKey ? assets[options.bannerKey] : ""),
+    "--game-ui-frame": cssAssetUrl(options.includeFrame ? assets.frame : ""),
+    "--game-board-fx": cssAssetUrl(options.includeFx ? assets.moveFx : "")
+  });
+  return style;
+}
+
 function getGameHelpContent(gameType, instructions = "") {
   const guides = {
     chess: {
@@ -6973,7 +7018,10 @@ function buildChatView() {
                   ${(() => {
                     const outcome = buildGameOutcomeSummary(state.activeGame, spiritkin.name);
                     return outcome ? `
-                      <div class="game-outcome-banner ${state.activeGame.result?.isDraw ? 'draw' : state.activeGame.result?.winner === 'user' ? 'win' : 'loss'}">
+                      <div class="game-outcome-banner ${state.activeGame.result?.isDraw ? 'draw' : state.activeGame.result?.winner === 'user' ? 'win' : 'loss'}" style="${buildGameChromeStyle(state.activeGame.type, {
+                        bannerKey: state.activeGame.result?.isDraw ? '' : (state.activeGame.result?.winner === 'user' ? 'win' : 'loss'),
+                        includeFrame: true
+                      })}">
                         <div class="game-outcome-title">${esc(outcome.headline)}</div>
                         <div class="game-outcome-detail">${esc(outcome.detail)}</div>
                         <div class="game-outcome-actions">
@@ -7007,7 +7055,9 @@ function buildChatView() {
                       : `<button class="btn btn-ghost btn-xs game-end-btn" data-action="clear-finished-game">Close</button>`}
                   </div>
 
-                  <div class="game-turn-badge ${state.activeGame.status === 'ended' ? 'turn-finished' : state.activeGame.turn === 'user' ? 'turn-user' : 'turn-spiritkin'}">
+                  <div class="game-turn-badge ${state.activeGame.status === 'ended' ? 'turn-finished' : state.activeGame.turn === 'user' ? 'turn-user' : 'turn-spiritkin'}" style="${buildGameChromeStyle(state.activeGame.type, {
+                    bannerKey: state.activeGame.status === 'ended' ? '' : (state.activeGame.turn === 'user' ? 'yourMove' : 'thinking')
+                  })}">
                     ${state.activeGame.status === 'ended'
                       ? (state.activeGame.result?.isDraw
                         ? 'Finished in a draw'
@@ -7020,7 +7070,10 @@ function buildChatView() {
                   </div>
 
                   ${gameFeedback ? `
-                    <div class="game-feedback-strip ${esc(gameFeedback.phase || "ready")}">
+                    <div class="game-feedback-strip ${esc(gameFeedback.phase || "ready")}" style="${buildGameChromeStyle(state.activeGame.type, {
+                      bannerKey: state.gameLoading ? 'thinking' : 'yourMove',
+                      includeFx: true
+                    })}">
                       <div class="game-feedback-label">${state.gameLoading ? `${esc(spiritkin.name)} is thinking` : "Board feedback"}</div>
                       <div class="game-feedback-body">
                         ${state.gameLoading ? `<span class="typing-dots subtle"><span></span><span></span><span></span></span>` : ""}
@@ -7038,7 +7091,10 @@ function buildChatView() {
                   ` : ''}
 
                   <!-- Visual game board — rendered by SpiritverseGames after DOM update -->
-                  <div class="game-board-container ${state.gameLoading ? 'is-thinking' : ''}">
+                  <div class="game-board-container ${state.gameLoading ? 'is-thinking' : ''}" style="${buildGameChromeStyle(state.activeGame.type, {
+                    includeFrame: true,
+                    includeFx: true
+                  })}">
                     <div id="spiritverse-game-board"></div>
                   </div>
                   

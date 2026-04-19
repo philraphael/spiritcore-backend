@@ -1,0 +1,876 @@
+{
+  "asset_pack": "spiritverse_codex_final_asset_pack",
+  "version": "phase2",
+  "items": [
+    {
+      "file": "rooms/room_chess_lyra_celestial_scene.png",
+      "category": "rooms",
+      "source_box": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "recommended_use": "lyra chess celestial room backdrop / loading scene",
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "file": "rooms/room_battleship_forge_scene.png",
+      "category": "rooms",
+      "source_box": [
+        512,
+        0,
+        1024,
+        512
+      ],
+      "recommended_use": "forge battleship room backdrop / loading scene",
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "file": "rooms/room_connect4_waterfall_scene.png",
+      "category": "rooms",
+      "source_box": [
+        1024,
+        0,
+        1536,
+        512
+      ],
+      "recommended_use": "waterfall connect four room backdrop / loading scene",
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "file": "rooms/room_checkers_dragonforge_scene.png",
+      "category": "rooms",
+      "source_box": [
+        0,
+        512,
+        512,
+        1024
+      ],
+      "recommended_use": "dragonforge checkers room backdrop / loading scene",
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "file": "rooms/room_go_aquatic_scene.png",
+      "category": "rooms",
+      "source_box": [
+        512,
+        512,
+        1024,
+        1024
+      ],
+      "recommended_use": "aquatic go room backdrop / loading scene",
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "file": "rooms/room_tictactoe_forest_scene.png",
+      "category": "rooms",
+      "source_box": [
+        1024,
+        512,
+        1536,
+        1024
+      ],
+      "recommended_use": "forest tic tac toe room backdrop / loading scene",
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "file": "boards/chess_board_base_v1.png",
+      "category": "boards",
+      "source_box": [
+        25,
+        30,
+        395,
+        330
+      ],
+      "recommended_use": "primary chess board surface",
+      "size": [
+        370,
+        300
+      ]
+    },
+    {
+      "file": "boards/connect4_board_base_v1.png",
+      "category": "boards",
+      "source_box": [
+        585,
+        35,
+        995,
+        410
+      ],
+      "recommended_use": "primary connect four board surface",
+      "size": [
+        410,
+        375
+      ]
+    },
+    {
+      "file": "boards/checkers_board_base_v1.png",
+      "category": "boards",
+      "source_box": [
+        40,
+        500,
+        430,
+        820
+      ],
+      "recommended_use": "primary checkers board surface",
+      "size": [
+        390,
+        320
+      ]
+    },
+    {
+      "file": "tokens/go_stone_layout_preview_v1.png",
+      "category": "tokens",
+      "source_box": [
+        35,
+        825,
+        425,
+        1085
+      ],
+      "recommended_use": "go stone layout reference / preview state",
+      "size": [
+        390,
+        260
+      ]
+    },
+    {
+      "file": "ships/battleship_ship_set_v1.png",
+      "category": "ships",
+      "source_box": [
+        360,
+        1030,
+        1000,
+        1290
+      ],
+      "recommended_use": "battleship fleet set",
+      "size": [
+        640,
+        260
+      ]
+    },
+    {
+      "file": "ui/check_banner_v1.png",
+      "category": "ui",
+      "source_box": [
+        450,
+        335,
+        865,
+        405
+      ],
+      "recommended_use": "check banner",
+      "size": [
+        415,
+        70
+      ]
+    },
+    {
+      "file": "ui/checkmate_banner_v1.png",
+      "category": "ui",
+      "source_box": [
+        450,
+        405,
+        865,
+        475
+      ],
+      "recommended_use": "checkmate banner",
+      "size": [
+        415,
+        70
+      ]
+    },
+    {
+      "file": "ui/you_won_banner_large_v1.png",
+      "category": "ui",
+      "source_box": [
+        650,
+        505,
+        1010,
+        595
+      ],
+      "recommended_use": "large you won banner",
+      "size": [
+        360,
+        90
+      ]
+    },
+    {
+      "file": "ui/you_lost_banner_large_v1.png",
+      "category": "ui",
+      "source_box": [
+        650,
+        595,
+        1010,
+        685
+      ],
+      "recommended_use": "large you lost banner",
+      "size": [
+        360,
+        90
+      ]
+    },
+    {
+      "file": "ui/you_won_banner_small_v1.png",
+      "category": "ui",
+      "source_box": [
+        625,
+        785,
+        955,
+        855
+      ],
+      "recommended_use": "small you won banner",
+      "size": [
+        330,
+        70
+      ]
+    },
+    {
+      "file": "ui/you_lost_banner_small_v1.png",
+      "category": "ui",
+      "source_box": [
+        625,
+        855,
+        955,
+        925
+      ],
+      "recommended_use": "small you lost banner",
+      "size": [
+        330,
+        70
+      ]
+    },
+    {
+      "file": "ui/your_move_banner_v1.png",
+      "category": "ui",
+      "source_box": [
+        20,
+        1180,
+        420,
+        1260
+      ],
+      "recommended_use": "your move banner",
+      "size": [
+        400,
+        80
+      ]
+    },
+    {
+      "file": "ui/spiritkin_thinking_banner_v1.png",
+      "category": "ui",
+      "source_box": [
+        20,
+        1260,
+        420,
+        1340
+      ],
+      "recommended_use": "spiritkin thinking banner",
+      "size": [
+        400,
+        80
+      ]
+    },
+    {
+      "file": "ui/modal_frame_premium_v1.png",
+      "category": "ui",
+      "source_box": [
+        20,
+        1040,
+        370,
+        1175
+      ],
+      "recommended_use": "modal or panel frame",
+      "size": [
+        350,
+        135
+      ]
+    },
+    {
+      "file": "fx/portal_beam_fx_blue_v1.png",
+      "category": "fx",
+      "source_box": [
+        525,
+        460,
+        790,
+        725
+      ],
+      "recommended_use": "portal beam / summon effect",
+      "size": [
+        265,
+        265
+      ]
+    },
+    {
+      "file": "fx/move_highlight_ring_blue_v1.png",
+      "category": "fx",
+      "source_box": [
+        375,
+        1035,
+        560,
+        1190
+      ],
+      "recommended_use": "move highlight ring blue",
+      "size": [
+        185,
+        155
+      ]
+    },
+    {
+      "file": "fx/tictactoe_glow_marks_v1.png",
+      "category": "fx",
+      "source_box": [
+        455,
+        1180,
+        615,
+        1340
+      ],
+      "recommended_use": "glow marks / impact fx",
+      "size": [
+        160,
+        160
+      ]
+    },
+    {
+      "file": "tokens/connect4_disc_blue_single_v1.png",
+      "category": "tokens",
+      "source_box": [
+        510,
+        350,
+        620,
+        475
+      ],
+      "recommended_use": "single blue connect four disc",
+      "size": [
+        110,
+        125
+      ]
+    },
+    {
+      "file": "tokens/connect4_disc_purple_single_v1.png",
+      "category": "tokens",
+      "source_box": [
+        620,
+        350,
+        735,
+        475
+      ],
+      "recommended_use": "single purple connect four disc",
+      "size": [
+        115,
+        125
+      ]
+    },
+    {
+      "file": "tokens/connect4_disc_set_v1.png",
+      "category": "tokens",
+      "source_box": [
+        500,
+        340,
+        795,
+        520
+      ],
+      "recommended_use": "connect four disc set",
+      "size": [
+        295,
+        180
+      ]
+    },
+    {
+      "file": "tokens/tictactoe_token_set_v1.png",
+      "category": "tokens",
+      "source_box": [
+        565,
+        1170,
+        895,
+        1365
+      ],
+      "recommended_use": "tic tac toe token set",
+      "size": [
+        330,
+        195
+      ]
+    },
+    {
+      "file": "pieces/chess_piece_lineup_v1.png",
+      "category": "pieces",
+      "source_box": [
+        20,
+        335,
+        445,
+        495
+      ],
+      "recommended_use": "chess piece lineup reference",
+      "size": [
+        425,
+        160
+      ]
+    },
+    {
+      "file": "pieces/checkers_piece_set_v1.png",
+      "category": "pieces",
+      "source_box": [
+        25,
+        655,
+        410,
+        815
+      ],
+      "recommended_use": "checkers piece set",
+      "size": [
+        385,
+        160
+      ]
+    },
+    {
+      "file": "concepts/full_asset_sheet_reference_v1.png",
+      "category": "concepts",
+      "source_box": [
+        0,
+        0,
+        1024,
+        1536
+      ],
+      "recommended_use": "full premium asset sheet reference v1",
+      "size": [
+        1024,
+        1536
+      ]
+    },
+    {
+      "file": "boards/chess_board_base_v2.png",
+      "category": "boards",
+      "source_box": [
+        20,
+        20,
+        360,
+        280
+      ],
+      "recommended_use": "alternate chess board surface",
+      "size": [
+        340,
+        260
+      ]
+    },
+    {
+      "file": "boards/checkers_board_base_v2.png",
+      "category": "boards",
+      "source_box": [
+        15,
+        330,
+        380,
+        620
+      ],
+      "recommended_use": "alternate checkers board surface",
+      "size": [
+        365,
+        290
+      ]
+    },
+    {
+      "file": "boards/connect4_board_base_v2.png",
+      "category": "boards",
+      "source_box": [
+        600,
+        20,
+        1000,
+        390
+      ],
+      "recommended_use": "alternate connect four board surface",
+      "size": [
+        400,
+        370
+      ]
+    },
+    {
+      "file": "pieces/chess_piece_lineup_alt_v2.png",
+      "category": "pieces",
+      "source_box": [
+        20,
+        20,
+        510,
+        160
+      ],
+      "recommended_use": "alternate chess piece lineup",
+      "size": [
+        490,
+        140
+      ]
+    },
+    {
+      "file": "pieces/checkers_piece_set_alt_v2.png",
+      "category": "pieces",
+      "source_box": [
+        20,
+        160,
+        460,
+        330
+      ],
+      "recommended_use": "alternate checkers piece lineup",
+      "size": [
+        440,
+        170
+      ]
+    },
+    {
+      "file": "tokens/connect4_disc_blue_single_v2.png",
+      "category": "tokens",
+      "source_box": [
+        530,
+        370,
+        615,
+        450
+      ],
+      "recommended_use": "alt single blue disc",
+      "size": [
+        85,
+        80
+      ]
+    },
+    {
+      "file": "tokens/connect4_disc_purple_single_v2.png",
+      "category": "tokens",
+      "source_box": [
+        620,
+        370,
+        710,
+        450
+      ],
+      "recommended_use": "alt single purple disc",
+      "size": [
+        90,
+        80
+      ]
+    },
+    {
+      "file": "tokens/connect4_disc_set_v2.png",
+      "category": "tokens",
+      "source_box": [
+        525,
+        340,
+        795,
+        520
+      ],
+      "recommended_use": "alternate connect four disc set",
+      "size": [
+        270,
+        180
+      ]
+    },
+    {
+      "file": "ships/battleship_ship_set_v2.png",
+      "category": "ships",
+      "source_box": [
+        320,
+        820,
+        930,
+        1140
+      ],
+      "recommended_use": "alternate battleship fleet set",
+      "size": [
+        610,
+        320
+      ]
+    },
+    {
+      "file": "tokens/go_stones_set_v2.png",
+      "category": "tokens",
+      "source_box": [
+        35,
+        640,
+        470,
+        865
+      ],
+      "recommended_use": "go stones isolated cluster",
+      "size": [
+        435,
+        225
+      ]
+    },
+    {
+      "file": "ui/check_banner_v2.png",
+      "category": "ui",
+      "source_box": [
+        10,
+        180,
+        430,
+        250
+      ],
+      "recommended_use": "alternate check banner",
+      "size": [
+        420,
+        70
+      ]
+    },
+    {
+      "file": "ui/checkmate_banner_v2.png",
+      "category": "ui",
+      "source_box": [
+        10,
+        250,
+        430,
+        320
+      ],
+      "recommended_use": "alternate checkmate banner",
+      "size": [
+        420,
+        70
+      ]
+    },
+    {
+      "file": "ui/you_lost_banner_orange_v2.png",
+      "category": "ui",
+      "source_box": [
+        650,
+        520,
+        970,
+        600
+      ],
+      "recommended_use": "you lost orange banner",
+      "size": [
+        320,
+        80
+      ]
+    },
+    {
+      "file": "ui/you_won_banner_blue_v2.png",
+      "category": "ui",
+      "source_box": [
+        680,
+        600,
+        960,
+        670
+      ],
+      "recommended_use": "you won blue banner",
+      "size": [
+        280,
+        70
+      ]
+    },
+    {
+      "file": "ui/your_move_banner_v2.png",
+      "category": "ui",
+      "source_box": [
+        20,
+        1160,
+        420,
+        1245
+      ],
+      "recommended_use": "alternate your move banner",
+      "size": [
+        400,
+        85
+      ]
+    },
+    {
+      "file": "ui/spiritkin_thinking_banner_v2.png",
+      "category": "ui",
+      "source_box": [
+        20,
+        1245,
+        420,
+        1325
+      ],
+      "recommended_use": "alternate spiritkin thinking banner",
+      "size": [
+        400,
+        80
+      ]
+    },
+    {
+      "file": "ui/modal_frame_premium_v2.png",
+      "category": "ui",
+      "source_box": [
+        10,
+        1030,
+        350,
+        1170
+      ],
+      "recommended_use": "alternate modal frame",
+      "size": [
+        340,
+        140
+      ]
+    },
+    {
+      "file": "fx/move_highlight_ring_gold_v2.png",
+      "category": "fx",
+      "source_box": [
+        20,
+        820,
+        190,
+        960
+      ],
+      "recommended_use": "gold move highlight ring",
+      "size": [
+        170,
+        140
+      ]
+    },
+    {
+      "file": "fx/crosshair_glow_v2.png",
+      "category": "fx",
+      "source_box": [
+        490,
+        1120,
+        620,
+        1260
+      ],
+      "recommended_use": "crosshair / target glow",
+      "size": [
+        130,
+        140
+      ]
+    },
+    {
+      "file": "fx/portal_beam_fx_blue_v2.png",
+      "category": "fx",
+      "source_box": [
+        745,
+        420,
+        920,
+        625
+      ],
+      "recommended_use": "alternate portal beam",
+      "size": [
+        175,
+        205
+      ]
+    },
+    {
+      "file": "tokens/tictactoe_token_set_v2.png",
+      "category": "tokens",
+      "source_box": [
+        720,
+        1160,
+        1005,
+        1370
+      ],
+      "recommended_use": "alternate tic tac toe token set",
+      "size": [
+        285,
+        210
+      ]
+    },
+    {
+      "file": "concepts/full_asset_sheet_reference_v2.png",
+      "category": "concepts",
+      "source_box": [
+        0,
+        0,
+        1024,
+        1536
+      ],
+      "recommended_use": "full premium asset sheet reference v2",
+      "size": [
+        1024,
+        1536
+      ]
+    },
+    {
+      "file": "concepts/chess_lyra_theme_reference_scene.png",
+      "category": "concepts",
+      "source_box": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "recommended_use": "concept board scene for Lyra chess",
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "file": "concepts/checkers_dragonforge_theme_reference_scene.png",
+      "category": "concepts",
+      "source_box": [
+        0,
+        512,
+        512,
+        1024
+      ],
+      "recommended_use": "concept board scene for dragonforge checkers",
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "file": "concepts/connect4_waterfall_theme_reference_scene.png",
+      "category": "concepts",
+      "source_box": [
+        1024,
+        0,
+        1536,
+        512
+      ],
+      "recommended_use": "concept board scene for waterfall connect four",
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "file": "concepts/go_aquatic_theme_reference_scene.png",
+      "category": "concepts",
+      "source_box": [
+        512,
+        512,
+        1024,
+        1024
+      ],
+      "recommended_use": "concept board scene for aquatic go",
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "file": "concepts/tictactoe_forest_theme_reference_scene.png",
+      "category": "concepts",
+      "source_box": [
+        1024,
+        512,
+        1536,
+        1024
+      ],
+      "recommended_use": "concept board scene for forest tic tac toe",
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "file": "concepts/battleship_forge_theme_reference_scene.png",
+      "category": "concepts",
+      "source_box": [
+        512,
+        0,
+        1024,
+        512
+      ],
+      "recommended_use": "concept board scene for forge battleship",
+      "size": [
+        512,
+        512
+      ]
+    }
+  ]
+}
