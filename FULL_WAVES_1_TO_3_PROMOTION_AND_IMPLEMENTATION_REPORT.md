@@ -251,7 +251,8 @@ The ACTIVE index now includes the full wave3 promoted asset set.
 
 ## Incoming Status
 
-`INCOMING` is now clean.
+`INCOMING` is clean for waves 1 to 3.
 
-- no processed wave folders remain in `INCOMING`
-- all three waves were classified and moved out
+- no processed wave 1, wave 2, or wave 3 folders remain in `INCOMING`
+- all three requested waves were classified and moved out
+- `INCOMING/wave4a_production_assets` remains as a new unprocessed intake and was not part of this waves 1 to 3 pass
