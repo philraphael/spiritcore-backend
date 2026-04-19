@@ -316,6 +316,79 @@ function parseFEN(fen) {
   return board;
 }
 
+function getBoardPieceAtSquare(board, square) {
+  if (!board || !square) return null;
+  const file = 'abcdefgh'.indexOf(String(square[0] || '').toLowerCase());
+  const rank = 8 - parseInt(String(square[1] || ''), 10);
+  if (file < 0 || Number.isNaN(rank) || rank < 0 || rank > 7) return null;
+  return board[rank]?.[file] || null;
+}
+
+function buildChessPieceMarkup(piece, themeId) {
+  if (!piece) return "";
+  const pieceKey = `${piece.color}${piece.type}`;
+  const themePieces = CHESS_PIECE_THEMES[themeId] || CHESS_PIECE_THEMES.crown;
+  const pieceSvg = themePieces[pieceKey] || "";
+  if (!pieceSvg) return "";
+  return `<div class="chess-piece ${piece.color === 'w' ? 'piece-white' : 'piece-black'}">${pieceSvg}</div>`;
+}
+
+function playMoveSound(detail = {}) {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent("spiritverse:chess-move-sound", { detail }));
+  } catch {}
+}
+
+function animateCommittedChessMove(target, previousFen, nextFen, lastMove, themeId) {
+  if (!target || !previousFen || !nextFen || !lastMove?.from || !lastMove?.to) return;
+  const boardEl = target.querySelector('#chess-board');
+  if (!boardEl) return;
+  const fromCell = target.querySelector(`.chess-cell[data-sq="${lastMove.from}"]`);
+  const toCell = target.querySelector(`.chess-cell[data-sq="${lastMove.to}"]`);
+  if (!fromCell || !toCell) return;
+
+  const previousBoard = parseFEN(previousFen);
+  const nextBoard = parseFEN(nextFen);
+  const movingPiece = getBoardPieceAtSquare(previousBoard, lastMove.from) || getBoardPieceAtSquare(nextBoard, lastMove.to);
+  const capturedPiece = getBoardPieceAtSquare(previousBoard, lastMove.to);
+  const nextPieceEl = toCell.querySelector('.chess-piece');
+  if (!movingPiece || !nextPieceEl) return;
+
+  const fromRect = fromCell.getBoundingClientRect();
+  const toRect = toCell.getBoundingClientRect();
+  if (!fromRect.width || !toRect.width) return;
+
+  const ghost = document.createElement('div');
+  ghost.className = `chess-piece chess-piece-ghost ${movingPiece.color === 'w' ? 'piece-white' : 'piece-black'}`;
+  ghost.innerHTML = nextPieceEl.innerHTML;
+  ghost.style.left = `${fromRect.left}px`;
+  ghost.style.top = `${fromRect.top}px`;
+  ghost.style.width = `${fromRect.width}px`;
+  ghost.style.height = `${fromRect.height}px`;
+  document.body.appendChild(ghost);
+
+  nextPieceEl.classList.add('chess-piece-hidden');
+
+  if (capturedPiece && capturedPiece.color !== movingPiece.color) {
+    toCell.classList.add('chess-capture-flash');
+    window.setTimeout(() => toCell.classList.remove('chess-capture-flash'), 260);
+  }
+
+  window.requestAnimationFrame(() => {
+    ghost.classList.add('is-moving');
+    ghost.style.transform = `translate(${toRect.left - fromRect.left}px, ${toRect.top - fromRect.top}px) scale(1)`;
+  });
+
+  window.setTimeout(() => {
+    nextPieceEl.classList.remove('chess-piece-hidden');
+    nextPieceEl.classList.add('chess-piece-landed');
+    window.setTimeout(() => nextPieceEl.classList.remove('chess-piece-landed'), 240);
+    ghost.remove();
+    playMoveSound({ from: lastMove.from, to: lastMove.to, piece: `${movingPiece.color}${movingPiece.type}` });
+  }, 230);
+}
+
 function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, onSquareClick, isExpanded = false, theme = resolveGameTheme("chess"), isInteractive = true) {
   const board = parseFEN(fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
   const files = ['a','b','c','d','e','f','g','h'];
@@ -374,7 +447,16 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
 
   const target = resolveTarget(container);
   if (!target) return;
+  const previousFen = target.dataset.renderFen || '';
+  const nextMoveSignature = lastMove?.from && lastMove?.to ? `${lastMove.from}-${lastMove.to}-${fen}` : '';
+  const previousMoveSignature = target.dataset.lastMoveSignature || '';
   target.innerHTML = withThemeFrame(html, 'chess', theme, `${isExpanded ? 'sv-theme-expanded ' : ''}chess-showcase-shell`.trim());
+  target.dataset.renderFen = fen || '';
+  target.dataset.lastMoveSignature = nextMoveSignature;
+
+  if (nextMoveSignature && previousFen && previousMoveSignature !== nextMoveSignature) {
+    animateCommittedChessMove(target, previousFen, fen, lastMove, themeId);
+  }
 
   if (!isExpanded) {
     const expandBtn = target.querySelector('[data-action="chess-expand"]');

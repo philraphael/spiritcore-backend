@@ -5120,10 +5120,18 @@ async function executeGameMove(move, options = {}) {
       if (!didCanonicalGameApplyMove(previousGame, canonicalGame, move)) {
         throw new Error("Game state was not committed.");
       }
-      state.activeGame = canonicalGame;
       const latestHistory = Array.isArray(canonicalGame?.history) && canonicalGame.history.length
         ? canonicalGame.history[canonicalGame.history.length - 1]
         : null;
+      const shouldHoldChessReply =
+        canonicalGame?.type === "chess" &&
+        latestHistory?.player === "spiritkin" &&
+        canonicalGame?.status === "active";
+      if (shouldHoldChessReply) {
+        const replyDelayMs = 360 + Math.floor(Math.random() * 180);
+        await new Promise((resolve) => window.setTimeout(resolve, replyDelayMs));
+      }
+      state.activeGame = canonicalGame;
       const resolvedGameReply =
         data.spiritkinMessage ||
         buildGameOutcomeReaction(state.selectedSpiritkin.name, state.activeGame) ||
