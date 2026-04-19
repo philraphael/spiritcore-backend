@@ -9,6 +9,36 @@
 
 export async function analyticsRoutes(fastify, opts) {
   const { feedbackService, analyticsService, supabase } = opts;
+  const requireAdminAccess = fastify.requireAdminAccess;
+
+  async function safeSelectMetrics() {
+    try {
+      const { data, error } = await supabase
+        .from("spiritkin_metrics")
+        .select("*")
+        .order("total_interactions", { ascending: false });
+
+      if (error) throw error;
+      return data ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  async function safeRecentInteractionCount() {
+    try {
+      const since24h = new Date(Date.now() - 86400000).toISOString();
+      const { count, error } = await supabase
+        .from("analytics_interactions")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", since24h);
+
+      if (error) throw error;
+      return count ?? 0;
+    } catch {
+      return 0;
+    }
+  }
 
   // ── POST /v1/feedback ──────────────────────────────────────────────────────
   fastify.post("/v1/feedback", {
@@ -65,7 +95,7 @@ export async function analyticsRoutes(fastify, opts) {
   });
 
   // ── GET /v1/analytics/spiritkin/:name ──────────────────────────────────────
-  fastify.get("/v1/analytics/spiritkin/:name", async (req, reply) => {
+  fastify.get("/v1/analytics/spiritkin/:name", { preHandler: requireAdminAccess }, async (req, reply) => {
     const { name } = req.params;
     try {
       const { data, error } = await supabase
@@ -84,26 +114,15 @@ export async function analyticsRoutes(fastify, opts) {
   });
 
   // ── GET /v1/analytics/summary ─────────────────────────────────────────────
-  fastify.get("/v1/analytics/summary", async (req, reply) => {
+  fastify.get("/v1/analytics/summary", { preHandler: requireAdminAccess }, async (req, reply) => {
     try {
-      const { data: metrics, error: metricsErr } = await supabase
-        .from("spiritkin_metrics")
-        .select("*")
-        .order("total_interactions", { ascending: false });
-
-      if (metricsErr) throw new Error(metricsErr.message);
+      const metrics = await safeSelectMetrics();
 
       // Aggregate totals
-      const totalInteractions = (metrics ?? []).reduce((s, m) => s + (m.total_interactions ?? 0), 0);
-      const totalSessions     = (metrics ?? []).reduce((s, m) => s + (m.total_sessions ?? 0), 0);
-      const totalFeedback     = (metrics ?? []).reduce((s, m) => s + (m.total_feedback_count ?? 0), 0);
-
-      // Recent interaction count (last 24h)
-      const since24h = new Date(Date.now() - 86400000).toISOString();
-      const { count: recent24h } = await supabase
-        .from("analytics_interactions")
-        .select("id", { count: "exact", head: true })
-        .gte("created_at", since24h);
+      const totalInteractions = metrics.reduce((s, m) => s + (m.total_interactions ?? 0), 0);
+      const totalSessions     = metrics.reduce((s, m) => s + (m.total_sessions ?? 0), 0);
+      const totalFeedback     = metrics.reduce((s, m) => s + (m.total_feedback_count ?? 0), 0);
+      const recent24h = await safeRecentInteractionCount();
 
       return {
         ok: true,
@@ -113,7 +132,7 @@ export async function analyticsRoutes(fastify, opts) {
           total_feedback:     totalFeedback,
           interactions_last_24h: recent24h ?? 0,
         },
-        spiritkins: metrics ?? [],
+        spiritkins: metrics,
       };
     } catch (err) {
       return reply.code(500).send({ ok: false, error: "INTERNAL", message: err.message });

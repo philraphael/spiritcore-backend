@@ -22,6 +22,11 @@ import { AppError } from "../errors.mjs";
 import { nowIso } from "../utils/time.mjs";
 
 export function createMessageService({ supabase }) {
+  function normalizeRole(role) {
+    const normalized = String(role || "").trim().toLowerCase();
+    if (normalized === "spiritkin") return "assistant";
+    return normalized;
+  }
 
   /**
    * Persist a single message turn to the durable ledger.
@@ -34,14 +39,15 @@ export function createMessageService({ supabase }) {
     if (!role) throw new AppError("VALIDATION", "role is required", 400);
     if (!content || typeof content !== "string") throw new AppError("VALIDATION", "content is required", 400);
 
-    const validRoles = ["user", "spiritkin", "system"];
-    if (!validRoles.includes(role)) {
+    const normalizedRole = normalizeRole(role);
+    const validRoles = ["user", "assistant", "spiritkin", "system"];
+    if (!validRoles.includes(normalizedRole)) {
       throw new AppError("VALIDATION", `role must be one of: ${validRoles.join(", ")}`, 400);
     }
 
     const payload = {
       conversation_id: conversationId,
-      role,
+      role: normalizedRole,
       content: content.slice(0, 8000), // hard cap to prevent runaway writes
       client_timestamp: clientTimestamp ?? null,
       created_at: nowIso(),
@@ -81,7 +87,10 @@ export function createMessageService({ supabase }) {
     if (error) throw new AppError("DB", "Failed to fetch messages", 500, error.message);
 
     // Return in chronological order
-    return (data ?? []).reverse();
+    return (data ?? []).reverse().map((entry) => ({
+      ...entry,
+      role: normalizeRole(entry.role),
+    }));
   }
 
   return { persist, fetchRecent };

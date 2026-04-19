@@ -5,8 +5,20 @@
  * GET  /v1/conversations/:userId  — list conversations for a user
  */
 
+function buildOpeningGreeting(spiritkinName) {
+  const normalized = String(spiritkinName || "").trim();
+  const greetings = {
+    Lyra: "This is our first conversation. I'd like to know: what brought you here today?",
+    Raien: "New energy. New possibilities. What's calling you?",
+    Kairo: "A new thread in the tapestry. What does it feel like?",
+    Elaria: "A new record is opening. What truth belongs here first?",
+    Thalassar: "The tide is new tonight. What rises first when you listen inward?",
+  };
+  return greetings[normalized] || "This is our first conversation. What brought you here today?";
+}
+
 export async function conversationRoutes(fastify, opts) {
-  const { conversationService, analyticsService, engagementEngine } = opts;
+  const { conversationService, analyticsService, engagementEngine, messageService, sessionControlService } = opts;
 
   /**
    * POST /v1/conversations
@@ -53,7 +65,40 @@ export async function conversationRoutes(fastify, opts) {
           eventType: "start",
         });
       }
-      return { ok: true, conversation: result, engagement };
+
+      if (messageService && result?.conversation_id) {
+        const greetingText = buildOpeningGreeting(spiritkinName);
+        await messageService.persist({
+          conversationId: result.conversation_id,
+          role: "assistant",
+          content: greetingText,
+        }).catch(() => null);
+      }
+
+      let session = null;
+      if (sessionControlService) {
+        session = await sessionControlService.updateControl({
+          userId,
+          conversationId: result?.conversation_id ?? null,
+          currentSpiritkinName: spiritkinName,
+          currentSurface: "profile",
+          currentMode: "conversation",
+          activeTab: "profile",
+          speechState: { turnPhase: "idle", lastUtteranceId: null },
+        }).catch(() => null);
+
+        if (!session?.session) {
+          session = await sessionControlService.getSnapshot({
+            userId,
+            conversationId: result?.conversation_id ?? null,
+            spiritkinName,
+            currentSurface: "profile",
+            currentMode: "conversation",
+          }).catch(() => null);
+        }
+      }
+
+      return { ok: true, conversation: result, engagement, session: session?.session || null };
     } catch (err) {
       const code = err.httpCode ?? 500;
       return reply.code(code).send({ ok: false, error: err.code ?? "INTERNAL", message: err.message });

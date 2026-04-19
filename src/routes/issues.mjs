@@ -1,5 +1,25 @@
+function normalizeOptionalString(value, { maxLength = 120 } = {}) {
+  if (value == null) return null;
+  const normalized = String(value).replace(/\s+/g, " ").trim();
+  if (!normalized) return null;
+  return normalized.slice(0, maxLength);
+}
+
+export function normalizeIssueReportPayload(body = {}) {
+  const reportText = String(body.reportText || "").trim().slice(0, 2000);
+  return {
+    reportText,
+    userId: normalizeOptionalString(body.userId, { maxLength: 160 }),
+    conversationId: normalizeOptionalString(body.conversationId, { maxLength: 160 }),
+    spiritkinName: normalizeOptionalString(body.spiritkinName, { maxLength: 120 }),
+    sessionId: normalizeOptionalString(body.sessionId, { maxLength: 160 }),
+    sourceContext: normalizeOptionalString(body.sourceContext, { maxLength: 120 }),
+    currentFeature: normalizeOptionalString(body.currentFeature, { maxLength: 120 }),
+  };
+}
+
 export async function issueRoutes(fastify, opts) {
-  const { issueReportService } = opts;
+  const { issueReportService, sessionControlService } = opts;
 
   fastify.post("/v1/issues/report", {
     schema: {
@@ -12,7 +32,7 @@ export async function issueRoutes(fastify, opts) {
           conversationId: { type: "string", nullable: true },
           spiritkinName: { type: "string", nullable: true },
           sessionId: { type: "string", nullable: true },
-          sourceContext: { type: "string", nullable: true, maxLength: 120 },
+          sourceContext: { type: "string", nullable: true, maxLength: 512 },
           currentFeature: { type: "string", nullable: true, maxLength: 120 },
         },
       },
@@ -27,16 +47,37 @@ export async function issueRoutes(fastify, opts) {
     }
 
     try {
+      const payload = normalizeIssueReportPayload(req.body);
+      if (!payload.reportText) {
+        return reply.code(400).send({
+          ok: false,
+          error: "ISSUE_REPORT_ERROR",
+          message: "Report text is required.",
+        });
+      }
+
       const result = await issueReportService.reportIssue({
-        userId: req.body.userId ?? null,
-        conversationId: req.body.conversationId ?? null,
-        spiritkinName: req.body.spiritkinName ?? null,
-        sessionId: req.body.sessionId ?? null,
-        input: req.body.reportText,
+        userId: payload.userId,
+        conversationId: payload.conversationId,
+        spiritkinName: payload.spiritkinName,
+        sessionId: payload.sessionId,
+        input: payload.reportText,
         source: "user_report",
-        sourceContext: req.body.sourceContext ?? "explicit_user_report",
-        currentFeature: req.body.currentFeature ?? null,
+        sourceContext: payload.sourceContext ?? "explicit_user_report",
+        currentFeature: payload.currentFeature,
       });
+
+      if (sessionControlService && payload.userId) {
+        sessionControlService.updateControl({
+          userId: payload.userId,
+          conversationId: payload.conversationId,
+          currentSpiritkinName: payload.spiritkinName,
+          currentSurface: "reporting",
+          currentMode: "report",
+          activeTab: payload.currentFeature,
+          speechState: { turnPhase: "complete" },
+        }).catch(() => {});
+      }
 
       return {
         ok: true,

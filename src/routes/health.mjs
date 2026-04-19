@@ -24,6 +24,7 @@ export function incrementMetric(key) {
 
 export const healthRoutes = async (app, opts = {}) => {
   const { registry, supabase } = opts;
+  const requireAdminAccess = app.requireAdminAccess;
 
   // ── GET /health — Liveness ────────────────────────────────────────────────
   app.get("/health", async (req, reply) => {
@@ -89,7 +90,7 @@ export const healthRoutes = async (app, opts = {}) => {
   });
 
   // ── GET /metrics — Lightweight counters ──────────────────────────────────
-  app.get("/metrics", async (req, reply) => {
+  app.get("/metrics", { preHandler: requireAdminAccess }, async (req, reply) => {
     const uptimeMs = Date.now() - _metrics.startedAt;
     return reply.code(200).send({
       ok:      true,

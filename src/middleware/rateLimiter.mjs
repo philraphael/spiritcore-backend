@@ -68,8 +68,29 @@ export async function registerRateLimiter(app) {
 export function adapterRateLimitConfig() {
   return {
     rateLimit: {
+      // /v1/interact identifies callers by body.userId, so this route-specific
+      // limiter must run after body parsing instead of inheriting the global
+      // onRequest timing.
+      hook: "preHandler",
       max: config.rateLimit.adapterMax,
       timeWindow: config.rateLimit.timeWindowMs,
+      errorResponseBuilder(req, context) {
+        return {
+          statusCode: 429,
+          ok: false,
+          error: "RATE_LIMIT",
+          message: `Interaction limit reached. Limit: ${context.max} per ${context.after}. Please pause briefly and try again.`,
+          retryAfter: context.ttl,
+        };
+      },
+      onExceeded(req, key) {
+        req.log.warn({
+          route: req.routeOptions?.url ?? req.url,
+          method: req.method,
+          rate_limit_key: key,
+          user_id: req.body?.userId ?? req.headers["x-user-id"] ?? null,
+        }, "[rate-limit] interact throttled");
+      },
     },
   };
 }

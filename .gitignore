@@ -40,3 +40,7 @@ RepoMap.md
 
 # Test output
 tests/output/
+tmp-* 
+tmp-live-* 
+tmp-chrome-* 
+*.png 

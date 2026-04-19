@@ -198,9 +198,38 @@ export const createWorldService = ({ supabase, bus }) => {
       updated_at: nowIso(),
     };
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from("world_state")
       .upsert(payload, { onConflict: "conversation_id" });
+
+    if (error) {
+      console.warn("[WorldService] world_state upsert failed, attempting fallback write:", error.message);
+      const { data: existingRow, error: lookupError } = await supabase
+        .from("world_state")
+        .select("conversation_id")
+        .eq("conversation_id", conversationId)
+        .maybeSingle();
+
+      if (lookupError) {
+        throw new AppError("DB", "Failed to write world state", 500, lookupError.message);
+      }
+
+      if (existingRow?.conversation_id) {
+        ({ error } = await supabase
+          .from("world_state")
+          .update({
+            user_id: safeUserId,
+            spiritkin_id: spiritkinId,
+            scene_json: state,
+            updated_at: payload.updated_at,
+          })
+          .eq("conversation_id", conversationId));
+      } else {
+        ({ error } = await supabase
+          .from("world_state")
+          .insert(payload));
+      }
+    }
 
     if (error) {
       throw new AppError("DB", "Failed to write world state", 500, error.message);

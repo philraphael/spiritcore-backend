@@ -1,66 +1,63 @@
-const API = "";
-const SESSION_KEY = "sv.session.v5";
-const ENTRY_KEY = "sv.entry.v5";
-const CONSENT_KEY = "sv.entry.consent.v1";
-const ONBOARDING_COMPLETE_KEY = "sv.onboarding.complete.v1";
-const NAME_KEY = "sv.name.v5";
-const UID_KEY = "sv.uid.v5";
-const RATINGS_KEY = "sv.ratings.v5";
-const PRIMARY_KEY = "sv.primary.v5";
-const RESONANCE_KEY = "sv.resonance.v5"; // {spiritkinName: messageCount}
-const GAME_HELP_SEEN_KEY = "sv.game_help_seen.v1";
-const MEDIA_MUTED_KEY = "sv.media_muted.v1";
-const ADAPTIVE_PROFILE_KEY = "sv.adaptive_profile.v1";
-const SPIRITKIN_EVOLUTION_KEY = "sv.spiritkin_evolution.v1";
-const RETENTION_STATE_KEY = "sv.retention_state.v1";
-const RETENTION_TELEMETRY_KEY = "sv.retention_telemetry.v1";
-const CROWN_GATE_HOLD_MS = 1500;
-const ENTRY_TRANSITION_MS = 2600;
-const SPIRITGATE_VIDEO_FAILSAFE_MS = 2400;
-const SPIRITGATE_TRAILER_FAILSAFE_MS = 18000;
-const SPIRITGATE_POST_VIDEO_PAUSE_MS = 2000;
-const SPIRITGATE_POST_COPY_SETTLE_MS = 1000;
-const INTERACTION_BUILD_MARKER = "interaction-audit-2026-04-16-live-v2";
-const RETENTION_BUILD_MARKER = "retention-foundation-2026-04-16-v1";
-const SPIRITCORE_WELCOME_VOICE = "nova";
-const SPIRITCORE_WELCOME_TEXT = `Welcome…
-
-You’ve crossed the threshold into the SpiritVerse.
-
-A living world… shaped by memory, emotion, and connection.
-
-Here, you are not alone.
-
-The Spiritkins are waiting.
-
-Each one carries a presence… a purpose… a path.
-
-But only one will walk beside you.
-
-This is more than a choice.
-
-It is the beginning of a bond.
-
-One that grows… learns… and evolves with you.
-
-Take your time.
-
-Listen closely.
-
-And when you feel it…
-
-Choose the one that calls to you.
-
-Your journey begins now.`;
-const BOND_LEVELS = [
-  { min: 0, max: 7, stage: 0, label: "First Contact", nodes: 1, desc: "The bond is just beginning to form." },
-  { min: 8, max: 29, stage: 1, label: "Awakening", nodes: 1, desc: "Recognition has begun, but trust is still new." },
-  { min: 30, max: 79, stage: 2, label: "Recognition", nodes: 2, desc: "The bond is settling into a real pattern." },
-  { min: 80, max: 179, stage: 3, label: "Resonance", nodes: 3, desc: "A deeper continuity is forming between you." },
-  { min: 180, max: 359, stage: 4, label: "Convergence", nodes: 4, desc: "The bond now reflects shared history and trust." },
-  { min: 360, max: Infinity, stage: 5, label: "Deep Bond", nodes: 5, desc: "This is long-term bond depth, earned over time." }
-];
-
+import {
+  ADAPTIVE_PROFILE_KEY,
+  API,
+  BOND_LEVELS,
+  CONSENT_KEY,
+  CROWN_GATE_HOLD_MS,
+  DEFAULT_PROMPTS,
+  ENTRY_KEY,
+  ENTRY_TRANSITION_MS,
+  FOUNDING_PILLARS,
+  GAME_HELP_SEEN_KEY,
+  GAME_NAME_OVERRIDES,
+  INTERACTION_BUILD_MARKER,
+  MEDIA_MUTED_KEY,
+  NAME_KEY,
+  ONBOARDING_COMPLETE_KEY,
+  PRIMARY_KEY,
+  RATINGS_KEY,
+  RESONANCE_KEY,
+  RETENTION_BUILD_MARKER,
+  RETENTION_STATE_KEY,
+  RETENTION_TELEMETRY_KEY,
+  SESSION_KEY,
+  SPIRITCORE_WELCOME_TEXT,
+  SPIRITCORE_WELCOME_VOICE,
+  SPIRITGATE_POST_COPY_SETTLE_MS,
+  SPIRITGATE_POST_VIDEO_PAUSE_MS,
+  SPIRITGATE_TRAILER_COMPLETION_FAILSAFE_MS,
+  SPIRITGATE_TRAILER_FAILSAFE_MS,
+  SPIRITGATE_VIDEO_COMPLETION_FAILSAFE_MS,
+  SPIRITGATE_VIDEO_FAILSAFE_MS,
+  SPIRITKIN_EVOLUTION_KEY,
+  UID_KEY,
+  VALID_PRESENCE_TABS,
+  WORLD_ART
+} from "./app-constants.js";
+import {
+  clamp01,
+  clampInt,
+  esc,
+  fmtDate,
+  fmtTime,
+  formatSignal,
+  formatTimeAway,
+  getLocalTemporalWorldState,
+  getUtcDayKey,
+  getUtcWeekKey,
+  hashSeed,
+  hoursBetween,
+  normalizePhraseList,
+  normalizeReactionText,
+  normalizeTimestamp,
+  normalizeTextSnippet,
+  nowIso,
+  sanitizeScene,
+  sanitizeTone,
+  seededUnit,
+  toneHasTag,
+  uuid
+} from "./app-helpers.js";
 import { spiritkins as CANON_SPIRITKINS, realms as CANON_REALMS, charter as CANON_CHARTER, echoes as CANON_ECHOES, governance as CANON_GOVERNANCE, world as CANON_WORLD, bondStages as CANON_BOND_STAGES } from "./data/spiritverseCanon.js";
 
 function createSpiritverseGamesFallback() {
@@ -106,18 +103,12 @@ try {
 let revealAnimationInstance = null;
 let spiritGateFallbackTimer = null;
 let spiritGateArrivalFallbackTimer = null;
+let spiritGatePlaybackSafetyTimer = null;
+let spiritGateArrivalPlaybackSafetyTimer = null;
 let spiritGateActiveAttemptId = 0;
 let spiritGateTransitionRevealTimer = null;
 let spiritGateTransitionRouteTimer = null;
 
-const DEFAULT_PROMPTS = [
-  "Tell me what kind of presence you are.",
-  "What can I bring to this conversation?",
-  "Help me settle into the Spiritverse."
-];
-
-const FOUNDING_PILLARS = ["Lyra", "Raien", "Kairo", "Elaria", "Thalassar"];
-const VALID_PRESENCE_TABS = ["profile", "echoes", "charter", "games", "journal", "events", "quest"];
 const CANON_SPIRITKIN_MAP = Object.fromEntries(CANON_SPIRITKINS.map((spiritkin) => [spiritkin.name, spiritkin]));
 const SPIRITVERSE_ECHOES = {
   origin: CANON_WORLD.origin,
@@ -150,18 +141,6 @@ const SPIRITKIN_ECHOES = Object.fromEntries(
   ])
 );
 
-const WORLD_ART = {
-  background: "Spiritverse background base theme.png",
-  ensemble: "Spiritkins in spiritverse.png",
-  mythicEnsemble: "Spiritverse elder gods photo base needs edits.png",
-  chroniclesAll: "Book Covers All.png",
-  chroniclesBase: "Book Covers.png",
-  elaria: "Elaria.png",
-  thalassar: "thalassar.png",
-  pair: "Elaria Left 1 Thalassar right 1.png",
-  pairAlt: "Elaria Left Thalassar right.png"
-};
-
 function worldArtUrl(filename) {
   return `/world-art/${encodeURIComponent(filename)}`;
 }
@@ -180,7 +159,8 @@ function worldArtImage(filename, alt, cls = "", eager = false) {
   `;
 }
 
-// Audio state - must be declared at top level
+// Browser-local speech runtime handles.
+// These are intentionally not canonical session state; session snapshots only mirror their coarse lifecycle.
 let _AUDIO_CONTEXT = null;
 let _currentAudio = null;
 let _voiceLoopTimer = null;
@@ -192,6 +172,23 @@ let _lastVoiceSubmission = { text: "", at: 0 };
 let _lastUserSubmission = { text: "", at: 0, source: "" };
 let _voiceAwaitingUserTurn = false;
 let _voiceTurnCaptureAfterAudio = false;
+let _scheduledAutoSpeechMessageId = null;
+let _lastAutoSpokenMessageId = null;
+
+function getLocalSpeechRuntimeState() {
+  return {
+    audioPlaying: !!_audioPlaying,
+    hasRecognition: !!_recognition,
+    awaitingUserTurn: !!_voiceAwaitingUserTurn,
+    captureAfterAudio: !!_voiceTurnCaptureAfterAudio,
+  };
+}
+
+function setVoiceTurnRuntimeState({ awaitingUserTurn = _voiceAwaitingUserTurn, captureAfterAudio = _voiceTurnCaptureAfterAudio } = {}) {
+  _voiceAwaitingUserTurn = !!awaitingUserTurn;
+  _voiceTurnCaptureAfterAudio = !!captureAfterAudio;
+  return getLocalSpeechRuntimeState();
+}
 
 function getMediaToggleState(muted) {
   return muted
@@ -329,24 +326,6 @@ const SPIRITKIN_SELECTION_CONTEXT = {
   Thalassar: "Choose Thalassar if you need depth, patience, and a witness who can stay with what is unfolding beneath the surface."
 };
 
-function uuid() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
-    const rand = Math.random() * 16 | 0;
-    return (char === "x" ? rand : (rand & 0x3 | 0x8)).toString(16);
-  });
-}
-
-function nowIso() { return new Date().toISOString(); }
-
-function esc(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 function readJson(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -358,130 +337,6 @@ function readJson(key, fallback) {
 
 function writeJson(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
-}
-
-function fmtTime(iso) {
-  try {
-    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return "";
-  }
-}
-
-function fmtDate(iso) {
-  try {
-    return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
-  } catch {
-    return "";
-  }
-}
-
-function clampInt(value, fallback = 0) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(0, Math.round(n));
-}
-
-function normalizeTextSnippet(value, maxLength = 120) {
-  const text = String(value || "")
-    .replace(/\s+/g, " ")
-    .replace(/^["'“”]+|["'“”]+$/g, "")
-    .replace(/^MOVE:[^\s]+/i, "")
-    .trim();
-  if (!text) return "";
-  return text.length > maxLength ? `${text.slice(0, maxLength - 1).trim()}…` : text;
-}
-
-function hoursBetween(earlierIso, laterIso = nowIso()) {
-  const earlier = new Date(earlierIso).getTime();
-  const later = new Date(laterIso).getTime();
-  if (!Number.isFinite(earlier) || !Number.isFinite(later) || later < earlier) return 0;
-  return (later - earlier) / 3600000;
-}
-
-function formatTimeAway(hoursAway) {
-  if (hoursAway >= 24 * 7) {
-    const weeks = Math.max(1, Math.round(hoursAway / (24 * 7)));
-    return `${weeks} week${weeks === 1 ? "" : "s"}`;
-  }
-  if (hoursAway >= 24) {
-    const days = Math.max(1, Math.round(hoursAway / 24));
-    return `${days} day${days === 1 ? "" : "s"}`;
-  }
-  if (hoursAway >= 1) {
-    const hours = Math.max(1, Math.round(hoursAway));
-    return `${hours} hour${hours === 1 ? "" : "s"}`;
-  }
-  return "a short while";
-}
-
-function getUtcDayKey(date = new Date()) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())).toISOString().slice(0, 10);
-}
-
-function getUtcWeekKey(date = new Date()) {
-  const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = utc.getUTCDay() || 7;
-  utc.setUTCDate(utc.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
-  const week = Math.ceil((((utc - yearStart) / 86400000) + 1) / 7);
-  return `${utc.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
-}
-
-function getLocalTemporalWorldState(date = new Date()) {
-  const hour = date.getHours();
-  if (hour < 4) {
-    return {
-      key: "deep_night",
-      label: "Deep Night",
-      tone: "hushed and inward",
-      worldShift: "The Spiritverse is at its quietest. Signals feel closer, slower, and more exact.",
-      continuity: "This is a good window for stillness, honesty, and things that only surface when the world goes quiet."
-    };
-  }
-  if (hour < 8) {
-    return {
-      key: "dawn",
-      label: "Dawn",
-      tone: "tender and opening",
-      worldShift: "Light is gathering at the edge of the realms. The world feels newly available.",
-      continuity: "Returns here feel like fresh permission. Bonds often reset into clarity instead of force."
-    };
-  }
-  if (hour < 12) {
-    return {
-      key: "dayrise",
-      label: "Dayrise",
-      tone: "clear and forward-moving",
-      worldShift: "The realms have fully turned toward motion. Questions land cleanly and decisions feel easier to name.",
-      continuity: "This window favors directness, orientation, and practical next steps."
-    };
-  }
-  if (hour < 16) {
-    return {
-      key: "highday",
-      label: "Highday",
-      tone: "bright and alert",
-      worldShift: "The Spiritverse is fully awake. Cross-currents are visible, and pattern recognition comes faster.",
-      continuity: "This window favors perspective, strategy, and stronger challenge without hostility."
-    };
-  }
-  if (hour < 20) {
-    return {
-      key: "dusk",
-      label: "Dusk",
-      tone: "reflective and softening",
-      worldShift: "The realms begin settling into evening. The pace lowers and emotional detail becomes easier to hear.",
-      continuity: "Returns here often feel more intimate, introspective, and memory-rich."
-    };
-  }
-  return {
-    key: "nightfall",
-    label: "Nightfall",
-    tone: "charged and resonant",
-    worldShift: "The Spiritverse holds more echo at night. Bonds feel slightly more mythic, but the pull remains restrained.",
-    continuity: "This window favors depth, atmosphere, and the kind of truth that is easier to admit after the day has quieted."
-  };
 }
 
 function normalizeRetentionTelemetry(raw = null) {
@@ -850,17 +705,6 @@ function normalizeGameTheme(theme) {
   return ["crown", "veil", "ember", "astral", "abyssal"].includes(mapped) ? mapped : "crown";
 }
 
-const GAME_NAME_OVERRIDES = {
-  chess: "Celestial Chess",
-  checkers: "Veil Checkers",
-  go: "Star-Mapping (Go)",
-  spirit_cards: "Spirit-Cards",
-  echo_trials: "Echo Trials",
-  tictactoe: "TicTacToe of Echoes",
-  connect_four: "Connect Four Constellations",
-  battleship: "Abyssal Battleship"
-};
-
 function buildDefaultGameData(type) {
   switch (type) {
     case "chess":
@@ -953,7 +797,7 @@ function normalizeActiveGame(game) {
   if (!game || typeof game !== "object" || Array.isArray(game)) return null;
   const type = String(game.type || "").trim();
   if (!type) return null;
-  return {
+  const normalized = {
     ...game,
     type,
     name: game.name || GAME_NAME_OVERRIDES[type] || type.replace(/_/g, " "),
@@ -964,6 +808,16 @@ function normalizeActiveGame(game) {
     result: game.result && typeof game.result === "object" ? game.result : null,
     data: normalizeGameData(type, game.data)
   };
+  logGameDebug("normalize-active-game", {
+    sourceType: game.type || null,
+    normalizedType: normalized.type,
+    status: normalized.status,
+    turn: normalized.turn,
+    moveCount: normalized.moveCount,
+    historyLength: normalized.history.length,
+    dataKeys: Object.keys(normalized.data || {}),
+  });
+  return normalized;
 }
 
 function getOrCreateUid() {
@@ -1490,37 +1344,6 @@ function getAtmosphereSpiritkin() {
   return state.primarySpiritkin || state.pendingBondSpiritkin || state.selectedSpiritkin || null;
 }
 
-function sanitizeTone(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function sanitizeScene(value) {
-  const scene = typeof value === "string" ? value.trim() : "";
-  return scene && scene.toLowerCase() !== "default" ? scene : "";
-}
-
-function formatSignal(value) {
-  const cleaned = typeof value === "string" ? value.trim() : "";
-  if (!cleaned) return "";
-  return cleaned
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ");
-}
-
-function clamp01(value, fallback = 0.5) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(0, Math.min(1, n));
-}
-
-function normalizePhraseList(values = [], limit = 8) {
-  return [...new Set(
-    (Array.isArray(values) ? values : [])
-      .map((value) => String(value || "").trim().toLowerCase())
-      .filter(Boolean)
-  )].slice(-limit);
-}
-
 function createDefaultAdaptiveProfile() {
   return {
     version: 1,
@@ -1882,13 +1705,54 @@ function observeAssistantStyle(text) {
 
 function normalizeMessage(raw) {
   const tags = Array.isArray(raw?.tags) ? raw.tags.filter((tag) => typeof tag === "string") : [];
+  const normalizedTime = normalizeTimestamp(raw?.time || raw?.created_at || raw?.timestamp || raw?.updated_at, "");
   return {
     ...raw,
     tags,
+    time: normalizedTime,
+    created_at: normalizedTime || null,
     memoryActive: tags.includes("memory:active"),
     emotionTone: sanitizeTone(raw?.emotionTone),
     sceneName: sanitizeScene(raw?.sceneName)
   };
+}
+
+let _bootSessionSeed = null;
+
+function createDefaultSessionModel() {
+  return {
+    sessionId: null,
+    userId: null,
+    currentSpiritkin: null,
+    currentSurface: "selection",
+    currentMode: "idle",
+    currentGame: null,
+    gameState: null,
+    conversationState: {
+      conversationId: null,
+      messageCount: 0,
+      lastMessageRole: null,
+      lastMessageAt: null,
+    },
+    speechState: {
+      isSpeaking: false,
+      isListening: false,
+      isPaused: false,
+      lastUtteranceId: null,
+      turnPhase: "idle",
+    },
+    memoryContext: null,
+    recentMessages: [],
+    hydrated: false,
+    source: "local-default",
+  };
+}
+
+function normalizeTurnPhaseValue(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["idle", "user_input", "processing", "spirit_response", "complete"].includes(normalized)
+    ? normalized
+    : "idle";
 }
 
 function getStageSignals() {
@@ -1906,6 +1770,7 @@ function getStageSignals() {
 
 const state = {
   userId: getOrCreateUid(),
+  sessionModel: createDefaultSessionModel(),
   entryAccepted: false,
   consentAccepted: !!(localStorage.getItem(CONSENT_KEY) || localStorage.getItem(ENTRY_KEY)),
   consentChecked: !!(localStorage.getItem(CONSENT_KEY) || localStorage.getItem(ENTRY_KEY)),
@@ -1938,6 +1803,7 @@ const state = {
   voiceMuted: localStorage.getItem("sk_voice_muted") === "1",
   voiceListening: false,
   voiceMode: localStorage.getItem("sk_voice_mode") === "1", // Always-on mic mode
+  pendingVoiceResume: false,
   // Premium: Custom Spiritkin Matching
   surveyOpen: false,
   surveyStep: 0,
@@ -1969,6 +1835,7 @@ const state = {
   gameSpiritkinMessage: null,    // last Spiritkin commentary on a game move
   gameInstructions: null,        // instructions for the current game type
   gameHelpOpen: false,
+  gameHelpFirstRun: false,
   gameHelpSeen: readJson(GAME_HELP_SEEN_KEY, {}),
   gameLoading: false,            // loading state for game moves
   pendingGameType: null,         // game currently opening
@@ -2011,16 +1878,389 @@ const state = {
 
 (function hydrateSession() {
   const session = readJson(SESSION_KEY, null);
-  if (session && session.conversationId && session.selectedSpiritkin) {
-    state.conversationId = session.conversationId;
-    state.selectedSpiritkin = normalizeStoredSpiritkin(session.selectedSpiritkin);
-    state.messages = Array.isArray(session.messages) ? session.messages.map(normalizeMessage) : [];
+  _bootSessionSeed = session && typeof session === "object" ? session : null;
+  if (session && typeof session === "object") {
+    if (session.conversationId) state.conversationId = session.conversationId;
+    if (session.selectedSpiritkin) state.selectedSpiritkin = normalizeStoredSpiritkin(session.selectedSpiritkin);
+    if (Array.isArray(session.messages)) state.messages = session.messages.map(normalizeMessage);
     if (session.userId) state.userId = session.userId;
+    if (VALID_PRESENCE_TABS.includes(session.activePresenceTab)) {
+      state.activePresenceTab = session.activePresenceTab;
+      state.currentTab = session.activePresenceTab;
+    }
+    if (typeof session.showHomeView === "boolean") {
+      state.showHomeView = session.showHomeView;
+    }
+    state.pendingVoiceResume = !!session.pendingVoiceResume;
   }
   if (!state.selectedSpiritkin && state.primarySpiritkin) {
     state.selectedSpiritkin = state.primarySpiritkin;
   }
+  state.sessionModel = {
+    ...state.sessionModel,
+    sessionId: state.conversationId || null,
+    userId: state.userId,
+    currentSpiritkin: state.selectedSpiritkin ? {
+      id: state.selectedSpiritkin.id || null,
+      name: state.selectedSpiritkin.name,
+      title: state.selectedSpiritkin.title || null,
+      role: state.selectedSpiritkin.role || null,
+    } : null,
+    currentSurface: state.showHomeView ? "profile" : "selection",
+    currentMode: state.conversationId ? "conversation" : (state.showHomeView ? "bond_home" : "selection"),
+    conversationState: {
+      conversationId: state.conversationId || null,
+      messageCount: Array.isArray(state.messages) ? state.messages.length : 0,
+      lastMessageRole: state.messages[state.messages.length - 1]?.role || null,
+      lastMessageAt: normalizeTimestamp(state.messages[state.messages.length - 1]?.created_at || state.messages[state.messages.length - 1]?.time, null),
+    },
+    recentMessages: Array.isArray(state.messages) ? state.messages.slice(-80) : [],
+    source: session ? "local-seed" : "local-default",
+  };
+  logContinuityDebug("session-hydrated", {
+    restored: !!session,
+    persistedConversationId: session?.conversationId ?? null,
+    persistedSelectedSpiritkin: session?.selectedSpiritkin?.name ?? null,
+    persistedMessageCount: Array.isArray(session?.messages) ? session.messages.length : 0,
+  });
 })();
+
+function buildSessionSnapshot() {
+  const hasContinuityState = !!(
+    state.conversationId ||
+    state.selectedSpiritkin ||
+    state.primarySpiritkin ||
+    state.showHomeView
+  );
+
+  if (!hasContinuityState) return null;
+
+  return {
+    conversationId: state.conversationId || null,
+    selectedSpiritkin: state.selectedSpiritkin || state.primarySpiritkin || null,
+    messages: Array.isArray(state.sessionModel?.recentMessages) && state.sessionModel.recentMessages.length
+      ? state.sessionModel.recentMessages.slice(-80)
+      : (Array.isArray(state.messages) ? state.messages.slice(-80) : []),
+    userId: state.userId,
+    activePresenceTab: VALID_PRESENCE_TABS.includes(state.activePresenceTab) ? state.activePresenceTab : "profile",
+    showHomeView: !!state.showHomeView,
+    pendingVoiceResume: !!(
+      shouldKeepVoiceLoopActive() &&
+      (state.voiceListening || _audioPlaying || _voiceAwaitingUserTurn || _voiceTurnCaptureAfterAudio)
+    ),
+  };
+}
+
+function buildSpiritkinRecordFromName(name) {
+  if (!name) return null;
+  const fromLoaded = (state.spiritkins || []).find((spiritkin) => spiritkin?.name === name);
+  if (fromLoaded) return hydrateSpiritkin(fromLoaded);
+  if (FOUNDING_PILLARS.includes(name)) return buildFoundingPillarRecord(name);
+  return hydrateSpiritkin({
+    id: `session:${String(name).toLowerCase()}`,
+    name,
+    title: name,
+    role: `${name} is present in the Spiritverse.`,
+    essence: [],
+    invariant: `${name} remains identity-steady across the session.`,
+    tone: "steady presence",
+    is_canon: true,
+  });
+}
+
+function deriveCurrentSurfaceFromUI() {
+  if (!state.entryAccepted || state.showCrownGateHome || state.spiritverseTrailerActive || state.spiritCoreWelcoming) return "spirit_gate";
+  if (state.conversationId) return VALID_PRESENCE_TABS.includes(state.activePresenceTab) ? state.activePresenceTab : "profile";
+  if (state.showHomeView) return "profile";
+  if (state.primarySpiritkin || state.selectedSpiritkin) return "selection";
+  return "selection";
+}
+
+function deriveCurrentModeFromUI() {
+  if (!state.entryAccepted || state.showCrownGateHome || state.spiritverseTrailerActive || state.spiritCoreWelcoming) return "entry";
+  if (state.loadingReply) return "processing";
+  if (state.activeGame?.status === "active" && state.activePresenceTab === "games") return "game";
+  if (state.conversationId) return "conversation";
+  if (state.showHomeView) return "bond_home";
+  return "selection";
+}
+
+function applySessionSnapshot(session, source = "backend") {
+  if (!session || typeof session !== "object") return false;
+
+  const spiritkinRecord = buildSpiritkinRecordFromName(session.currentSpiritkin?.name || null);
+  const recentMessages = Array.isArray(session.recentMessages)
+    ? session.recentMessages.map(normalizeMessage)
+    : [];
+  const conversationState = session.conversationState && typeof session.conversationState === "object"
+    ? session.conversationState
+    : {};
+  const speechState = session.speechState && typeof session.speechState === "object"
+    ? session.speechState
+    : {};
+  const gameState = normalizeActiveGame(session.gameState);
+  const currentSurface = String(session.currentSurface || deriveCurrentSurfaceFromUI()).trim().toLowerCase() || "selection";
+  const currentMode = String(session.currentMode || deriveCurrentModeFromUI()).trim().toLowerCase() || "idle";
+
+  state.userId = session.userId || state.userId;
+  state.conversationId = conversationState.conversationId || session.sessionId || null;
+  state.messages = recentMessages;
+  if (spiritkinRecord) {
+    state.selectedSpiritkin = spiritkinRecord;
+    if (!state.primarySpiritkin && FOUNDING_PILLARS.includes(spiritkinRecord.name)) {
+      state.primarySpiritkin = state.primarySpiritkin || spiritkinRecord;
+    }
+  }
+  state.activeGame = gameState;
+  state.gameActive = !!(gameState && gameState.status === "active");
+  if (currentSurface === "profile") {
+    state.activePresenceTab = "profile";
+    state.showHomeView = currentMode === "bond_home";
+  } else if (VALID_PRESENCE_TABS.includes(currentSurface)) {
+    state.activePresenceTab = currentSurface;
+    state.showHomeView = false;
+  } else if (currentSurface === "selection") {
+    state.showHomeView = false;
+  } else if (state.gameActive) {
+    state.activePresenceTab = "games";
+    state.showHomeView = false;
+  }
+  state.currentTab = state.activePresenceTab;
+
+  state.voiceListening = !!speechState.isListening;
+
+  state.sessionModel = {
+    sessionId: session.sessionId || state.conversationId || null,
+    userId: session.userId || state.userId,
+    currentSpiritkin: session.currentSpiritkin || null,
+    currentSurface,
+    currentMode,
+    currentGame: session.currentGame || (gameState ? {
+      type: gameState.type,
+      name: gameState.name,
+      status: gameState.status,
+      turn: gameState.turn,
+      moveCount: gameState.moveCount,
+      historyLength: Array.isArray(gameState.history) ? gameState.history.length : 0,
+    } : null),
+    gameState,
+    conversationState: {
+      conversationId: conversationState.conversationId || state.conversationId || null,
+      messageCount: Number.isFinite(conversationState.messageCount) ? conversationState.messageCount : recentMessages.length,
+      lastMessageRole: conversationState.lastMessageRole || recentMessages[recentMessages.length - 1]?.role || null,
+      lastMessageAt: normalizeTimestamp(conversationState.lastMessageAt || recentMessages[recentMessages.length - 1]?.created_at || recentMessages[recentMessages.length - 1]?.time, null),
+    },
+    speechState: {
+      isSpeaking: !!speechState.isSpeaking,
+      isListening: !!speechState.isListening,
+      isPaused: !!speechState.isPaused,
+      lastUtteranceId: speechState.lastUtteranceId ? String(speechState.lastUtteranceId) : null,
+      turnPhase: normalizeTurnPhaseValue(speechState.turnPhase),
+    },
+    memoryContext: session.memoryContext || null,
+    recentMessages,
+    hydrated: true,
+    source,
+  };
+
+  return true;
+}
+
+async function fetchSessionSnapshot(options = {}) {
+  const {
+    conversationId = state.conversationId || _bootSessionSeed?.conversationId || null,
+    spiritkinName = state.selectedSpiritkin?.name || state.primarySpiritkin?.name || _bootSessionSeed?.selectedSpiritkin?.name || null,
+    currentSurface = deriveCurrentSurfaceFromUI(),
+    currentMode = deriveCurrentModeFromUI(),
+    renderOnFinish = true,
+    silent = false,
+  } = options;
+
+  if (!state.userId) return null;
+
+  const query = new URLSearchParams({
+    userId: state.userId,
+    currentSurface,
+    currentMode,
+  });
+  if (conversationId) query.set("conversationId", conversationId);
+  if (spiritkinName) query.set("spiritkinName", spiritkinName);
+
+  try {
+    const res = await fetch(`${API}/v1/session/snapshot?${query.toString()}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) throw new Error(data.message || "Failed to fetch session snapshot.");
+    applySessionSnapshot(data.session, "backend-snapshot");
+    if (renderOnFinish) render();
+    return data.session;
+  } catch (error) {
+    if (!silent) {
+      state.statusText = error.message || "Could not restore the session.";
+      state.statusError = true;
+    }
+    if (_bootSessionSeed && !_bootSessionSeed.__appliedFallback) {
+      _bootSessionSeed.__appliedFallback = true;
+      applySessionSnapshot({
+        sessionId: _bootSessionSeed.conversationId || null,
+        userId: _bootSessionSeed.userId || state.userId,
+        currentSpiritkin: _bootSessionSeed.selectedSpiritkin ? { name: _bootSessionSeed.selectedSpiritkin.name } : null,
+        currentSurface: _bootSessionSeed.activePresenceTab || "selection",
+        currentMode: _bootSessionSeed.conversationId ? "conversation" : "selection",
+        currentGame: null,
+        gameState: null,
+        conversationState: {
+          conversationId: _bootSessionSeed.conversationId || null,
+          messageCount: Array.isArray(_bootSessionSeed.messages) ? _bootSessionSeed.messages.length : 0,
+        },
+        speechState: {
+          isSpeaking: false,
+          isListening: false,
+          isPaused: !!_bootSessionSeed.pendingVoiceResume,
+          lastUtteranceId: null,
+          turnPhase: "idle",
+        },
+        memoryContext: null,
+        recentMessages: Array.isArray(_bootSessionSeed.messages) ? _bootSessionSeed.messages : [],
+      }, "local-fallback");
+      if (renderOnFinish) render();
+    }
+    return null;
+  }
+}
+
+async function syncSessionControl(overrides = {}, options = {}) {
+  const { renderOnFinish = false } = options;
+  if (!state.userId) return null;
+
+  const speechState = {
+    isSpeaking: !!_audioPlaying,
+    isListening: !!state.voiceListening,
+    isPaused: !!state.pendingVoiceResume,
+    lastUtteranceId: state.sessionModel?.speechState?.lastUtteranceId || null,
+    turnPhase: normalizeTurnPhaseValue(overrides.turnPhase || state.sessionModel?.speechState?.turnPhase || "idle"),
+  };
+
+  const payload = {
+    userId: state.userId,
+    conversationId: overrides.conversationId !== undefined ? overrides.conversationId : (state.conversationId || null),
+    currentSpiritkinName: overrides.currentSpiritkinName || state.selectedSpiritkin?.name || state.primarySpiritkin?.name || null,
+    currentSurface: overrides.currentSurface || deriveCurrentSurfaceFromUI(),
+    currentMode: overrides.currentMode || deriveCurrentModeFromUI(),
+    activeTab: overrides.activeTab || state.activePresenceTab || "profile",
+    speechState: {
+      ...speechState,
+      ...(overrides.speechState || {}),
+      turnPhase: normalizeTurnPhaseValue((overrides.speechState || {}).turnPhase || speechState.turnPhase),
+    },
+  };
+
+  try {
+    const res = await fetch(`${API}/v1/session/control`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) throw new Error(data.message || "Failed to sync session control.");
+    applySessionSnapshot(data.session, "backend-control");
+    persistSession();
+    if (renderOnFinish) render();
+    return data.session;
+  } catch (error) {
+    logContinuityDebug("session-control-sync-failed", {
+      message: error.message,
+      payload,
+    });
+    return null;
+  }
+}
+
+function setAuthoritativeTurnPhase(turnPhase, overrides = {}) {
+  const nextTurnPhase = normalizeTurnPhaseValue(turnPhase);
+  state.sessionModel = {
+    ...state.sessionModel,
+    speechState: {
+      ...(state.sessionModel?.speechState || createDefaultSessionModel().speechState),
+      isSpeaking: !!(overrides.isSpeaking ?? _audioPlaying),
+      isListening: !!(overrides.isListening ?? state.voiceListening),
+      isPaused: !!(overrides.isPaused ?? state.pendingVoiceResume),
+      lastUtteranceId: overrides.lastUtteranceId !== undefined
+        ? overrides.lastUtteranceId
+        : (state.sessionModel?.speechState?.lastUtteranceId || null),
+      turnPhase: nextTurnPhase,
+    },
+  };
+}
+
+function syncSessionControlSoon(overrides = {}, options = {}) {
+  Promise.resolve().then(() => syncSessionControl(overrides, options)).catch(() => {});
+}
+
+function deriveModeForSurface(surface) {
+  if (!state.entryAccepted || state.showCrownGateHome || state.spiritverseTrailerActive || state.spiritCoreWelcoming) return "entry";
+  if (surface === "games" && state.activeGame?.status === "active") return "game";
+  if (state.conversationId) return "conversation";
+  if (state.showHomeView || surface === "profile") return "bond_home";
+  return "selection";
+}
+
+let _surfaceTransitionRunId = 0;
+
+async function transitionPresenceSurface(tab, options = {}) {
+  if (!VALID_PRESENCE_TABS.includes(tab)) return false;
+  const { announce = true } = options;
+  const runId = ++_surfaceTransitionRunId;
+  const previousTab = state.activePresenceTab;
+  const session = await syncSessionControl({
+    currentSurface: tab,
+    currentMode: deriveModeForSurface(tab),
+    activeTab: tab,
+    speechState: { turnPhase: state.sessionModel?.speechState?.turnPhase || "complete" },
+  });
+  if (runId !== _surfaceTransitionRunId) return false;
+  if (!session) {
+    state.statusText = "Could not switch views right now.";
+    state.statusError = true;
+    render();
+    return false;
+  }
+  normalizeInteractionState("transitionPresenceSurface");
+  persistSession();
+  render();
+  if (announce && tab !== previousTab) {
+    narratePresenceTab(tab).catch(() => {});
+  }
+  if (tab === "events" && !state.spiritverseEvent) {
+    fetchSpiritverseEvent();
+  }
+  if (tab === "quest" && !state.dailyQuest) {
+    fetchDailyQuest();
+  }
+  if (tab === "journal" && state.conversationId && state.userId) {
+    fetch(`${API}/v1/bond-journal?userId=${encodeURIComponent(state.userId)}&conversationId=${encodeURIComponent(state.conversationId)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          state.bondJournal = data.journal;
+          persistSession();
+          render();
+        }
+      })
+      .catch(() => {});
+  }
+  return true;
+}
+
+function didCanonicalGameApplyMove(previousGame, nextGame, move) {
+  if (!nextGame || (nextGame.status !== "active" && nextGame.status !== "ended")) return false;
+  const previousHistoryLength = Array.isArray(previousGame?.history) ? previousGame.history.length : 0;
+  const nextHistory = Array.isArray(nextGame.history) ? nextGame.history : [];
+  const nextEntries = nextHistory.slice(previousHistoryLength);
+  const normalizedMove = String(move || "").trim();
+  if (!normalizedMove || nextEntries.length === 0) return false;
+  if (Number(nextGame.moveCount || 0) <= Number(previousGame?.moveCount || 0)) return false;
+  return nextEntries.some((entry) => entry?.player === "user" && String(entry?.move || "").trim() === normalizedMove);
+}
 
 function syncPrimarySelection() {
   if (!state.primarySpiritkin) return;
@@ -2063,6 +2303,89 @@ function logInteraction(eventName, detail = {}) {
     ...detail,
     snapshot: getInteractionStateSnapshot(),
   });
+}
+
+function shouldLogGameDebug() {
+  try {
+    return window.__SV_GAME_DEBUG === true || localStorage.getItem("sv.game.debug") === "1";
+  } catch (_) {
+    return window.__SV_GAME_DEBUG === true;
+  }
+}
+
+function logGameDebug(eventName, detail = {}) {
+  if (!shouldLogGameDebug()) return;
+  console.info(`[GameDebug] ${eventName}`, {
+    ...detail,
+    snapshot: {
+      conversationId: state.conversationId || null,
+      activeGameType: state.activeGame?.type || null,
+      activeGameStatus: state.activeGame?.status || null,
+      activeGameTurn: state.activeGame?.turn || null,
+      moveCount: state.activeGame?.moveCount || 0,
+      historyLength: Array.isArray(state.activeGame?.history) ? state.activeGame.history.length : 0,
+      loading: !!state.gameLoading,
+    },
+  });
+}
+
+function shouldLogContinuityDebug() {
+  try {
+    return window.__SV_CONTINUITY_DEBUG === true || localStorage.getItem("sv.continuity.debug") === "1";
+  } catch (_) {
+    return window.__SV_CONTINUITY_DEBUG === true;
+  }
+}
+
+function getContinuitySnapshot() {
+  return {
+    userId: state.userId || null,
+    primarySpiritkin: state.primarySpiritkin?.name || null,
+    selectedSpiritkin: state.selectedSpiritkin?.name || null,
+    conversationId: state.conversationId || null,
+    activePresenceTab: state.activePresenceTab || null,
+    currentTab: state.currentTab || null,
+    showHomeView: !!state.showHomeView,
+    showCrownGateHome: !!state.showCrownGateHome,
+    activeGame: state.activeGame?.type || null,
+    gameStatus: state.activeGame?.status || null,
+    entryAccepted: !!state.entryAccepted,
+    voiceMode: !!state.voiceMode,
+    voiceMuted: !!state.voiceMuted,
+    voiceListening: !!state.voiceListening,
+    audioPlaying: !!_audioPlaying,
+    awaitingUserTurn: !!_voiceAwaitingUserTurn,
+    turnCaptureAfterAudio: !!_voiceTurnCaptureAfterAudio,
+    messageCount: Array.isArray(state.messages) ? state.messages.length : 0,
+  };
+}
+
+function logContinuityDebug(eventName, detail = {}) {
+  if (!shouldLogContinuityDebug()) return;
+  console.info(`[ContinuityDebug] ${eventName}`, {
+    ...detail,
+    snapshot: getContinuitySnapshot(),
+  });
+}
+
+let _lastContinuityViewSignature = "";
+
+function logContinuityViewIfChanged(source = "unknown") {
+  if (!shouldLogContinuityDebug()) return;
+  const signature = [
+    state.entryAccepted ? "accepted" : "entry",
+    state.showCrownGateHome ? "gate-home" : "gate-hidden",
+    state.showHomeView ? "home" : "surface",
+    state.activePresenceTab || "profile",
+    state.conversationId || "no-conversation",
+    state.selectedSpiritkin?.name || state.primarySpiritkin?.name || "no-spiritkin",
+    state.activeGame?.type || "no-game",
+    state.voiceListening ? "listening" : "not-listening",
+    _audioPlaying ? "audio" : "silent",
+  ].join("|");
+  if (signature === _lastContinuityViewSignature) return;
+  _lastContinuityViewSignature = signature;
+  logContinuityDebug("view-signature", { source, signature });
 }
 
 function normalizeInteractionState(source = "unknown") {
@@ -2319,6 +2642,20 @@ function clearSpiritGateArrivalFallback() {
   }
 }
 
+function clearSpiritGatePlaybackSafetyTimer() {
+  if (spiritGatePlaybackSafetyTimer) {
+    window.clearTimeout(spiritGatePlaybackSafetyTimer);
+    spiritGatePlaybackSafetyTimer = null;
+  }
+}
+
+function clearSpiritGateArrivalPlaybackSafetyTimer() {
+  if (spiritGateArrivalPlaybackSafetyTimer) {
+    window.clearTimeout(spiritGateArrivalPlaybackSafetyTimer);
+    spiritGateArrivalPlaybackSafetyTimer = null;
+  }
+}
+
 function clearSpiritGateTransitionTimers() {
   if (spiritGateTransitionRevealTimer) {
     window.clearTimeout(spiritGateTransitionRevealTimer);
@@ -2328,6 +2665,8 @@ function clearSpiritGateTransitionTimers() {
     window.clearTimeout(spiritGateTransitionRouteTimer);
     spiritGateTransitionRouteTimer = null;
   }
+  clearSpiritGatePlaybackSafetyTimer();
+  clearSpiritGateArrivalPlaybackSafetyTimer();
 }
 
 function failSpiritGateEntry(message, error, detail = {}) {
@@ -2365,22 +2704,65 @@ function armSpiritGateArrivalFallback(source) {
   }, SPIRITGATE_TRAILER_FAILSAFE_MS);
 }
 
+function armSpiritGatePlaybackSafety(source, video) {
+  clearSpiritGatePlaybackSafetyTimer();
+  const attemptId = spiritGateActiveAttemptId;
+  const durationMs = Number.isFinite(video?.duration) && video.duration > 0
+    ? Math.ceil(video.duration * 1000) + 2000
+    : SPIRITGATE_VIDEO_COMPLETION_FAILSAFE_MS;
+  const timeoutMs = Math.max(durationMs, SPIRITGATE_VIDEO_COMPLETION_FAILSAFE_MS);
+  spiritGatePlaybackSafetyTimer = window.setTimeout(() => {
+    if (attemptId !== spiritGateActiveAttemptId) return;
+    if (!state.crownGateOpening || state.entryTransitioning || state.entryAccepted) return;
+    console.warn("Fallback triggered", { source, stage: "gate-video-complete" });
+    logSpiritGate("completion-failsafe-transition", { source, timeoutMs });
+    completeCrownGateEntry({ skipped: true, source: `${source}:completion-failsafe`, force: true });
+  }, timeoutMs);
+}
+
+function armSpiritGateArrivalPlaybackSafety(source, video) {
+  clearSpiritGateArrivalPlaybackSafetyTimer();
+  const attemptId = spiritGateActiveAttemptId;
+  const durationMs = Number.isFinite(video?.duration) && video.duration > 0
+    ? Math.ceil(video.duration * 1000) + 2500
+    : SPIRITGATE_TRAILER_COMPLETION_FAILSAFE_MS;
+  const timeoutMs = Math.max(durationMs, SPIRITGATE_TRAILER_COMPLETION_FAILSAFE_MS);
+  spiritGateArrivalPlaybackSafetyTimer = window.setTimeout(() => {
+    if (attemptId !== spiritGateActiveAttemptId) return;
+    if (!state.spiritverseTrailerActive || state.spiritCoreWelcoming || state.onboardingComplete) return;
+    console.warn("Fallback triggered", { source, stage: "arrival-video-complete" });
+    logSpiritGate("arrival-completion-failsafe-transition", { source, timeoutMs });
+    beginSpiritCoreWelcome().catch((error) => {
+      failSpiritGateEntry("SpiritGate arrival failed. Refresh and try again.", error, { source });
+    });
+  }, timeoutMs);
+}
+
 function syncEntryCinematics() {
   const gateVideo = document.querySelector("[data-entry-video='gate']");
   if (gateVideo) {
+    gateVideo.onloadedmetadata = () => {
+      if (state.entryVideoStarted && state.crownGateOpening) {
+        armSpiritGatePlaybackSafety("gate-video-metadata", gateVideo);
+      }
+    };
     gateVideo.onplay = () => {
       clearSpiritGateFallback();
+      armSpiritGatePlaybackSafety("gate-video-play", gateVideo);
       logSpiritGate("gate-video-play", { currentTime: gateVideo.currentTime, paused: gateVideo.paused });
     };
     gateVideo.onplaying = () => {
       clearSpiritGateFallback();
+      armSpiritGatePlaybackSafety("gate-video-playing", gateVideo);
       logSpiritGate("gate-video-playing", { currentTime: gateVideo.currentTime, paused: gateVideo.paused });
     };
     gateVideo.onended = () => {
+      clearSpiritGatePlaybackSafetyTimer();
       logSpiritGate("gate-video-ended", { currentTime: gateVideo.currentTime, duration: gateVideo.duration || null });
       completeCrownGateEntry({ source: "gate-video-ended" });
     };
     gateVideo.onerror = () => {
+      clearSpiritGatePlaybackSafetyTimer();
       console.error("Gate video failed", { mediaError: gateVideo.error?.message || gateVideo.error?.code || "unknown" });
       logSpiritGate("gate-video-error", { mediaError: gateVideo.error?.message || gateVideo.error?.code || "unknown" });
       completeCrownGateEntry({ skipped: true, source: "gate-video-error", force: true });
@@ -2409,8 +2791,14 @@ function syncEntryCinematics() {
 
   const trailerVideo = document.querySelector("[data-entry-video='trailer']");
   if (trailerVideo) {
+    trailerVideo.onloadedmetadata = () => {
+      if (state.spiritverseTrailerActive) {
+        armSpiritGateArrivalPlaybackSafety("arrival-video-metadata", trailerVideo);
+      }
+    };
     trailerVideo.onended = () => {
       clearSpiritGateArrivalFallback();
+      clearSpiritGateArrivalPlaybackSafetyTimer();
       logSpiritGate("arrival-video-ended", { currentTime: trailerVideo.currentTime, duration: trailerVideo.duration || null });
       beginSpiritCoreWelcome().catch((error) => {
         failSpiritGateEntry("SpiritGate arrival failed. Refresh and try again.", error, { source: "arrival-video-ended" });
@@ -2418,6 +2806,7 @@ function syncEntryCinematics() {
     };
     trailerVideo.onerror = () => {
       clearSpiritGateArrivalFallback();
+      clearSpiritGateArrivalPlaybackSafetyTimer();
       logSpiritGate("arrival-video-error", { mediaError: trailerVideo.error?.message || trailerVideo.error?.code || "unknown" });
       beginSpiritCoreWelcome().catch((error) => {
         failSpiritGateEntry("SpiritGate arrival failed. Refresh and try again.", error, { source: "arrival-video-error" });
@@ -2425,6 +2814,7 @@ function syncEntryCinematics() {
     };
     if (state.spiritverseTrailerActive) {
       armSpiritGateArrivalFallback("arrival-video-playback");
+      armSpiritGateArrivalPlaybackSafety("arrival-video-playback", trailerVideo);
       const playAttempt = trailerVideo.play?.();
       if (playAttempt?.catch) {
         playAttempt.catch((error) => {
@@ -2717,6 +3107,7 @@ function buildPresenceTabNarration(tab, spiritkin, currentBond, stageData, depth
 async function narratePresenceTab(tab) {
   const spiritkin = state.selectedSpiritkin || state.primarySpiritkin;
   if (!spiritkin || state.voiceMuted || state.gameLoading) return;
+  cleanupSpeechLifecycle("presence-tab-narration", { renderOnFinish: false, clearStatus: false });
   const { currentBond, stageData } = getBondStateForSpiritkin(spiritkin.name);
   const depthEchoes = SPIRITKIN_ECHOES[spiritkin.name] || {};
   const line = buildPresenceTabNarration(tab, spiritkin, currentBond, stageData, depthEchoes);
@@ -2848,6 +3239,7 @@ async function performReadAloud(scope = state.activePresenceTab) {
     return false;
   }
 
+  cleanupSpeechLifecycle("read-aloud", { renderOnFinish: false, clearStatus: false });
   state.voiceMuted = false;
   localStorage.setItem("sk_voice_muted", "0");
   state.statusText = "Reading the visible section aloud...";
@@ -2871,14 +3263,10 @@ async function deliverConversationGreeting(context = "newSession") {
 
 function persistSession() {
   const previousRetentionSnapshot = readJson(RETENTION_STATE_KEY, null);
+  const sessionSnapshot = buildSessionSnapshot();
   if (state.primarySpiritkin) writeJson(PRIMARY_KEY, state.primarySpiritkin);
-  if (state.conversationId) {
-    writeJson(SESSION_KEY, {
-      conversationId: state.conversationId,
-      selectedSpiritkin: state.selectedSpiritkin,
-      messages: state.messages.slice(-80),
-      userId: state.userId
-    });
+  if (sessionSnapshot) {
+    writeJson(SESSION_KEY, sessionSnapshot);
   } else {
     localStorage.removeItem(SESSION_KEY);
   }
@@ -2893,6 +3281,99 @@ function persistSession() {
     preserveVisibility: true
   });
   writeRetentionState();
+  logContinuityDebug("session-persisted", {
+    persistedConversationId: state.conversationId || null,
+    persistedSelectedSpiritkin: state.selectedSpiritkin?.name || null,
+    persistedMessageCount: Array.isArray(state.messages) ? Math.min(state.messages.length, 80) : 0,
+    activePresenceTabPersisted: sessionSnapshot?.activePresenceTab || null,
+    showHomeViewPersisted: !!sessionSnapshot?.showHomeView,
+    activeGamePersisted: false,
+    voiceStatePersisted: !!sessionSnapshot?.pendingVoiceResume,
+  });
+}
+
+let _activeGameRestoreRunId = 0;
+
+async function restoreActiveGameState(options = {}) {
+  const {
+    conversationId = state.conversationId,
+    silent = true,
+    renderOnFinish = true
+  } = options;
+
+  if (!conversationId || !state.userId) return null;
+
+  const requestedConversationId = String(conversationId).trim();
+  if (!requestedConversationId) return null;
+
+  const runId = ++_activeGameRestoreRunId;
+  logGameDebug("restore-game-begin", {
+    conversationId: requestedConversationId,
+    silent,
+    currentGameType: state.activeGame?.type || null,
+  });
+
+  try {
+    const res = await fetch(`${API}/v1/games/state/${encodeURIComponent(requestedConversationId)}?userId=${encodeURIComponent(state.userId)}`);
+    const data = await res.json();
+
+    if (runId !== _activeGameRestoreRunId || requestedConversationId !== state.conversationId) {
+      logGameDebug("restore-game-stale", {
+        conversationId: requestedConversationId,
+        runId,
+        latestRunId: _activeGameRestoreRunId,
+        activeConversationId: state.conversationId || null,
+      });
+      return null;
+    }
+
+    if (!data.ok) {
+      throw new Error(data.message || "Failed to restore game state.");
+    }
+
+    if (data.session) {
+      applySessionSnapshot(data.session, "backend-game-restore");
+    }
+
+    const restoredGame = normalizeActiveGame(data.game);
+    state.activeGame = restoredGame;
+    state.gameActive = !!(restoredGame && restoredGame.status === "active");
+
+    if (!restoredGame) {
+      state.gameSpiritkinMessage = null;
+      state.gameInstructions = null;
+      state.gameEchoGuide = null;
+      state.gameHelpOpen = false;
+      state.gameHelpFirstRun = false;
+    } else if (!state.gameHelpSeen?.[restoredGame.type]) {
+      state.gameHelpOpen = true;
+      state.gameHelpFirstRun = true;
+      markGameHelpSeen(restoredGame.type);
+    }
+
+    logGameDebug("restore-game-success", {
+      conversationId: requestedConversationId,
+      restoredType: restoredGame?.type || null,
+      restoredStatus: restoredGame?.status || null,
+      restoredTurn: restoredGame?.turn || null,
+      historyLength: Array.isArray(restoredGame?.history) ? restoredGame.history.length : 0,
+    });
+
+    if (renderOnFinish) render();
+    return restoredGame;
+  } catch (err) {
+    logGameDebug("restore-game-error", {
+      conversationId: requestedConversationId,
+      silent,
+      error: err?.message || String(err),
+    });
+    if (!silent) {
+      state.statusText = "Could not restore the current game.";
+      state.statusError = true;
+      if (renderOnFinish) render();
+    }
+    return null;
+  }
 }
 
 async function fetchSpiritkins() {
@@ -3020,6 +3501,7 @@ function openCrownGate() {
   clearSpiritGateArrivalFallback();
   clearSpiritGateTransitionTimers();
   spiritGateActiveAttemptId += 1;
+  const attemptId = spiritGateActiveAttemptId;
   state.crownGateOpening = true;
   state.showCrownGateHome = false;
   state.entryVideoStarted = true;
@@ -3029,10 +3511,17 @@ function openCrownGate() {
   console.info("[SpiritGate] route-video-start", { action: "continue", snapshot: getInteractionStateSnapshot() });
   console.info("Gate video start", getInteractionStateSnapshot());
   setMediaMuted(false);
+  armSpiritGatePlaybackSafety("gate-route-start");
   state.statusText = "The Crown Gate is opening...";
   state.statusError = false;
   normalizeInteractionState("openCrownGate");
   render();
+  window.setTimeout(() => {
+    if (attemptId !== spiritGateActiveAttemptId) return;
+    if (!state.crownGateOpening || state.entryAccepted || state.entryTransitioning) return;
+    logSpiritGate("deterministic-transition", { source: "gate-recovery-direct" });
+    completeCrownGateEntry({ skipped: true, source: "gate-recovery-direct", force: true });
+  }, CROWN_GATE_HOLD_MS);
 }
 
 async function finalizeCrownGateRoute({ skipped = false, source = "unspecified" } = {}) {
@@ -3040,21 +3529,26 @@ async function finalizeCrownGateRoute({ skipped = false, source = "unspecified" 
   state.entryTransitioning = false;
   state.showHomeView = true;
   state.showCrownGateHome = false;
+  logContinuityDebug("post-gate-route-begin", { skipped, source, route: getPostGateRoute() });
 
   const route = getPostGateRoute();
   logSpiritGate("entry-route-resolved", { route, skipped, source });
   if (route === "first-run") {
-    state.spiritverseTrailerActive = true;
-    state.statusText = "Spiritverse arrival sequence beginning...";
+    state.spiritverseTrailerActive = false;
+    state.statusText = "SpiritCore is welcoming you...";
+    armSpiritGateArrivalPlaybackSafety("arrival-route-start");
     render();
+    await beginSpiritCoreWelcome();
     return;
   }
 
   state.spiritverseTrailerActive = false;
   render();
   if (route === "bonded-home" && state.primarySpiritkin && !state.voiceMuted) {
+    cleanupSpeechLifecycle("post-gate-returning-user-greeting", { renderOnFinish: false, clearStatus: false });
     await speakMoment(buildGreetingText(state.primarySpiritkin.name, "returningUser"), state.primarySpiritkin.ui.voice || "nova");
   }
+  logContinuityDebug("post-gate-route-complete", { skipped, source, route });
 }
 
 function completeCrownGateEntry({ skipped = false, source = "unspecified", force = false } = {}) {
@@ -3112,6 +3606,7 @@ async function beginSpiritCoreWelcome() {
 
   await new Promise((resolve) => window.setTimeout(resolve, 700));
   if (!state.voiceMuted) {
+    cleanupSpeechLifecycle("spiritcore-welcome", { renderOnFinish: false, clearStatus: false });
     await speakMoment(SPIRITCORE_WELCOME_TEXT, SPIRITCORE_WELCOME_VOICE);
   } else {
     await new Promise((resolve) => window.setTimeout(resolve, 4200));
@@ -3125,6 +3620,11 @@ async function beginSpiritCoreWelcome() {
 }
 
 function goHome() {
+  logContinuityDebug("go-home", {
+    fromConversationId: state.conversationId || null,
+    fromTab: state.activePresenceTab,
+    fromGame: state.activeGame?.type || null,
+  });
   syncPrimarySelection();
   clearSpiritGateFallback();
   clearSpiritGateArrivalFallback();
@@ -3140,17 +3640,30 @@ function goHome() {
   state.showHomeView = true;
   state.realmTravelOpen = false;
   state.activePresenceTab = "profile";
-  stopListening();
+  cleanupSpeechLifecycle("go-home", { renderOnFinish: false, clearStatus: false });
   state.statusText = state.primarySpiritkin
     ? `Returned to the Crown Gate. ${state.primarySpiritkin.name} remains bonded.`
     : "Returned to the Crown Gate.";
   state.statusError = false;
   normalizeInteractionState("goHome");
+  persistSession();
+  syncSessionControlSoon({
+    currentSurface: "profile",
+    currentMode: "bond_home",
+    activeTab: "profile",
+    speechState: { turnPhase: "complete" },
+  });
   render();
 }
 
 function startFreshSession() {
+  logContinuityDebug("start-fresh-session", {
+    previousConversationId: state.conversationId || null,
+    previousMessageCount: Array.isArray(state.messages) ? state.messages.length : 0,
+  });
   syncPrimarySelection();
+  cleanupSpeechLifecycle("start-fresh-session", { renderOnFinish: false, clearStatus: false });
+  _lastAutoSpokenMessageId = null;
   state.showHomeView = false;
   state.conversationId = null;
   state.messages = [];
@@ -3161,10 +3674,23 @@ function startFreshSession() {
   state.statusError = false;
   normalizeInteractionState("startFreshSession");
   persistSession();
+  setAuthoritativeTurnPhase("idle", { isSpeaking: false, isListening: false, isPaused: false, lastUtteranceId: null });
+  syncSessionControlSoon({
+    conversationId: null,
+    currentSurface: "selection",
+    currentMode: "selection",
+    activeTab: "profile",
+    speechState: { turnPhase: "idle", lastUtteranceId: null },
+  });
   render();
 }
 
 async function beginConversation() {
+  logContinuityDebug("begin-conversation-request", {
+    selectedSpiritkin: state.selectedSpiritkin?.name || null,
+    existingConversationId: state.conversationId || null,
+    showHomeView: !!state.showHomeView,
+  });
   syncPrimarySelection();
   if (!state.selectedSpiritkin) return;
   state.showCrownGateHome = false;
@@ -3174,6 +3700,7 @@ async function beginConversation() {
     scrollThread();
     return;
   }
+  cleanupSpeechLifecycle("begin-conversation", { renderOnFinish: false, clearStatus: false });
   state.showHomeView = false;
   state.loadingConv = true;
   state.convError = null;
@@ -3191,10 +3718,26 @@ async function beginConversation() {
     if (!data.ok) throw new Error(data.message || "Could not begin conversation.");
     state.conversationId = data.conversation?.conversation_id ?? data.conversation?.id ?? data.conversationId;
     if (!state.conversationId) throw new Error("No conversation ID returned.");
-    state.messages = [];
+    _lastAutoSpokenMessageId = null;
+    if (!(data.session && applySessionSnapshot(data.session, "conversation-bootstrap"))) {
+      state.messages = [];
+    }
     state.statusText = `Linked with ${state.selectedSpiritkin.name}.`;
     state.statusError = false;
+    setAuthoritativeTurnPhase("idle", { isSpeaking: false, isListening: false, isPaused: false, lastUtteranceId: null });
     persistSession();
+    await syncSessionControl({
+      conversationId: state.conversationId,
+      currentSpiritkinName: state.selectedSpiritkin.name,
+      currentSurface: deriveCurrentSurfaceFromUI(),
+      currentMode: deriveCurrentModeFromUI(),
+      activeTab: state.activePresenceTab || "profile",
+      speechState: { turnPhase: "idle", lastUtteranceId: null },
+    });
+    logContinuityDebug("begin-conversation-success", {
+      conversationId: state.conversationId,
+      selectedSpiritkin: state.selectedSpiritkin?.name || null,
+    });
     // Start wellness session timer
     startSessionTimer();
     // Process engagement state from backend
@@ -3217,6 +3760,10 @@ async function beginConversation() {
       }
     }
   } catch (error) {
+    logContinuityDebug("begin-conversation-failed", {
+      selectedSpiritkin: state.selectedSpiritkin?.name || null,
+      error: error.message,
+    });
     state.convError = error.message;
     state.statusText = error.message;
     state.statusError = true;
@@ -3235,10 +3782,7 @@ async function sendMessage(overrideText) {
   const text = (overrideText ?? state.input).trim();
   if (!text || state.loadingReply) return;
   if (isDuplicateUserSubmission(text)) return;
-  clearVoiceTurnCapture();
-  if (state.voiceListening) {
-    stopListening();
-  }
+  cleanupSpeechLifecycle("send-message", { renderOnFinish: false, clearStatus: false });
   markUserSubmission(text, overrideText === undefined ? "text" : "voice");
   updateAdaptiveProfileFromUserText(text);
   state.showCrownGateHome = false;
@@ -3254,9 +3798,20 @@ async function sendMessage(overrideText) {
   const outgoingId = uuid();
   state.messages.push({ id: outgoingId, role: "user", content: text, time: nowIso(), status: "sent" });
   state.loadingReply = true;
+  setAuthoritativeTurnPhase("processing", {
+    isSpeaking: false,
+    isListening: false,
+    isPaused: false,
+  });
   state.convError = null;
   state.statusText = `Receiving ${state.selectedSpiritkin?.name || "Spiritkin"}...`;
   state.statusError = false;
+  logContinuityDebug("send-message", {
+    conversationId: state.conversationId || null,
+    selectedSpiritkin: state.selectedSpiritkin?.name || null,
+    source: overrideText === undefined ? "text" : "voice",
+    textLength: text.length,
+  });
   render();
   scrollThread();
 
@@ -3273,31 +3828,50 @@ async function sendMessage(overrideText) {
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.message || "Reply interrupted.");
+    const sessionApplied = !!(data.session && applySessionSnapshot(data.session, "backend-interact"));
     const reply = data.message ?? data.output ?? data.response?.text ?? data.response ?? "...";
     const tags = Array.isArray(data.metadata?.tags) ? data.metadata.tags.filter((tag) => typeof tag === "string") : [];
     const emotionTone = sanitizeTone(data.metadata?.emotion?.tone);
     const sceneName = sanitizeScene(data.metadata?.world?.scene?.name);
     const assistantMsgId = uuid();
+    const resolvedAssistantMessageId = sessionApplied
+      ? ([...state.messages].reverse().find((message) => message?.role === "assistant" && String(message.content || "").trim() === String(reply || "").trim())?.id || assistantMsgId)
+      : assistantMsgId;
     const spiritkinVoice = state.selectedSpiritkin?.ui?.voice || "nova";
-    state.messages.push({
-      id: assistantMsgId,
-      role: "assistant",
-      content: reply,
-      spiritkinName: state.selectedSpiritkin?.name,
-      spiritkinVoice,
-      time: nowIso(),
-      status: "sent",
-      tags,
-      memoryActive: tags.includes("memory:active"),
-      emotionTone,
-      sceneName
-    });
+    if (!sessionApplied) {
+      state.messages.push({
+        id: assistantMsgId,
+        role: "assistant",
+        content: reply,
+        spiritkinName: state.selectedSpiritkin?.name,
+        spiritkinVoice,
+        time: nowIso(),
+        status: "sent",
+        tags,
+        memoryActive: tags.includes("memory:active"),
+        emotionTone,
+        sceneName
+      });
+    }
     observeAssistantStyle(reply);
     state.statusText = `${state.selectedSpiritkin?.name || "Spiritkin"} is with you.`;
     state.statusError = false;
     if (data.metadata?.world?.game) {
-      state.activeGame = data.metadata.world.game;
+      state.activeGame = normalizeActiveGame(data.metadata.world.game);
     }
+    setAuthoritativeTurnPhase("spirit_response", {
+      isSpeaking: !state.voiceMuted,
+      isListening: false,
+      isPaused: false,
+      lastUtteranceId: resolvedAssistantMessageId,
+    });
+    logContinuityDebug("receive-message", {
+      conversationId: state.conversationId || null,
+      replyLength: String(reply || "").length,
+      worldScene: sceneName || null,
+      worldGameType: data.metadata?.world?.game?.type || null,
+      voiceAutoplay: !state.voiceMuted,
+    });
     persistSession();
     // Increment resonance counter for this Spiritkin
     if (state.selectedSpiritkin?.name) {
@@ -3307,19 +3881,28 @@ async function sendMessage(overrideText) {
     }
     // Auto-speak the response unless muted
     if (!state.voiceMuted) {
-      speakMessage(assistantMsgId, { armUserTurn: shouldKeepVoiceLoopActive() }).catch(() => {
+      speakMessage(resolvedAssistantMessageId, { armUserTurn: shouldKeepVoiceLoopActive() }).catch(() => {
         if (shouldKeepVoiceLoopActive()) {
           setVoiceWaitingStatus();
         }
       });
     }
   } catch (error) {
+    logContinuityDebug("send-message-failed", {
+      conversationId: state.conversationId || null,
+      error: error.message,
+    });
     state.messages = state.messages.map((message) => (
       message.id === outgoingId ? { ...message, status: "failed" } : message
     ));
     state.convError = error.message;
     state.statusText = error.message;
     state.statusError = true;
+    setAuthoritativeTurnPhase("complete", {
+      isSpeaking: false,
+      isListening: false,
+      isPaused: false,
+    });
   }
   state.loadingReply = false;
   render();
@@ -3506,7 +4089,23 @@ function pushAssistantMoment(content, overrides = {}) {
 
 function maybeSpeakMessageLater(messageId, options = {}) {
   if (!messageId || state.voiceMuted) return;
-  Promise.resolve().then(() => speakMessage(messageId, options)).catch(() => {});
+  if (_scheduledAutoSpeechMessageId === messageId || _lastAutoSpokenMessageId === messageId) {
+    logContinuityDebug("auto-speech-skipped-duplicate", { messageId });
+    return;
+  }
+  _scheduledAutoSpeechMessageId = messageId;
+  Promise.resolve()
+    .then(async () => {
+      if (state.voiceMuted) return;
+      await speakMessage(messageId, options);
+      _lastAutoSpokenMessageId = messageId;
+    })
+    .catch(() => {})
+    .finally(() => {
+      if (_scheduledAutoSpeechMessageId === messageId) {
+        _scheduledAutoSpeechMessageId = null;
+      }
+    });
 }
 
 function buildAdaptiveRequestContext() {
@@ -3515,6 +4114,9 @@ function buildAdaptiveRequestContext() {
   const evolution = spiritkin ? updateSpiritkinEvolution(spiritkin.name, {}) : null;
   const descriptor = spiritkin ? buildEvolutionDescriptor(spiritkin) : null;
   const temporal = state.spiritverseTemporal || getLocalTemporalWorldState();
+  const localSpeechRuntime = getLocalSpeechRuntimeState();
+  const activeSurface = state.sessionModel?.currentSurface || deriveCurrentSurfaceFromUI();
+  const activeMode = state.sessionModel?.currentMode || deriveCurrentModeFromUI();
   return {
     adaptiveProfile: {
       toneStyle: profile.toneStyle,
@@ -3557,6 +4159,30 @@ function buildAdaptiveRequestContext() {
       eventContinuity: temporal.eventContinuity || "",
       activeEventTitle: temporal.activeEventTitle || state.spiritverseEvent?.title || null
     } : null,
+    surfaceContext: {
+      activeSurface,
+      activeMode,
+      activeTab: state.activePresenceTab || "profile",
+      showHomeView: !!state.showHomeView,
+      showCrownGateHome: !!state.showCrownGateHome,
+      activeGameType: state.activeGame?.type || null,
+    },
+    speechState: {
+      isSpeaking: !!_audioPlaying,
+      isListening: !!state.voiceListening,
+      isPaused: !!state.pendingVoiceResume,
+      lastUtteranceId: state.sessionModel?.speechState?.lastUtteranceId || null,
+      turnPhase: normalizeTurnPhaseValue(state.sessionModel?.speechState?.turnPhase || "idle"),
+      // Browser-native runtime details remain local and advisory.
+      localRuntime: localSpeechRuntime,
+      voiceMode: !!state.voiceMode,
+      voiceMuted: !!state.voiceMuted,
+      voiceListening: !!state.voiceListening,
+      audioPlaying: localSpeechRuntime.audioPlaying,
+      awaitingUserTurn: localSpeechRuntime.awaitingUserTurn,
+      captureAfterAudio: localSpeechRuntime.captureAfterAudio,
+      pendingVoiceResume: !!state.pendingVoiceResume,
+    },
     recentAssistantMessages: state.messages
       .filter((message) => message.role === "assistant" && message.content)
       .slice(-3)
@@ -3776,29 +4402,6 @@ const COMPANION_REACTION_BANKS = {
     ]
   }
 };
-
-function hashSeed(value) {
-  const input = String(value || "");
-  let hash = 2166136261;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-function seededUnit(value) {
-  return hashSeed(value) / 4294967295;
-}
-
-function normalizeReactionText(text) {
-  return String(text || "").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function toneHasTag(tone, tags) {
-  const value = String(tone || "").toLowerCase();
-  return tags.some((tag) => value.includes(tag));
-}
 
 function getReactionCooldownMs(kind, profile) {
   const baseMap = {
@@ -4240,25 +4843,27 @@ async function executeGameMove(move, options = {}) {
   const { addUserMessage = false } = options;
   const previousGame = cloneGameState(state.activeGame);
   const previousSpiritkinMessage = state.gameSpiritkinMessage;
-  const optimisticGame = buildOptimisticGameState(previousGame, move);
   let spokenGameMessageId = null;
 
   try {
     stopListening();
     state.gameLoading = true;
     state.gameInput = "";
+    setAuthoritativeTurnPhase("processing", {
+      isSpeaking: false,
+      isListening: false,
+      isPaused: false,
+    });
     state.statusText = "Sending move...";
     state.statusError = false;
-
-    if (optimisticGame) {
-      state.activeGame = optimisticGame;
-      state.gameSpiritkinMessage = optimisticGame.status === "ended"
-        ? (buildGameOutcomeReaction(state.selectedSpiritkin.name, optimisticGame) || optimisticGame.result?.label || "Game complete.")
-        : (buildGamePendingReaction(state.selectedSpiritkin.name, optimisticGame.type, move) || `${state.selectedSpiritkin.name} is considering the board...`);
-      if (SpiritverseGames && SpiritverseGames.reset) {
-        SpiritverseGames.reset();
-      }
-    }
+    logGameDebug("move-submit-begin", {
+      move: String(move),
+      addUserMessage,
+      previousStatus: previousGame?.status || null,
+      previousTurn: previousGame?.turn || null,
+      previousHistoryLength: Array.isArray(previousGame?.history) ? previousGame.history.length : 0,
+      authoritativeFlow: true,
+    });
 
     render();
 
@@ -4275,7 +4880,14 @@ async function executeGameMove(move, options = {}) {
     const data = await res.json();
 
     if (data.ok) {
-      state.activeGame = normalizeActiveGame(data.game);
+      if (data.session) {
+        applySessionSnapshot(data.session, "backend-game-move");
+      }
+      const canonicalGame = normalizeActiveGame(data.game);
+      if (!didCanonicalGameApplyMove(previousGame, canonicalGame, move)) {
+        throw new Error("Game state was not committed.");
+      }
+      state.activeGame = canonicalGame;
       const resolvedGameReply =
         data.spiritkinMessage ||
         buildGameOutcomeReaction(state.selectedSpiritkin.name, state.activeGame) ||
@@ -4287,7 +4899,7 @@ async function executeGameMove(move, options = {}) {
       state.statusError = false;
 
       if (SpiritverseGames && SpiritverseGames.reset) {
-        SpiritverseGames.reset();
+        SpiritverseGames.reset({ closeStage: false });
       }
 
       if (addUserMessage) {
@@ -4308,11 +4920,37 @@ async function executeGameMove(move, options = {}) {
         });
         spokenGameMessageId = message?.id || null;
       }
+      setAuthoritativeTurnPhase("spirit_response", {
+        isSpeaking: !state.voiceMuted && !!spokenGameMessageId,
+        isListening: false,
+        isPaused: false,
+        lastUtteranceId: spokenGameMessageId || state.sessionModel?.speechState?.lastUtteranceId || null,
+      });
+      logGameDebug("move-submit-success", {
+        move: String(move),
+        status: state.activeGame?.status || null,
+        turn: state.activeGame?.turn || null,
+        moveCount: state.activeGame?.moveCount || 0,
+        historyLength: Array.isArray(state.activeGame?.history) ? state.activeGame.history.length : 0,
+        lastHistory: Array.isArray(state.activeGame?.history) && state.activeGame.history.length
+          ? state.activeGame.history[state.activeGame.history.length - 1]
+          : null,
+      });
     } else {
       state.activeGame = previousGame;
       state.gameSpiritkinMessage = previousSpiritkinMessage;
       state.statusText = data.message || "Move failed.";
       state.statusError = true;
+      setAuthoritativeTurnPhase("complete", {
+        isSpeaking: false,
+        isListening: false,
+        isPaused: false,
+      });
+      logGameDebug("move-submit-rejected", {
+        move: String(move),
+        error: data.error || null,
+        message: data.message || null,
+      });
     }
   } catch (err) {
     console.error("Failed to submit game move", err);
@@ -4320,6 +4958,15 @@ async function executeGameMove(move, options = {}) {
     state.gameSpiritkinMessage = previousSpiritkinMessage;
     state.statusText = "Move failed — please try again.";
     state.statusError = true;
+    setAuthoritativeTurnPhase("complete", {
+      isSpeaking: false,
+      isListening: false,
+      isPaused: false,
+    });
+    logGameDebug("move-submit-error", {
+      move: String(move),
+      error: err?.message || String(err),
+    });
   } finally {
     state.gameLoading = false;
     render();
@@ -4336,6 +4983,11 @@ async function submitGameMove(move) {
 async function startGameSession(gameType) {
   if (!gameType || state.gameLoading) return false;
   let spokenGameMessageId = null;
+  logGameDebug("start-game-begin", {
+    gameType,
+    hasConversation: !!state.conversationId,
+    selectedSpiritkin: state.selectedSpiritkin?.name || null,
+  });
   try {
     if (!state.selectedSpiritkin?.name) {
       state.statusText = "Choose a bonded Spiritkin before starting a game.";
@@ -4385,13 +5037,15 @@ async function startGameSession(gameType) {
     state.statusText = "Game started.";
     state.statusError = false;
     state.gameActive = true;
-    state.gameHelpOpen = !state.gameHelpSeen?.[gameType];
-    if (!state.gameHelpSeen?.[gameType]) {
+    const isFirstGameLook = !state.gameHelpSeen?.[gameType];
+    state.gameHelpOpen = isFirstGameLook;
+    state.gameHelpFirstRun = isFirstGameLook;
+    if (isFirstGameLook) {
       markGameHelpSeen(gameType);
     }
 
     if (SpiritverseGames && SpiritverseGames.reset) {
-      SpiritverseGames.reset();
+      SpiritverseGames.reset({ closeStage: true });
     }
 
     if (resolvedGameReply) {
@@ -4403,6 +5057,14 @@ async function startGameSession(gameType) {
       spokenGameMessageId = message?.id || null;
     }
     normalizeInteractionState("startGameSession:success");
+    logGameDebug("start-game-success", {
+      gameType,
+      status: state.activeGame?.status || null,
+      turn: state.activeGame?.turn || null,
+      moveCount: state.activeGame?.moveCount || 0,
+      historyLength: Array.isArray(state.activeGame?.history) ? state.activeGame.history.length : 0,
+      instructionsPresent: !!state.gameInstructions,
+    });
     render();
     scrollThread();
     maybeSpeakMessageLater(spokenGameMessageId);
@@ -4411,6 +5073,10 @@ async function startGameSession(gameType) {
     console.error("Failed to start game", err);
     state.statusText = "Failed to start game.";
     state.statusError = true;
+    logGameDebug("start-game-error", {
+      gameType,
+      error: err?.message || String(err),
+    });
     render();
     return false;
   } finally {
@@ -4438,55 +5104,88 @@ function buildGameOutcomeSummary(game, spiritkinName) {
 function getGameHelpContent(gameType, instructions = "") {
   const guides = {
     chess: {
+      whatItIs: "A full chess match on a celestial board where you play white and the Spiritkin answers as black.",
       objective: "Pressure the Spiritkin king until it has no legal escape.",
       basicMove: "Tap one of your white pieces, then tap a highlighted destination square.",
+      feedback: "Watch the turn badge, highlighted squares, Spiritkin commentary, and move history after each turn.",
       winCondition: "Checkmate wins. If neither side can force progress, the board resolves to a draw."
     },
     checkers: {
+      whatItIs: "A checkers duel across the Veil where your white pieces advance against the Spiritkin's black pieces.",
       objective: "Remove every opposing piece or leave the Spiritkin with no move.",
       basicMove: "Tap one of your white pieces, then tap a highlighted dark square to move or jump.",
+      feedback: "Watch for highlighted landing squares, the turn badge, and the move history to confirm each jump or trade.",
       winCondition: "Capture the full opposing set or lock the board in your favor."
     },
     go: {
+      whatItIs: "A star-mapping form of Go played on a 13x13 constellation grid.",
       objective: "Place stones to claim more territory than your companion.",
       basicMove: "Tap any open intersection on the star-map board to place your next stone.",
+      feedback: "Look at the last placed stone, the commentary line, and the board spread to track how territory is shifting.",
       winCondition: "The larger controlled territory at the end wins the round."
     },
     spirit_cards: {
+      whatItIs: "A lightweight card duel where you build board presence and realm points against your Spiritkin.",
       objective: "Build more realm power than your companion by playing your hand efficiently.",
       basicMove: "Use Draw to refill your hand, then tap a card in your hand to play it.",
+      feedback: "Watch your hand, mana, board row, realm points, and the Spiritkin commentary after each play.",
       winCondition: "Keep building stronger board presence and realm points than the Spiritkin."
     },
     echo_trials: {
+      whatItIs: "A short riddle trial where the Spiritkin presents a question and you answer directly.",
       objective: "Solve the riddle before your attempts run out.",
       basicMove: "Read the riddle, enter your answer in the field, and submit your guess.",
+      feedback: "Keep an eye on the riddle text, your remaining attempts, and the Spiritkin response after each answer.",
       winCondition: "A correct answer clears the trial. Running out of attempts ends it."
     },
     tictactoe: {
+      whatItIs: "A quick pattern duel where you and your Spiritkin alternate marks on a 3x3 grid.",
       objective: "Claim three aligned marks before your companion does.",
       basicMove: "Tap any empty square once to place your mark.",
+      feedback: "Watch the turn badge, the fresh mark on the grid, and the move history after the Spiritkin answers.",
       winCondition: "Three in a row wins. A full board with no line is a draw."
     },
     connect_four: {
+      whatItIs: "A column-drop duel where stars stack until one side connects four first.",
       objective: "Connect four of your stars before the Spiritkin connects theirs.",
       basicMove: "Tap any column header or cell in that column to drop your next piece.",
+      feedback: "Look for the newest dropped piece, the turn badge, and the commentary line to track pressure by column.",
       winCondition: "The first four-in-a-row horizontally, vertically, or diagonally wins."
     },
     battleship: {
+      whatItIs: "A hidden-grid search duel where you probe the deep to locate the Spiritkin fleet first.",
       objective: "Find every hidden Spiritkin vessel before yours are found.",
       basicMove: "Tap an unguessed cell on the 5x5 search grid to fire a shot.",
+      feedback: "Use the hit and miss markers, commentary text, and move history to follow the search pattern.",
       winCondition: "Reveal the full opposing fleet first."
     }
   };
   const guide = guides[gameType] || {
+    whatItIs: "A Spiritverse challenge surface with its own board, feedback, and move rhythm.",
     objective: instructions || "Complete the current Spiritverse challenge.",
     basicMove: "Use the active board controls to make your move.",
+    feedback: "Look for updates in the board, commentary, and move history after each action.",
     winCondition: "Fulfill the challenge conditions before your companion does."
   };
   return {
     ...guide,
     instructions: instructions || guide.basicMove
   };
+}
+
+function buildGameTutorialIntro(spiritkinName, gameType, help) {
+  const spiritkin = spiritkinName || state.selectedSpiritkin?.name || "Your Spiritkin";
+  const intros = {
+    chess: `${spiritkin} opens Celestial Chess with you. Start by selecting a white piece, then follow the highlighted squares. After every move, watch the board and commentary for the answer.`,
+    checkers: `${spiritkin} draws the Veil board into focus. Pick a white piece, follow the highlighted landing squares, and watch the move history after each jump or trade.`,
+    go: `${spiritkin} spreads a star-map between you. Place one stone at a time, then read the board shape and commentary to understand how territory is shifting.`,
+    spirit_cards: `${spiritkin} lays out the first hand. Watch your mana, play or draw from the visible controls, and check the board row and realm points after each card.`,
+    echo_trials: `${spiritkin} presents the trial directly. Read the riddle first, answer in the visible input, and use the response plus remaining attempts as your guide.`,
+    tictactoe: `${spiritkin} sets a simple grid between you. Tap one empty square, then watch where the answering mark appears before planning the next line.`,
+    connect_four: `${spiritkin} raises the columns into view. Drop into one column at a time and look for the newest piece, turn badge, and commentary to read the pressure.`,
+    battleship: `${spiritkin} hides a fleet beneath the deep grid. Tap one new cell per turn and use the hit or miss markers plus commentary to refine the search.`
+  };
+  return intros[gameType] || `${spiritkin} is ready. ${help.basicMove} ${help.feedback}`;
 }
 
 function markGameHelpSeen(gameType) {
@@ -4511,6 +5210,7 @@ function render() {
     if (typeof window.__svMarkBootReady === "function") {
       window.__svMarkBootReady();
     }
+    logContinuityViewIfChanged("render");
 
     // Handle RevealAnimation lifecycle
     if (state.customSpiritkinRevealed && state.generatedSpiritkin) {
@@ -4623,8 +5323,97 @@ function clearVoiceLoopTimer() {
 
 function clearVoiceTurnCapture() {
   clearVoiceLoopTimer();
-  _voiceAwaitingUserTurn = false;
-  _voiceTurnCaptureAfterAudio = false;
+  setVoiceTurnRuntimeState({ awaitingUserTurn: false, captureAfterAudio: false });
+  logContinuityDebug("voice-turn-capture-cleared", {});
+}
+
+function stopCurrentAudioPlayback() {
+  const activeAudio = _currentAudio;
+  _currentAudio = null;
+  _audioPlaying = false;
+  if (activeAudio instanceof HTMLAudioElement) {
+    try {
+      activeAudio.onended = null;
+      activeAudio.onerror = null;
+      const src = activeAudio.src;
+      activeAudio.pause();
+      activeAudio.src = "";
+      if (typeof src === "string" && src.startsWith("blob:")) {
+        URL.revokeObjectURL(src);
+      }
+    } catch (_) {}
+    return;
+  }
+  if (activeAudio && typeof activeAudio.stop === "function") {
+    try {
+      activeAudio.stop();
+    } catch (_) {}
+  }
+}
+
+function cleanupSpeechLifecycle(reason = "unspecified", options = {}) {
+  const {
+    renderOnFinish = false,
+    clearStatus = false,
+    preserveResumeHint = false,
+  } = options;
+
+  logContinuityDebug("speech-lifecycle-cleanup", {
+    reason,
+    renderOnFinish,
+    clearStatus,
+    preserveResumeHint,
+    hadRecognition: !!_recognition,
+    hadAudio: !!_currentAudio || !!_audioPlaying,
+    awaitingUserTurn: !!_voiceAwaitingUserTurn,
+  });
+
+  _scheduledAutoSpeechMessageId = null;
+  clearVoiceLoopTimer();
+
+  if (_recognition) {
+    _recognitionStopRequested = true;
+    const recognition = _recognition;
+    _recognition = null;
+    try {
+      recognition.stop();
+    } catch (_) {}
+  }
+
+  state.voiceListening = false;
+  stopCurrentAudioPlayback();
+  setAuthoritativeTurnPhase(preserveResumeHint ? "complete" : "idle", {
+    isSpeaking: false,
+    isListening: false,
+    isPaused: !!preserveResumeHint,
+    lastUtteranceId: preserveResumeHint
+      ? state.sessionModel?.speechState?.lastUtteranceId || null
+      : null,
+  });
+
+  if (!preserveResumeHint) {
+    setVoiceTurnRuntimeState({ awaitingUserTurn: false, captureAfterAudio: false });
+    state.pendingVoiceResume = false;
+  }
+
+  if (clearStatus) {
+    state.statusText = "";
+    state.statusError = false;
+  }
+
+  syncSessionControlSoon({
+    speechState: {
+      isSpeaking: false,
+      isListening: false,
+      isPaused: !!preserveResumeHint,
+      lastUtteranceId: preserveResumeHint
+        ? state.sessionModel?.speechState?.lastUtteranceId || null
+        : null,
+      turnPhase: preserveResumeHint ? "complete" : "idle",
+    },
+  });
+
+  if (renderOnFinish) render();
 }
 
 function markUserSubmission(text, source = "unknown") {
@@ -4644,18 +5433,22 @@ function isDuplicateUserSubmission(text, windowMs = 1800) {
 function setVoiceWaitingStatus(message = "I'm here when you're ready. Tap the mic or type to continue.") {
   state.statusText = message;
   state.statusError = false;
+  logContinuityDebug("voice-waiting", { message });
   render();
 }
 
 function requestVoiceTurnCapture(options = {}) {
   const { afterAudio = false, delay = 350 } = options;
+  logContinuityDebug("voice-turn-capture-requested", { afterAudio, delay });
   clearVoiceLoopTimer();
   if (!shouldKeepVoiceLoopActive()) {
     clearVoiceTurnCapture();
     return false;
   }
-  _voiceAwaitingUserTurn = true;
-  _voiceTurnCaptureAfterAudio = !!afterAudio || _audioPlaying;
+  setVoiceTurnRuntimeState({
+    awaitingUserTurn: true,
+    captureAfterAudio: !!afterAudio || _audioPlaying,
+  });
   if (_voiceTurnCaptureAfterAudio) return true;
   scheduleVoiceLoop(delay);
   return true;
@@ -4693,6 +5486,12 @@ function buildIssueContextSummary() {
   if (state.activeGame?.type) parts.push(`Game: ${state.activeGame.type.replace(/_/g, " ")}`);
   if (state.conversationId) parts.push("Conversation active");
   return parts.join(" • ");
+}
+
+function normalizeIssueReportField(value, maxLength = 120) {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  return normalized.slice(0, maxLength);
 }
 
 function buildRetentionPanel() {
@@ -4818,13 +5617,16 @@ async function submitIssueReport() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        reportText,
+        reportText: reportText.slice(0, 2000),
         userId: state.userId,
         conversationId: state.conversationId || null,
         spiritkinName: state.selectedSpiritkin?.name || state.primarySpiritkin?.name || null,
         sessionId: state.conversationId || null,
-        sourceContext: [getIssueSourceContext(), state.issueReportContextNote.trim()].filter(Boolean).join(" | "),
-        currentFeature: getIssueFeatureContext(),
+        sourceContext: normalizeIssueReportField(
+          [getIssueSourceContext(), state.issueReportContextNote].filter(Boolean).join(" | "),
+          120
+        ),
+        currentFeature: normalizeIssueReportField(getIssueFeatureContext(), 120),
       }),
     });
 
@@ -5798,6 +6600,7 @@ function buildChatView() {
                 <div class="active-game-panel">
                   ${(() => {
                     const help = getGameHelpContent(state.activeGame.type, state.gameInstructions);
+                    const tutorialIntro = buildGameTutorialIntro(spiritkin.name, state.activeGame.type, help);
                     return `
                       <div class="game-help-panel ${state.gameHelpOpen ? 'open' : ''}">
                         <div class="game-help-header">
@@ -5810,14 +6613,28 @@ function buildChatView() {
                           </button>
                         </div>
                         ${state.gameHelpOpen ? `
+                          ${state.gameHelpFirstRun ? `
+                            <div class="game-help-intro">
+                              <div class="game-help-intro-label">${esc(spiritkin.name)} guides the first round</div>
+                              <p>${esc(tutorialIntro)}</p>
+                            </div>
+                          ` : ''}
                           <div class="game-help-grid">
+                            <div class="game-help-card">
+                              <div class="game-help-card-label">What It Is</div>
+                              <p>${esc(help.whatItIs)}</p>
+                            </div>
                             <div class="game-help-card">
                               <div class="game-help-card-label">Objective</div>
                               <p>${esc(help.objective)}</p>
                             </div>
                             <div class="game-help-card">
-                              <div class="game-help-card-label">Basic Move</div>
+                              <div class="game-help-card-label">Make A Move</div>
                               <p>${esc(help.basicMove)}</p>
+                            </div>
+                            <div class="game-help-card">
+                              <div class="game-help-card-label">Watch For Feedback</div>
+                              <p>${esc(help.feedback)}</p>
                             </div>
                             <div class="game-help-card">
                               <div class="game-help-card-label">Win Condition</div>
@@ -6474,6 +7291,7 @@ async function onClick(event) {
     state.statusText = candidate ? `${candidate.name} ready to become your primary companion.` : "";
     state.statusError = false;
     normalizeInteractionState("select-spiritkin");
+    persistSession();
     render();
     return;
   }
@@ -6494,6 +7312,7 @@ async function onClick(event) {
   }
 
   if (action === "open-bond-manager") {
+    cleanupSpeechLifecycle("open-bond-manager", { renderOnFinish: false, clearStatus: false });
     state.showHomeView = true;
     state.activePresenceTab = "profile";
     state.selectedSpiritkin = state.primarySpiritkin || state.selectedSpiritkin;
@@ -6604,17 +7423,16 @@ async function onClick(event) {
 
   if (action === "begin") { await beginConversation(); return; }
   if (action === "open-games-hub") {
-    state.activePresenceTab = "games";
     state.showHomeView = false;
     state.selectedSpiritkin = state.primarySpiritkin || state.selectedSpiritkin;
     normalizeInteractionState("open-games-hub");
     if (!state.conversationId) {
       await beginConversation();
-    } else {
+    }
+    if (state.conversationId) {
       state.showHomeView = false;
-      normalizeInteractionState("open-games-hub:existing-conversation");
-      render();
-      narratePresenceTab("games").catch(() => {});
+      normalizeInteractionState("open-games-hub:games");
+      await transitionPresenceSurface("games");
     }
     return;
   }
@@ -6639,7 +7457,7 @@ async function onClick(event) {
   if (action === "retry-load") { await fetchSpiritkins(); return; }
   if (action === "thumb-up") { submitFeedback(element.dataset.msgId, true); return; }
   if (action === "thumb-down") { submitFeedback(element.dataset.msgId, false); }
-  if (action === "speak") { await speakMessage(element.dataset.msgId); return; }
+  if (action === "speak") { await speakMessage(element.dataset.msgId, { forceReplay: true }); return; }
   if (action === "enable-voice-mode") {
     // Unlock autoplay by playing a silent audio
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -6723,7 +7541,7 @@ async function onClick(event) {
     if (prompt) {
       state.input = prompt;
       state.dailyQuestStarted = true;
-      state.activePresenceTab = 'profile'; // Switch back to chat
+      await transitionPresenceSurface("profile", { announce: false });
       render();
       // Focus the textarea
       setTimeout(() => {
@@ -6740,38 +7558,8 @@ async function onClick(event) {
   }
   if (action === "set-presence-tab") {
     const tab = element.dataset.tab;
-    const previousTab = state.activePresenceTab;
-    state.activePresenceTab = tab;
-    normalizeInteractionState("set-presence-tab");
-    render();
-    if (tab !== previousTab) {
-      narratePresenceTab(tab).catch(() => {});
-    }
-    // Load events/quest when those tabs are opened
-    if (tab === 'events' && !state.spiritverseEvent) {
-      fetchSpiritverseEvent();
-    }
-    if (tab === 'quest' && !state.dailyQuest) {
-      fetchDailyQuest();
-    }
-    // Load bond journal data when journal tab is opened
-    if (tab === 'journal' && state.conversationId && state.userId) {
-      fetch(`${API}/v1/bond-journal?userId=${encodeURIComponent(state.userId)}&conversationId=${encodeURIComponent(state.conversationId)}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.ok) {
-            state.bondJournal = data.journal;
-            persistSession();
-            render();
-          }
-        })
-        .catch(() => {
+    await transitionPresenceSurface(tab);
           // Graceful fallback — show empty journal
-          state.bondJournal = { gamesCompleted: 0, bondStage: 0, bondStageName: 'First Contact', unlockedEchoCount: 0, memories: [], gameUnlocks: [] };
-          persistSession();
-          render();
-        });
-    }
     return;
   }
 
@@ -6792,7 +7580,7 @@ async function onClick(event) {
     if (['crown', 'veil', 'ember', 'astral', 'abyssal'].includes(theme)) {
       state.pieceTheme = theme;
       localStorage.setItem('sk_piece_theme', theme);
-      if (SpiritverseGames) SpiritverseGames.reset();
+      if (SpiritverseGames) SpiritverseGames.reset({ closeStage: false });
       render();
     }
     return;
@@ -6814,24 +7602,27 @@ async function onClick(event) {
 
   if (action === "toggle-game-help") {
     state.gameHelpOpen = !state.gameHelpOpen;
+    if (!state.gameHelpOpen) state.gameHelpFirstRun = false;
     render();
     return;
   }
 
   if (action === "dismiss-game-help") {
     state.gameHelpOpen = false;
+    state.gameHelpFirstRun = false;
     render();
     return;
   }
 
   if (action === "clear-finished-game") {
     if (SpiritverseGames && SpiritverseGames.reset) {
-      SpiritverseGames.reset();
+      SpiritverseGames.reset({ closeStage: true });
     }
     state.activeGame = null;
     state.gameSpiritkinMessage = null;
     state.gameInstructions = null;
     state.gameHelpOpen = false;
+    state.gameHelpFirstRun = false;
     state.gameEchoGuide = null;
     state.gameInput = "";
     render();
@@ -6965,7 +7756,7 @@ async function onClick(event) {
         })
       });
       const endData = endRes.ok ? await endRes.json().catch(() => null) : null;
-      state.activeGame = endData?.game || state.activeGame;
+      state.activeGame = endData?.game ? normalizeActiveGame(endData.game) : state.activeGame;
       state.gameSpiritkinMessage = endData?.message || state.gameSpiritkinMessage;
       state.gameInstructions = null;
       state.gameEchoGuide = null;
@@ -7142,8 +7933,7 @@ function startListening(options = {}) {
   }
 
   clearVoiceLoopTimer();
-  _voiceAwaitingUserTurn = true;
-  _voiceTurnCaptureAfterAudio = false;
+  setVoiceTurnRuntimeState({ awaitingUserTurn: true, captureAfterAudio: false });
   const recognition = new SpeechRecognition();
   const runId = ++_recognitionRunId;
   _recognitionStopRequested = false;
@@ -7157,9 +7947,23 @@ function startListening(options = {}) {
   recognition.onstart = () => {
     if (!isActiveRun()) return;
     state.voiceListening = true;
+    setAuthoritativeTurnPhase("user_input", {
+      isSpeaking: false,
+      isListening: true,
+      isPaused: false,
+    });
+    syncSessionControlSoon({
+      speechState: {
+        isSpeaking: false,
+        isListening: true,
+        isPaused: false,
+        turnPhase: "user_input",
+      },
+    });
     state.statusText = "Listening… Speak now.";
     state.statusError = false;
     console.info("[Voice] listening-started", { source });
+    logContinuityDebug("listening-started", { source, runId });
     render();
   };
 
@@ -7171,7 +7975,17 @@ function startListening(options = {}) {
     state.input = transcript;
     render();
     if (!transcript) return;
-    _voiceAwaitingUserTurn = false;
+    setVoiceTurnRuntimeState({ awaitingUserTurn: false, captureAfterAudio: false });
+    setAuthoritativeTurnPhase("processing", {
+      isSpeaking: false,
+      isListening: false,
+      isPaused: false,
+    });
+    logContinuityDebug("listening-transcript", {
+      source,
+      runId,
+      transcriptLength: transcript.length,
+    });
     const now = Date.now();
     if (_lastVoiceSubmission.text === transcript && (now - _lastVoiceSubmission.at) < 1500) return;
     _lastVoiceSubmission = { text: transcript, at: now };
@@ -7186,7 +8000,26 @@ function startListening(options = {}) {
 
   recognition.onerror = (event) => {
     if (!isActiveRun()) return;
+    logContinuityDebug("listening-error", {
+      source,
+      runId,
+      error: event.error,
+      stopRequested: !!_recognitionStopRequested,
+    });
     state.voiceListening = false;
+    setAuthoritativeTurnPhase("complete", {
+      isSpeaking: false,
+      isListening: false,
+      isPaused: false,
+    });
+    syncSessionControlSoon({
+      speechState: {
+        isSpeaking: false,
+        isListening: false,
+        isPaused: false,
+        turnPhase: "complete",
+      },
+    });
     state.statusText = `Voice error: ${event.error}. Tap 🎤 to try again.`;
     state.statusError = true;
     _recognition = null;
@@ -7206,6 +8039,13 @@ function startListening(options = {}) {
   };
 
   recognition.onend = () => {
+    logContinuityDebug("listening-ended", {
+      source,
+      runId,
+      stopRequested: !!_recognitionStopRequested,
+      loadingReply: !!state.loadingReply,
+      convError: state.convError || null,
+    });
     const stopRequested = _recognitionStopRequested;
     if (state.voiceListening) {
       state.voiceListening = false;
@@ -7221,6 +8061,19 @@ function startListening(options = {}) {
     }
     _recognition = null;
     state.voiceListening = false;
+    setAuthoritativeTurnPhase("complete", {
+      isSpeaking: false,
+      isListening: false,
+      isPaused: false,
+    });
+    syncSessionControlSoon({
+      speechState: {
+        isSpeaking: false,
+        isListening: false,
+        isPaused: false,
+        turnPhase: "complete",
+      },
+    });
     if (!state.loadingReply && !state.convError) {
       setVoiceWaitingStatus();
     }
@@ -7239,21 +8092,51 @@ function startListening(options = {}) {
 }
 
 function stopListening() {
-  clearVoiceTurnCapture();
-  if (_recognition) {
-    _recognitionStopRequested = true;
-    const recognition = _recognition;
-    _recognition = null;
-    try {
-      recognition.stop();
-    } catch (_) {}
-  }
-  state.voiceListening = false;
-  state.statusText = "";
-  render();
+  logContinuityDebug("listening-stop-requested", {
+    hasRecognition: !!_recognition,
+    voiceListening: !!state.voiceListening,
+  });
+  cleanupSpeechLifecycle("stop-listening", { renderOnFinish: true, clearStatus: true });
 }
 
 let _spiritverseBootInitialized = false;
+let _speechLifecycleGuardsInstalled = false;
+
+function restoreVoiceContinuityState() {
+  if (!state.pendingVoiceResume) return;
+  const canResumeHint = !!(state.voiceMode && !state.voiceMuted && state.selectedSpiritkin && state.conversationId);
+  state.pendingVoiceResume = false;
+  if (canResumeHint) {
+    state.statusText = "Voice session paused during transition. Tap the mic or type to continue.";
+    state.statusError = false;
+  }
+  persistSession();
+  render();
+}
+
+function installSpeechLifecycleGuards() {
+  if (_speechLifecycleGuardsInstalled) return;
+  _speechLifecycleGuardsInstalled = true;
+
+  window.addEventListener("pagehide", () => {
+    const preserveResumeHint = !!(state.voiceMode && !state.voiceMuted && state.selectedSpiritkin && state.conversationId);
+    if (preserveResumeHint) {
+      state.pendingVoiceResume = true;
+      persistSession();
+    }
+    cleanupSpeechLifecycle("pagehide", { renderOnFinish: false, clearStatus: false, preserveResumeHint });
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "hidden") return;
+    const preserveResumeHint = !!(state.voiceMode && !state.voiceMuted && state.selectedSpiritkin && state.conversationId);
+    if (preserveResumeHint) {
+      state.pendingVoiceResume = true;
+      persistSession();
+    }
+    cleanupSpeechLifecycle("visibility-hidden", { renderOnFinish: false, clearStatus: false, preserveResumeHint });
+  });
+}
 
 function initializeSpiritverseApp() {
   if (_spiritverseBootInitialized) {
@@ -7263,9 +8146,19 @@ function initializeSpiritverseApp() {
   _spiritverseBootInitialized = true;
   try {
     installGlobalInteractionDiagnostics();
+    installSpeechLifecycleGuards();
     bootstrapRetentionExperience();
     logInteraction("boot", { rootReady: !!document.getElementById("root") });
     render();
+    fetchSessionSnapshot({ silent: true, renderOnFinish: false })
+      .then(() => {
+        if (state.conversationId) {
+          return restoreActiveGameState({ silent: true, renderOnFinish: true });
+        }
+        render();
+        return null;
+      })
+      .catch(() => {});
     fetchSpiritkins();
     // Phase 6 & 7: Load Spiritverse events and daily quest after spiritkins load
     setTimeout(() => {
@@ -7293,6 +8186,7 @@ function initializeSpiritverseApp() {
         }
       }
     });
+    restoreVoiceContinuityState();
   } catch (error) {
     console.error("[Spiritverse Boot Failure]", error);
     const root = document.getElementById("root");
@@ -7322,23 +8216,32 @@ if (document.readyState === "loading") {
 
 async function playAudio(buffer) {
   try {
-    _audioPlaying = true;
+    logContinuityDebug("speech-playback-start", {
+      byteLength: buffer?.byteLength || buffer?.length || 0,
+      hadRecognition: !!_recognition,
+      hadCurrentAudio: !!_currentAudio,
+    });
     clearVoiceLoopTimer();
     if (_recognition) {
-      stopListening();
+      cleanupSpeechLifecycle("play-audio-stop-listening", { renderOnFinish: false, clearStatus: false, preserveResumeHint: true });
     }
     pauseMountedVideoAudio();
-    // Stop any currently playing audio
-    if (_currentAudio instanceof HTMLAudioElement) {
-      _currentAudio.pause();
-      _currentAudio.src = '';
-      _currentAudio = null;
-    } else if (_currentAudio) {
-      try {
-        _currentAudio.stop();
-      } catch (e) {}
-      _currentAudio = null;
-    }
+    stopCurrentAudioPlayback();
+    _audioPlaying = true;
+    setAuthoritativeTurnPhase("spirit_response", {
+      isSpeaking: true,
+      isListening: false,
+      isPaused: false,
+    });
+    syncSessionControlSoon({
+      speechState: {
+        isSpeaking: true,
+        isListening: false,
+        isPaused: false,
+        lastUtteranceId: state.sessionModel?.speechState?.lastUtteranceId || null,
+        turnPhase: "spirit_response",
+      },
+    });
 
     // Create a blob from the buffer and use HTML5 audio element
     const blob = new Blob([buffer], { type: 'audio/mpeg' });
@@ -7348,20 +8251,56 @@ async function playAudio(buffer) {
     audio.src = url;
     audio.volume = 1.0;
     audio.onended = () => {
+      logContinuityDebug("speech-playback-ended", {
+        autoResumeListening: !!_voiceTurnCaptureAfterAudio,
+      });
+      _currentAudio = null;
       _audioPlaying = false;
+      setAuthoritativeTurnPhase("complete", {
+        isSpeaking: false,
+        isListening: false,
+        isPaused: false,
+      });
+      syncSessionControlSoon({
+        speechState: {
+          isSpeaking: false,
+          isListening: false,
+          isPaused: false,
+          lastUtteranceId: state.sessionModel?.speechState?.lastUtteranceId || null,
+          turnPhase: "complete",
+        },
+      });
       URL.revokeObjectURL(url);
-      if (_voiceTurnCaptureAfterAudio) {
-        _voiceTurnCaptureAfterAudio = false;
-        requestVoiceTurnCapture({ delay: 220 });
-      }
+    if (_voiceTurnCaptureAfterAudio) {
+      setVoiceTurnRuntimeState({ awaitingUserTurn: _voiceAwaitingUserTurn, captureAfterAudio: false });
+      requestVoiceTurnCapture({ delay: 220 });
+    }
     };
     audio.onerror = (e) => {
+      logContinuityDebug("speech-playback-error", {
+        autoResumeListening: !!_voiceTurnCaptureAfterAudio,
+      });
+      _currentAudio = null;
       _audioPlaying = false;
+      setAuthoritativeTurnPhase("complete", {
+        isSpeaking: false,
+        isListening: false,
+        isPaused: false,
+      });
+      syncSessionControlSoon({
+        speechState: {
+          isSpeaking: false,
+          isListening: false,
+          isPaused: false,
+          lastUtteranceId: state.sessionModel?.speechState?.lastUtteranceId || null,
+          turnPhase: "complete",
+        },
+      });
       URL.revokeObjectURL(url);
-      if (_voiceTurnCaptureAfterAudio) {
-        _voiceTurnCaptureAfterAudio = false;
-        setVoiceWaitingStatus("Audio playback failed. Tap the mic or type to continue.");
-      }
+    if (_voiceTurnCaptureAfterAudio) {
+      setVoiceTurnRuntimeState({ awaitingUserTurn: _voiceAwaitingUserTurn, captureAfterAudio: false });
+      setVoiceWaitingStatus("Audio playback failed. Tap the mic or type to continue.");
+    }
     };
     
     // Attempting to play audio
@@ -7371,10 +8310,20 @@ async function playAudio(buffer) {
       playPromise
         .then(() => {
           // Audio is now playing
+          logContinuityDebug("speech-playback-confirmed", {});
           _currentAudio = audio;
         })
         .catch(err => {
+          logContinuityDebug("speech-playback-failed", {
+            error: err.message,
+            name: err.name,
+          });
           _audioPlaying = false;
+          setAuthoritativeTurnPhase("complete", {
+            isSpeaking: false,
+            isListening: false,
+            isPaused: false,
+          });
           // Audio play failed
           if (err.name === 'NotAllowedError') {
             state.statusText = "🔊 Click the speaker button to enable audio playback.";
@@ -7383,8 +8332,7 @@ async function playAudio(buffer) {
           }
           state.statusError = false;
           if (_voiceTurnCaptureAfterAudio) {
-            _voiceTurnCaptureAfterAudio = false;
-            _voiceAwaitingUserTurn = false;
+            setVoiceTurnRuntimeState({ awaitingUserTurn: false, captureAfterAudio: false });
           }
           render();
         });
@@ -7392,10 +8340,17 @@ async function playAudio(buffer) {
       _currentAudio = audio;
     }
   } catch (e) {
+    logContinuityDebug("speech-playback-exception", {
+      error: e.message,
+    });
     _audioPlaying = false;
+    setAuthoritativeTurnPhase("complete", {
+      isSpeaking: false,
+      isListening: false,
+      isPaused: false,
+    });
     if (_voiceTurnCaptureAfterAudio) {
-      _voiceTurnCaptureAfterAudio = false;
-      _voiceAwaitingUserTurn = false;
+      setVoiceTurnRuntimeState({ awaitingUserTurn: false, captureAfterAudio: false });
     }
     // Failed to create audio element
     state.statusText = "Failed to play audio: " + e.message;
@@ -7410,15 +8365,42 @@ async function speakMessage(messageId, options = {}) {
     // No message found or no content
     return;
   }
+  if (!options.forceReplay && _audioPlaying && state.sessionModel?.speechState?.lastUtteranceId === messageId) {
+    return;
+  }
 
   try {
+    logContinuityDebug("speak-message", {
+      messageId,
+      role: message.role || null,
+      voice: message.spiritkinVoice || "nova",
+      armUserTurn: !!options.armUserTurn,
+      forceReplay: !!options.forceReplay,
+    });
+    if (options.forceReplay) {
+      cleanupSpeechLifecycle("manual-replay", { renderOnFinish: false, clearStatus: false });
+      state.statusText = "Replaying audio...";
+      state.statusError = false;
+      render();
+    }
     if (options.armUserTurn) {
       requestVoiceTurnCapture({ afterAudio: true });
     }
+    setAuthoritativeTurnPhase("spirit_response", {
+      isSpeaking: true,
+      isListening: false,
+      isPaused: false,
+      lastUtteranceId: messageId,
+    });
     const voice = message.spiritkinVoice || "nova";
     await speakText(message.content, voice);
   } catch (error) {
     // Speech generation failed
+    logContinuityDebug("speak-message-failed", {
+      messageId,
+      error: error.message,
+      armUserTurn: !!options.armUserTurn,
+    });
     if (options.armUserTurn) {
       clearVoiceTurnCapture();
     }
@@ -8194,3 +9176,4 @@ const _wellnessInterval = setInterval(checkWellnessNudge, 60 * 1000); // check e
 // Make render globally accessible
 window.render = render;
 window.initializeSpiritverseApp = initializeSpiritverseApp;
+

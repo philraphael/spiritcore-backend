@@ -277,16 +277,75 @@ function applyFenMove(fen, move, playerColor) {
   };
 }
 
-function applyCheckersMove(game, move) {
+function applyCheckersMove(game, move, player) {
   const [fromRaw, toRaw] = String(move || "").split("-");
   const from = parseInt(fromRaw, 10);
   const to = parseInt(toRaw, 10);
-  if (!Number.isInteger(from) || !Number.isInteger(to) || !game.data.board[from]) return false;
+  const board = Array.isArray(game?.data?.board) ? game.data.board : null;
+  if (!board || !Number.isInteger(from) || !Number.isInteger(to) || from < 0 || from >= 32 || to < 0 || to >= 32) return false;
+  const piece = board[from];
+  const owner = player === "spiritkin" ? "black" : "white";
+  if (!piece || !String(piece).includes(owner) || board[to]) return false;
+
+  const legalMoves = getCheckersLegalMoves(board, from, owner);
+  if (!legalMoves.includes(to)) return false;
+
+  const delta = to - from;
+  const isJump = Math.abs(delta) > 5;
+  const capturedSquare = isJump ? getCheckersCapturedSquare(from, to) : null;
+  if (isJump) {
+    if (!Number.isInteger(capturedSquare)) return false;
+    const capturedPiece = board[capturedSquare];
+    if (!capturedPiece || String(capturedPiece).includes(owner)) return false;
+    game.data.board[capturedSquare] = null;
+  }
+
   game.data.board[to] = game.data.board[from];
   game.data.board[from] = null;
-  if (Math.abs(to - from) > 5) game.data.board[Math.floor((from + to) / 2)] = null;
   game.data.lastMove = move;
   return true;
+}
+
+function getCheckersLegalMoves(board, from, owner) {
+  const moves = [];
+  const piece = board[from];
+  if (!piece || !String(piece).includes(owner)) return moves;
+
+  const isKing = piece.includes("king");
+  const col = from % 4;
+  const directions = [];
+
+  if (owner === "white" || isKing) {
+    if (col > 0) directions.push(-5);
+    if (col < 3) directions.push(-3);
+  }
+  if (owner === "black" || isKing) {
+    if (col > 0) directions.push(3);
+    if (col < 3) directions.push(5);
+  }
+
+  for (const delta of directions) {
+    const target = from + delta;
+    if (target < 0 || target >= 32) continue;
+    if (!board[target]) {
+      moves.push(target);
+      continue;
+    }
+    if (String(board[target]).includes(owner)) continue;
+    const jump = from + delta * 2;
+    if (jump >= 0 && jump < 32 && !board[jump]) {
+      moves.push(jump);
+    }
+  }
+
+  return moves;
+}
+
+function getCheckersCapturedSquare(from, to) {
+  const delta = to - from;
+  if (delta % 2 !== 0) return null;
+  const midpoint = from + delta / 2;
+  return midpoint >= 0 && midpoint < 32 ? midpoint : null;
 }
 
 function applyGoMove(game, move, player) {

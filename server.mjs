@@ -28,10 +28,12 @@ import { createFeedbackService }  from "./src/services/feedbackService.mjs";
 import { createIssueReportService } from "./src/services/issueReportService.mjs";
 import { analyticsRoutes }        from "./src/routes/analytics.mjs";
 import { issueRoutes }            from "./src/routes/issues.mjs";
+import { sessionRoutes }          from "./src/routes/session.mjs";
 // ── Phase F: Production hardening ───────────────────────────────────────────
 import { validateConfig, config } from "./src/config.mjs";
 import { getPinoOptions, setAppLogger } from "./src/logger.mjs";
 import { registerRateLimiter }    from "./src/middleware/rateLimiter.mjs";
+import { createAdminAccessGuard, extractAdminToken } from "./src/middleware/adminAccess.mjs";
 import { gameRoutes }             from "./src/routes/games.mjs";
 import { veilCrossingRoutes }     from "./src/routes/veilCrossing.mjs";
 import { bondJournalRoutes }      from "./src/routes/bondJournal.mjs";
@@ -50,9 +52,9 @@ const WORLD_ART_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "photos"
 const GAME_THEME_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "Game_Themes");
 const SPIRITVERSE_APP_BUILD = "20260417033000";
 
-const PORT    = config.port;
-const USE_LLM = String(process.env.USE_LLM || "false").toLowerCase() === "true";
-const DEBUG   = String(process.env.DEBUG   || "false").toLowerCase() === "true";
+const PORT = config.port;
+const USE_LLM = config.useLLM;
+const DEBUG = config.debug;
 
 // Fastify app with structured Pino logger
 const app = Fastify({
@@ -61,16 +63,18 @@ const app = Fastify({
   genReqId:   () => randomUUID(),
 });
 
-await app.register(cors, { origin: true });
+app.decorate("requireAdminAccess", createAdminAccessGuard({ config, logger: app.log }));
+
+await app.register(cors, { origin: config.corsOrigin });
 
 // Rate limiter registered via Phase F module (replaces inline registration)
 await registerRateLimiter(app);
 
 // Supabase
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+if (!config.supabase.url || !config.supabase.serviceRoleKey) {
   app.log.warn("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env");
 }
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
 // Decorate so handlers can access
 app.decorate("supabase", supabase);
@@ -96,6 +100,20 @@ function getStaticAssetMimeType(filePath) {
   if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
   if (ext === ".webp") return "image/webp";
   return "application/octet-stream";
+}
+
+function setAdminSessionCookie(req, reply) {
+  const auth = req.adminAccess || {};
+  if (auth.bypassed) return;
+
+  const { token, source } = extractAdminToken(req.headers || {});
+  if (!token || source === "cookie") return;
+
+  const secure = config.env === "production" ? "; Secure" : "";
+  reply.header(
+    "Set-Cookie",
+    `spiritcore_admin=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=900${secure}`
+  );
 }
 
 function sendError(reply, httpStatus, code, message, details, request_id) {
@@ -186,12 +204,14 @@ app.get("/", async (req, reply) => {
   };
 });
 
-app.get("/operator", async (_req, reply) => {
+app.get("/operator", { preHandler: app.requireAdminAccess }, async (req, reply) => {
+  setAdminSessionCookie(req, reply);
   const html = await readFile(path.join(OPERATOR_CONSOLE_DIR, "index.html"), "utf8");
   return reply.type("text/html; charset=utf-8").send(html);
 });
 
-app.get("/operator/:asset", async (req, reply) => {
+app.get("/operator/:asset", { preHandler: app.requireAdminAccess }, async (req, reply) => {
+  setAdminSessionCookie(req, reply);
   const { asset } = req.params;
   if (!["app.js", "styles.css"].includes(asset)) {
     return reply.code(404).send({ ok: false, error: "Not found" });
@@ -210,25 +230,28 @@ app.get("/app", async (_req, reply) => {
   return reply.type("text/html; charset=utf-8").send(html);
 });
 
-app.get("/command-center", async (_req, reply) => {
+app.get("/command-center", { preHandler: app.requireAdminAccess }, async (req, reply) => {
+  setAdminSessionCookie(req, reply);
   const html = await readFile(path.join(USER_APP_DIR, "command-center.html"), "utf8");
   return reply.type("text/html; charset=utf-8").send(html);
 });
 
 // Serve assets for Command Center specifically
-app.get("/command-center.js", async (_req, reply) => {
+app.get("/command-center.js", { preHandler: app.requireAdminAccess }, async (req, reply) => {
+  setAdminSessionCookie(req, reply);
   const content = await readFile(path.join(USER_APP_DIR, "command-center.js"), "utf8");
   return reply.type("text/javascript; charset=utf-8").send(content);
 });
 
-app.get("/command-center.css", async (_req, reply) => {
+app.get("/command-center.css", { preHandler: app.requireAdminAccess }, async (req, reply) => {
+  setAdminSessionCookie(req, reply);
   const content = await readFile(path.join(USER_APP_DIR, "command-center.css"), "utf8");
   return reply.type("text/css; charset=utf-8").send(content);
 });
 
 app.get("/app/:asset", async (req, reply) => {
   const { asset } = req.params;
-  if (!["app.js", "styles.css", "reveal-animation.js", "spiritverse-echoes.js", "video-player.js", "command-center.js", "command-center.css", "spirit-icons.svg", "spirit-background.jpg", "spiritverse-games.js", "spiritverse-games.css"].includes(asset)) {
+  if (!["app.js", "app-constants.js", "app-helpers.js", "styles.css", "reveal-animation.js", "spiritverse-echoes.js", "video-player.js", "command-center.js", "command-center.css", "spirit-icons.svg", "spirit-background.jpg", "spiritverse-games.js", "spiritverse-games.css"].includes(asset)) {
     return reply.code(404).send({ ok: false, error: "Not found" });
   }
 
@@ -610,6 +633,7 @@ try {
 // Expose container and orchestrator via Fastify decorators
 app.decorate("container",    container);
 app.decorate("orchestrator", container.orchestrator);
+app.decorate("sessionControlService", container.sessionControlService);
 
 // -- Analytics & Feedback services (non-blocking, safe to fail)
 const analyticsService = createAnalyticsService({ supabase: container.supabase });
@@ -641,6 +665,11 @@ await app.register(analyticsRoutes, {
 
 await app.register(issueRoutes, {
   issueReportService,
+  sessionControlService: container.sessionControlService,
+});
+
+await app.register(sessionRoutes, {
+  sessionControlService: container.sessionControlService,
 });
 
 await app.register(conversationRoutes, {
@@ -648,6 +677,8 @@ await app.register(conversationRoutes, {
   conversationService: container.conversationService,
   analyticsService,
   engagementEngine: container.engagementEngine,
+  messageService: container.messageService,
+  sessionControlService: container.sessionControlService,
 });
 
 await app.register(adminRoutes, {
@@ -664,6 +695,7 @@ await app.register(gameRoutes, {
   gameEngine: container.gameEngine,
   world: container.worldService,
   worldProgression: container.worldProgression,
+  sessionControlService: container.sessionControlService,
 });
 
 await app.register(veilCrossingRoutes, {

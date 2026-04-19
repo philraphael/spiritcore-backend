@@ -8,9 +8,10 @@
 
 export async function adminRoutes(fastify, opts) {
   const { supabase, messageService, registry, issueReportService } = opts;
+  const requireAdminAccess = fastify.requireAdminAccess;
 
   // ── GET /v1/admin/conversations/recent ──────────────────────────────────────
-  fastify.get("/v1/admin/conversations/recent", async (req, reply) => {
+  fastify.get("/v1/admin/conversations/recent", { preHandler: requireAdminAccess }, async (req, reply) => {
     try {
       const limit = Math.min(Number(req.query?.limit ?? 50), 200);
       const { data, error } = await supabase
@@ -37,7 +38,7 @@ export async function adminRoutes(fastify, opts) {
   });
 
   // ── GET /v1/admin/messages/:conversationId ──────────────────────────────────
-  fastify.get("/v1/admin/messages/:conversationId", async (req, reply) => {
+  fastify.get("/v1/admin/messages/:conversationId", { preHandler: requireAdminAccess }, async (req, reply) => {
     const { conversationId } = req.params;
     try {
       const messages = await messageService.fetchRecent({ conversationId, limit: 100 });
@@ -48,7 +49,7 @@ export async function adminRoutes(fastify, opts) {
   });
 
   // ── GET /v1/admin/stats ─────────────────────────────────────────────────────
-  fastify.get("/v1/admin/stats", async (req, reply) => {
+  fastify.get("/v1/admin/stats", { preHandler: requireAdminAccess }, async (req, reply) => {
     try {
       const { count: totalUsers } = await supabase.from("entitlements").select("*", { count: "exact", head: true });
       const { count: totalMessages } = await supabase.from("messages").select("*", { count: "exact", head: true });
@@ -68,7 +69,7 @@ export async function adminRoutes(fastify, opts) {
     }
   });
 
-  fastify.get("/v1/admin/issues/recent", async (_req, reply) => {
+  fastify.get("/v1/admin/issues/recent", { preHandler: requireAdminAccess }, async (_req, reply) => {
     if (!issueReportService) {
       return reply.code(503).send({ ok: false, error: "SERVICE_UNAVAILABLE", message: "Issue report service unavailable." });
     }
@@ -80,7 +81,7 @@ export async function adminRoutes(fastify, opts) {
     }
   });
 
-  fastify.get("/v1/admin/issues/digest", async (_req, reply) => {
+  fastify.get("/v1/admin/issues/digest", { preHandler: requireAdminAccess }, async (_req, reply) => {
     if (!issueReportService) {
       return reply.code(503).send({ ok: false, error: "SERVICE_UNAVAILABLE", message: "Issue report service unavailable." });
     }
@@ -92,7 +93,7 @@ export async function adminRoutes(fastify, opts) {
     }
   });
 
-  fastify.get("/v1/admin/issues/repair-packets", async (req, reply) => {
+  fastify.get("/v1/admin/issues/repair-packets", { preHandler: requireAdminAccess }, async (req, reply) => {
     if (!issueReportService) {
       return reply.code(503).send({ ok: false, error: "SERVICE_UNAVAILABLE", message: "Issue report service unavailable." });
     }
@@ -105,7 +106,7 @@ export async function adminRoutes(fastify, opts) {
     }
   });
 
-  fastify.get("/v1/admin/issues/repair-handoff", async (req, reply) => {
+  fastify.get("/v1/admin/issues/repair-handoff", { preHandler: requireAdminAccess }, async (req, reply) => {
     if (!issueReportService) {
       return reply.code(503).send({ ok: false, error: "SERVICE_UNAVAILABLE", message: "Issue report service unavailable." });
     }

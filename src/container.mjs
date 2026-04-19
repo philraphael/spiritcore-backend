@@ -47,6 +47,7 @@ import { createGameEngine }             from "./services/gameEngine.mjs";
 import { createSpiritMemoryEngine }     from "./services/spiritMemoryEngine.mjs";
 import { createWorldProgression }       from "./services/worldProgression.mjs";
 import { createResponseEngine }         from "./services/responseEngine.mjs";
+import { createSessionControlService }  from "./services/sessionControlService.mjs";
 
 /**
  * Build and return the fully wired service container.
@@ -82,8 +83,18 @@ export function buildContainer() {
   const hierarchicalMemoryService = createHierarchicalMemoryService({ supabase, bus });
   const structuredMemoryService = createStructuredMemoryService({ supabase, bus });
 
+  // --- Phase E: Messages Ledger + Safety Governor ---
+  const messageService  = createMessageService({ supabase });
+  const safetyGovernor  = createSafetyGovernor({ supabase });
+
   // --- Conversation & Context ---
   const conversationService = createConversationService({ supabase, registry });
+  const sessionControlService = createSessionControlService({
+    conversationService,
+    messageService,
+    world: worldService,
+    registry,
+  });
   const contextService      = createContextService({
     supabase,
     emotionService,
@@ -96,10 +107,6 @@ export function buildContainer() {
 
   // --- Adapters ---
   const adapters = buildAdapterRegistry({ bus });
-
-  // --- Phase E: Messages Ledger + Safety Governor ---
-  const messageService  = createMessageService({ supabase });
-  const safetyGovernor  = createSafetyGovernor({ supabase });
 
   // --- Phase G: Deep Memory Extraction ---
   const memoryExtractor = createMemoryExtractor({ memoryService });
@@ -120,6 +127,7 @@ export function buildContainer() {
     world: worldService,
     identityGovernor,
     conversationService,
+    sessionControlService,
     contextService,
     emotionService,
     episodeService,
@@ -152,6 +160,7 @@ export function buildContainer() {
     registry,
     identityGovernor,
     conversationService,
+    sessionControlService,
     contextService,
     safetyGovernor,
     memoryExtractor,

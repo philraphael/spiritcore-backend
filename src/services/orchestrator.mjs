@@ -182,6 +182,11 @@ export const createOrchestrator = ({
           role: "user",
           content: input,
         }).catch(() => {});
+        await messageService.persist({
+          conversationId: convId,
+          role: "assistant",
+          content: safetyPreResult.escalationResponse,
+        }).catch(() => {});
       }
 
       incrementMetric("requestsOk");
@@ -354,7 +359,7 @@ export const createOrchestrator = ({
     });
 
     // Stage 11d: Process Spiritkin game move if present
-    if (adapterResult.gameMove && nextWorldState.flags?.active_game?.status === "active") {
+    if (!context?.isGameMove && adapterResult.gameMove && nextWorldState.flags?.active_game?.status === "active") {
       const game = nextWorldState.flags.active_game;
       if (game.turn === "spiritkin") {
         game.history.push({
@@ -388,7 +393,7 @@ export const createOrchestrator = ({
         ? [
             messageService.persist({
               conversationId: convId,
-              role: "spiritkin",
+              role: "assistant",
               content: finalResponseText,
             }),
           ]

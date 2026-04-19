@@ -1,3 +1,16 @@
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+
+function hasPinoPrettyTransport() {
+  try {
+    require.resolve("pino-pretty");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * SpiritCore — Structured Logger (Phase F)
  *
@@ -20,10 +33,11 @@
 export function getPinoOptions(logConfig = {}) {
   const isPretty = logConfig.prettyPrint ?? (process.env.NODE_ENV !== "production");
   const level    = logConfig.level ?? "info";
+  const prettyAvailable = hasPinoPrettyTransport();
 
   return {
     level,
-    ...(isPretty
+    ...(isPretty && prettyAvailable
       ? {
           transport: {
             target: "pino-pretty",

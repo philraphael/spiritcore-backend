@@ -10,7 +10,7 @@
  */
 
 export async function gameRoutes(fastify, opts) {
-  const { gameEngine, world, worldProgression } = opts;
+  const { gameEngine, world, worldProgression, sessionControlService } = opts;
 
   /**
    * GET /v1/games/list
@@ -41,12 +41,26 @@ export async function gameRoutes(fastify, opts) {
 
     try {
       const result = await gameEngine.startGame({ userId, conversationId, gameType, spiritkinName });
+      const persistedWorld = await world.get({ userId, conversationId });
+      const canonicalGame = persistedWorld.state?.flags?.active_game || result.game;
+      const session = sessionControlService
+        ? await sessionControlService.updateControl({
+            userId,
+            conversationId,
+            currentSpiritkinName: spiritkinName,
+            currentSurface: "games",
+            currentMode: "game",
+            activeTab: "games",
+            speechState: { turnPhase: "complete" },
+          }).catch(() => null)
+        : null;
       return {
         ok: true,
-        game: result.game,
+        game: canonicalGame,
         spiritkinMessage: result.spiritkinMessage,
         instructions: result.instructions,
-        guide: result.guide || null
+        guide: result.guide || null,
+        session: session?.session || null,
       };
     } catch (err) {
       req.log.error(err, `[games] startGame failed for ${gameType}`);
@@ -71,10 +85,24 @@ export async function gameRoutes(fastify, opts) {
 
     try {
       const result = await gameEngine.makeMove({ userId, conversationId, move, spiritkinName });
+      const persistedWorld = await world.get({ userId, conversationId });
+      const canonicalGame = persistedWorld.state?.flags?.active_game || result.game;
+      const session = sessionControlService
+        ? await sessionControlService.updateControl({
+            userId,
+            conversationId,
+            currentSpiritkinName: spiritkinName,
+            currentSurface: "games",
+            currentMode: "game",
+            activeTab: "games",
+            speechState: { turnPhase: "spirit_response" },
+          }).catch(() => null)
+        : null;
       return {
         ok: true,
-        game: result.game,
-        spiritkinMessage: result.spiritkinMessage
+        game: canonicalGame,
+        spiritkinMessage: result.spiritkinMessage,
+        session: session?.session || null,
       };
     } catch (err) {
       req.log.error(err, `[games] makeMove failed for conversation ${conversationId}`);
@@ -100,10 +128,24 @@ export async function gameRoutes(fastify, opts) {
 
     try {
       const result = await gameEngine.drawCard({ userId, conversationId, spiritkinName });
+      const persistedWorld = await world.get({ userId, conversationId });
+      const canonicalGame = persistedWorld.state?.flags?.active_game || result.game;
+      const session = sessionControlService
+        ? await sessionControlService.updateControl({
+            userId,
+            conversationId,
+            currentSpiritkinName: spiritkinName,
+            currentSurface: "games",
+            currentMode: "game",
+            activeTab: "games",
+            speechState: { turnPhase: "spirit_response" },
+          }).catch(() => null)
+        : null;
       return {
         ok: true,
-        game: result.game,
-        spiritkinMessage: result.spiritkinMessage
+        game: canonicalGame,
+        spiritkinMessage: result.spiritkinMessage,
+        session: session?.session || null,
       };
     } catch (err) {
       req.log.error(err, `[games] drawCard failed for conversation ${conversationId}`);
@@ -126,7 +168,15 @@ export async function gameRoutes(fastify, opts) {
     try {
       const worldData = await world.get({ userId, conversationId });
       const game = worldData.state.flags?.active_game || null;
-      return { ok: true, game };
+      const session = sessionControlService
+        ? await sessionControlService.getSnapshot({
+            userId,
+            conversationId,
+            currentSurface: game?.status === "active" ? "games" : "profile",
+            currentMode: game?.status === "active" ? "game" : "conversation",
+          }).catch(() => null)
+        : null;
+      return { ok: true, game, session: session?.session || null };
     } catch (err) {
       req.log.error(err, `[games] getState failed for conversation ${conversationId}`);
       const code = err.statusCode || err.httpCode || 500;
@@ -172,6 +222,17 @@ export async function gameRoutes(fastify, opts) {
         ok: true,
         game: result.game,
         message: result.message,
+        session: sessionControlService
+          ? (await sessionControlService.updateControl({
+              userId,
+              conversationId,
+              currentSpiritkinName: spiritkinName,
+              currentSurface: "profile",
+              currentMode: "conversation",
+              activeTab: "profile",
+              speechState: { turnPhase: "complete" },
+            }).catch(() => null))?.session || null
+          : null,
         progression: progression ? {
           echoUnlock: progression.echoUnlock ?? null,
           bondAdvanced: progression.bondAdvanced ?? false,

@@ -21,6 +21,9 @@ const state = {
   input: "",
   selectedSpiritkin: "Lyra",
   messages: [],
+  issueReports: [],
+  issueDigest: null,
+  issueAccess: { available: null, message: "Report review not checked yet." },
   status: { kind: "info", message: "Operator console ready." },
   raw: null,
   loading: false,
@@ -108,6 +111,31 @@ async function createConversation() {
   }
 }
 
+async function loadIssueReports() {
+  try {
+    state.debug.lastAction = "loadIssueReports:start";
+    const [recentData, digestData] = await Promise.all([
+      request("/v1/admin/issues/recent"),
+      request("/v1/admin/issues/digest"),
+    ]);
+    state.issueReports = recentData.reports || [];
+    state.issueDigest = digestData.digest || null;
+    state.issueAccess = {
+      available: true,
+      message: `Loaded ${state.issueReports.length} recent report${state.issueReports.length === 1 ? "" : "s"}.`,
+    };
+    setStatus("ok", "Loaded reporting pipeline review data.");
+  } catch (err) {
+    state.issueAccess = {
+      available: false,
+      message: err.message,
+    };
+    setStatus("error", `Reporting review unavailable: ${err.message}`);
+    state.debug.lastError = err.message;
+  }
+  render();
+}
+
 async function sendMessage() {
   const text = state.input.trim();
   if (!text || !state.selectedConversation) {
@@ -171,6 +199,30 @@ function render() {
         <button id="sendInteractionBtn" class="send-btn">Send</button>
       </section>
 
+      <section class="panel">
+        <h2>Issue Reports</h2>
+        <div class="button-row"><button id="loadIssueReportsBtn">Refresh Reports</button></div>
+        <p class="status ${state.issueAccess.available === false ? "error" : "info"}">${escapeHtml(state.issueAccess.message)}</p>
+        ${(state.issueDigest || state.issueReports.length) ? `
+          <div class="conversation-list">
+            ${(state.issueReports || []).slice(0, 8).map((report) => `
+              <div class="conversation-row">
+                <div>
+                  <strong>${escapeHtml(report.repair_summary?.owner_digest_line || report.summary || "Report received.")}</strong>
+                  <div>${escapeHtml(report.classification || "unknown")} • ${escapeHtml(report.status || "logged")} • ${escapeHtml(report.context?.current_feature || "general_app")}</div>
+                </div>
+                <span>${escapeHtml(String(report.severity || "low"))}</span>
+              </div>
+            `).join("")}
+          </div>
+          <pre>${escapeHtml(JSON.stringify({
+            unresolved: state.issueDigest?.unresolved_issues?.length || 0,
+            recurring: state.issueDigest?.grouped_recurring_issues?.length || 0,
+            queue: state.issueDigest?.queue?.length || 0,
+          }, null, 2))}</pre>
+        ` : '<p class="empty">No report review data loaded.</p>'}
+      </section>
+
       <section class="panel"><h2>Raw JSON</h2><pre>${escapeHtml(JSON.stringify(state.raw ?? {}, null, 2))}</pre></section>
       <section class="panel"><h2>Debug</h2><p><strong>JS loaded:</strong> ${state.debug.jsLoaded ? "yes" : "no"}</p><p><strong>Handlers attached:</strong> ${state.debug.handlersAttached ? "yes" : "no"}</p><p><strong>Last action:</strong> ${escapeHtml(state.debug.lastAction)}</p><p><strong>Last error:</strong> ${escapeHtml(state.debug.lastError || "none")}</p><pre>${escapeHtml(JSON.stringify({ payload: state.debug.lastPayload, response: state.debug.lastResponse }, null, 2))}</pre></section>
     </main>
@@ -189,6 +241,8 @@ function wireCriticalHandlers() {
   if (createConversationEl) createConversationEl.onclick = () => { state.debug.lastAction = "click:createConversationBtn"; createConversation(); };
   const sendEl = document.getElementById("sendInteractionBtn");
   if (sendEl) sendEl.onclick = () => { state.debug.lastAction = "click:sendInteractionBtn"; sendMessage(); };
+  const loadIssueReportsEl = document.getElementById("loadIssueReportsBtn");
+  if (loadIssueReportsEl) loadIssueReportsEl.onclick = () => { state.debug.lastAction = "click:loadIssueReportsBtn"; loadIssueReports(); };
 }
 
 function onInput(e) {
@@ -231,4 +285,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   checkReady();
   loadSpiritkins();
+  loadIssueReports();
 });

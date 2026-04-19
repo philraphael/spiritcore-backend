@@ -127,6 +127,19 @@ function bindClicks(root, selector, handler) {
   });
 }
 
+function shouldLogGameRenderDebug() {
+  try {
+    return window.__SV_GAME_DEBUG === true || localStorage.getItem("sv.game.debug") === "1";
+  } catch (_) {
+    return window.__SV_GAME_DEBUG === true;
+  }
+}
+
+function logGameRenderDebug(eventName, detail = {}) {
+  if (!shouldLogGameRenderDebug()) return;
+  console.info(`[GameRenderDebug] ${eventName}`, detail);
+}
+
 function spiritCardGlyph(card = {}) {
   const glyphs = {
     Essence: "✦",
@@ -654,6 +667,18 @@ export const SpiritverseGames = {
     const board = payload.board || safeGame.board;
     const lastMove = normalizeLastMove(type, payload.lastMove || safeGame.lastMove);
     const isInteractive = safeGame.status === 'active' && safeGame.turn === 'user';
+    logGameRenderDebug("render", {
+      type,
+      spiritkinName,
+      status: safeGame.status,
+      turn: safeGame.turn,
+      moveCount: safeGame.moveCount || 0,
+      historyLength: history.length,
+      isInteractive,
+      payloadKeys: Object.keys(payload || {}),
+      boardSize: Array.isArray(board) ? board.length : null,
+      hasFen: typeof chessFen === 'string' && chessFen.length > 0,
+    });
 
     const renderFn = (target, isExp) => {
       switch (type) {
@@ -971,7 +996,7 @@ export const SpiritverseGames = {
     }
   },
 
-  renderConnectFour(container, gameData, onMoveSubmit, isExpanded, theme = resolveGameTheme("connect_four")) {
+  _renderConnectFourLegacy(container, gameData, onMoveSubmit, isExpanded, theme = resolveGameTheme("connect_four")) {
     const board = gameData.board || Array(42).fill(null);
     const finished = Boolean(gameData.result || gameData.winner || !board.includes(null));
     const isUsersTurn = !finished && gameData.turn === 'user';
@@ -997,7 +1022,7 @@ export const SpiritverseGames = {
     }
   },
 
-  renderBattleship(container, gameData, onMoveSubmit, isExpanded, theme = resolveGameTheme("battleship")) {
+  _renderBattleshipLegacy(container, gameData, onMoveSubmit, isExpanded, theme = resolveGameTheme("battleship")) {
     const guesses = new Set(gameData.userGuesses || []);
     const hits = new Set(gameData.hits?.user || []);
     const finished = Boolean(gameData.result || gameData.winner);
@@ -1132,11 +1157,12 @@ export const SpiritverseGames = {
     }
   },
 
-  reset() {
+  reset(options = {}) {
+    const { closeStage = true } = options;
     this.chess = { selectedSquare: null, validMoves: [], lastMove: null };
     this.checkers = { selectedPiece: null, validMoves: [] };
     this.echoAnswer = '';
-    GrandStage.close();
+    if (closeStage) GrandStage.close();
   }
 };
 

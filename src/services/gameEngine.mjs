@@ -3,6 +3,11 @@ import { createSharedGameRuntime } from "./sharedGameEngine.mjs";
 
 export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
   const runtime = createSharedGameRuntime();
+  const shouldDebugGames = String(process.env.GAME_DEBUG || "").trim() === "1";
+  const logGameEngineDebug = (eventName, detail = {}) => {
+    if (!shouldDebugGames) return;
+    console.info(`[GameEngineDebug] ${eventName}`, detail);
+  };
 
   const resolveSpiritkinId = async (name) => {
     if (!registry || !name) return null;
@@ -21,13 +26,23 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
 
     state.flags = state.flags || {};
     state.flags.active_game = gameState;
+    logGameEngineDebug("start-game", {
+      userId,
+      conversationId,
+      gameType,
+      spiritkinName,
+      moveCount: gameState.moveCount,
+      turn: gameState.turn,
+    });
 
     await world.upsert({ userId, conversationId, spiritkinId: spiritkinId ?? worldData.spiritkinId, state });
     bus.emit("game.started", { userId, conversationId, gameType, spiritkinName });
+    const persisted = await world.get({ userId, conversationId });
+    const canonicalGame = persisted.state?.flags?.active_game || gameState;
 
     return {
       ok: true,
-      game: gameState,
+      game: canonicalGame,
       spiritkinMessage: buildStartMessage(spiritkinName, meta, gameType),
       instructions: meta.instructions,
       guide: null,
@@ -41,7 +56,22 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
 
     if (!game || game.status !== "active") throw new AppError("GAME_ERROR", "No active game found.", 400);
     const normalizedMove = String(move || "").trim();
+    logGameEngineDebug("user-move-received", {
+      userId,
+      conversationId,
+      gameType: game.type,
+      move: normalizedMove,
+      turn: game.turn,
+      moveCount: game.moveCount,
+      historyLength: Array.isArray(game.history) ? game.history.length : 0,
+    });
     if (!runtime.applyUserMove(game, normalizedMove)) {
+      logGameEngineDebug("user-move-rejected", {
+        userId,
+        conversationId,
+        gameType: game.type,
+        move: normalizedMove,
+      });
       throw new AppError("GAME_ERROR", "That move could not be applied.", 400);
     }
 
@@ -49,6 +79,16 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
     game.moveCount++;
     if (game.status !== "ended") game.turn = "spiritkin";
     await world.upsert({ userId, conversationId, spiritkinId: worldData.spiritkinId, state });
+    logGameEngineDebug("user-move-applied", {
+      userId,
+      conversationId,
+      gameType: game.type,
+      move: normalizedMove,
+      status: game.status,
+      turn: game.turn,
+      moveCount: game.moveCount,
+      historyLength: game.history.length,
+    });
 
     let spiritkinResponse = buildFallbackReaction(spiritkinName, game);
     if (game.status === "ended") {
@@ -65,7 +105,7 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
           conversationId,
           input: runtime.buildPrompt(game, normalizedMove, spiritkinName),
           spiritkin: { name: spiritkinName },
-          context: { isGameMove: true, gameType: game.type, activeGame: game }
+          context: { isGameMove: true, gameType: game.type }
         });
       } catch (_) {
         result = null;
@@ -73,11 +113,24 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
 
       spiritkinResponse = result?.message || spiritkinResponse;
       let spiritkinMove = runtime.extractMove(spiritkinResponse, game.type) || runtime.chooseFallbackMove(game, "spiritkin");
+      logGameEngineDebug("spiritkin-move-candidate", {
+        userId,
+        conversationId,
+        gameType: game.type,
+        candidateMove: spiritkinMove,
+        responsePreview: String(spiritkinResponse || "").slice(0, 160),
+      });
       if (spiritkinMove && runtime.applySpiritkinMove(game, spiritkinMove)) {
         game.history.push({ player: "spiritkin", move: spiritkinMove, timestamp: new Date().toISOString() });
         game.moveCount++;
       } else if (game.status !== "ended") {
         spiritkinMove = runtime.chooseFallbackMove(game, "spiritkin");
+        logGameEngineDebug("spiritkin-fallback-move", {
+          userId,
+          conversationId,
+          gameType: game.type,
+          fallbackMove: spiritkinMove,
+        });
         if (spiritkinMove && runtime.applySpiritkinMove(game, spiritkinMove)) {
           game.history.push({ player: "spiritkin", move: spiritkinMove, timestamp: new Date().toISOString() });
           game.moveCount++;
@@ -90,9 +143,21 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
         game.turn = "user";
       }
       await world.upsert({ userId, conversationId, spiritkinId: worldData.spiritkinId, state });
+      logGameEngineDebug("move-cycle-complete", {
+        userId,
+        conversationId,
+        gameType: game.type,
+        status: game.status,
+        turn: game.turn,
+        moveCount: game.moveCount,
+        historyLength: game.history.length,
+        result: game.result || null,
+      });
     }
 
-    return { ok: true, game, spiritkinMessage: spiritkinResponse };
+    const persisted = await world.get({ userId, conversationId });
+    const canonicalGame = persisted.state?.flags?.active_game || game;
+    return { ok: true, game: canonicalGame, spiritkinMessage: spiritkinResponse };
   };
 
   const drawCard = async ({ userId, conversationId, spiritkinName }) => {
@@ -117,7 +182,9 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
       message = buildOutcomeReaction(spiritkinName, game, outcome === "forfeit" ? "forfeit" : "system");
     }
     await world.upsert({ userId, conversationId, spiritkinId: worldData.spiritkinId, state });
-    return { ok: true, game, message };
+    const persisted = await world.get({ userId, conversationId });
+    const canonicalGame = persisted.state?.flags?.active_game || game;
+    return { ok: true, game: canonicalGame, message };
   };
 
   return { startGame, makeMove, drawCard, endGame, listGames: () => runtime.listGames() };

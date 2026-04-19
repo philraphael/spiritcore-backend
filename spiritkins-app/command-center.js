@@ -34,6 +34,7 @@ const state = {
   selectedConversationMessages: [],
   systemStats: {},
   globalMetrics: {},
+  recentIssueReports: [],
   issueDigest: null,
   repairHandoff: null,
   isTestingVoice: false,
@@ -95,12 +96,15 @@ async function refreshData() {
     state.recentConversations = convData.conversations || [];
 
     // 4. Fetch issue review data
-    const [digestRes, handoffRes] = await Promise.all([
+    const [recentRes, digestRes, handoffRes] = await Promise.all([
+      fetch(`${API}/v1/admin/issues/recent`),
       fetch(`${API}/v1/admin/issues/digest`),
       fetch(`${API}/v1/admin/issues/repair-handoff`)
     ]);
+    const recentData = await recentRes.json();
     const digestData = await digestRes.json();
     const handoffData = await handoffRes.json();
+    state.recentIssueReports = recentData.reports || [];
     state.issueDigest = digestData.digest || null;
     state.repairHandoff = handoffData.handoff || null;
 
@@ -391,6 +395,7 @@ function renderRepairTab() {
   const emerging = handoff.newly_emerging_issues || [];
   const areas = handoff.repeat_complaints_by_system_area || [];
   const packets = handoff.repair_packets || [];
+  const recentReports = state.recentIssueReports || [];
 
   return `
     <div class="cc-tab-content">
@@ -478,6 +483,24 @@ function renderRepairTab() {
                 <div class="cc-issue-meta">${item.clusters} active cluster${item.clusters === 1 ? "" : "s"}</div>
               </div>
             `).join("") : '<p class="cc-empty">No system-area repeats yet.</p>'}
+          </div>
+        </section>
+        <section class="cc-card" style="grid-column: span 2;">
+          <h3>Recent Reports</h3>
+          <div class="cc-issue-list">
+            ${recentReports.length ? recentReports.slice(0, 10).map((report) => `
+              <div class="cc-issue-item">
+                <div class="cc-issue-top">
+                  <strong>${report.context?.current_feature || report.repair_summary?.probable_area || "general_app"}</strong>
+                  <span class="cc-severity ${report.severity || 'low'}">${report.severity || 'low'}</span>
+                </div>
+                <div class="cc-issue-summary">${report.repair_summary?.owner_digest_line || report.summary || "Report received."}</div>
+                <div class="cc-issue-meta">
+                  ${report.classification || "unknown"} • ${report.status || "logged"} • ${new Date(report.created_at).toLocaleString()}
+                  ${report.conversation_id ? ` • <button class="btn btn-ghost btn-sm" onclick="viewTranscript('${report.conversation_id}')">Open transcript</button>` : ""}
+                </div>
+              </div>
+            `).join("") : '<p class="cc-empty">No recent reports available.</p>'}
           </div>
         </section>
         <section class="cc-card" style="grid-column: span 2;">

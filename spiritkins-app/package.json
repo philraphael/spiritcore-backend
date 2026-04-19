@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "node --check ./app.js && node --check ./command-center.js && node --check ./reveal-animation.js && node --check ./spiritverse-echoes.js && node --check ./spiritverse-games.js && node --check ./video-player.js && node --check ./data/spiritverseCanon.js && node --check ./data/gameAssetManifest.js && node ./scripts/verify-static-build.mjs",
+    "verify:static": "node ./scripts/verify-static-build.mjs",
+    "test": "npm run build"
   },
   "keywords": [],
   "author": "",

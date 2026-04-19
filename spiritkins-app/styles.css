@@ -3842,6 +3842,97 @@ button:disabled {
   animation: fadeIn 0.35s ease-out;
 }
 
+.game-help-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.game-help-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.game-help-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.game-help-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.game-help-intro {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(78, 205, 196, 0.08);
+  border: 1px solid rgba(78, 205, 196, 0.18);
+}
+
+.game-help-intro-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #4ecdc4;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.game-help-intro p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.game-help-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.game-help-card {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.game-help-card-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--realm-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.game-help-card p {
+  margin: 0;
+  font-size: 0.83rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.game-help-instructions {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
 .game-panel-header {
   display: flex;
   align-items: center;
@@ -3872,6 +3963,12 @@ button:disabled {
 
 .game-end-btn:hover {
   opacity: 1;
+}
+
+@media (max-width: 720px) {
+  .game-help-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Turn badge */
