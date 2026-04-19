@@ -1861,6 +1861,7 @@ const state = {
   showEchoUnlock: false,        // whether to show the echoes unlock notification
   currentEchoUnlock: null,      // the echoes unlock to display
   activePresenceTab: "profile",  // profile, echoes, charter, games, journal
+  pendingPresenceTab: null,
   bondJournal: null,              // loaded bond journal data
   // Game state
   activeGame: null,              // current active game object
@@ -2244,12 +2245,23 @@ async function transitionPresenceSurface(tab, options = {}) {
   const { announce = true } = options;
   const runId = ++_surfaceTransitionRunId;
   const previousTab = state.activePresenceTab;
-  const session = await syncSessionControl({
-    currentSurface: tab,
-    currentMode: deriveModeForSurface(tab),
-    activeTab: tab,
-    speechState: { turnPhase: state.sessionModel?.speechState?.turnPhase || "complete" },
-  });
+  state.pendingPresenceTab = tab;
+  if (tab !== previousTab) {
+    state.statusText = `Opening ${tab.replace("_", " ")}...`;
+    state.statusError = false;
+    render();
+  }
+  let session;
+  try {
+    session = await syncSessionControl({
+      currentSurface: tab,
+      currentMode: deriveModeForSurface(tab),
+      activeTab: tab,
+      speechState: { turnPhase: state.sessionModel?.speechState?.turnPhase || "complete" },
+    });
+  } finally {
+    state.pendingPresenceTab = null;
+  }
   if (runId !== _surfaceTransitionRunId) return false;
   if (!session) {
     state.statusText = "Could not switch views right now.";
@@ -5900,7 +5912,7 @@ function buildEntry() {
               maxlength="40"
             />
           </div>
-          <button class="btn btn-primary btn-wide" data-action="continue" ${state.crownGateOpening ? "disabled" : ""}>${state.crownGateOpening ? "Opening the Crown Gate..." : (returning ? "Re-enter the Spiritverse" : "Open the Crown Gate")}</button>
+          <button class="btn btn-primary btn-wide entry-main-cta" data-action="continue" ${state.crownGateOpening ? "disabled" : ""}>${state.crownGateOpening ? `<span class="btn-inline-spinner"></span><span>Entering...</span>` : (returning ? "Re-enter the Spiritverse" : "Open the Crown Gate")}</button>
           <p class="entry-disclaimer">Your primary companion can be changed later through an intentional rebonding step — not by accident.</p>
         </div>
       </div>
@@ -6006,16 +6018,16 @@ function buildCrownGateEntry() {
             </div>
           `}
           <div class="entry-action-rail">
-            <button class="entry-skip-btn ${consentBlocked ? "is-guarded" : ""}" data-action="skip-gate" ${state.crownGateOpening ? "disabled" : ""} aria-disabled="${consentBlocked ? "true" : "false"}">Skip</button>
+            <button class="entry-skip-btn ${consentBlocked ? "is-guarded" : ""}" data-action="skip-gate" ${state.crownGateOpening ? "disabled" : ""} aria-disabled="${consentBlocked ? "true" : "false"}">${state.crownGateOpening ? "Please wait..." : "Skip"}</button>
             <div class="entry-cta">
               <button class="btn btn-primary btn-wide entry-main-cta ${consentBlocked ? "is-guarded" : ""}" data-action="continue" ${state.crownGateOpening ? "disabled" : ""} aria-disabled="${consentBlocked ? "true" : "false"}">
-                ${state.crownGateOpening ? "Opening the SpiritGate..." : "Enter the SpiritVerse"}
+                ${state.crownGateOpening ? `<span class="btn-inline-spinner"></span><span>Entering...</span>` : "Enter the SpiritVerse"}
               </button>
             </div>
           </div>
           ${state.statusText ? `
             <div class="entry-status ${state.statusError ? "is-error" : ""}">
-              ${esc(state.statusText)}
+              ${state.crownGateOpening || state.entryTransitioning ? `<span class="spinner-sm"></span>` : ""}${esc(state.statusText)}
             </div>
           ` : ""}
         </div>
@@ -6421,17 +6433,18 @@ function buildChatView() {
         </div>
 
         <div class="presence-tabs">
-          <button class="presence-tab ${state.activePresenceTab === 'profile' ? 'active' : ''}" data-action="set-presence-tab" data-tab="profile">Profile</button>
-          <button class="presence-tab ${state.activePresenceTab === 'echoes' ? 'active' : ''}" data-action="set-presence-tab" data-tab="echoes">Echoes (${unlockedEchoes.length})</button>
-          <button class="presence-tab ${state.activePresenceTab === 'charter' ? 'active' : ''}" data-action="set-presence-tab" data-tab="charter">Charter</button>
-          <button class="presence-tab ${state.activePresenceTab === 'games' ? 'active' : ''}" data-action="set-presence-tab" data-tab="games">Games</button>
-          <button class="presence-tab ${state.activePresenceTab === 'journal' ? 'active' : ''}" data-action="set-presence-tab" data-tab="journal">Bond Journal</button>
-          <button class="presence-tab ${state.activePresenceTab === 'events' ? 'active' : ''}" data-action="set-presence-tab" data-tab="events">Realm Events</button>
-          <button class="presence-tab ${state.activePresenceTab === 'quest' ? 'active' : ''}" data-action="set-presence-tab" data-tab="quest">Daily Quest</button>
+          <button class="presence-tab ${state.activePresenceTab === 'profile' ? 'active' : ''} ${state.pendingPresenceTab === 'profile' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="profile">Profile</button>
+          <button class="presence-tab ${state.activePresenceTab === 'echoes' ? 'active' : ''} ${state.pendingPresenceTab === 'echoes' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="echoes">Echoes (${unlockedEchoes.length})</button>
+          <button class="presence-tab ${state.activePresenceTab === 'charter' ? 'active' : ''} ${state.pendingPresenceTab === 'charter' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="charter">Charter</button>
+          <button class="presence-tab ${state.activePresenceTab === 'games' ? 'active' : ''} ${state.pendingPresenceTab === 'games' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="games">Games</button>
+          <button class="presence-tab ${state.activePresenceTab === 'journal' ? 'active' : ''} ${state.pendingPresenceTab === 'journal' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="journal">Bond Journal</button>
+          <button class="presence-tab ${state.activePresenceTab === 'events' ? 'active' : ''} ${state.pendingPresenceTab === 'events' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="events">Realm Events</button>
+          <button class="presence-tab ${state.activePresenceTab === 'quest' ? 'active' : ''} ${state.pendingPresenceTab === 'quest' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="quest">Daily Quest</button>
         </div>
 
-        <div class="presence-tab-content">
+        <div class="presence-tab-content ${state.pendingPresenceTab ? 'is-switching' : ''}">
           <div class="presence-tab-tools">
+            ${state.pendingPresenceTab ? `<div class="surface-loading-chip"><div class="spinner-sm"></div><span>Opening ${esc(state.pendingPresenceTab.replace("_", " "))}...</span></div>` : ""}
             ${buildReadAloudButton(state.activePresenceTab)}
           </div>
           ${state.activePresenceTab === 'profile' ? `
@@ -7114,6 +7127,7 @@ function buildBubble(message, spiritkin) {
     </div>
   ` : "";
   const rated = state.ratings[message.id];
+  const isPlaying = !!(_audioPlaying && state.sessionModel?.speechState?.lastUtteranceId === message.id);
   const feedback = message.role === "assistant" ? `
     <div class="bubble-thumbs">
        <button class="thumb ${rated === 'up' ? 'active' : ''}" data-action="thumb-up" data-msg-id="${message.id}" ${rated ? 'disabled' : ''} title="This resonated">&#9825;</button>
@@ -7125,7 +7139,9 @@ function buildBubble(message, spiritkin) {
       <div class="bubble-role">${message.role === "user" ? esc(state.userName || "You") : esc(message.spiritkinName || spiritkin.name)}</div>
       ${memoryResonance}
       <p>${esc(message.content)}</p>
-      <button class="speak-button" data-action="speak" data-msg-id="${message.id}">🔊</button>
+      <button class="speak-button ${isPlaying ? "playing" : ""}" data-action="speak" data-msg-id="${message.id}" title="${isPlaying ? "Playing audio" : "Play audio"}">
+        ${isPlaying ? `<span class="speak-indicator"><span></span><span></span><span></span></span><span>Playing</span>` : `<span>🔊</span>`}
+      </button>
       ${toneSignal}
       <div class="bubble-meta">
         <span class="${message.status === "failed" ? "bubble-failed" : "bubble-time"}">${message.status === "failed" ? "Not delivered" : fmtTime(message.time)}</span>
