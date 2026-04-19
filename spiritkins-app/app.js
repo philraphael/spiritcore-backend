@@ -150,6 +150,36 @@ function worldArtUrl(filename) {
   return `/world-art/${encodeURIComponent(filename)}`;
 }
 
+function activeAssetUrl(category, filename) {
+  return `/app/active-assets/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`;
+}
+
+const COMPOSITE_VISUAL_ASSETS = {
+  spiritcore: {
+    gate: activeAssetUrl("ui", "welcome_close.png"),
+    arrival: activeAssetUrl("ui", "welcome_open.png"),
+    hero: activeAssetUrl("ui", "spiritcore-media-hero.png"),
+    founders: activeAssetUrl("ui", "spiritcore-spiritkins-portraits.png")
+  },
+  spiritkins: {
+    Lyra: {
+      focus: activeAssetUrl("ui", "lyra_open.png"),
+      profile: activeAssetUrl("ui", "lyra_open.png"),
+      card: activeAssetUrl("ui", "lyra_close.png")
+    },
+    Raien: {
+      focus: activeAssetUrl("ui", "raien_open.png"),
+      profile: activeAssetUrl("ui", "raien_open.png"),
+      card: activeAssetUrl("ui", "raien_close.png")
+    },
+    Kairo: {
+      focus: activeAssetUrl("ui", "kairo_open.png"),
+      profile: activeAssetUrl("ui", "kairo_open.png"),
+      card: activeAssetUrl("ui", "kairo_close.png")
+    }
+  }
+};
+
 function worldArtImage(filename, alt, cls = "", eager = false) {
   return `
     <div class="world-art-frame ${esc(cls)}">
@@ -1639,7 +1669,13 @@ function buildFounderEnsemblePanel(kind = "entry") {
     : "The original sovereign companions of the Spiritverse hold the first five axes of memory, courage, wonder, truth, and depth.";
   return `
     <div class="founder-ensemble-panel ${esc(kind)}">
-      ${worldArtImage(WORLD_ART.ensemble, "The Five Founding Pillars gathered within the Spiritverse", "founder-ensemble-art", kind === "entry")}
+      ${buildCompositeVisualFrame(
+        COMPOSITE_VISUAL_ASSETS.spiritcore.founders,
+        worldArtUrl(WORLD_ART.ensemble),
+        "The Five Founding Pillars gathered within the Spiritverse",
+        `founder-ensemble-art ${kind}`,
+        kind === "entry"
+      )}
       <div class="founder-ensemble-copy">
         <div class="panel-label">${title}</div>
         <p>${sub}</p>
@@ -1658,6 +1694,32 @@ function buildChronicleShelf(title = "Spiritverse Chronicles", filename = WORLD_
       </div>
     </div>
   `;
+}
+
+function buildCompositeVisualFrame(primarySrc, fallbackSrc, alt, cls = "", eager = false) {
+  if (!primarySrc) return "";
+  return `
+    <div class="composite-visual-frame ${esc(cls)} ${fallbackSrc ? "has-fallback" : ""}">
+      ${fallbackSrc ? `<img src="${fallbackSrc}" alt="${esc(alt)}" class="composite-visual-image composite-visual-fallback" loading="${eager ? "eager" : "lazy"}" decoding="async" ${eager ? 'fetchpriority="high"' : ""} />` : ""}
+      <img
+        src="${primarySrc}"
+        alt="${esc(alt)}"
+        class="composite-visual-image composite-visual-primary"
+        loading="${eager ? "eager" : "lazy"}"
+        decoding="async"
+        ${eager ? 'fetchpriority="high"' : ""}
+        onload="this.classList.add('is-loaded'); this.parentElement.classList.add('visual-loaded');"
+        onerror="this.style.display='none'; this.parentElement.classList.add('visual-fallback-only');"
+      />
+    </div>
+  `;
+}
+
+function buildSpiritkinMediaPanel(name, surface = "focus") {
+  const primarySrc = COMPOSITE_VISUAL_ASSETS.spiritkins[name]?.[surface] || "";
+  if (!primarySrc) return "";
+  const fallbackPortrait = `/portraits/${encodeURIComponent(String(name || "").toLowerCase())}_portrait.png`;
+  return buildCompositeVisualFrame(primarySrc, fallbackPortrait, `${name} visual panel`, `spiritkin-media-panel ${surface}`, surface !== "card");
 }
 
 function getAtmosphereSpiritkin() {
@@ -6568,6 +6630,13 @@ function buildCrownGateEntry() {
       <div class="entry-gate-scrim"></div>
       <div class="entry-gate-shell">
         <div class="entry-copy ${state.entryVideoStarted ? "entry-copy-hidden" : ""}">
+          ${buildCompositeVisualFrame(
+            COMPOSITE_VISUAL_ASSETS.spiritcore.gate,
+            worldArtUrl(WORLD_ART.baseTheme),
+            "SpiritGate gate shell art",
+            "entry-visual-shell",
+            true
+          )}
           <div class="entry-glyph-wrap">
             <div class="entry-glyph">SC</div>
             <div class="entry-glyph-line">SpiritCore</div>
@@ -6650,6 +6719,13 @@ function buildSpiritverseArrival() {
         <div class="entry-stage-scrim"></div>
       </div>
       <div class="entry-stage-copy">
+        ${buildCompositeVisualFrame(
+          COMPOSITE_VISUAL_ASSETS.spiritcore.arrival,
+          worldArtUrl(WORLD_ART.baseTheme),
+          "Spiritverse arrival shell art",
+          "entry-visual-shell arrival",
+          true
+        )}
         <div class="panel-label">Spiritverse Arrival</div>
         <h2>The realm is revealing itself.</h2>
         <p>After this reveal, SpiritCore will place the Founding Pillars before you so you can meet one, bond, or keep looking.</p>
@@ -6666,6 +6742,13 @@ function buildSpiritCoreWelcome() {
     <section class="entry-stage-screen spiritcore-welcome-screen">
       <div class="entry-stage-scrim"></div>
       <div class="spiritcore-welcome-copy">
+        ${buildCompositeVisualFrame(
+          COMPOSITE_VISUAL_ASSETS.spiritcore.hero,
+          COMPOSITE_VISUAL_ASSETS.spiritcore.founders,
+          "SpiritCore welcome hero",
+          "entry-visual-shell spiritcore",
+          true
+        )}
         <div class="panel-label">SpiritCore</div>
         <h2>The realm is now under your witness.</h2>
         <p class="spiritcore-welcome-text">${esc(SPIRITCORE_WELCOME_TEXT)}</p>
@@ -6903,6 +6986,7 @@ function buildBondPreview(spiritkin, pending) {
             <span>${esc(`${spiritkin.name}'s self-reveal pipeline is wired and waiting for final trailer media.`)}</span>
           </div>
         ` : ""}
+        ${buildSpiritkinMediaPanel(spiritkin.name, pending ? "card" : "focus")}
         ${buildSigil(spiritkin.ui, "focus", spiritkin.ui.symbol)}
         ${buildPortrait(spiritkin.name, "portrait-focus", spiritkin.ui.cls)}
       </div>
@@ -6949,6 +7033,7 @@ function buildBondCard(spiritkin, index, subdued) {
         ${activeBond ? `<div class="sk-selected-badge">Bonded</div>` : pending ? `<div class="sk-pending-badge">Pending</div>` : ""}
       </div>
       <div class="sk-founder-badge">Founding Pillar</div>
+      ${buildSpiritkinMediaPanel(spiritkin.name, "card")}
       ${buildSigil(spiritkin.ui, "card", spiritkin.ui.symbol)}
       ${buildPortrait(spiritkin.name, "portrait-card", spiritkin.ui.cls)}
       <div class="sk-role">${esc(spiritkin.role || spiritkin.ui.bondLine)}</div>
@@ -7084,6 +7169,7 @@ function buildChatView() {
           </div>
           ${state.activePresenceTab === 'profile' ? `
             <div class="presence-stage">
+              ${buildSpiritkinMediaPanel(spiritkin.name, "profile")}
               ${buildSigil(meta, "hero", meta.symbol)}
               ${buildPortrait(spiritkin.name, "portrait-hero", meta.cls)}
             </div>

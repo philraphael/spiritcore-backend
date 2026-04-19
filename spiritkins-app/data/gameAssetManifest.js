@@ -186,8 +186,8 @@ export const GAME_ASSET_MANIFEST = {
     sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("boards", "battleship_grid_premium_placeholder.svg", {
-        notes: "Readable tactical grid shell remains the live board layer while forge art supports the room framing."
+      default: activeAsset("concepts", "spiritverse_battleship_forge_theme.png", {
+        notes: "Forge tactical concept art now serves as the primary battleship shell while the live grid remains readable above it."
       })
     },
     pieces: {
@@ -223,18 +223,26 @@ export const GAME_ASSET_MANIFEST = {
     sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("boards", "spirit_cards_table_premium_placeholder.svg")
+      default: activeAsset("concepts", "Book Covers All.png", {
+        notes: "Composite codex cover art now replaces the placeholder table as the primary Spirit Cards shell."
+      })
     },
     pieces: {},
     cards: {
+      default: activeAsset("concepts", "Spiritkins in spiritverse.png", {
+        notes: "Founders scene enriches Spirit Cards as support art."
+      }),
       backs: activeAsset("ui", "spirit_cards_back_placeholder.svg"),
       frames: activeAsset("ui", "spirit_cards_frame_placeholder.svg"),
-      founderSet: activeAsset("ui", "spirit_cards_founder_set_placeholder.svg")
+      founderSet: activeAsset("ui", "spiritcore-spiritkins-portraits.png")
     },
     room: {
-      default: activeAsset("rooms", "spirit_cards_room_premium_placeholder.svg")
+      default: activeAsset("concepts", "Spiritkins in spiritverse.png")
     },
     overlays: {},
+    ui: {
+      frame: activeAsset("ui", "modal_frame_premium.png")
+    },
     fallback: runtimeFallback("spirit_cards", "Current spirit-cards renderer uses placeholder card assets preserved in ACTIVE.")
   },
   echo_trials: {
@@ -242,14 +250,19 @@ export const GAME_ASSET_MANIFEST = {
     sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("boards", "echo_trials_panel_premium_placeholder.svg")
+      default: activeAsset("concepts", "spiritcore-architecture-layers.png", {
+        notes: "Architecture layers concept art now serves as the primary Echo Trials shell."
+      })
     },
     pieces: {},
     cards: {},
     room: {
-      default: activeAsset("rooms", "echo_trials_room_premium_placeholder.svg")
+      default: activeAsset("concepts", "Spiritverse_all_games_together_theme.png")
     },
     overlays: {},
+    ui: {
+      frame: activeAsset("ui", "modal_frame_premium.png")
+    },
     fallback: runtimeFallback("echo_trials", "Current echo-trials renderer uses placeholder ACTIVE shell assets.")
   },
   go: {
@@ -295,12 +308,14 @@ export const GAME_ASSET_MANIFEST = {
     sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("boards", "grand_stage_platform_premium_placeholder.svg")
+      default: activeAsset("concepts", "spiritcore-architecture-layers.png", {
+        notes: "Grand Stage now uses architecture layers art as the primary platform shell."
+      })
     },
     pieces: {},
     cards: {},
     room: {
-      default: activeAsset("concepts", "full_asset_sheet_reference.png")
+      default: activeAsset("concepts", "Spiritverse_all_games_together_theme.png")
     },
     overlays: {
       spotlight: activeAsset("fx", "portal_beam_fx_blue_v1.png"),
