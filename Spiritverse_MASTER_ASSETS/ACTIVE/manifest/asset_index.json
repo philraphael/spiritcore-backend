@@ -1,842 +1,1058 @@
 [
-  {
-    "filename": "battleship_grid_premium_placeholder.svg",
-    "category": "boards",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "checkers_board_base_v1.png",
-    "category": "boards",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "390x320"
-  },
-  {
-    "filename": "checkers_board_dragonforge_base.png",
-    "category": "boards",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "415x220"
-  },
-  {
-    "filename": "checkers_board_premium_placeholder.svg",
-    "category": "boards",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "chess_board_base_v1.png",
-    "category": "boards",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "370x300"
-  },
-  {
-    "filename": "chess_board_lyra_base.png",
-    "category": "boards",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "500x310"
-  },
-  {
-    "filename": "chess_board_premium_placeholder.svg",
-    "category": "boards",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "connect_four_board_premium_placeholder.svg",
-    "category": "boards",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "connect4_board_base_v1.png",
-    "category": "boards",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "410x375"
-  },
-  {
-    "filename": "connect4_board_waterfall_base.png",
-    "category": "boards",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "455x320"
-  },
-  {
-    "filename": "echo_trials_panel_premium_placeholder.svg",
-    "category": "boards",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "go_board_aquatic_base.png",
-    "category": "boards",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "185x145"
-  },
-  {
-    "filename": "go_board_premium_placeholder.svg",
-    "category": "boards",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "grand_stage_platform_premium_placeholder.svg",
-    "category": "boards",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "spirit_cards_table_premium_placeholder.svg",
-    "category": "boards",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "tictactoe_echoes_board_premium_placeholder.svg",
-    "category": "boards",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "a_set_of_six_3d_rendered_digital_images_showcases.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_game_concept_assets",
-    "resolution": "1536x1024"
-  },
-  {
-    "filename": "battleship_forge_theme_reference_scene.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "Book Covers All.png",
-    "category": "concepts",
-    "originalSourceFolder": "photos",
-    "resolution": "1536x1024"
-  },
-  {
-    "filename": "Book Covers.png",
-    "category": "concepts",
-    "originalSourceFolder": "photos",
-    "resolution": "1536x1024"
-  },
-  {
-    "filename": "checkers_dragonforge_theme_reference_scene.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "Chess Base theme 1.jpg",
-    "category": "concepts",
-    "originalSourceFolder": "photos",
-    "resolution": "560x357"
-  },
-  {
-    "filename": "Chess Base theme 2.jpg",
-    "category": "concepts",
-    "originalSourceFolder": "photos",
-    "resolution": "1856x2160"
-  },
-  {
-    "filename": "Chess base theme 3.jpg",
-    "category": "concepts",
-    "originalSourceFolder": "photos",
-    "resolution": "1856x2160"
-  },
-  {
-    "filename": "chess_lyra_theme_reference_scene.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "connect4_waterfall_theme_reference_scene.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "Elaria Left 1 Thalassar right 1.png",
-    "category": "concepts",
-    "originalSourceFolder": "photos",
-    "resolution": "1536x1024"
-  },
-  {
-    "filename": "Elaria Left Thalassar right.png",
-    "category": "concepts",
-    "originalSourceFolder": "photos",
-    "resolution": "1024x1536"
-  },
-  {
-    "filename": "Elaria.png",
-    "category": "concepts",
-    "originalSourceFolder": "photos",
-    "resolution": "1024x1536"
-  },
-  {
-    "filename": "full_asset_sheet_reference.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "1024x1536"
-  },
-  {
-    "filename": "go_aquatic_theme_reference_scene.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "Spiritkins in spiritverse.png",
-    "category": "concepts",
-    "originalSourceFolder": "photos",
-    "resolution": "1536x1024"
-  },
-  {
-    "filename": "Spiritverse elder gods photo base needs edits.png",
-    "category": "concepts",
-    "originalSourceFolder": "photos",
-    "resolution": "1024x1536"
-  },
-  {
-    "filename": "Spiritverse_all_games_together_theme.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_game_concept_assets",
-    "resolution": "1536x1024"
-  },
-  {
-    "filename": "spiritverse_battleship_forge_theme.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_game_concept_assets",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "spiritverse_checkers_dragonforge_theme.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_game_concept_assets",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "spiritverse_chess_lyra_theme.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_game_concept_assets",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "spiritverse_connect_four_waterfall_theme.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_game_concept_assets",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "spiritverse_go_aquatic_theme.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_game_concept_assets",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "spiritverse_tictactoe_forest_theme.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_game_concept_assets",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "thalassar.png",
-    "category": "concepts",
-    "originalSourceFolder": "photos",
-    "resolution": "1024x1536"
-  },
-  {
-    "filename": "tictactoe_forest_theme_reference_scene.png",
-    "category": "concepts",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "battleship_marker_family_v4a.png",
-    "category": "fx",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "checkers_move_marker_v4a.png",
-    "category": "fx",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_overlay_set_v4a.png",
-    "category": "fx",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "connect4_fx_family_v4a.png",
-    "category": "fx",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "crosshair_glow_v2.png",
-    "category": "fx",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "130x140"
-  },
-  {
-    "filename": "go_ring_overlay_family_v4a.png",
-    "category": "fx",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "move_highlight_ring_blue_v1.png",
-    "category": "fx",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "185x155"
-  },
-  {
-    "filename": "move_highlight_ring_gold_v2.png",
-    "category": "fx",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "170x140"
-  },
-  {
-    "filename": "move_highlight_ring.png",
-    "category": "fx",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "180x100"
-  },
-  {
-    "filename": "portal_beam_fx_blue_v1.png",
-    "category": "fx",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "265x265"
-  },
-  {
-    "filename": "portal_beam_fx.png",
-    "category": "fx",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "240x175"
-  },
-  {
-    "filename": "tictactoe_glow_marks.png",
-    "category": "fx",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "270x150"
-  },
-  {
-    "filename": "checkers_piece_dark_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "checkers_piece_family_v4a.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "checkers_piece_light_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "checkers_piece_set_alt_v2.png",
-    "category": "pieces",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "440x170"
-  },
-  {
-    "filename": "checkers_piece_set_v1.png",
-    "category": "pieces",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "385x160"
-  },
-  {
-    "filename": "checkers_pieces_set.png",
-    "category": "pieces",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "410x170"
-  },
-  {
-    "filename": "chess_dark_bishop_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_dark_king_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_dark_knight_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_dark_pawn_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_dark_piece_family_v4a.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_dark_queen_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_dark_rook_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_piece_lineup_alt_v2.png",
-    "category": "pieces",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "490x140"
-  },
-  {
-    "filename": "chess_piece_lineup_v1.png",
-    "category": "pieces",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "425x160"
-  },
-  {
-    "filename": "chess_pieces_set.png",
-    "category": "pieces",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "520x165"
-  },
-  {
-    "filename": "chess_white_bishop_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_white_king_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_white_knight_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_white_pawn_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_white_piece_family_v4a.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_white_queen_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "chess_white_rook_single_v3.png",
-    "category": "pieces",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "battleship_room_premium_placeholder.svg",
-    "category": "rooms",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "checkers_room_premium_placeholder.svg",
-    "category": "rooms",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "chess_room_premium_placeholder.svg",
-    "category": "rooms",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "connect_four_room_premium_placeholder.svg",
-    "category": "rooms",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "echo_trials_room_premium_placeholder.svg",
-    "category": "rooms",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "go_room_premium_placeholder.svg",
-    "category": "rooms",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "grand_stage_room_premium_placeholder.svg",
-    "category": "rooms",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "room_battleship_forge_scene.png",
-    "category": "rooms",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "room_checkers_dragonforge_scene.png",
-    "category": "rooms",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "room_chess_lyra_celestial_scene.png",
-    "category": "rooms",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "room_connect4_waterfall_scene.png",
-    "category": "rooms",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "room_go_aquatic_scene.png",
-    "category": "rooms",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "room_tictactoe_forest_scene.png",
-    "category": "rooms",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "512x512"
-  },
-  {
-    "filename": "spirit_cards_room_premium_placeholder.svg",
-    "category": "rooms",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "Spiritverse background base theme.png",
-    "category": "rooms",
-    "originalSourceFolder": "photos",
-    "resolution": "1536x1024"
-  },
-  {
-    "filename": "tictactoe_room_premium_placeholder.svg",
-    "category": "rooms",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "battleship_forge_ships_set.png",
-    "category": "ships",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "520x195"
-  },
-  {
-    "filename": "battleship_hit_marker_v3.png",
-    "category": "ships",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "battleship_miss_marker_v3.png",
-    "category": "ships",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "battleship_ship_family_v4a.png",
-    "category": "ships",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "battleship_ship_set_v2.png",
-    "category": "ships",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "610x320"
-  },
-  {
-    "filename": "connect4_disc_blue_single_v1.png",
-    "category": "tokens",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "110x125"
-  },
-  {
-    "filename": "connect4_disc_blue_single_v3.png",
-    "category": "tokens",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "connect4_disc_blue.png",
-    "category": "tokens",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "120x135"
-  },
-  {
-    "filename": "connect4_disc_darkblue.png",
-    "category": "tokens",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "195x135"
-  },
-  {
-    "filename": "connect4_disc_family_v4a.png",
-    "category": "tokens",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "connect4_disc_gold_single_v3.png",
-    "category": "tokens",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "connect4_disc_purple_single_v1.png",
-    "category": "tokens",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "115x125"
-  },
-  {
-    "filename": "connect4_disc_purple_single_v3.png",
-    "category": "tokens",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "connect4_disc_purple.png",
-    "category": "tokens",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "125x135"
-  },
-  {
-    "filename": "connect4_disc_set_v1.png",
-    "category": "tokens",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "295x180"
-  },
-  {
-    "filename": "go_stone_black_single_v3.png",
-    "category": "tokens",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "go_stone_family_v4a_left.png",
-    "category": "tokens",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "go_stone_family_v4a_right.png",
-    "category": "tokens",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "go_stone_layout_preview_v1.png",
-    "category": "tokens",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "390x260"
-  },
-  {
-    "filename": "go_stone_white_single_v3.png",
-    "category": "tokens",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "go_stones_set_v2.png",
-    "category": "tokens",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "435x225"
-  },
-  {
-    "filename": "tictactoe_o_single_v3.png",
-    "category": "tokens",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "tictactoe_token_family_v4a.png",
-    "category": "tokens",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "tictactoe_token_set_v1.png",
-    "category": "tokens",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "330x195"
-  },
-  {
-    "filename": "tictactoe_tokens_forest_set.png",
-    "category": "tokens",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "310x100"
-  },
-  {
-    "filename": "tictactoe_x_single_v3.png",
-    "category": "tokens",
-    "originalSourceFolder": "wave3_premium_assets",
-    "resolution": null
-  },
-  {
-    "filename": "check_banner_v2.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "420x70"
-  },
-  {
-    "filename": "checkers_you_lost_banner.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "315x75"
-  },
-  {
-    "filename": "checkers_you_won_banner.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "315x75"
-  },
-  {
-    "filename": "checkmate_banner_v2.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "420x70"
-  },
-  {
-    "filename": "chess_check_banner.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "375x80"
-  },
-  {
-    "filename": "chess_checkmate_banner.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "390x80"
-  },
-  {
-    "filename": "generic_you_lost_banner_large.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "440x90"
-  },
-  {
-    "filename": "generic_you_won_banner_large.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "440x90"
-  },
-  {
-    "filename": "modal_frame_premium.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_premium_game_asset_pack",
-    "resolution": "390x193"
-  },
-  {
-    "filename": "shared_ui_banner_set_v4a.png",
-    "category": "ui",
-    "originalSourceFolder": "wave4a_production_assets",
-    "resolution": null
-  },
-  {
-    "filename": "spirit_cards_back_placeholder.svg",
-    "category": "ui",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "spirit_cards_founder_set_placeholder.svg",
-    "category": "ui",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "spirit_cards_frame_placeholder.svg",
-    "category": "ui",
-    "originalSourceFolder": "Game_Themes",
-    "resolution": null
-  },
-  {
-    "filename": "spiritkin_thinking_banner_v1.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "400x80"
-  },
-  {
-    "filename": "you_lost_banner_large_v1.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "360x90"
-  },
-  {
-    "filename": "you_lost_banner_orange_v2.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "320x80"
-  },
-  {
-    "filename": "you_lost_banner_small_v1.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "330x70"
-  },
-  {
-    "filename": "you_won_banner_blue_v2.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "280x70"
-  },
-  {
-    "filename": "you_won_banner_large_v1.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "360x90"
-  },
-  {
-    "filename": "you_won_banner_small_v1.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "330x70"
-  },
-  {
-    "filename": "your_move_banner_v2.png",
-    "category": "ui",
-    "originalSourceFolder": "spiritverse_codex_final_asset_pack",
-    "resolution": "400x85"
-  }
+    {
+        "filename":  "battleship_grid_premium_placeholder.svg",
+        "category":  "boards",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "checkers_board_base_v1.png",
+        "category":  "boards",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "390x320"
+    },
+    {
+        "filename":  "checkers_board_dragonforge_base.png",
+        "category":  "boards",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "415x220"
+    },
+    {
+        "filename":  "checkers_board_premium_placeholder.svg",
+        "category":  "boards",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_board_base_v1.png",
+        "category":  "boards",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "370x300"
+    },
+    {
+        "filename":  "chess_board_lyra_base.png",
+        "category":  "boards",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "500x310"
+    },
+    {
+        "filename":  "chess_board_premium_placeholder.svg",
+        "category":  "boards",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "connect_four_board_premium_placeholder.svg",
+        "category":  "boards",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "connect4_board_base_v1.png",
+        "category":  "boards",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "410x375"
+    },
+    {
+        "filename":  "connect4_board_waterfall_base.png",
+        "category":  "boards",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "455x320"
+    },
+    {
+        "filename":  "echo_trials_panel_premium_placeholder.svg",
+        "category":  "boards",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "go_board_aquatic_base.png",
+        "category":  "boards",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "185x145"
+    },
+    {
+        "filename":  "go_board_premium_placeholder.svg",
+        "category":  "boards",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "grand_stage_platform_premium_placeholder.svg",
+        "category":  "boards",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "spirit_cards_table_premium_placeholder.svg",
+        "category":  "boards",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "tictactoe_echoes_board_premium_placeholder.svg",
+        "category":  "boards",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "a_set_of_six_3d_rendered_digital_images_showcases.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_game_concept_assets",
+        "resolution":  "1536x1024"
+    },
+    {
+        "filename":  "battleship_forge_theme_reference_scene.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "Book Covers All.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "photos",
+        "resolution":  "1536x1024"
+    },
+    {
+        "filename":  "Book Covers.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "photos",
+        "resolution":  "1536x1024"
+    },
+    {
+        "filename":  "checkers_dragonforge_theme_reference_scene.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "Chess Base theme 1.jpg",
+        "category":  "concepts",
+        "originalSourceFolder":  "photos",
+        "resolution":  "560x357"
+    },
+    {
+        "filename":  "Chess Base theme 2.jpg",
+        "category":  "concepts",
+        "originalSourceFolder":  "photos",
+        "resolution":  "1856x2160"
+    },
+    {
+        "filename":  "Chess base theme 3.jpg",
+        "category":  "concepts",
+        "originalSourceFolder":  "photos",
+        "resolution":  "1856x2160"
+    },
+    {
+        "filename":  "chess_lyra_theme_reference_scene.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "connect4_waterfall_theme_reference_scene.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "Elaria Left 1 Thalassar right 1.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "photos",
+        "resolution":  "1536x1024"
+    },
+    {
+        "filename":  "Elaria Left Thalassar right.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "photos",
+        "resolution":  "1024x1536"
+    },
+    {
+        "filename":  "Elaria.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "photos",
+        "resolution":  "1024x1536"
+    },
+    {
+        "filename":  "full_asset_sheet_reference.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "1024x1536"
+    },
+    {
+        "filename":  "go_aquatic_theme_reference_scene.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "spiritcore-architecture-layers.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "Spiritkins in spiritverse.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "photos",
+        "resolution":  "1536x1024"
+    },
+    {
+        "filename":  "Spiritverse elder gods photo base needs edits.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "photos",
+        "resolution":  "1024x1536"
+    },
+    {
+        "filename":  "Spiritverse_all_games_together_theme.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_game_concept_assets",
+        "resolution":  "1536x1024"
+    },
+    {
+        "filename":  "spiritverse_battleship_forge_theme.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_game_concept_assets",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "spiritverse_checkers_dragonforge_theme.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_game_concept_assets",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "spiritverse_chess_lyra_theme.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_game_concept_assets",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "spiritverse_connect_four_waterfall_theme.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_game_concept_assets",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "spiritverse_go_aquatic_theme.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_game_concept_assets",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "spiritverse_tictactoe_forest_theme.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_game_concept_assets",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "thalassar.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "photos",
+        "resolution":  "1024x1536"
+    },
+    {
+        "filename":  "tictactoe_forest_theme_reference_scene.png",
+        "category":  "concepts",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "spiritverse_beta_qr.png",
+        "category":  "docs",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "battleship_marker_family_v4a.png",
+        "category":  "fx",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "checkers_move_marker_v4a.png",
+        "category":  "fx",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "checkers-overlay-selected.png",
+        "category":  "fx",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_overlay_set_v4a.png",
+        "category":  "fx",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-overlay-capture.png",
+        "category":  "fx",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-overlay-selected.png",
+        "category":  "fx",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-overlay-valid-move.png",
+        "category":  "fx",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "connect4_fx_family_v4a.png",
+        "category":  "fx",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "crosshair_glow_v2.png",
+        "category":  "fx",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "130x140"
+    },
+    {
+        "filename":  "go_ring_overlay_family_v4a.png",
+        "category":  "fx",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "move_highlight_ring.png",
+        "category":  "fx",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "180x100"
+    },
+    {
+        "filename":  "move_highlight_ring_blue_v1.png",
+        "category":  "fx",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "185x155"
+    },
+    {
+        "filename":  "move_highlight_ring_gold_v2.png",
+        "category":  "fx",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "170x140"
+    },
+    {
+        "filename":  "portal_beam_fx.png",
+        "category":  "fx",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "240x175"
+    },
+    {
+        "filename":  "portal_beam_fx_blue_v1.png",
+        "category":  "fx",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "265x265"
+    },
+    {
+        "filename":  "tictactoe_glow_marks.png",
+        "category":  "fx",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "270x150"
+    },
+    {
+        "filename":  "checkers_piece_dark_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "checkers_piece_family_v4a.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "checkers_piece_light_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "checkers_piece_set_alt_v2.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "440x170"
+    },
+    {
+        "filename":  "checkers_piece_set_v1.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "385x160"
+    },
+    {
+        "filename":  "checkers_pieces_set.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "410x170"
+    },
+    {
+        "filename":  "checkers-piece-black.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "checkers-piece-black-king.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "checkers-piece-white.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "checkers-piece-white-king.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_dark_bishop_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_dark_king_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_dark_knight_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_dark_pawn_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_dark_piece_family_v4a.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_dark_queen_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_dark_rook_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_piece_lineup_alt_v2.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "490x140"
+    },
+    {
+        "filename":  "chess_piece_lineup_v1.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "425x160"
+    },
+    {
+        "filename":  "chess_pieces_set.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "520x165"
+    },
+    {
+        "filename":  "chess_white_bishop_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_white_king_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_white_knight_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_white_pawn_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_white_piece_family_v4a.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_white_queen_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_white_rook_single_v3.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-piece-bishop-black.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-piece-bishop-white.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-piece-king-black.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-piece-king-white.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-piece-knight-black.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-piece-knight-white.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-piece-pawn-black.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-piece-pawn-white.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-piece-queen-black.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-piece-queen-white.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-piece-rook-black.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess-piece-rook-white.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "spiritverse-checkers-pieces-premium.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "spiritverse-chess-pieces-premium.png",
+        "category":  "pieces",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "battleship_room_premium_placeholder.svg",
+        "category":  "rooms",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "checkers_room_premium_placeholder.svg",
+        "category":  "rooms",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "chess_room_premium_placeholder.svg",
+        "category":  "rooms",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "connect_four_room_premium_placeholder.svg",
+        "category":  "rooms",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "echo_trials_room_premium_placeholder.svg",
+        "category":  "rooms",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "go_room_premium_placeholder.svg",
+        "category":  "rooms",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "grand_stage_room_premium_placeholder.svg",
+        "category":  "rooms",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "room_battleship_forge_scene.png",
+        "category":  "rooms",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "room_checkers_dragonforge_scene.png",
+        "category":  "rooms",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "room_chess_lyra_celestial_scene.png",
+        "category":  "rooms",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "room_connect4_waterfall_scene.png",
+        "category":  "rooms",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "room_go_aquatic_scene.png",
+        "category":  "rooms",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "room_tictactoe_forest_scene.png",
+        "category":  "rooms",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "512x512"
+    },
+    {
+        "filename":  "spirit_cards_room_premium_placeholder.svg",
+        "category":  "rooms",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "Spiritverse background base theme.png",
+        "category":  "rooms",
+        "originalSourceFolder":  "photos",
+        "resolution":  "1536x1024"
+    },
+    {
+        "filename":  "tictactoe_room_premium_placeholder.svg",
+        "category":  "rooms",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "battleship_forge_ships_set.png",
+        "category":  "ships",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "520x195"
+    },
+    {
+        "filename":  "battleship_hit_marker_v3.png",
+        "category":  "ships",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "battleship_miss_marker_v3.png",
+        "category":  "ships",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "battleship_ship_family_v4a.png",
+        "category":  "ships",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "battleship_ship_set_v2.png",
+        "category":  "ships",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "610x320"
+    },
+    {
+        "filename":  "connect4_disc_blue.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "120x135"
+    },
+    {
+        "filename":  "connect4_disc_blue_single_v1.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "110x125"
+    },
+    {
+        "filename":  "connect4_disc_blue_single_v3.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "connect4_disc_darkblue.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "195x135"
+    },
+    {
+        "filename":  "connect4_disc_family_v4a.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "connect4_disc_gold_single_v3.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "connect4_disc_purple.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "125x135"
+    },
+    {
+        "filename":  "connect4_disc_purple_single_v1.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "115x125"
+    },
+    {
+        "filename":  "connect4_disc_purple_single_v3.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "connect4_disc_set_v1.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "295x180"
+    },
+    {
+        "filename":  "go_stone_black_single_v3.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "go_stone_family_v4a_left.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "go_stone_family_v4a_right.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "go_stone_layout_preview_v1.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "390x260"
+    },
+    {
+        "filename":  "go_stone_white_single_v3.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "go_stones_set_v2.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "435x225"
+    },
+    {
+        "filename":  "spiritverse-go-stones-premium.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "tictactoe_o_single_v3.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "tictactoe_token_family_v4a.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "tictactoe_token_set_v1.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "330x195"
+    },
+    {
+        "filename":  "tictactoe_tokens_forest_set.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "310x100"
+    },
+    {
+        "filename":  "tictactoe_x_single_v3.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave3_premium_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "check_banner_v2.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "420x70"
+    },
+    {
+        "filename":  "checkers_you_lost_banner.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "315x75"
+    },
+    {
+        "filename":  "checkers_you_won_banner.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "315x75"
+    },
+    {
+        "filename":  "checkmate_banner_v2.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "420x70"
+    },
+    {
+        "filename":  "chess_check_banner.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "375x80"
+    },
+    {
+        "filename":  "chess_checkmate_banner.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "390x80"
+    },
+    {
+        "filename":  "generic_you_lost_banner_large.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "440x90"
+    },
+    {
+        "filename":  "generic_you_won_banner_large.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "440x90"
+    },
+    {
+        "filename":  "kairo_close.png",
+        "category":  "ui",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "kairo_open.png",
+        "category":  "ui",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "lyra_close.png",
+        "category":  "ui",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "lyra_open.png",
+        "category":  "ui",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "lyra_portrait.png",
+        "category":  "ui",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "modal_frame_premium.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
+        "resolution":  "390x193"
+    },
+    {
+        "filename":  "raien_close.png",
+        "category":  "ui",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "raien_open.png",
+        "category":  "ui",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "shared_ui_banner_set_v4a.png",
+        "category":  "ui",
+        "originalSourceFolder":  "wave4a_production_assets",
+        "resolution":  null
+    },
+    {
+        "filename":  "spirit_cards_back_placeholder.svg",
+        "category":  "ui",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "spirit_cards_founder_set_placeholder.svg",
+        "category":  "ui",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "spirit_cards_frame_placeholder.svg",
+        "category":  "ui",
+        "originalSourceFolder":  "Game_Themes",
+        "resolution":  null
+    },
+    {
+        "filename":  "spiritcore-media-hero.png",
+        "category":  "ui",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "spiritcore-spiritkins-portraits.png",
+        "category":  "ui",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "spiritkin_thinking_banner_v1.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "400x80"
+    },
+    {
+        "filename":  "welcome_close.png",
+        "category":  "ui",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "welcome_open.png",
+        "category":  "ui",
+        "originalSourceFolder":  "images.zip",
+        "resolution":  null
+    },
+    {
+        "filename":  "you_lost_banner_large_v1.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "360x90"
+    },
+    {
+        "filename":  "you_lost_banner_orange_v2.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "320x80"
+    },
+    {
+        "filename":  "you_lost_banner_small_v1.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "330x70"
+    },
+    {
+        "filename":  "you_won_banner_blue_v2.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "280x70"
+    },
+    {
+        "filename":  "you_won_banner_large_v1.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "360x90"
+    },
+    {
+        "filename":  "you_won_banner_small_v1.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "330x70"
+    },
+    {
+        "filename":  "your_move_banner_v2.png",
+        "category":  "ui",
+        "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
+        "resolution":  "400x85"
+    }
 ]

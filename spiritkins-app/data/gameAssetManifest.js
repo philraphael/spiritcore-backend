@@ -40,27 +40,43 @@ export const GAME_ASSET_MANIFEST = {
       })
     },
     pieces: {
-      default: activeAsset("pieces", "chess_white_piece_family_v4a.png", {
-        notes: "Wave 4A family crop used as premium shell support, not as direct board-piece runtime replacement."
+      default: activeAsset("pieces", "chess-piece-king-white.png", {
+        notes: "Manus image pack isolated chess pieces are now the primary runtime piece source."
       }),
-      crown: activeAsset("pieces", "chess_white_piece_family_v4a.png"),
-      veil: activeAsset("pieces", "chess_white_piece_family_v4a.png"),
-      ember: activeAsset("pieces", "chess_white_piece_family_v4a.png"),
-      astral: activeAsset("pieces", "chess_white_piece_family_v4a.png"),
-      abyssal: activeAsset("pieces", "chess_white_piece_family_v4a.png")
+      crown: activeAsset("pieces", "spiritverse-chess-pieces-premium.png", {
+        notes: "Premium chess lineup remains available as shell accent art."
+      }),
+      veil: activeAsset("pieces", "spiritverse-chess-pieces-premium.png"),
+      ember: activeAsset("pieces", "spiritverse-chess-pieces-premium.png"),
+      astral: activeAsset("pieces", "spiritverse-chess-pieces-premium.png"),
+      abyssal: activeAsset("pieces", "spiritverse-chess-pieces-premium.png"),
+      whitePawn: activeAsset("pieces", "chess-piece-pawn-white.png"),
+      blackPawn: activeAsset("pieces", "chess-piece-pawn-black.png"),
+      whiteRook: activeAsset("pieces", "chess-piece-rook-white.png"),
+      blackRook: activeAsset("pieces", "chess-piece-rook-black.png"),
+      whiteKnight: activeAsset("pieces", "chess-piece-knight-white.png"),
+      blackKnight: activeAsset("pieces", "chess-piece-knight-black.png"),
+      whiteBishop: activeAsset("pieces", "chess-piece-bishop-white.png"),
+      blackBishop: activeAsset("pieces", "chess-piece-bishop-black.png"),
+      whiteQueen: activeAsset("pieces", "chess-piece-queen-white.png"),
+      blackQueen: activeAsset("pieces", "chess-piece-queen-black.png"),
+      whiteKing: activeAsset("pieces", "chess-piece-king-white.png"),
+      blackKing: activeAsset("pieces", "chess-piece-king-black.png")
     },
     cards: {
-      default: activeAsset("pieces", "chess_dark_piece_family_v4a.png", {
-        notes: "Wave 4A dark family crop used as support-layer shell art."
+      default: activeAsset("pieces", "spiritverse-chess-pieces-premium.png", {
+        notes: "Manus premium chess lineup used as supporting shell art."
       })
     },
     room: {
       default: activeAsset("rooms", "room_chess_lyra_celestial_scene.png")
     },
     overlays: {
-      moveGlow: activeAsset("fx", "chess_overlay_set_v4a.png", {
-        notes: "Wave 4A overlay family used as shell FX overlay."
-      })
+      moveGlow: activeAsset("fx", "chess-overlay-valid-move.png", {
+        notes: "Manus valid-move overlay is the primary chess move indicator."
+      }),
+      selection: activeAsset("fx", "chess-overlay-selected.png"),
+      capture: activeAsset("fx", "chess-overlay-capture.png")
     },
     ui: {
       yourMove: activeAsset("ui", "your_move_banner_v2.png"),
@@ -71,7 +87,7 @@ export const GAME_ASSET_MANIFEST = {
       checkmate: activeAsset("ui", "chess_checkmate_banner.png"),
       frame: activeAsset("ui", "modal_frame_premium.png")
     },
-    fallback: runtimeFallback("chess", "Current chess renderer uses inline SVG pieces and ACTIVE shell art.")
+    fallback: runtimeFallback("chess", "Chess now uses Manus isolated PNG pieces as the primary runtime board-piece source.")
   },
   checkers: {
     label: "Checkers",
@@ -83,22 +99,26 @@ export const GAME_ASSET_MANIFEST = {
       })
     },
     pieces: {
-      default: activeAsset("pieces", "checkers_piece_family_v4a.png", {
-        notes: "Wave 4A checkers family crop used as shell accent support."
+      default: activeAsset("pieces", "checkers-piece-white.png", {
+        notes: "Manus isolated checkers pieces are now the primary runtime source."
       }),
-      user: activeAsset("pieces", "checkers_piece_light_single_v3.png"),
-      spiritkin: activeAsset("pieces", "checkers_piece_dark_single_v3.png"),
-      king: activeAsset("pieces", "checkers_piece_set_alt_v2.png")
+      user: activeAsset("pieces", "checkers-piece-white.png"),
+      spiritkin: activeAsset("pieces", "checkers-piece-black.png"),
+      userKing: activeAsset("pieces", "checkers-piece-white-king.png"),
+      spiritkinKing: activeAsset("pieces", "checkers-piece-black-king.png"),
+      king: activeAsset("pieces", "spiritverse-checkers-pieces-premium.png", {
+        notes: "Premium lineup retained as shell support art."
+      })
     },
     cards: {
-      default: activeAsset("pieces", "checkers_pieces_set.png")
+      default: activeAsset("pieces", "spiritverse-checkers-pieces-premium.png")
     },
     room: {
       default: activeAsset("rooms", "room_checkers_dragonforge_scene.png")
     },
     overlays: {
-      selection: activeAsset("fx", "checkers_move_marker_v4a.png", {
-        notes: "Wave 4A move-marker family used as premium selection FX."
+      selection: activeAsset("fx", "checkers-overlay-selected.png", {
+        notes: "Manus selected overlay is the primary checkers selection indicator."
       })
     },
     ui: {
@@ -108,7 +128,7 @@ export const GAME_ASSET_MANIFEST = {
       loss: activeAsset("ui", "checkers_you_lost_banner.png"),
       frame: activeAsset("ui", "modal_frame_premium.png")
     },
-    fallback: runtimeFallback("checkers", "Current checkers renderer uses CSS discs over ACTIVE board and room art.")
+    fallback: runtimeFallback("checkers", "Checkers now uses Manus isolated PNG pieces as the primary runtime piece source.")
   },
   tictactoe: {
     label: "TicTacToe of Echoes",
@@ -186,8 +206,8 @@ export const GAME_ASSET_MANIFEST = {
     sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("boards", "battleship_grid_premium_placeholder.svg", {
-        notes: "Readable tactical grid shell remains the live board layer while forge art supports the room framing."
+      default: activeAsset("concepts", "spiritverse_battleship_forge_theme.png", {
+        notes: "Forge concept art now replaces the generic battleship board placeholder as the primary visible shell."
       })
     },
     pieces: {
@@ -260,8 +280,8 @@ export const GAME_ASSET_MANIFEST = {
       default: activeAsset("boards", "go_board_aquatic_base.png")
     },
     pieces: {
-      default: activeAsset("tokens", "go_stone_family_v4a_right.png", {
-        notes: "Wave 4A stone family crop used as shell accent support."
+      default: activeAsset("tokens", "spiritverse-go-stones-premium.png", {
+        notes: "Manus Go stones sheet is used as premium preview shell support only."
       }),
       user: activeAsset("tokens", "go_stone_white_single_v3.png"),
       spiritkin: activeAsset("tokens", "go_stone_black_single_v3.png"),
@@ -269,8 +289,8 @@ export const GAME_ASSET_MANIFEST = {
       whiteStone: activeAsset("tokens", "go_stone_white_single_v3.png")
     },
     cards: {
-      default: activeAsset("tokens", "go_stone_family_v4a_left.png", {
-        notes: "Wave 4A left stone family used as support-layer shell art."
+      default: activeAsset("tokens", "spiritverse-go-stones-premium.png", {
+        notes: "Manus Go stones sheet is retained as support-layer shell art."
       })
     },
     room: {
