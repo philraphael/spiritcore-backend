@@ -1015,11 +1015,36 @@ function getGreeting(spiritkinName) {
 
 function getContextualGreeting(spiritkinName, context = 'newSession') {
   const contextual = GREETING_PROMPTS[spiritkinName]?.contextual || {};
-  return contextual[context] || "What's on your mind?";
+  return contextual[context] || "";
 }
 
 function getGreetingChoices(spiritkinName) {
   return GREETING_PROMPTS[spiritkinName]?.choices || ["Continue", "Tell me more"];
+}
+
+const RETURNING_GREETING_STATE_KEY = "sv.returning_greeting_state.v1";
+
+function pickGreetingVariant(spiritkinName, context = "newSession") {
+  const greetings = GREETING_PROMPTS[spiritkinName]?.greetings || [];
+  const contextualGreeting = getContextualGreeting(spiritkinName, context);
+  if (context !== "returningUser" || greetings.length === 0) {
+    return contextualGreeting || getGreeting(spiritkinName);
+  }
+
+  const saved = readJson(RETURNING_GREETING_STATE_KEY, {});
+  const spiritState = saved?.[spiritkinName] && typeof saved[spiritkinName] === "object" ? saved[spiritkinName] : {};
+  const recent = Array.isArray(spiritState.recent) ? spiritState.recent.filter((line) => greetings.includes(line)) : [];
+  const pool = greetings.filter((line) => !recent.includes(line));
+  const selected = (pool.length ? pool : greetings)[Math.floor(Math.random() * (pool.length ? pool.length : greetings.length))] || getGreeting(spiritkinName);
+  const nextRecent = [selected, ...recent.filter((line) => line !== selected)].slice(0, 3);
+  writeJson(RETURNING_GREETING_STATE_KEY, {
+    ...saved,
+    [spiritkinName]: {
+      recent: nextRecent,
+      lastAt: nowIso(),
+    },
+  });
+  return selected;
 }
 
 
@@ -2647,7 +2672,7 @@ function syncMountedMedia({ attemptPlay = false } = {}) {
     video.muted = effectiveMuted;
     video.defaultMuted = effectiveMuted;
     video.volume = effectiveMuted ? 0 : 1;
-    if (attemptPlay) {
+    if (attemptPlay && video.paused) {
       const playAttempt = video.play?.();
       if (playAttempt?.catch) {
         playAttempt.catch(() => {});
@@ -2827,17 +2852,25 @@ function syncEntryCinematics() {
       completeCrownGateEntry({ skipped: true, source: "gate-video-error", force: true });
     };
     if (state.entryVideoStarted && state.crownGateOpening) {
+      const attemptKey = String(spiritGateActiveAttemptId || "gate");
+      const isCurrentAttempt = gateVideo.dataset.gateAttemptId === attemptKey;
+      gateVideo.dataset.gateAttemptId = attemptKey;
       armSpiritGateFallback("gate-video-playback");
-      gateVideo.currentTime = 0;
-      const playAttempt = gateVideo.play?.();
-      if (playAttempt?.catch) {
-        playAttempt.catch((error) => {
-          console.error("Gate video failed", { reason: error?.message || "unknown" });
-          logSpiritGate("gate-video-play-rejected", { reason: error?.message || "unknown" });
-          completeCrownGateEntry({ skipped: true, source: "gate-video-play-rejected", force: true });
-        });
+      if (!isCurrentAttempt) {
+        gateVideo.currentTime = 0;
+      }
+      if (gateVideo.paused) {
+        const playAttempt = gateVideo.play?.();
+        if (playAttempt?.catch) {
+          playAttempt.catch((error) => {
+            console.error("Gate video failed", { reason: error?.message || "unknown" });
+            logSpiritGate("gate-video-play-rejected", { reason: error?.message || "unknown" });
+            completeCrownGateEntry({ skipped: true, source: "gate-video-play-rejected", force: true });
+          });
+        }
       }
     } else {
+      delete gateVideo.dataset.gateAttemptId;
       clearSpiritGateFallback();
       clearSpiritGateTransitionTimers();
       if (previewingGate) {
@@ -2923,7 +2956,7 @@ function createLocalAssistantMessage(content, overrides = {}) {
 }
 
 function buildGreetingText(spiritkinName, context = "newSession") {
-  const greeting = getContextualGreeting(spiritkinName, context) || getRandomGreeting(spiritkinName);
+  const greeting = pickGreetingVariant(spiritkinName, context);
   if (!state.userName) return greeting;
   return `${state.userName}, ${greeting}`;
 }
