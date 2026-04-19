@@ -72,12 +72,14 @@ export const GAME_ASSET_MANIFEST = {
     sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("boards", "checkers_board_base_v1.png")
+      default: activeAsset("boards", "checkers_board_dragonforge_base.png", {
+        notes: "Dragonforge board base promoted into live runtime."
+      })
     },
     pieces: {
       default: activeAsset("pieces", "checkers_piece_set_alt_v2.png"),
-      user: activeAsset("pieces", "checkers_piece_set_alt_v2.png"),
-      spiritkin: activeAsset("pieces", "checkers_piece_set_alt_v2.png"),
+      user: activeAsset("pieces", "checkers_piece_light_single_v3.png"),
+      spiritkin: activeAsset("pieces", "checkers_piece_dark_single_v3.png"),
       king: activeAsset("pieces", "checkers_piece_set_alt_v2.png")
     },
     cards: {
@@ -109,8 +111,8 @@ export const GAME_ASSET_MANIFEST = {
     },
     pieces: {
       default: activeAsset("tokens", "tictactoe_token_set_v1.png"),
-      user: activeAsset("tokens", "tictactoe_token_set_v1.png"),
-      spiritkin: activeAsset("tokens", "tictactoe_token_set_v1.png")
+      user: activeAsset("tokens", "tictactoe_x_single_v3.png"),
+      spiritkin: activeAsset("tokens", "tictactoe_o_single_v3.png")
     },
     cards: {
       default: activeAsset("tokens", "tictactoe_tokens_forest_set.png")
@@ -135,12 +137,14 @@ export const GAME_ASSET_MANIFEST = {
     sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("boards", "connect4_board_base_v1.png")
+      default: activeAsset("boards", "connect4_board_waterfall_base.png", {
+        notes: "Waterfall board base is the current live board shell."
+      })
     },
     pieces: {
-      user: activeAsset("tokens", "connect4_disc_blue.png"),
-      spiritkin: activeAsset("tokens", "connect4_disc_purple.png"),
-      accent: activeAsset("tokens", "connect4_disc_darkblue.png")
+      user: activeAsset("tokens", "connect4_disc_blue_single_v3.png"),
+      spiritkin: activeAsset("tokens", "connect4_disc_purple_single_v3.png"),
+      accent: activeAsset("tokens", "connect4_disc_gold_single_v3.png")
     },
     cards: {
       default: activeAsset("tokens", "connect4_disc_set_v1.png")
@@ -165,12 +169,15 @@ export const GAME_ASSET_MANIFEST = {
     sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("concepts", "spiritverse_battleship_forge_theme.png", {
-        notes: "Battleship still relies on a scene surface because there is no isolated final grid board asset."
+      default: activeAsset("boards", "battleship_grid_premium_placeholder.svg", {
+        notes: "Readable tactical grid shell remains the live board layer while forge art supports the room framing."
       })
     },
     pieces: {
-      shipSet: activeAsset("ships", "battleship_ship_set_v2.png")
+      default: activeAsset("ships", "battleship_ship_set_v2.png"),
+      shipSet: activeAsset("ships", "battleship_ship_set_v2.png"),
+      user: activeAsset("ships", "battleship_hit_marker_v3.png"),
+      spiritkin: activeAsset("ships", "battleship_miss_marker_v3.png")
     },
     cards: {
       default: activeAsset("ships", "battleship_forge_ships_set.png")
@@ -233,8 +240,10 @@ export const GAME_ASSET_MANIFEST = {
     },
     pieces: {
       default: activeAsset("tokens", "go_stones_set_v2.png"),
-      blackStone: activeAsset("tokens", "go_stones_set_v2.png"),
-      whiteStone: activeAsset("tokens", "go_stones_set_v2.png")
+      user: activeAsset("tokens", "go_stone_white_single_v3.png"),
+      spiritkin: activeAsset("tokens", "go_stone_black_single_v3.png"),
+      blackStone: activeAsset("tokens", "go_stone_black_single_v3.png"),
+      whiteStone: activeAsset("tokens", "go_stone_white_single_v3.png")
     },
     cards: {
       default: activeAsset("tokens", "go_stone_layout_preview_v1.png")
