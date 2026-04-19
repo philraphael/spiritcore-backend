@@ -5431,6 +5431,44 @@ function buildGameChromeStyle(gameType, options = {}) {
   return style;
 }
 
+function inferChessBannerKey(game, gameFeedback, commentary = "") {
+  const reason = String(game?.result?.reason || "").toLowerCase();
+  if (reason === "checkmate") return "checkmate";
+  const combined = `${gameFeedback?.text || ""} ${game?.result?.label || ""} ${commentary || ""}`.toLowerCase();
+  if (/\bcheckmate\b/.test(combined)) return "checkmate";
+  if (/\bcheck\b/.test(combined)) return "check";
+  return "";
+}
+
+function getGameBannerKey(game, channel, gameFeedback, commentary = "") {
+  if (!game?.type) return "";
+  if (game.type === "chess") {
+    const chessKey = inferChessBannerKey(game, gameFeedback, commentary);
+    if (channel === "outcome" && chessKey === "checkmate") return "checkmate";
+    if (channel === "feedback" && chessKey) return chessKey;
+    if (channel === "turn" && chessKey && game.status !== "ended") return chessKey;
+  }
+  if (channel === "outcome") {
+    if (game?.result?.isDraw) return "";
+    return game?.result?.winner === "user" ? "win" : "loss";
+  }
+  if (channel === "turn") {
+    if (game?.status === "ended") return "";
+    return game?.turn === "user" ? "yourMove" : "thinking";
+  }
+  if (channel === "feedback") {
+    if (gameFeedback?.phase === "error") return "";
+    return state.gameLoading ? "thinking" : "yourMove";
+  }
+  return "";
+}
+
+function buildGamePanelClasses(game) {
+  const classes = ["active-game-panel"];
+  if (game?.type === "chess") classes.push("chess-showcase-panel");
+  return classes.join(" ");
+}
+
 function getGameHelpContent(gameType, instructions = "") {
   const guides = {
     chess: {
@@ -6966,7 +7004,14 @@ function buildChatView() {
                   `).join('')}
                 </div>
               ` : `
-                <div class="active-game-panel" data-focus-anchor="game-panel">
+                <div class="${buildGamePanelClasses(state.activeGame)}" data-focus-anchor="game-panel">
+                  ${state.activeGame.type === 'chess' ? `
+                    <div class="game-mode-hero chess-mode-hero">
+                      <div class="game-mode-kicker">Premium Showcase</div>
+                      <div class="game-mode-title">Celestial Chess</div>
+                      <p class="game-mode-copy">The board holds center. Your move lands first, then ${esc(spiritkin.name)} answers in full view.</p>
+                    </div>
+                  ` : ''}
                   ${(() => {
                     const help = getGameHelpContent(state.activeGame.type, state.gameInstructions);
                     const tutorialIntro = buildGameTutorialIntro(spiritkin.name, state.activeGame.type, help);
@@ -7019,7 +7064,7 @@ function buildChatView() {
                     const outcome = buildGameOutcomeSummary(state.activeGame, spiritkin.name);
                     return outcome ? `
                       <div class="game-outcome-banner ${state.activeGame.result?.isDraw ? 'draw' : state.activeGame.result?.winner === 'user' ? 'win' : 'loss'}" style="${buildGameChromeStyle(state.activeGame.type, {
-                        bannerKey: state.activeGame.result?.isDraw ? '' : (state.activeGame.result?.winner === 'user' ? 'win' : 'loss'),
+                        bannerKey: getGameBannerKey(state.activeGame, 'outcome', state.gameFeedback, state.gameSpiritkinMessage),
                         includeFrame: true
                       })}">
                         <div class="game-outcome-title">${esc(outcome.headline)}</div>
@@ -7056,7 +7101,7 @@ function buildChatView() {
                   </div>
 
                   <div class="game-turn-badge ${state.activeGame.status === 'ended' ? 'turn-finished' : state.activeGame.turn === 'user' ? 'turn-user' : 'turn-spiritkin'}" style="${buildGameChromeStyle(state.activeGame.type, {
-                    bannerKey: state.activeGame.status === 'ended' ? '' : (state.activeGame.turn === 'user' ? 'yourMove' : 'thinking')
+                    bannerKey: getGameBannerKey(state.activeGame, 'turn', state.gameFeedback, state.gameSpiritkinMessage)
                   })}">
                     ${state.activeGame.status === 'ended'
                       ? (state.activeGame.result?.isDraw
@@ -7070,8 +7115,8 @@ function buildChatView() {
                   </div>
 
                   ${gameFeedback ? `
-                    <div class="game-feedback-strip ${esc(gameFeedback.phase || "ready")}" style="${buildGameChromeStyle(state.activeGame.type, {
-                      bannerKey: state.gameLoading ? 'thinking' : 'yourMove',
+                    <div class="game-feedback-strip ${esc(gameFeedback.phase || "ready")} ${state.activeGame.type === 'chess' ? 'chess-feedback-strip' : ''}" style="${buildGameChromeStyle(state.activeGame.type, {
+                      bannerKey: getGameBannerKey(state.activeGame, 'feedback', gameFeedback, state.gameSpiritkinMessage),
                       includeFx: true
                     })}">
                       <div class="game-feedback-label">${state.gameLoading ? `${esc(spiritkin.name)} is thinking` : "Board feedback"}</div>
@@ -7091,7 +7136,7 @@ function buildChatView() {
                   ` : ''}
 
                   <!-- Visual game board — rendered by SpiritverseGames after DOM update -->
-                  <div class="game-board-container ${state.gameLoading ? 'is-thinking' : ''}" style="${buildGameChromeStyle(state.activeGame.type, {
+                  <div class="game-board-container ${state.gameLoading ? 'is-thinking' : ''} ${state.activeGame.type === 'chess' ? 'chess-showcase-board-stage' : ''}" style="${buildGameChromeStyle(state.activeGame.type, {
                     includeFrame: true,
                     includeFx: true
                   })}">

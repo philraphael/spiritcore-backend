@@ -323,16 +323,21 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
 
   let html = '';
   if (!isExpanded) {
-    html += `<div class="game-board-controls" style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:340px;margin-bottom:6px;">
+    html += `<div class="game-board-controls chess-board-controls">
       <div class="piece-theme-selector">
         <span class="piece-theme-label">Theme</span>
         ${CHESS_THEME_OPTIONS.map((option) => `<button class="piece-theme-btn ${themeId === option.id ? 'active' : ''}" data-action="set-piece-theme" data-theme="${option.id}">${option.label}</button>`).join('')}
       </div>
-      <button class="game-expand-btn" data-action="chess-expand">&#x26F6; Grand Stage</button>
+      <button class="game-expand-btn chess-stage-btn" data-action="chess-expand">&#x26F6; Enter Grand Stage</button>
     </div>`;
   }
 
-  html += `<div class="chess-board chess-theme-${themeId} ${isExpanded ? 'board-3d board-grand' : 'board-standard'} ${isInteractive ? '' : 'board-locked'}" id="chess-board">`;
+  html += `<div class="chess-showcase-meta">
+    <div class="chess-showcase-kicker">Authoritative Board</div>
+    <div class="chess-showcase-copy">${isInteractive ? 'Select a white piece, follow the glow, and keep the board centered while the answer lands.' : 'The canonical position is locked while the board resolves.'}</div>
+  </div>`;
+
+  html += `<div class="chess-board chess-theme-${themeId} chess-showcase-board ${isExpanded ? 'board-3d board-grand' : 'board-standard'} ${isInteractive ? '' : 'board-locked'}" id="chess-board">`;
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
       const sq = files[file] + (8 - rank);
@@ -364,11 +369,12 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
     html += `<div class="chess-labels-files">`;
     for (const f of files) html += `<span>${f}</span>`;
     html += `</div>`;
+    html += `<div class="chess-showcase-footer">Every move resolves through the live bonded board. Watch the highlighted landing squares and the response banner above the board.</div>`;
   }
 
   const target = resolveTarget(container);
   if (!target) return;
-  target.innerHTML = withThemeFrame(html, 'chess', theme, isExpanded ? 'sv-theme-expanded' : '');
+  target.innerHTML = withThemeFrame(html, 'chess', theme, `${isExpanded ? 'sv-theme-expanded ' : ''}chess-showcase-shell`.trim());
 
   if (!isExpanded) {
     const expandBtn = target.querySelector('[data-action="chess-expand"]');
