@@ -1,0 +1,13 @@
+{
+  "games": {
+    "Chess": ["boards", "pieces_tokens", "cards", "room_backdrops", "overlays_effects"],
+    "Checkers": ["boards", "pieces_tokens", "cards", "room_backdrops", "overlays_effects"],
+    "TicTacToe_of_Echoes": ["boards", "pieces_tokens", "cards", "room_backdrops", "overlays_effects"],
+    "Connect_Four": ["boards", "pieces_tokens", "cards", "room_backdrops", "overlays_effects"],
+    "Battleship": ["boards", "pieces_tokens", "cards", "room_backdrops", "overlays_effects"],
+    "Spirit_Cards": ["boards", "pieces_tokens", "cards", "room_backdrops", "overlays_effects"],
+    "Echo_Trials": ["boards", "pieces_tokens", "cards", "room_backdrops", "overlays_effects"],
+    "Go": ["boards", "pieces_tokens", "cards", "room_backdrops", "overlays_effects"],
+    "Grand_Stage": ["boards", "pieces_tokens", "cards", "room_backdrops", "overlays_effects"]
+  }
+}

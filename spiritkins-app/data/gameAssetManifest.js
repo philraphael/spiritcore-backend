@@ -1,15 +1,11 @@
-const GAME_THEME_ROOT = "Spiritverse_MASTER_ASSETS/Game_Themes";
-const GAME_THEME_PUBLIC_ROOT = "/app/game-theme-assets";
-const GAME_CONCEPT_ROOT = "Spiritverse_MASTER_ASSETS/spiritverse_game_concept_assets/spiritverse_game_concepts";
-const GAME_CONCEPT_PUBLIC_ROOT = "/app/game-concept-assets";
-const PREMIUM_GAME_PACK_ROOT = "Spiritverse_MASTER_ASSETS/spiritverse_premium_game_asset_pack";
-const PREMIUM_GAME_PACK_PUBLIC_ROOT = "/app/premium-game-assets";
+const ACTIVE_ASSET_ROOT = "Spiritverse_MASTER_ASSETS/ACTIVE";
+const ACTIVE_ASSET_PUBLIC_ROOT = "/app/active-assets";
 
 function assetRecord(sourcePath, options = {}) {
   return {
     sourcePath,
     publicPath: options.publicPath || null,
-    status: options.status || "needed",
+    status: options.status || "active",
     notes: options.notes || ""
   };
 }
@@ -23,39 +19,12 @@ function runtimeFallback(type, notes) {
   };
 }
 
-function sourceAsset(relativePath, options = {}) {
-  const normalized = String(relativePath || "").replace(/\\/g, "/");
-  return assetRecord(`${GAME_THEME_ROOT}/${normalized}`, {
-    publicPath: `${GAME_THEME_PUBLIC_ROOT}/${normalized}`,
-    status: options.status || "placeholder-source",
-    notes: options.notes || ""
-  });
-}
-
-function rootedAsset(root, publicRoot, relativePath, options = {}) {
-  const normalized = String(relativePath || "").replace(/\\/g, "/");
-  return assetRecord(`${root}/${normalized}`, {
-    publicPath: publicRoot ? `${publicRoot}/${normalized}` : null,
-    status: options.status || "implemented",
-    notes: options.notes || ""
-  });
-}
-
-function premiumAsset(relativePath, options = {}) {
-  return rootedAsset(PREMIUM_GAME_PACK_ROOT, PREMIUM_GAME_PACK_PUBLIC_ROOT, relativePath, options);
-}
-
-function conceptAsset(relativePath, options = {}) {
-  return rootedAsset(GAME_CONCEPT_ROOT, GAME_CONCEPT_PUBLIC_ROOT, relativePath, {
-    status: options.status || "concept-layer",
-    notes: options.notes || ""
-  });
-}
-
-function plannedAsset(relativePath, options = {}) {
-  const normalized = String(relativePath || "").replace(/\\/g, "/");
-  return assetRecord(`${GAME_THEME_ROOT}/${normalized}`, {
-    status: options.status || "needed",
+function activeAsset(category, relativePath, options = {}) {
+  const normalizedCategory = String(category || "").replace(/\\/g, "/");
+  const normalizedPath = String(relativePath || "").replace(/\\/g, "/");
+  return assetRecord(`${ACTIVE_ASSET_ROOT}/${normalizedCategory}/${normalizedPath}`, {
+    publicPath: `${ACTIVE_ASSET_PUBLIC_ROOT}/${normalizedCategory}/${normalizedPath}`,
+    status: options.status || "active",
     notes: options.notes || ""
   });
 }
@@ -63,268 +32,248 @@ function plannedAsset(relativePath, options = {}) {
 export const GAME_ASSET_MANIFEST = {
   chess: {
     label: "Chess",
-    sourceRoot: PREMIUM_GAME_PACK_ROOT,
+    sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["crown", "veil", "ember", "astral", "abyssal"],
     board: {
-      default: premiumAsset("boards/chess_board_lyra_base.png", {
-        notes: "Premium Phase 1 board base for Lyra-themed chess."
+      default: activeAsset("boards", "chess_board_lyra_base.png", {
+        notes: "Canonical premium-active chess board surface."
       })
     },
     pieces: {
-      default: premiumAsset("pieces/chess_pieces_set.png", {
-        notes: "Premium piece-sheet used as visual accent while gameplay keeps readable inline SVG chess pieces."
-      }),
-      crown: premiumAsset("pieces/chess_pieces_set.png"),
-      veil: premiumAsset("pieces/chess_pieces_set.png"),
-      ember: premiumAsset("pieces/chess_pieces_set.png"),
-      astral: premiumAsset("pieces/chess_pieces_set.png"),
-      abyssal: premiumAsset("pieces/chess_pieces_set.png")
+      default: activeAsset("pieces", "chess_pieces_set.png"),
+      crown: activeAsset("pieces", "chess_pieces_set.png"),
+      veil: activeAsset("pieces", "chess_pieces_set.png"),
+      ember: activeAsset("pieces", "chess_pieces_set.png"),
+      astral: activeAsset("pieces", "chess_pieces_set.png"),
+      abyssal: activeAsset("pieces", "chess_pieces_set.png")
     },
     cards: {
-      default: premiumAsset("pieces/chess_pieces_set.png", {
-        notes: "Phase 1 decorative sheet used for shell chrome."
-      })
+      default: activeAsset("pieces", "chess_piece_lineup_alt_v2.png")
     },
     room: {
-      default: conceptAsset("spiritverse_chess_lyra_theme.png", {
-        notes: "Concept scene used as the premium chess chamber backdrop."
-      })
+      default: activeAsset("rooms", "room_chess_lyra_celestial_scene.png")
     },
     overlays: {
-      moveGlow: premiumAsset("fx/move_highlight_ring.png")
+      moveGlow: activeAsset("fx", "move_highlight_ring_blue_v1.png")
     },
     ui: {
-      yourMove: premiumAsset("ui/your_move_banner.png"),
-      thinking: premiumAsset("ui/spiritkin_thinking_banner.png"),
-      win: premiumAsset("ui/generic_you_won_banner_large.png"),
-      loss: premiumAsset("ui/generic_you_lost_banner_large.png"),
-      check: premiumAsset("ui/chess_check_banner.png"),
-      checkmate: premiumAsset("ui/chess_checkmate_banner.png"),
-      frame: premiumAsset("ui/modal_frame_premium.png")
+      yourMove: activeAsset("ui", "your_move_banner_v2.png"),
+      thinking: activeAsset("ui", "spiritkin_thinking_banner_v1.png"),
+      win: activeAsset("ui", "generic_you_won_banner_large.png"),
+      loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
+      check: activeAsset("ui", "chess_check_banner.png"),
+      checkmate: activeAsset("ui", "chess_checkmate_banner.png"),
+      frame: activeAsset("ui", "modal_frame_premium.png")
     },
-    fallback: runtimeFallback("chess", "Current chess renderer uses inline SVG pieces and CSS board themes.")
+    fallback: runtimeFallback("chess", "Current chess renderer uses inline SVG pieces and ACTIVE shell art.")
   },
   checkers: {
     label: "Checkers",
-    sourceRoot: PREMIUM_GAME_PACK_ROOT,
+    sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: premiumAsset("boards/checkers_board_dragonforge_base.png")
+      default: activeAsset("boards", "checkers_board_base_v1.png")
     },
     pieces: {
-      default: premiumAsset("pieces/checkers_pieces_set.png"),
-      user: premiumAsset("pieces/checkers_pieces_set.png"),
-      spiritkin: premiumAsset("pieces/checkers_pieces_set.png"),
-      king: premiumAsset("pieces/checkers_pieces_set.png")
+      default: activeAsset("pieces", "checkers_piece_set_alt_v2.png"),
+      user: activeAsset("pieces", "checkers_piece_set_alt_v2.png"),
+      spiritkin: activeAsset("pieces", "checkers_piece_set_alt_v2.png"),
+      king: activeAsset("pieces", "checkers_piece_set_alt_v2.png")
     },
     cards: {
-      default: premiumAsset("pieces/checkers_pieces_set.png")
+      default: activeAsset("pieces", "checkers_pieces_set.png")
     },
     room: {
-      default: conceptAsset("spiritverse_checkers_dragonforge_theme.png")
+      default: activeAsset("rooms", "room_checkers_dragonforge_scene.png")
     },
     overlays: {
-      selection: premiumAsset("fx/move_highlight_ring.png")
+      selection: activeAsset("fx", "move_highlight_ring_gold_v2.png")
     },
     ui: {
-      yourMove: premiumAsset("ui/your_move_banner.png"),
-      thinking: premiumAsset("ui/spiritkin_thinking_banner.png"),
-      win: premiumAsset("ui/checkers_you_won_banner.png"),
-      loss: premiumAsset("ui/checkers_you_lost_banner.png"),
-      frame: premiumAsset("ui/modal_frame_premium.png")
+      yourMove: activeAsset("ui", "your_move_banner_v2.png"),
+      thinking: activeAsset("ui", "spiritkin_thinking_banner_v1.png"),
+      win: activeAsset("ui", "checkers_you_won_banner.png"),
+      loss: activeAsset("ui", "checkers_you_lost_banner.png"),
+      frame: activeAsset("ui", "modal_frame_premium.png")
     },
-    fallback: runtimeFallback("checkers", "Current checkers renderer uses CSS discs and board gradients.")
+    fallback: runtimeFallback("checkers", "Current checkers renderer uses CSS discs over ACTIVE board and room art.")
   },
   tictactoe: {
     label: "TicTacToe of Echoes",
-    sourceRoot: PREMIUM_GAME_PACK_ROOT,
+    sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: conceptAsset("spiritverse_tictactoe_forest_theme.png", {
-        notes: "Phase 1 concept board used as both backdrop and board reference until a direct isolated board crop is available."
+      default: activeAsset("concepts", "spiritverse_tictactoe_forest_theme.png", {
+        notes: "Concept-board layer remains the best available active asset for TicTacToe."
       })
     },
     pieces: {
-      default: premiumAsset("tokens/tictactoe_tokens_forest_set.png"),
-      user: premiumAsset("tokens/tictactoe_tokens_forest_set.png"),
-      spiritkin: premiumAsset("tokens/tictactoe_tokens_forest_set.png")
+      default: activeAsset("tokens", "tictactoe_token_set_v1.png"),
+      user: activeAsset("tokens", "tictactoe_token_set_v1.png"),
+      spiritkin: activeAsset("tokens", "tictactoe_token_set_v1.png")
     },
     cards: {
-      default: premiumAsset("tokens/tictactoe_tokens_forest_set.png")
+      default: activeAsset("tokens", "tictactoe_tokens_forest_set.png")
     },
     room: {
-      default: conceptAsset("spiritverse_tictactoe_forest_theme.png")
+      default: activeAsset("rooms", "room_tictactoe_forest_scene.png")
     },
     overlays: {
-      winLine: premiumAsset("fx/tictactoe_glow_marks.png")
+      winLine: activeAsset("fx", "tictactoe_glow_marks.png")
     },
     ui: {
-      yourMove: premiumAsset("ui/your_move_banner.png"),
-      thinking: premiumAsset("ui/spiritkin_thinking_banner.png"),
-      win: premiumAsset("ui/generic_you_won_banner_large.png"),
-      loss: premiumAsset("ui/generic_you_lost_banner_large.png"),
-      frame: premiumAsset("ui/modal_frame_premium.png")
+      yourMove: activeAsset("ui", "your_move_banner_v2.png"),
+      thinking: activeAsset("ui", "spiritkin_thinking_banner_v1.png"),
+      win: activeAsset("ui", "generic_you_won_banner_large.png"),
+      loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
+      frame: activeAsset("ui", "modal_frame_premium.png")
     },
-    fallback: runtimeFallback("tictactoe", "Current tic-tac-toe renderer uses CSS board cells and text marks.")
+    fallback: runtimeFallback("tictactoe", "Current tic-tac-toe renderer uses CSS cells over ACTIVE concept and room art.")
   },
   connect_four: {
     label: "Connect Four",
-    sourceRoot: PREMIUM_GAME_PACK_ROOT,
+    sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: premiumAsset("boards/connect4_board_waterfall_base.png")
+      default: activeAsset("boards", "connect4_board_base_v1.png")
     },
     pieces: {
-      user: premiumAsset("tokens/connect4_disc_blue.png"),
-      spiritkin: premiumAsset("tokens/connect4_disc_purple.png"),
-      accent: premiumAsset("tokens/connect4_disc_darkblue.png")
+      user: activeAsset("tokens", "connect4_disc_blue.png"),
+      spiritkin: activeAsset("tokens", "connect4_disc_purple.png"),
+      accent: activeAsset("tokens", "connect4_disc_darkblue.png")
     },
     cards: {
-      default: premiumAsset("tokens/connect4_disc_darkblue.png")
+      default: activeAsset("tokens", "connect4_disc_set_v1.png")
     },
     room: {
-      default: conceptAsset("spiritverse_connect_four_waterfall_theme.png")
+      default: activeAsset("rooms", "room_connect4_waterfall_scene.png")
     },
     overlays: {
-      dropTrail: premiumAsset("fx/portal_beam_fx.png")
+      dropTrail: activeAsset("fx", "portal_beam_fx_blue_v1.png")
     },
     ui: {
-      yourMove: premiumAsset("ui/your_move_banner.png"),
-      thinking: premiumAsset("ui/spiritkin_thinking_banner.png"),
-      win: premiumAsset("ui/generic_you_won_banner_large.png"),
-      loss: premiumAsset("ui/generic_you_lost_banner_large.png"),
-      frame: premiumAsset("ui/modal_frame_premium.png")
+      yourMove: activeAsset("ui", "your_move_banner_v2.png"),
+      thinking: activeAsset("ui", "spiritkin_thinking_banner_v1.png"),
+      win: activeAsset("ui", "generic_you_won_banner_large.png"),
+      loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
+      frame: activeAsset("ui", "modal_frame_premium.png")
     },
-    fallback: runtimeFallback("connect_four", "Current connect-four renderer uses CSS board framing and colored tokens.")
+    fallback: runtimeFallback("connect_four", "Current connect-four renderer uses ACTIVE token discs and shell art.")
   },
   battleship: {
     label: "Battleship",
-    sourceRoot: PREMIUM_GAME_PACK_ROOT,
+    sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: conceptAsset("spiritverse_battleship_forge_theme.png", {
-        notes: "Phase 1 uses the forge tactical scene as the main board surface because no isolated direct grid crop exists in the pack."
+      default: activeAsset("concepts", "spiritverse_battleship_forge_theme.png", {
+        notes: "Battleship still relies on a scene surface because there is no isolated final grid board asset."
       })
     },
     pieces: {
-      shipSet: premiumAsset("ships/battleship_forge_ships_set.png")
+      shipSet: activeAsset("ships", "battleship_ship_set_v2.png")
     },
     cards: {
-      default: premiumAsset("ships/battleship_forge_ships_set.png")
+      default: activeAsset("ships", "battleship_forge_ships_set.png")
     },
     room: {
-      default: conceptAsset("spiritverse_battleship_forge_theme.png")
+      default: activeAsset("rooms", "room_battleship_forge_scene.png")
     },
     overlays: {
-      sonar: premiumAsset("fx/portal_beam_fx.png")
+      sonar: activeAsset("fx", "portal_beam_fx_blue_v1.png")
     },
     ui: {
-      yourMove: premiumAsset("ui/your_move_banner.png"),
-      thinking: premiumAsset("ui/spiritkin_thinking_banner.png"),
-      win: premiumAsset("ui/generic_you_won_banner_large.png"),
-      loss: premiumAsset("ui/generic_you_lost_banner_large.png"),
-      frame: premiumAsset("ui/modal_frame_premium.png")
+      yourMove: activeAsset("ui", "your_move_banner_v2.png"),
+      thinking: activeAsset("ui", "spiritkin_thinking_banner_v1.png"),
+      win: activeAsset("ui", "generic_you_won_banner_large.png"),
+      loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
+      frame: activeAsset("ui", "modal_frame_premium.png")
     },
-    fallback: runtimeFallback("battleship", "Current battleship renderer uses CSS grid and marker states.")
+    fallback: runtimeFallback("battleship", "Current battleship renderer uses CSS grid markers over ACTIVE forge scene art.")
   },
   spirit_cards: {
     label: "Spirit Cards",
-    sourceRoot: `${GAME_THEME_ROOT}/Spirit_Cards`,
+    sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: sourceAsset("Spirit_Cards/boards/spirit_cards_table_premium_placeholder.svg")
+      default: activeAsset("boards", "spirit_cards_table_premium_placeholder.svg")
     },
     pieces: {},
     cards: {
-      backs: sourceAsset("Spirit_Cards/cards/spirit_cards_back_placeholder.svg", {
-        notes: "Placeholder named card back. Replace with final premium card back art."
-      }),
-      frames: sourceAsset("Spirit_Cards/cards/spirit_cards_frame_placeholder.svg", {
-        notes: "Placeholder named card frame. Replace with final premium frame art."
-      }),
-      founderSet: sourceAsset("Spirit_Cards/cards/spirit_cards_founder_set_placeholder.svg", {
-        notes: "Placeholder founder set atlas. Replace with canon founder card faces."
-      })
+      backs: activeAsset("ui", "spirit_cards_back_placeholder.svg"),
+      frames: activeAsset("ui", "spirit_cards_frame_placeholder.svg"),
+      founderSet: activeAsset("ui", "spirit_cards_founder_set_placeholder.svg")
     },
     room: {
-      default: sourceAsset("Spirit_Cards/room_backdrops/spirit_cards_room_premium_placeholder.svg")
+      default: activeAsset("rooms", "spirit_cards_room_premium_placeholder.svg")
     },
-    overlays: {
-      aura: plannedAsset("Spirit_Cards/overlays_effects/spirit_cards_aura_overlay.png")
-    },
-    fallback: runtimeFallback("spirit_cards", "Current spirit-cards renderer uses CSS tiles and glyphs.")
+    overlays: {},
+    fallback: runtimeFallback("spirit_cards", "Current spirit-cards renderer uses placeholder card assets preserved in ACTIVE.")
   },
   echo_trials: {
     label: "Echo Trials",
-    sourceRoot: `${GAME_THEME_ROOT}/Echo_Trials`,
+    sourceRoot: ACTIVE_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: sourceAsset("Echo_Trials/boards/echo_trials_panel_premium_placeholder.svg")
-    },
-    pieces: {
-      glyphs: plannedAsset("Echo_Trials/pieces_tokens/echo_trials_glyph_set_master.svg")
-    },
-    cards: {
-      promptDeck: plannedAsset("Echo_Trials/cards/echo_trials_prompt_cards_master.png")
-    },
-    room: {
-      default: sourceAsset("Echo_Trials/room_backdrops/echo_trials_room_premium_placeholder.svg")
-    },
-    overlays: {
-      resonance: plannedAsset("Echo_Trials/overlays_effects/echo_trials_resonance_overlay.png")
-    },
-    fallback: runtimeFallback("echo_trials", "Current echo-trials renderer uses HTML/CSS prompt panels.")
-  },
-  go: {
-    label: "Go",
-    sourceRoot: PREMIUM_GAME_PACK_ROOT,
-    variants: ["default"],
-    board: {
-      default: premiumAsset("boards/go_board_aquatic_base.png")
-    },
-    pieces: {
-      default: premiumAsset("tokens/go_stones_set.png"),
-      blackStone: premiumAsset("tokens/go_stones_set.png"),
-      whiteStone: premiumAsset("tokens/go_stones_set.png")
-    },
-    cards: {
-      default: premiumAsset("tokens/go_stones_set.png")
-    },
-    room: {
-      default: conceptAsset("spiritverse_go_aquatic_theme.png")
-    },
-    overlays: {
-      hoshi: premiumAsset("fx/move_highlight_ring.png")
-    },
-    ui: {
-      yourMove: premiumAsset("ui/your_move_banner.png"),
-      thinking: premiumAsset("ui/spiritkin_thinking_banner.png"),
-      win: premiumAsset("ui/generic_you_won_banner_large.png"),
-      loss: premiumAsset("ui/generic_you_lost_banner_large.png"),
-      frame: premiumAsset("ui/modal_frame_premium.png")
-    },
-    fallback: runtimeFallback("go", "Current go renderer uses CSS intersections and stone gradients.")
-  },
-  grand_stage: {
-    label: "Grand Stage",
-    sourceRoot: PREMIUM_GAME_PACK_ROOT,
-    variants: ["default"],
-    board: {
-      default: premiumAsset("concepts/full_asset_sheet_reference.png")
+      default: activeAsset("boards", "echo_trials_panel_premium_placeholder.svg")
     },
     pieces: {},
     cards: {},
     room: {
-      default: premiumAsset("concepts/full_asset_sheet_reference.png")
+      default: activeAsset("rooms", "echo_trials_room_premium_placeholder.svg")
+    },
+    overlays: {},
+    fallback: runtimeFallback("echo_trials", "Current echo-trials renderer uses placeholder ACTIVE shell assets.")
+  },
+  go: {
+    label: "Go",
+    sourceRoot: ACTIVE_ASSET_ROOT,
+    variants: ["default"],
+    board: {
+      default: activeAsset("boards", "go_board_aquatic_base.png")
+    },
+    pieces: {
+      default: activeAsset("tokens", "go_stones_set_v2.png"),
+      blackStone: activeAsset("tokens", "go_stones_set_v2.png"),
+      whiteStone: activeAsset("tokens", "go_stones_set_v2.png")
+    },
+    cards: {
+      default: activeAsset("tokens", "go_stone_layout_preview_v1.png")
+    },
+    room: {
+      default: activeAsset("rooms", "room_go_aquatic_scene.png")
     },
     overlays: {
-      spotlight: premiumAsset("fx/portal_beam_fx.png"),
-      frame: premiumAsset("ui/modal_frame_premium.png")
+      hoshi: activeAsset("fx", "move_highlight_ring_gold_v2.png")
     },
     ui: {
-      frame: premiumAsset("ui/modal_frame_premium.png")
+      yourMove: activeAsset("ui", "your_move_banner_v2.png"),
+      thinking: activeAsset("ui", "spiritkin_thinking_banner_v1.png"),
+      win: activeAsset("ui", "generic_you_won_banner_large.png"),
+      loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
+      frame: activeAsset("ui", "modal_frame_premium.png")
     },
-    fallback: runtimeFallback("grand_stage", "Current grand-stage experience uses CSS fullscreen shell and existing board renderer output.")
+    fallback: runtimeFallback("go", "Current go renderer uses CSS stones over ACTIVE board and room art.")
+  },
+  grand_stage: {
+    label: "Grand Stage",
+    sourceRoot: ACTIVE_ASSET_ROOT,
+    variants: ["default"],
+    board: {
+      default: activeAsset("boards", "grand_stage_platform_premium_placeholder.svg")
+    },
+    pieces: {},
+    cards: {},
+    room: {
+      default: activeAsset("concepts", "full_asset_sheet_reference.png")
+    },
+    overlays: {
+      spotlight: activeAsset("fx", "portal_beam_fx_blue_v1.png"),
+      frame: activeAsset("ui", "modal_frame_premium.png")
+    },
+    ui: {
+      frame: activeAsset("ui", "modal_frame_premium.png")
+    },
+    fallback: runtimeFallback("grand_stage", "Current grand-stage experience uses ACTIVE fullscreen shell assets.")
   }
 };
 
@@ -365,7 +314,6 @@ export function resolveGameAssetUrl(gameType, slot, variant = "default") {
 export function listGameAssetInventory() {
   return Object.entries(GAME_ASSET_MANIFEST).map(([gameType, entry]) => {
     const implemented = [];
-    const missing = [];
     for (const [slotName, slotEntries] of Object.entries({
       board: entry.board,
       pieces: entry.pieces,
@@ -377,20 +325,14 @@ export function listGameAssetInventory() {
       if (!slotEntries || typeof slotEntries !== "object") continue;
       for (const asset of Object.values(slotEntries)) {
         if (!asset) continue;
-        const bucket = `${slotName}:${asset.sourcePath.split("/").pop()}`;
-        if (asset.publicPath) {
-          implemented.push(bucket);
-        } else {
-          missing.push(bucket);
-        }
+        implemented.push(`${slotName}:${asset.sourcePath.split("/").pop()}`);
       }
     }
     return {
       gameType,
       label: entry.label,
       sourceRoot: entry.sourceRoot,
-      implemented,
-      missing
+      implemented
     };
   });
 }

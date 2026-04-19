@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#2a1812"/><stop offset="1" stop-color="#06080f"/></linearGradient></defs>
+  <rect width="1600" height="900" fill="url(#bg)"/><circle cx="1240" cy="180" r="130" fill="#f2c57a" opacity=".12"/><rect x="140" y="150" width="1320" height="600" rx="36" fill="none" stroke="#d77f45" stroke-width="4" opacity=".55"/>
+  <text x="800" y="118" fill="#ffd7a0" font-size="58" text-anchor="middle" font-family="Georgia,serif">Chess Room Premium Placeholder</text>
+  <text x="800" y="790" fill="#f4e7c9" font-size="28" text-anchor="middle" font-family="Arial,sans-serif">Permanent backdrop path is live. Final environment art still needed.</text>
+</svg>

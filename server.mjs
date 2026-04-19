@@ -48,10 +48,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const OPERATOR_CONSOLE_DIR = path.join(__dirname, "operator-console");
 const USER_APP_DIR = path.join(__dirname, "spiritkins-app");
-const WORLD_ART_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "photos");
-const GAME_THEME_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "Game_Themes");
-const GAME_CONCEPT_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "spiritverse_game_concept_assets", "spiritverse_game_concepts");
-const PREMIUM_GAME_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "spiritverse_premium_game_asset_pack");
+const ACTIVE_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "ACTIVE");
+const ACTIVE_WORLD_ART_DIRS = [
+  path.join(ACTIVE_ASSET_DIR, "rooms"),
+  path.join(ACTIVE_ASSET_DIR, "concepts")
+];
 const SPIRITVERSE_APP_BUILD = "20260417033000";
 
 const PORT = config.port;
@@ -298,16 +299,21 @@ app.get("/app/data/:asset", async (req, reply) => {
   return reply.type("text/javascript; charset=utf-8").send(content);
 });
 
+app.get("/app/active-assets/*", async (req, reply) => {
+  return sendStaticAssetFromRoot(reply, ACTIVE_ASSET_DIR, req.params["*"]);
+});
+
+// Compatibility aliases for older frontend builds. These now resolve from ACTIVE.
 app.get("/app/game-theme-assets/*", async (req, reply) => {
-  return sendStaticAssetFromRoot(reply, GAME_THEME_ASSET_DIR, req.params["*"]);
+  return sendStaticAssetFromRoot(reply, ACTIVE_ASSET_DIR, req.params["*"]);
 });
 
 app.get("/app/game-concept-assets/*", async (req, reply) => {
-  return sendStaticAssetFromRoot(reply, GAME_CONCEPT_ASSET_DIR, req.params["*"]);
+  return sendStaticAssetFromRoot(reply, ACTIVE_ASSET_DIR, req.params["*"]);
 });
 
 app.get("/app/premium-game-assets/*", async (req, reply) => {
-  return sendStaticAssetFromRoot(reply, PREMIUM_GAME_ASSET_DIR, req.params["*"]);
+  return sendStaticAssetFromRoot(reply, ACTIVE_ASSET_DIR, req.params["*"]);
 });
 
 // Serve portrait images from public/portraits
@@ -370,11 +376,16 @@ app.get("/world-art/:filename", async (req, reply) => {
   }
 
   try {
-    const filePath = path.join(WORLD_ART_DIR, filename);
-    const content = await readFile(filePath);
-    const ext = path.extname(filename).toLowerCase();
-    const mime = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : "application/octet-stream";
-    return reply.type(mime).send(content);
+    for (const dir of ACTIVE_WORLD_ART_DIRS) {
+      const filePath = path.join(dir, filename);
+      try {
+        const content = await readFile(filePath);
+        const ext = path.extname(filename).toLowerCase();
+        const mime = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : "application/octet-stream";
+        return reply.type(mime).send(content);
+      } catch {}
+    }
+    throw new Error("not found");
   } catch (err) {
     app.log.warn(`Failed to serve world art ${filename}: ${err.message}`);
     return reply.code(404).send({ ok: false, error: "Art not found" });
