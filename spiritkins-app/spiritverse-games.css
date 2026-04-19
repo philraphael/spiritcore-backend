@@ -490,7 +490,7 @@
     var(--game-board-art, none);
   background-size: cover;
   background-position: center;
-  opacity: 0.42;
+  opacity: 0.68;
   pointer-events: none;
 }
 
@@ -529,7 +529,7 @@
   border-radius: 22px;
   border: 1px solid rgba(255,255,255,0.08);
   background:
-    linear-gradient(180deg, rgba(4, 7, 14, 0.58), rgba(4, 7, 14, 0.74)),
+    linear-gradient(180deg, rgba(4, 7, 14, 0.34), rgba(4, 7, 14, 0.56)),
     var(--game-room-art, none),
     radial-gradient(circle at top, var(--game-accent-soft) 0%, transparent 48%),
     linear-gradient(180deg, var(--game-surface-top) 0%, var(--game-surface-bottom) 100%);
@@ -562,7 +562,7 @@
   background:
     var(--game-modal-frame, none) center / cover no-repeat,
     var(--game-accent-art, none) right -12px top 10px / min(38%, 220px) auto no-repeat;
-  opacity: 0.18;
+  opacity: 0.3;
   pointer-events: none;
 }
 
@@ -839,7 +839,7 @@
     var(--game-board-art, none);
   background-size: cover;
   background-position: center;
-  opacity: 0.32;
+  opacity: 0.56;
   pointer-events: none;
 }
 

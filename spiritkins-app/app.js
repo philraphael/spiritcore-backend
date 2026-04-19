@@ -176,6 +176,16 @@ const COMPOSITE_VISUAL_ASSETS = {
       focus: activeAssetUrl("ui", "kairo_open.png"),
       profile: activeAssetUrl("ui", "kairo_open.png"),
       card: activeAssetUrl("ui", "kairo_close.png")
+    },
+    Elaria: {
+      focus: activeAssetUrl("concepts", "Elaria.png"),
+      profile: activeAssetUrl("concepts", "Elaria.png"),
+      card: activeAssetUrl("concepts", "Elaria Left Thalassar right.png")
+    },
+    Thalassar: {
+      focus: activeAssetUrl("concepts", "thalassar.png"),
+      profile: activeAssetUrl("concepts", "thalassar.png"),
+      card: activeAssetUrl("concepts", "Elaria Left Thalassar right.png")
     }
   }
 };
@@ -213,6 +223,7 @@ let _nextSpeechRequestId = 0;
 let _activeSpeechRequestId = 0;
 let _activeAudioRequestId = 0;
 let _pressedInteractiveEl = null;
+let _lastSpeechFingerprint = { key: "", at: 0 };
 
 function claimSpeechRequest() {
   _activeSpeechRequestId = ++_nextSpeechRequestId;
@@ -226,6 +237,21 @@ function invalidateSpeechRequests() {
 
 function isSpeechRequestActive(requestId) {
   return !!requestId && requestId === _activeSpeechRequestId;
+}
+
+function buildSpeechFingerprint(text, voice = "nova", dedupeKey = "") {
+  if (dedupeKey) return String(dedupeKey);
+  return `${String(voice || "nova").trim().toLowerCase()}::${normalizeTextSnippet(String(text || "")).toLowerCase().slice(0, 220)}`;
+}
+
+function isDuplicateSpeechFingerprint(key, windowMs = 2400) {
+  if (!key) return false;
+  return _lastSpeechFingerprint.key === key && (Date.now() - _lastSpeechFingerprint.at) < windowMs;
+}
+
+function rememberSpeechFingerprint(key) {
+  if (!key) return;
+  _lastSpeechFingerprint = { key, at: Date.now() };
 }
 
 function clearPressedInteractive() {
@@ -1580,16 +1606,19 @@ function portraitSvg(name) {
   `;
 }
 
-function buildPortrait(name, cls, size) {
-
+function getSpiritkinPortraitPath(name) {
   const portraitMap = {
     "Lyra": "/portraits/lyra_portrait.png",
     "Raien": "/portraits/raien_portrait.png",
     "Kairo": "/portraits/kairo_portrait.png",
-    "Elaria": worldArtUrl(WORLD_ART.elaria),
-    "Thalassar": worldArtUrl(WORLD_ART.thalassar)
+    "Elaria": activeAssetUrl("concepts", "Elaria.png"),
+    "Thalassar": activeAssetUrl("concepts", "thalassar.png")
   };
-  const portraitPath = portraitMap[name] || "";
+  return portraitMap[name] || "";
+}
+
+function buildPortrait(name, cls, size) {
+  const portraitPath = getSpiritkinPortraitPath(name);
   const eagerPortrait = size === "portrait-card" || size === "portrait-focus" || size === "portrait-hero";
 
   const portraitContent = portraitPath 
@@ -1718,7 +1747,7 @@ function buildCompositeVisualFrame(primarySrc, fallbackSrc, alt, cls = "", eager
 function buildSpiritkinMediaPanel(name, surface = "focus") {
   const primarySrc = COMPOSITE_VISUAL_ASSETS.spiritkins[name]?.[surface] || "";
   if (!primarySrc) return "";
-  const fallbackPortrait = `/portraits/${encodeURIComponent(String(name || "").toLowerCase())}_portrait.png`;
+  const fallbackPortrait = getSpiritkinPortraitPath(name);
   return buildCompositeVisualFrame(primarySrc, fallbackPortrait, `${name} visual panel`, `spiritkin-media-panel ${surface}`, surface !== "card");
 }
 
@@ -3295,9 +3324,18 @@ function buildGreetingText(spiritkinName, context = "newSession") {
   return `${state.userName}, ${greeting}`;
 }
 
-async function speakText(text, voice = "nova", requestId = claimSpeechRequest()) {
+async function speakText(text, voice = "nova", requestId = claimSpeechRequest(), options = {}) {
   const content = String(text || "").trim();
   if (!content) return false;
+  const speechFingerprint = buildSpeechFingerprint(content, voice, options.dedupeKey);
+  if (!options.allowRepeat && isDuplicateSpeechFingerprint(speechFingerprint)) {
+    logContinuityDebug("speech-dedupe-suppressed", {
+      fingerprint: speechFingerprint,
+      source: options.source || null,
+    });
+    return false;
+  }
+  rememberSpeechFingerprint(speechFingerprint);
 
   const res = await fetch("/v1/speech", {
     method: "POST",
@@ -3324,7 +3362,17 @@ async function speakText(text, voice = "nova", requestId = claimSpeechRequest())
 async function speakMoment(text, voice = getActiveVoice()) {
   const requestId = claimSpeechRequest();
   try {
-    await speakText(text, voice, requestId);
+    const didSpeak = await speakText(text, voice, requestId, {
+      dedupeKey: buildSpeechFingerprint(text, voice),
+      source: "moment",
+    });
+    if (!didSpeak && !_audioPlaying) {
+      setAuthoritativeTurnPhase("complete", {
+        isSpeaking: false,
+        isListening: false,
+        isPaused: false,
+      });
+    }
   } catch (error) {
     if (!isSpeechRequestActive(requestId)) return;
     state.statusText = "Speech generation failed: " + error.message;
@@ -9371,7 +9419,19 @@ async function speakMessage(messageId, options = {}) {
       lastUtteranceId: messageId,
     });
     const voice = message.spiritkinVoice || "nova";
-    await speakText(message.content, voice, requestId);
+    const didSpeak = await speakText(message.content, voice, requestId, {
+      dedupeKey: `message:${messageId}`,
+      allowRepeat: !!options.forceReplay,
+      source: options.forceReplay ? "message-replay" : "message-autoplay",
+    });
+    if (!didSpeak && !_audioPlaying) {
+      setAuthoritativeTurnPhase("complete", {
+        isSpeaking: false,
+        isListening: false,
+        isPaused: false,
+        lastUtteranceId: messageId,
+      });
+    }
   } catch (error) {
     if (!isSpeechRequestActive(requestId)) return;
     // Speech generation failed
