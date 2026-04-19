@@ -177,6 +177,7 @@ let _lastAutoSpokenMessageId = null;
 let _nextSpeechRequestId = 0;
 let _activeSpeechRequestId = 0;
 let _activeAudioRequestId = 0;
+let _pressedInteractiveEl = null;
 
 function claimSpeechRequest() {
   _activeSpeechRequestId = ++_nextSpeechRequestId;
@@ -190,6 +191,21 @@ function invalidateSpeechRequests() {
 
 function isSpeechRequestActive(requestId) {
   return !!requestId && requestId === _activeSpeechRequestId;
+}
+
+function clearPressedInteractive() {
+  if (_pressedInteractiveEl && _pressedInteractiveEl.classList) {
+    _pressedInteractiveEl.classList.remove("is-pressed");
+  }
+  _pressedInteractiveEl = null;
+}
+
+function markPressedInteractive(target) {
+  const element = target?.closest?.("[data-action]");
+  if (!element) return;
+  clearPressedInteractive();
+  element.classList.add("is-pressed");
+  _pressedInteractiveEl = element;
 }
 
 function getLocalSpeechRuntimeState() {
@@ -7204,6 +7220,10 @@ async function onClick(event) {
     return;
   }
   const action = element.dataset.action;
+  if (element.matches?.(":disabled") || element.getAttribute?.("aria-disabled") === "true") {
+    return;
+  }
+  event.preventDefault();
   if (action === "continue" || action === "skip-gate" || spiritGateTarget) {
     console.info("[SpiritGate] click-action-resolved", {
       action,
@@ -8215,6 +8235,16 @@ function initializeSpiritverseApp() {
     if (!root) throw new Error("Boot failed: #root element was not found.");
     root.addEventListener("input", onInput);
     root.addEventListener("click", onClick);
+    root.addEventListener("pointerdown", (event) => {
+      markPressedInteractive(event.target);
+    }, { passive: true });
+    root.addEventListener("pointerup", () => {
+      window.setTimeout(() => {
+        clearPressedInteractive();
+      }, 120);
+    }, { passive: true });
+    root.addEventListener("pointercancel", clearPressedInteractive, { passive: true });
+    root.addEventListener("pointerleave", clearPressedInteractive, { passive: true });
     logInteraction("root-listeners-attached", { target: "#root" });
     root.addEventListener("keydown", (event) => {
       if (event.target.dataset.field === "chat-input" && event.key === "Enter" && !event.shiftKey) {
