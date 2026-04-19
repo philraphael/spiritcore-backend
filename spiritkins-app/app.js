@@ -2816,12 +2816,8 @@ function syncEntryCinematics() {
         gateVideo.muted = true;
         gateVideo.defaultMuted = true;
         gateVideo.playsInline = true;
-        const previewAttempt = gateVideo.play?.();
-        if (previewAttempt?.catch) {
-          previewAttempt.catch((error) => {
-            logSpiritGate("gate-video-preview-play-rejected", { reason: error?.message || "unknown" });
-          });
-        }
+        gateVideo.pause?.();
+        gateVideo.currentTime = 0;
       } else {
         gateVideo.pause?.();
         gateVideo.currentTime = 0;
@@ -3553,7 +3549,6 @@ function openCrownGate() {
   clearSpiritGateTransitionTimers();
   cleanupSpeechLifecycle("open-crown-gate", { renderOnFinish: false, clearStatus: false });
   spiritGateActiveAttemptId += 1;
-  const attemptId = spiritGateActiveAttemptId;
   state.crownGateOpening = true;
   state.showCrownGateHome = false;
   state.entryVideoStarted = true;
@@ -3562,18 +3557,13 @@ function openCrownGate() {
   state.spiritCoreWelcoming = false;
   console.info("[SpiritGate] route-video-start", { action: "continue", snapshot: getInteractionStateSnapshot() });
   console.info("Gate video start", getInteractionStateSnapshot());
-  setMediaMuted(true);
   armSpiritGatePlaybackSafety("gate-route-start");
-  state.statusText = "The Crown Gate is opening. Unmute when you are ready.";
+  state.statusText = state.mediaMuted
+    ? "The Crown Gate is opening. Sound is currently muted."
+    : "The Crown Gate is opening...";
   state.statusError = false;
   normalizeInteractionState("openCrownGate");
   render();
-  window.setTimeout(() => {
-    if (attemptId !== spiritGateActiveAttemptId) return;
-    if (!state.crownGateOpening || state.entryAccepted || state.entryTransitioning) return;
-    logSpiritGate("deterministic-transition", { source: "gate-recovery-direct" });
-    completeCrownGateEntry({ skipped: true, source: "gate-recovery-direct", force: true });
-  }, CROWN_GATE_HOLD_MS);
 }
 
 async function finalizeCrownGateRoute({ skipped = false, source = "unspecified" } = {}) {
@@ -5849,7 +5839,6 @@ function buildEntry() {
               class="video-player-element"
               data-entry-video="gate"
               muted
-              ${!state.entryVideoStarted ? "autoplay loop" : ""}
               playsinline
               preload="auto"
               poster="/world-art/Spiritverse%20background%20base%20theme.png"
@@ -5940,7 +5929,6 @@ function buildCrownGateEntry() {
               class="video-player-element"
               data-entry-video="gate"
               muted
-              ${!state.entryVideoStarted ? "autoplay loop" : ""}
               playsinline
               preload="auto"
               poster="/world-art/Spiritverse%20background%20base%20theme.png"
