@@ -822,6 +822,9 @@ button:disabled {
   height: 100%;
   position: relative;
   z-index: 1;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
 .portrait-fallback-svg svg {
@@ -852,13 +855,20 @@ button:disabled {
   opacity: 1;
 }
 
+.portrait-frame.has-remote-image .portrait-fallback-svg {
+  opacity: 0;
+  visibility: hidden;
+}
+
 .portrait-frame.portrait-loaded .portrait-fallback-svg {
   opacity: 0;
+  visibility: hidden;
   transition: opacity 0.24s ease;
 }
 
 .portrait-frame.portrait-fallback-only .portrait-fallback-svg {
   opacity: 1;
+  visibility: visible;
 }
 
 .portrait-mini {

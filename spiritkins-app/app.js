@@ -174,6 +174,23 @@ let _voiceAwaitingUserTurn = false;
 let _voiceTurnCaptureAfterAudio = false;
 let _scheduledAutoSpeechMessageId = null;
 let _lastAutoSpokenMessageId = null;
+let _nextSpeechRequestId = 0;
+let _activeSpeechRequestId = 0;
+let _activeAudioRequestId = 0;
+
+function claimSpeechRequest() {
+  _activeSpeechRequestId = ++_nextSpeechRequestId;
+  return _activeSpeechRequestId;
+}
+
+function invalidateSpeechRequests() {
+  _activeSpeechRequestId = ++_nextSpeechRequestId;
+  _activeAudioRequestId = 0;
+}
+
+function isSpeechRequestActive(requestId) {
+  return !!requestId && requestId === _activeSpeechRequestId;
+}
 
 function getLocalSpeechRuntimeState() {
   return {
@@ -1258,7 +1275,7 @@ function buildPortrait(name, cls, size) {
     `
     : portraitSvg(name);
   return `
-    <div class="portrait-frame ${esc(cls)} ${esc(size)}">
+    <div class="portrait-frame ${portraitPath ? "has-remote-image" : ""} ${esc(cls)} ${esc(size)}">
       <div class="portrait-backdrop"></div>
       <div class="portrait-art">${portraitContent}</div>
     </div>
@@ -2861,7 +2878,7 @@ function buildGreetingText(spiritkinName, context = "newSession") {
   return `${state.userName}, ${greeting}`;
 }
 
-async function speakText(text, voice = "nova") {
+async function speakText(text, voice = "nova", requestId = claimSpeechRequest()) {
   const content = String(text || "").trim();
   if (!content) return false;
 
@@ -2876,15 +2893,23 @@ async function speakText(text, voice = "nova") {
     throw new Error(`Speech API failed: ${res.status} ${res.statusText} - ${errorText}`);
   }
 
+  if (!isSpeechRequestActive(requestId)) {
+    return false;
+  }
   const audioBuffer = await res.arrayBuffer();
-  await playAudio(audioBuffer);
-  return true;
+  if (!isSpeechRequestActive(requestId)) {
+    return false;
+  }
+  await playAudio(audioBuffer, { requestId });
+  return isSpeechRequestActive(requestId);
 }
 
 async function speakMoment(text, voice = getActiveVoice()) {
+  const requestId = claimSpeechRequest();
   try {
-    await speakText(text, voice);
+    await speakText(text, voice, requestId);
   } catch (error) {
+    if (!isSpeechRequestActive(requestId)) return;
     state.statusText = "Speech generation failed: " + error.message;
     state.statusError = true;
     render();
@@ -3500,6 +3525,7 @@ function openCrownGate() {
   clearSpiritGateFallback();
   clearSpiritGateArrivalFallback();
   clearSpiritGateTransitionTimers();
+  cleanupSpeechLifecycle("open-crown-gate", { renderOnFinish: false, clearStatus: false });
   spiritGateActiveAttemptId += 1;
   const attemptId = spiritGateActiveAttemptId;
   state.crownGateOpening = true;
@@ -3510,9 +3536,9 @@ function openCrownGate() {
   state.spiritCoreWelcoming = false;
   console.info("[SpiritGate] route-video-start", { action: "continue", snapshot: getInteractionStateSnapshot() });
   console.info("Gate video start", getInteractionStateSnapshot());
-  setMediaMuted(false);
+  setMediaMuted(true);
   armSpiritGatePlaybackSafety("gate-route-start");
-  state.statusText = "The Crown Gate is opening...";
+  state.statusText = "The Crown Gate is opening. Unmute when you are ready.";
   state.statusError = false;
   normalizeInteractionState("openCrownGate");
   render();
@@ -4096,7 +4122,7 @@ function maybeSpeakMessageLater(messageId, options = {}) {
   _scheduledAutoSpeechMessageId = messageId;
   Promise.resolve()
     .then(async () => {
-      if (state.voiceMuted) return;
+      if (state.voiceMuted || _scheduledAutoSpeechMessageId !== messageId) return;
       await speakMessage(messageId, options);
       _lastAutoSpokenMessageId = messageId;
     })
@@ -5331,6 +5357,7 @@ function stopCurrentAudioPlayback() {
   const activeAudio = _currentAudio;
   _currentAudio = null;
   _audioPlaying = false;
+  _activeAudioRequestId = 0;
   if (activeAudio instanceof HTMLAudioElement) {
     try {
       activeAudio.onended = null;
@@ -5369,6 +5396,7 @@ function cleanupSpeechLifecycle(reason = "unspecified", options = {}) {
   });
 
   _scheduledAutoSpeechMessageId = null;
+  invalidateSpeechRequests();
   clearVoiceLoopTimer();
 
   if (_recognition) {
@@ -8214,20 +8242,40 @@ if (document.readyState === "loading") {
   initializeSpiritverseApp();
 }
 
-async function playAudio(buffer) {
+async function playAudio(buffer, options = {}) {
+  const requestId = options.requestId || claimSpeechRequest();
+  if (!isSpeechRequestActive(requestId)) {
+    return false;
+  }
   try {
     logContinuityDebug("speech-playback-start", {
       byteLength: buffer?.byteLength || buffer?.length || 0,
       hadRecognition: !!_recognition,
       hadCurrentAudio: !!_currentAudio,
+      requestId,
     });
     clearVoiceLoopTimer();
     if (_recognition) {
-      cleanupSpeechLifecycle("play-audio-stop-listening", { renderOnFinish: false, clearStatus: false, preserveResumeHint: true });
+      _recognitionStopRequested = true;
+      const recognition = _recognition;
+      _recognition = null;
+      try {
+        recognition.stop();
+      } catch (_) {}
+      state.voiceListening = false;
+      setAuthoritativeTurnPhase("spirit_response", {
+        isSpeaking: true,
+        isListening: false,
+        isPaused: false,
+      });
     }
     pauseMountedVideoAudio();
     stopCurrentAudioPlayback();
+    if (!isSpeechRequestActive(requestId)) {
+      return false;
+    }
     _audioPlaying = true;
+    _activeAudioRequestId = requestId;
     setAuthoritativeTurnPhase("spirit_response", {
       isSpeaking: true,
       isListening: false,
@@ -8244,18 +8292,24 @@ async function playAudio(buffer) {
     });
 
     // Create a blob from the buffer and use HTML5 audio element
-    const blob = new Blob([buffer], { type: 'audio/mpeg' });
+    const blob = new Blob([buffer], { type: "audio/mpeg" });
     const url = URL.createObjectURL(blob);
     
     const audio = new Audio();
     audio.src = url;
     audio.volume = 1.0;
     audio.onended = () => {
+      if (_activeAudioRequestId !== requestId) {
+        URL.revokeObjectURL(url);
+        return;
+      }
       logContinuityDebug("speech-playback-ended", {
         autoResumeListening: !!_voiceTurnCaptureAfterAudio,
+        requestId,
       });
       _currentAudio = null;
       _audioPlaying = false;
+      _activeAudioRequestId = 0;
       setAuthoritativeTurnPhase("complete", {
         isSpeaking: false,
         isListening: false,
@@ -8271,17 +8325,23 @@ async function playAudio(buffer) {
         },
       });
       URL.revokeObjectURL(url);
-    if (_voiceTurnCaptureAfterAudio) {
-      setVoiceTurnRuntimeState({ awaitingUserTurn: _voiceAwaitingUserTurn, captureAfterAudio: false });
-      requestVoiceTurnCapture({ delay: 220 });
-    }
+      if (_voiceTurnCaptureAfterAudio) {
+        setVoiceTurnRuntimeState({ awaitingUserTurn: _voiceAwaitingUserTurn, captureAfterAudio: false });
+        requestVoiceTurnCapture({ delay: 220 });
+      }
     };
-    audio.onerror = (e) => {
+    audio.onerror = () => {
+      if (_activeAudioRequestId !== requestId) {
+        URL.revokeObjectURL(url);
+        return;
+      }
       logContinuityDebug("speech-playback-error", {
         autoResumeListening: !!_voiceTurnCaptureAfterAudio,
+        requestId,
       });
       _currentAudio = null;
       _audioPlaying = false;
+      _activeAudioRequestId = 0;
       setAuthoritativeTurnPhase("complete", {
         isSpeaking: false,
         isListening: false,
@@ -8297,36 +8357,48 @@ async function playAudio(buffer) {
         },
       });
       URL.revokeObjectURL(url);
-    if (_voiceTurnCaptureAfterAudio) {
-      setVoiceTurnRuntimeState({ awaitingUserTurn: _voiceAwaitingUserTurn, captureAfterAudio: false });
-      setVoiceWaitingStatus("Audio playback failed. Tap the mic or type to continue.");
-    }
+      if (_voiceTurnCaptureAfterAudio) {
+        setVoiceTurnRuntimeState({ awaitingUserTurn: _voiceAwaitingUserTurn, captureAfterAudio: false });
+        setVoiceWaitingStatus("Audio playback failed. Tap the mic or type to continue.");
+      }
     };
     
     // Attempting to play audio
     const playPromise = audio.play();
     
     if (playPromise !== undefined) {
-      playPromise
+      await playPromise
         .then(() => {
+          if (!isSpeechRequestActive(requestId) || _activeAudioRequestId !== requestId) {
+            audio.pause();
+            audio.src = "";
+            URL.revokeObjectURL(url);
+            return;
+          }
           // Audio is now playing
-          logContinuityDebug("speech-playback-confirmed", {});
+          logContinuityDebug("speech-playback-confirmed", { requestId });
           _currentAudio = audio;
         })
         .catch(err => {
+          if (_activeAudioRequestId !== requestId) {
+            URL.revokeObjectURL(url);
+            return;
+          }
           logContinuityDebug("speech-playback-failed", {
             error: err.message,
             name: err.name,
+            requestId,
           });
           _audioPlaying = false;
+          _activeAudioRequestId = 0;
           setAuthoritativeTurnPhase("complete", {
             isSpeaking: false,
             isListening: false,
             isPaused: false,
           });
           // Audio play failed
-          if (err.name === 'NotAllowedError') {
-            state.statusText = "🔊 Click the speaker button to enable audio playback.";
+          if (err.name === "NotAllowedError") {
+            state.statusText = "Audio is blocked until you unmute or interact again.";
           } else {
             state.statusText = "Failed to play audio: " + err.message;
           }
@@ -8337,11 +8409,22 @@ async function playAudio(buffer) {
           render();
         });
     } else {
+      if (!isSpeechRequestActive(requestId) || _activeAudioRequestId !== requestId) {
+        audio.pause();
+        audio.src = "";
+        URL.revokeObjectURL(url);
+        return false;
+      }
       _currentAudio = audio;
     }
+    return true;
   } catch (e) {
+    if (_activeAudioRequestId === requestId) {
+      _activeAudioRequestId = 0;
+    }
     logContinuityDebug("speech-playback-exception", {
       error: e.message,
+      requestId,
     });
     _audioPlaying = false;
     setAuthoritativeTurnPhase("complete", {
@@ -8357,6 +8440,7 @@ async function playAudio(buffer) {
     state.statusError = true;
     render();
   }
+  return false;
 }
 
 async function speakMessage(messageId, options = {}) {
@@ -8368,6 +8452,7 @@ async function speakMessage(messageId, options = {}) {
   if (!options.forceReplay && _audioPlaying && state.sessionModel?.speechState?.lastUtteranceId === messageId) {
     return;
   }
+  const requestId = claimSpeechRequest();
 
   try {
     logContinuityDebug("speak-message", {
@@ -8393,8 +8478,9 @@ async function speakMessage(messageId, options = {}) {
       lastUtteranceId: messageId,
     });
     const voice = message.spiritkinVoice || "nova";
-    await speakText(message.content, voice);
+    await speakText(message.content, voice, requestId);
   } catch (error) {
+    if (!isSpeechRequestActive(requestId)) return;
     // Speech generation failed
     logContinuityDebug("speak-message-failed", {
       messageId,
