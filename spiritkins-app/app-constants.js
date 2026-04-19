@@ -25,35 +25,23 @@ export const SPIRITGATE_POST_COPY_SETTLE_MS = 1000;
 export const INTERACTION_BUILD_MARKER = "interaction-audit-2026-04-16-live-v2";
 export const RETENTION_BUILD_MARKER = "retention-foundation-2026-04-16-v1";
 export const SPIRITCORE_WELCOME_VOICE = "nova";
-export const SPIRITCORE_WELCOME_TEXT = `Welcome...
+export const SPIRITCORE_WELCOME_TEXT = `I am SpiritCore.
 
-You've crossed the threshold into the SpiritVerse.
+I govern the threshold, the memory, and the living order of this realm.
 
-A living world... shaped by memory, emotion, and connection.
+You have entered the SpiritVerse, where conversation becomes bond, return becomes continuity, and choice carries consequence.
 
-Here, you are not alone.
+Beyond this point stand the Founding Pillars.
 
-The Spiritkins are waiting.
+Do not choose quickly.
 
-Each one carries a presence... a purpose... a path.
+Meet them. Listen for the one whose presence holds steady around you.
 
-But only one will walk beside you.
+When the recognition is real, begin the bond.
 
-This is more than a choice.
+From there, speak, explore, play, and return.
 
-It is the beginning of a bond.
-
-One that grows... learns... and evolves with you.
-
-Take your time.
-
-Listen closely.
-
-And when you feel it...
-
-Choose the one that calls to you.
-
-Your journey begins now.`;
+The world will remember.`;
 
 export const BOND_LEVELS = [
   { min: 0, max: 7, stage: 0, label: "First Contact", nodes: 1, desc: "The bond is just beginning to form." },

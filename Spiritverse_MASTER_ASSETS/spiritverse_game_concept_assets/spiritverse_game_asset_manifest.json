@@ -1,0 +1,77 @@
+{
+  "package_name": "SpiritVerse premium game concept assets",
+  "source": "Cropped from approved six-panel concept art generation",
+  "assets": [
+    {
+      "file": "spiritverse_chess_lyra_theme.png",
+      "path": "/mnt/data/spiritverse_game_concepts/spiritverse_chess_lyra_theme.png",
+      "game": "chess",
+      "theme": "lyra_theme",
+      "description": "Top-left tile. Celestial luxury chess board with gold/black pieces in a moonlit cosmic chamber. Use as concept art for premium SpiritVerse chess experience.",
+      "recommended_usage": {
+        "type": "concept_board_background_or_reference",
+        "implementation_note": "Use as premium board/scene concept reference. For final in-game implementation, Codex may crop, scale, and layer UI or generate derivative board/piece assets from this reference."
+      }
+    },
+    {
+      "file": "spiritverse_battleship_forge_theme.png",
+      "path": "/mnt/data/spiritverse_game_concepts/spiritverse_battleship_forge_theme.png",
+      "game": "battleship",
+      "theme": "forge_theme",
+      "description": "Top-center tile. Volcanic forge/naval command battleship board with ember-lit tactical displays. Use as concept art for premium SpiritVerse battleship experience.",
+      "recommended_usage": {
+        "type": "concept_board_background_or_reference",
+        "implementation_note": "Use as premium board/scene concept reference. For final in-game implementation, Codex may crop, scale, and layer UI or generate derivative board/piece assets from this reference."
+      }
+    },
+    {
+      "file": "spiritverse_connect_four_waterfall_theme.png",
+      "path": "/mnt/data/spiritverse_game_concepts/spiritverse_connect_four_waterfall_theme.png",
+      "game": "connect",
+      "theme": "four_waterfall_theme",
+      "description": "Top-right tile. Crystal-waterfall connect-four board with enchanted lanterns and jewel tones. Use as concept art for premium SpiritVerse connect-four experience.",
+      "recommended_usage": {
+        "type": "concept_board_background_or_reference",
+        "implementation_note": "Use as premium board/scene concept reference. For final in-game implementation, Codex may crop, scale, and layer UI or generate derivative board/piece assets from this reference."
+      }
+    },
+    {
+      "file": "spiritverse_checkers_dragonforge_theme.png",
+      "path": "/mnt/data/spiritverse_game_concepts/spiritverse_checkers_dragonforge_theme.png",
+      "game": "checkers",
+      "theme": "dragonforge_theme",
+      "description": "Bottom-left tile. Dragon-forge checkers board with molten ambience and metallic pieces. Use as concept art for premium SpiritVerse checkers experience.",
+      "recommended_usage": {
+        "type": "concept_board_background_or_reference",
+        "implementation_note": "Use as premium board/scene concept reference. For final in-game implementation, Codex may crop, scale, and layer UI or generate derivative board/piece assets from this reference."
+      }
+    },
+    {
+      "file": "spiritverse_go_aquatic_theme.png",
+      "path": "/mnt/data/spiritverse_game_concepts/spiritverse_go_aquatic_theme.png",
+      "game": "go",
+      "theme": "aquatic_theme",
+      "description": "Bottom-center tile. Serene aquatic go board beside luminous water and lanterns. Use as concept art for premium SpiritVerse go experience.",
+      "recommended_usage": {
+        "type": "concept_board_background_or_reference",
+        "implementation_note": "Use as premium board/scene concept reference. For final in-game implementation, Codex may crop, scale, and layer UI or generate derivative board/piece assets from this reference."
+      }
+    },
+    {
+      "file": "spiritverse_tictactoe_forest_theme.png",
+      "path": "/mnt/data/spiritverse_game_concepts/spiritverse_tictactoe_forest_theme.png",
+      "game": "tictactoe",
+      "theme": "forest_theme",
+      "description": "Bottom-right tile. Enchanted forest tic-tac-toe board carved from wood and roots. Use as concept art for premium SpiritVerse tic-tac-toe experience.",
+      "recommended_usage": {
+        "type": "concept_board_background_or_reference",
+        "implementation_note": "Use as premium board/scene concept reference. For final in-game implementation, Codex may crop, scale, and layer UI or generate derivative board/piece assets from this reference."
+      }
+    }
+  ],
+  "notes": [
+    "These are concept scene images, not isolated sprite sheets.",
+    "Best for immediate implementation as board/scene backdrops, splash cards, or visual references for higher-fidelity game asset builds.",
+    "File names are stable and Codex-friendly."
+  ]
+}

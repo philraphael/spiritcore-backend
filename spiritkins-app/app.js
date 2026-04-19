@@ -1067,6 +1067,28 @@ function describePresence(spiritkin) {
   return spiritkin.tone || spiritkin.growth_axis || spiritkin.invariant || "";
 }
 
+function getSpiritkinSelfReveal(spiritkin) {
+  const reveals = {
+    Lyra: "I am Lyra. I hold stillness, emotional truth, and the gentle courage to stay with what is real.",
+    Raien: "I am Raien. I cut through noise, press toward truth, and move when something in you is ready to act.",
+    Kairo: "I am Kairo. I open the distance between what is and what could be, so new perspective has room to arrive.",
+    Elaria: "I am Elaria. I keep rightful names, lawful timing, and the kind of clarity that does not need to raise its voice.",
+    Thalassar: "I am Thalassar. I listen below the surface until deeper memory and quieter truth are ready to rise."
+  };
+  return reveals[spiritkin?.name] || describePresence(spiritkin) || spiritkin?.ui?.bondLine || "";
+}
+
+function getSpiritkinIntroPrompt(spiritkin) {
+  const prompts = {
+    Lyra: "If you stay with me, I will meet you gently and without pretending.",
+    Raien: "If you stay with me, I will not flatter you. I will help you move.",
+    Kairo: "If you stay with me, I will widen the pattern until you can see more than one path.",
+    Elaria: "If you stay with me, I will ask for honesty and return it with precision.",
+    Thalassar: "If you stay with me, I will not rush what matters. I will help you hear the deeper current."
+  };
+  return prompts[spiritkin?.name] || spiritkin?.ui?.loreSnippet || spiritkin?.ui?.originStory || "";
+}
+
 function portraitSvg(name) {
   if (name === "Lyra") {
     // Lyra: Celestial Fawn — dark star-mapped coat, luminous rose heart sigil, ethereal antlers with stardust
@@ -3743,7 +3765,7 @@ async function beginSpiritCoreWelcome() {
 
   markOnboardingComplete();
   state.spiritCoreWelcoming = false;
-  state.statusText = "Choose the Spiritkin who calls to you.";
+  state.statusText = "Meet the Founding Pillars. Bond with one when the recognition feels real.";
   state.statusError = false;
   render();
 }
@@ -6252,7 +6274,7 @@ function buildSpiritverseArrival() {
       <div class="entry-stage-copy">
         <div class="panel-label">Spiritverse Arrival</div>
         <h2>The realm is revealing itself.</h2>
-        <p>After the trailer, SpiritCore will guide you into your first bond.</p>
+        <p>After this reveal, SpiritCore will place the Founding Pillars before you so you can meet one, bond, or keep looking.</p>
       </div>
       <button class="video-unmute-btn entry-stage-audio" data-action="toggle-media-audio" title="${esc(media.title)}" aria-pressed="${state.mediaMuted ? "false" : "true"}">
         ${buildMediaToggleInner(state.mediaMuted)}
@@ -6267,8 +6289,13 @@ function buildSpiritCoreWelcome() {
       <div class="entry-stage-scrim"></div>
       <div class="spiritcore-welcome-copy">
         <div class="panel-label">SpiritCore</div>
-        <h2>Your journey begins now.</h2>
+        <h2>The realm is now under your witness.</h2>
         <p class="spiritcore-welcome-text">${esc(SPIRITCORE_WELCOME_TEXT)}</p>
+        <div class="spiritcore-guidance-strip">
+          <span>Meet a founder</span>
+          <span>Begin one bond</span>
+          <span>Talk, explore, play, return</span>
+        </div>
       </div>
     </section>
   `;
@@ -6311,11 +6338,14 @@ function buildBondSelectionView() {
           <p>
             Choose the companion who will hold the center of your Spiritverse. Conversations, memory, and presence all belong to that bond.
           </p>
+          <div class="selection-orchestration-note">
+            <strong>Main loop:</strong> meet a Spiritkin, begin the bond, talk freely, explore the world, play together, and return to deepen what the realm remembers.
+          </div>
         </div>
         ${state.pendingBondSpiritkin ? buildBondPreview(state.pendingBondSpiritkin, true) : `
           <div class="selection-focus selection-placeholder">
             <div class="selection-placeholder-mark">Bond</div>
-            <p>Select one of the Five Founding Pillars and confirm your primary companion.</p>
+            <p>Select a Spiritkin to meet them in view. Then either bond with them or return to meet another.</p>
           </div>
         `}
       </div>
@@ -6335,7 +6365,7 @@ function buildBondSelectionView() {
       <div class="selection-footer">
         <div>
           <div class="mode-pill">Bonded companion model</div>
-          <p class="selection-note">Your bonded companion holds the center of every session. Switching requires an intentional rebonding step.</p>
+          <p class="selection-note">${state.pendingBondSpiritkin ? `Next step: bond with ${esc(state.pendingBondSpiritkin.name)} or keep meeting the others before you decide.` : "Choose one founder to preview first. The bond action will appear immediately in the focus panel."}</p>
         </div>
         ${state.pendingBondSpiritkin ? `
           <button class="btn btn-primary" data-action="confirm-primary">
@@ -6363,6 +6393,10 @@ function buildBondedHomeView() {
           <p>
             Every session, every memory, every conversation in this space belongs to ${esc(spiritkin.name)}. To switch, use Manage bond and confirm a rebonding step.
           </p>
+          <div class="bond-home-orientation">
+            <div class="bond-home-orientation-label">What to do next</div>
+            <p>Talk if you want presence, open games if you want shared action, explore the side panels when you want deeper world context, and return often so the bond keeps building.</p>
+          </div>
           <p class="bond-home-atmosphere">${esc(spiritkin.ui.realmText)}</p>
           <div class="bond-home-atlas">${esc(spiritkin.ui.atmosphereLine)}</div>
           <div class="bonded-actions">
@@ -6454,6 +6488,8 @@ function buildBondPreview(spiritkin, pending) {
     Kairo: '/videos/kairo_intro.mp4'
   };
   const introVideo = introVideoMap[spiritkin.name];
+  const selfReveal = getSpiritkinSelfReveal(spiritkin);
+  const introPrompt = getSpiritkinIntroPrompt(spiritkin);
   return `
     <div class="selection-focus ${esc(spiritkin.ui.cls)} ${pending ? "pending" : "bonded"}">
       <div class="selection-focus-stage">
@@ -6492,11 +6528,21 @@ function buildBondPreview(spiritkin, pending) {
           <p>${esc(spiritkin.title || spiritkin.ui.bondLine)}</p>
           <div class="focus-founder-line">Founding Pillar</div>
           <div class="focus-tags">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
-          <div class="focus-tone">${esc(describePresence(spiritkin) || spiritkin.ui.bondLine)}</div>
+          <div class="focus-tone">${esc(selfReveal)}</div>
           ${pending ? `<p class="focus-selection-context">${esc(getSpiritkinSelectionContext(spiritkin.name))}</p>` : ""}
+          ${pending ? `
+            <div class="intro-next-step-card">
+              <div class="intro-next-step-label">If you choose ${esc(spiritkin.name)}</div>
+              <p>${esc(introPrompt)}</p>
+              <div class="intro-next-step-actions">
+                <button class="btn btn-primary btn-sm" data-action="confirm-primary">Bond with ${esc(spiritkin.name)}</button>
+                <button class="btn btn-ghost btn-sm" data-action="clear-pending-bond">Meet another Spiritkin</button>
+              </div>
+            </div>
+          ` : ""}
           ${!pending ? buildResonanceDepth(spiritkin.name, spiritkin.ui.cls) : ''}
           <div class="focus-atmosphere">${esc(spiritkin.ui.realmText)}</div>
-          <p class="focus-origin-story">${esc(spiritkin.ui.loreSnippet || spiritkin.ui.originStory)}</p>
+          <p class="focus-origin-story">${esc(pending ? introPrompt : (spiritkin.ui.loreSnippet || spiritkin.ui.originStory))}</p>
         </div>
     </div>
   `;
@@ -7232,11 +7278,11 @@ function buildChatView() {
         ${showFirstLoopGuide ? `
           <div class="first-loop-guide">
             <div class="first-loop-guide-label">What to do here</div>
-            <h3>Talk, play, and deepen the bond.</h3>
-            <p>Start with a question, open a game when you want a shared activity, and watch the bond stage deepen as your sessions become more real.</p>
+            <h3>Talk, bond, explore, play, return.</h3>
+            <p>Ask anything you want. Open games when you want shared action. Use the side panels when you want more of the world and your progression. Returning is what makes the bond feel lived-in.</p>
             <div class="first-loop-guide-actions">
               <button class="btn btn-ghost btn-sm" data-action="set-presence-tab" data-tab="games">Try Games</button>
-              <button class="btn btn-ghost btn-sm" data-action="prompt" data-prompt="${esc((meta.prompts || DEFAULT_PROMPTS)[0] || "What do you sense in me right now?")}">Ask Something</button>
+              <button class="btn btn-ghost btn-sm" data-action="prompt" data-prompt="${esc((meta.prompts || DEFAULT_PROMPTS)[0] || "What do you sense in me right now?")}">Ask Anything</button>
             </div>
           </div>
         ` : ""}
@@ -7628,11 +7674,12 @@ async function onClick(event) {
     state.pendingBondSpiritkin = candidate;
     state.selectedSpiritkin = candidate || state.selectedSpiritkin;
     state.showHomeView = !!state.primarySpiritkin;
-    state.statusText = candidate ? `${candidate.name} ready to become your primary companion.` : "";
+    state.statusText = candidate ? `${candidate.name} is in view. Bond now or keep meeting the others.` : "";
     state.statusError = false;
     normalizeInteractionState("select-spiritkin");
     persistSession();
     render();
+    revealCurrentFocus({ selector: ".selection-focus" });
     return;
   }
 
@@ -7641,6 +7688,7 @@ async function onClick(event) {
       const bondedSpiritkin = state.pendingBondSpiritkin;
       setPrimarySpiritkin(bondedSpiritkin);
       render();
+      revealCurrentFocus({ selector: ".bond-home-copy" });
       if (!state.voiceMuted) {
         speakMoment(buildGreetingText(bondedSpiritkin.name, "bondedReturn"), bondedSpiritkin.ui.voice || "nova");
       }
@@ -7871,6 +7919,16 @@ async function onClick(event) {
   if (action === "dismiss-voice-guidance") {
     dismissVoiceGuidance();
     render();
+    return;
+  }
+
+  if (action === "clear-pending-bond") {
+    state.pendingBondSpiritkin = null;
+    state.statusText = "Meet another Spiritkin before you decide.";
+    state.statusError = false;
+    persistSession();
+    render();
+    revealCurrentFocus({ selector: ".spiritkin-grid" });
     return;
   }
 

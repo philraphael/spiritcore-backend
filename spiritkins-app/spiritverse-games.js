@@ -452,7 +452,7 @@ function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpande
   let html = '';
   if (!isExpanded) {
     html += `<div class="game-board-controls" style="display:flex;align-items:center;justify-content:flex-end;width:100%;max-width:340px;margin-bottom:6px;">
-      <button class="game-expand-btn" data-action="go-expand">&#x26F6; Grand Stage</button>
+      <div class="game-preview-chip">Preview only</div>
     </div>`;
   }
 
@@ -482,18 +482,10 @@ function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpande
     }
   }
   html += `</div>`;
+  html += `<div class="sv-mini-caption">Star-Mapping is currently a read-only preview while capture, pass, and scoring rules stay out of live rotation.</div>`;
   const target = resolveTarget(container);
   if (!target) return;
   target.innerHTML = withThemeFrame(html, 'go', theme, isExpanded ? 'sv-theme-expanded' : '');
-
-  if (!isExpanded) {
-    const expandBtn = target.querySelector('[data-action="go-expand"]');
-    if (expandBtn) {
-      expandBtn.onclick = () => {
-        GrandStage.open('go', 'Spiritkin', (c, exp) => renderGoBoard(c, boardArray, lastMove, onSquareClick, exp, theme), theme);
-      };
-    }
-  }
 
   if (isExpanded) {
     bindClicks(target, '[data-action="go-square-click"]', (element) => {
@@ -666,7 +658,7 @@ export const SpiritverseGames = {
     const chessFen = payload.fen || safeGame.fen;
     const board = payload.board || safeGame.board;
     const lastMove = normalizeLastMove(type, payload.lastMove || safeGame.lastMove);
-    const isInteractive = safeGame.status === 'active' && safeGame.turn === 'user';
+    const isInteractive = safeGame.status === 'active' && safeGame.turn === 'user' && type !== 'go';
     logGameRenderDebug("render", {
       type,
       spiritkinName,
@@ -740,7 +732,7 @@ export const SpiritverseGames = {
     const chessFen = payload.fen || safeGame.fen;
     const board = payload.board || safeGame.board;
     const lastMove = normalizeLastMove(type, payload.lastMove || safeGame.lastMove);
-    const isInteractive = safeGame.status === 'active' && safeGame.turn === 'user';
+    const isInteractive = safeGame.status === 'active' && safeGame.turn === 'user' && type !== 'go';
     const renderFn = (target, isExp) => {
       switch (type) {
         case 'chess':

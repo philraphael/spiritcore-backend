@@ -96,6 +96,26 @@ async function testConnectFour(runtime) {
   assert(drawGame.status === "ended" && drawGame.result?.isDraw, "connect four draw should be detected");
 }
 
+async function testCheckers(runtime) {
+  const fallbackGame = runtime.createGameState("checkers");
+  const fallbackMove = runtime.chooseFallbackMove(fallbackGame, "spiritkin");
+  assert(typeof fallbackMove === "string" && fallbackMove.includes("-"), "checkers fallback should produce a move");
+  assert(runtime.applySpiritkinMove(fallbackGame, fallbackMove), "checkers fallback move should be legal");
+
+  const kingGame = runtime.createGameState("checkers");
+  kingGame.data.board = Array(32).fill(null);
+  kingGame.data.board[5] = "white";
+  assert(runtime.applyUserMove(kingGame, "5-0"), "checkers promotion move should apply");
+  assert(String(kingGame.data.board[0]).includes("king"), "checkers promotion should crown the piece");
+
+  const winGame = runtime.createGameState("checkers");
+  winGame.data.board = Array(32).fill(null);
+  winGame.data.board[9] = "white";
+  winGame.data.board[6] = "black";
+  assert(runtime.applyUserMove(winGame, "9-3"), "checkers capture move should apply");
+  assert(winGame.status === "ended" && winGame.result?.winner === "user", "checkers capture should complete the game");
+}
+
 async function testBattleship(runtime) {
   const game = runtime.createGameState("battleship");
   assert(runtime.applyUserMove(game, "4"), "battleship hit 4 failed");
@@ -141,6 +161,7 @@ async function testEngineReplay() {
 async function main() {
   const runtime = createSharedGameRuntime();
   await testChess(runtime);
+  await testCheckers(runtime);
   await testTicTacToe(runtime);
   await testConnectFour(runtime);
   await testBattleship(runtime);

@@ -141,7 +141,7 @@ export function createSharedGameRuntime() {
       const moves = listLegalChessMoves(game.data?.fen, player === "user" ? "w" : "b");
       return moves[0] ?? null;
     }
-    if (game.type === "checkers") return "11-15";
+    if (game.type === "checkers") return chooseCheckersMove(game.data?.board, player === "user" ? "white" : "black");
     if (game.type === "go") return "G7";
     if (game.type === "tictactoe") return chooseTicTacToeMove(game.data.board, player === "user" ? "X" : "O");
     if (game.type === "connect_four") return String(firstPlayableColumn(game.data.board));
@@ -300,10 +300,39 @@ function applyCheckersMove(game, move, player) {
     game.data.board[capturedSquare] = null;
   }
 
-  game.data.board[to] = game.data.board[from];
+  game.data.board[to] = promoteCheckersPiece(game.data.board[from], to);
   game.data.board[from] = null;
   game.data.lastMove = move;
+  updateCheckersOutcome(game, owner);
   return true;
+}
+
+function chooseCheckersMove(board, owner) {
+  const candidates = listCheckersMoves(board, owner);
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => b.score - a.score || a.from - b.from || a.to - b.to);
+  return `${candidates[0].from}-${candidates[0].to}`;
+}
+
+function listCheckersMoves(board, owner) {
+  if (!Array.isArray(board)) return [];
+  const moves = [];
+  for (let from = 0; from < board.length; from += 1) {
+    const piece = board[from];
+    if (!piece || !String(piece).includes(owner)) continue;
+    for (const to of getCheckersLegalMoves(board, from, owner)) {
+      const isJump = Math.abs(to - from) > 5;
+      const promotes = wouldPromoteCheckersPiece(piece, to);
+      moves.push({
+        from,
+        to,
+        isJump,
+        promotes,
+        score: (isJump ? 100 : 0) + (promotes ? 20 : 0) + (String(piece).includes("king") ? 5 : 0),
+      });
+    }
+  }
+  return moves;
 }
 
 function getCheckersLegalMoves(board, from, owner) {
@@ -346,6 +375,38 @@ function getCheckersCapturedSquare(from, to) {
   if (delta % 2 !== 0) return null;
   const midpoint = from + delta / 2;
   return midpoint >= 0 && midpoint < 32 ? midpoint : null;
+}
+
+function wouldPromoteCheckersPiece(piece, to) {
+  if (!piece || String(piece).includes("king")) return false;
+  const owner = String(piece).includes("white") ? "white" : "black";
+  const row = Math.floor(to / 4);
+  return (owner === "white" && row === 0) || (owner === "black" && row === 7);
+}
+
+function promoteCheckersPiece(piece, to) {
+  if (!wouldPromoteCheckersPiece(piece, to)) return piece;
+  const owner = String(piece).includes("white") ? "white" : "black";
+  return `${owner}-king`;
+}
+
+function hasAnyCheckersMove(board, owner) {
+  return listCheckersMoves(board, owner).length > 0;
+}
+
+function updateCheckersOutcome(game, owner) {
+  const opponent = owner === "white" ? "black" : "white";
+  const board = Array.isArray(game?.data?.board) ? game.data.board : [];
+  const opponentHasPieces = board.some((piece) => piece && String(piece).includes(opponent));
+  if (!opponentHasPieces || !hasAnyCheckersMove(board, opponent)) {
+    setOutcome(game, {
+      winner: owner === "white" ? "user" : "spiritkin",
+      reason: !opponentHasPieces ? "all-pieces-captured" : "no-legal-moves",
+      label: owner === "white"
+        ? "You cleared the Veil board."
+        : "Your Spiritkin closed every lane on the Veil board.",
+    });
+  }
 }
 
 function applyGoMove(game, move, player) {
