@@ -18,6 +18,14 @@
   gap: 10px;
 }
 
+.chat-layout.game-focus-mode .active-game-panel {
+  padding: 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(6, 12, 22, 0.62), rgba(6, 12, 22, 0.3));
+  box-shadow: 0 24px 52px rgba(0, 0, 0, 0.26);
+}
+
 .game-help-panel {
   display: grid;
   gap: 12px;

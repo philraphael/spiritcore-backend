@@ -654,6 +654,7 @@ button:disabled {
   background: rgba(8, 14, 26, 0.76);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
   text-align: center;
+  pointer-events: auto;
   animation: crownGateCopyLift 0.92s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
@@ -666,6 +667,10 @@ button:disabled {
 .crown-gate-copy p {
   margin: 0;
   color: var(--muted);
+}
+
+.crown-gate-skip {
+  margin-top: 18px;
 }
 
 @keyframes crownGateVeilShift {
@@ -1255,6 +1260,10 @@ button:disabled {
   align-items: stretch;
 }
 
+.chat-layout.game-focus-mode {
+  grid-template-columns: minmax(420px, 1.08fr) minmax(300px, 0.92fr);
+}
+
 .presence-panel {
   padding: 22px;
   display: grid;
@@ -1264,6 +1273,15 @@ button:disabled {
     linear-gradient(180deg, rgba(255,255,255,0.05), transparent 28%),
     color-mix(in srgb, var(--realm-panel) 92%, rgba(255,255,255,0.03));
   border-left: 3px solid color-mix(in srgb, var(--realm-accent) 32%, transparent);
+}
+
+.chat-layout.game-focus-mode .presence-panel {
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.28);
+}
+
+.chat-layout.game-focus-mode .chat-stage {
+  opacity: 0.8;
+  transform: scale(0.995);
 }
 
 .presence-summary {
@@ -1447,6 +1465,47 @@ button:disabled {
   max-height: 56vh;
   padding: 18px 8px 18px 0;
   margin-top: 8px;
+}
+
+.first-loop-guide {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--realm-accent) 20%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--realm-accent-soft) 38%, transparent), rgba(255,255,255,0.03)),
+    rgba(8, 16, 28, 0.52);
+  box-shadow: 0 18px 42px rgba(0,0,0,0.18);
+}
+
+.first-loop-guide-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.first-loop-guide h3,
+.first-loop-guide p {
+  margin: 0;
+}
+
+.first-loop-guide h3 {
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+.first-loop-guide p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.first-loop-guide-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .thread {
@@ -5506,6 +5565,15 @@ button[data-action="begin-quest"]:active,
     linear-gradient(180deg, rgba(5, 10, 18, 0.18), rgba(5, 10, 18, 0.84));
 }
 
+.entry-screen-gate:fullscreen,
+.entry-screen-gate:-webkit-full-screen {
+  background: #02060d;
+}
+
+.entry-screen-gate:fullscreen::backdrop {
+  background: #02060d;
+}
+
 .entry-gate-video,
 .entry-stage-video {
   position: absolute;
@@ -5650,6 +5718,26 @@ button[data-action="begin-quest"]:active,
   background:
     linear-gradient(180deg, rgba(2, 6, 14, 0.12) 0%, rgba(2, 6, 14, 0.2) 100%),
     radial-gradient(circle at 50% 40%, rgba(242, 219, 160, 0.04), transparent 36%);
+}
+
+.entry-live-skip {
+  position: fixed;
+  top: max(18px, env(safe-area-inset-top));
+  right: max(18px, env(safe-area-inset-right));
+  z-index: 8;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 219, 160, 0.24);
+  background: rgba(5, 10, 18, 0.62);
+  color: rgba(255, 245, 226, 0.92);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+
+.entry-live-skip:hover {
+  border-color: rgba(242, 219, 160, 0.46);
+  background: rgba(7, 13, 22, 0.78);
 }
 
 .entry-main-cta {

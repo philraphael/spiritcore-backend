@@ -2314,6 +2314,11 @@ async function transitionPresenceSurface(tab, options = {}) {
   normalizeInteractionState("transitionPresenceSurface");
   persistSession();
   render();
+  revealCurrentFocus({
+    selector: tab === "games" && state.activeGame
+      ? ".active-game-panel"
+      : ".presence-tab-content",
+  });
   if (announce && tab !== previousTab) {
     narratePresenceTab(tab).catch(() => {});
   }
@@ -3382,7 +3387,7 @@ async function deliverConversationGreeting(context = "newSession") {
     spiritkinVoice: spiritkin.ui.voice || "nova"
   });
   render();
-  scrollThread();
+  scrollThread({ reveal: true });
   maybeSpeakMessageLater(greetingMessage?.id, { armUserTurn: shouldKeepVoiceLoopActive() });
 }
 
@@ -3617,6 +3622,7 @@ function openCrownGate() {
     render();
     return;
   }
+  attemptSpiritGateFullscreen();
   state.userName = state.userNameDraft.trim();
   if (state.userName) localStorage.setItem(NAME_KEY, state.userName);
   if (state.consentChecked && !state.consentAccepted) {
@@ -3642,9 +3648,11 @@ function openCrownGate() {
   state.statusError = false;
   normalizeInteractionState("openCrownGate");
   render();
+  revealCurrentFocus({ selector: ".entry-screen-gate" });
 }
 
 async function finalizeCrownGateRoute({ skipped = false, source = "unspecified" } = {}) {
+  exitSpiritGateFullscreen();
   state.entryAccepted = true;
   state.entryTransitioning = false;
   state.showHomeView = true;
@@ -3687,6 +3695,7 @@ function completeCrownGateEntry({ skipped = false, source = "unspecified", force
   state.statusText = skipped ? "Crossing the threshold..." : "The world is settling around you...";
   state.statusError = false;
   render();
+  revealCurrentFocus({ selector: ".entry-screen-gate" });
 
   if (skipped) {
     window.setTimeout(async () => {
@@ -3817,7 +3826,7 @@ async function beginConversation() {
   if (state.conversationId && state.showHomeView) {
     state.showHomeView = false;
     render();
-    scrollThread();
+    scrollThread({ reveal: true });
     return;
   }
   cleanupSpeechLifecycle("begin-conversation", { renderOnFinish: false, clearStatus: false });
@@ -3891,7 +3900,7 @@ async function beginConversation() {
   state.loadingConv = false;
   normalizeInteractionState("beginConversation");
   render();
-  scrollThread();
+  scrollThread({ reveal: true });
   if (!state.convError && state.conversationId) {
     await deliverConversationGreeting("newSession");
   }
@@ -3936,7 +3945,7 @@ async function sendMessage(overrideText) {
     textLength: text.length,
   });
   render();
-  scrollThread();
+  scrollThread({ reveal: true });
 
   try {
     const res = await fetch(`${API}/v1/interact`, {
@@ -4032,13 +4041,83 @@ async function sendMessage(overrideText) {
     state.voiceTranscriptPreview = "";
   }
   render();
-  scrollThread();
+  scrollThread({ reveal: true });
 }
 
-function scrollThread() {
+function centerViewportOn(selector, options = {}) {
+  const {
+    block = "center",
+    delay = 0,
+  } = options;
+  const run = () => {
+    requestAnimationFrame(() => {
+      const target = document.querySelector(selector);
+      if (!target || typeof target.scrollIntoView !== "function") return;
+      target.scrollIntoView({ behavior: "smooth", block, inline: "nearest" });
+    });
+  };
+  if (delay > 0) {
+    window.setTimeout(run, delay);
+    return;
+  }
+  run();
+}
+
+function revealCurrentFocus(options = {}) {
+  const selector = options.selector || (
+    (state.crownGateOpening || state.entryTransitioning || state.entryVideoStarted)
+      ? ".entry-screen-gate"
+      : (state.activePresenceTab === "games" && state.activeGame)
+        ? ".active-game-panel"
+        : ".chat-stage"
+  );
+  centerViewportOn(selector, options);
+}
+
+function attemptSpiritGateFullscreen() {
+  const target = document.querySelector(".entry-screen-gate") || document.documentElement;
+  const requestFullscreen =
+    target?.requestFullscreen ||
+    target?.webkitRequestFullscreen ||
+    target?.msRequestFullscreen;
+  const alreadyFullscreen =
+    !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+  if (!requestFullscreen || alreadyFullscreen) return;
+  try {
+    const result = requestFullscreen.call(target);
+    if (result && typeof result.catch === "function") {
+      result.catch(() => {});
+    }
+  } catch (_) {}
+}
+
+function exitSpiritGateFullscreen() {
+  const exitFullscreen =
+    document.exitFullscreen ||
+    document.webkitExitFullscreen ||
+    document.msExitFullscreen;
+  const isFullscreen =
+    !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+  if (!exitFullscreen || !isFullscreen) return;
+  try {
+    const result = exitFullscreen.call(document);
+    if (result && typeof result.catch === "function") {
+      result.catch(() => {});
+    }
+  } catch (_) {}
+}
+
+function scrollThread(options = {}) {
+  const { reveal = false, targetSelector = ".thread .bubble:last-child" } = options;
   requestAnimationFrame(() => {
     const thread = document.querySelector(".thread-wrap");
     if (thread) thread.scrollTop = thread.scrollHeight;
+    if (reveal) {
+      const focusTarget = document.querySelector(targetSelector) || document.querySelector(".chat-stage");
+      if (focusTarget && typeof focusTarget.scrollIntoView === "function") {
+        focusTarget.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
+    }
   });
 }
 
@@ -5131,7 +5210,7 @@ async function executeGameMove(move, options = {}) {
   } finally {
     state.gameLoading = false;
     render();
-    scrollThread();
+    revealCurrentFocus({ selector: ".active-game-panel" });
     maybeSpeakMessageLater(spokenGameMessageId);
   }
 }
@@ -5245,7 +5324,7 @@ async function startGameSession(gameType) {
       instructionsPresent: !!state.gameInstructions,
     });
     render();
-    scrollThread();
+    revealCurrentFocus({ selector: ".active-game-panel" });
     maybeSpeakMessageLater(spokenGameMessageId);
     return true;
   } catch (err) {
@@ -5864,6 +5943,7 @@ function buildApp() {
             <div class="panel-label">SpiritGate</div>
             <h2>The Gate is opening.</h2>
             <p>Let the threshold settle around you. SpiritCore is carrying your arrival into the living world.</p>
+            <button class="btn btn-ghost btn-sm crown-gate-skip" data-action="skip-gate">Skip Intro</button>
           </div>
         </div>
       ` : ""}
@@ -6132,7 +6212,7 @@ function buildCrownGateEntry() {
             </div>
           `}
           <div class="entry-action-rail">
-            <button class="entry-skip-btn ${consentBlocked ? "is-guarded" : ""}" data-action="skip-gate" ${state.crownGateOpening ? "disabled" : ""} aria-disabled="${consentBlocked ? "true" : "false"}">${state.crownGateOpening ? "Please wait..." : "Skip"}</button>
+            <button class="entry-skip-btn ${consentBlocked ? "is-guarded" : ""}" data-action="skip-gate" aria-disabled="${consentBlocked ? "true" : "false"}">Skip Intro</button>
             <div class="entry-cta">
               <button class="btn btn-primary btn-wide entry-main-cta ${consentBlocked ? "is-guarded" : ""}" data-action="continue" ${state.crownGateOpening ? "disabled" : ""} aria-disabled="${consentBlocked ? "true" : "false"}">
                 ${state.crownGateOpening ? `<span class="btn-inline-spinner"></span><span>Entering...</span>` : "Enter the SpiritVerse"}
@@ -6146,6 +6226,7 @@ function buildCrownGateEntry() {
           ` : ""}
         </div>
       </div>
+      ${state.crownGateOpening ? `<button class="entry-live-skip" data-action="skip-gate">Skip Intro</button>` : ""}
     </section>
   `;
 }
@@ -6538,6 +6619,8 @@ function buildChatView() {
   const voicePreview = String(state.voiceTranscriptPreview || "").trim();
   const showVoicePreview = !!(state.voiceListening || voicePreview);
   const gameFeedback = state.activeGame ? state.gameFeedback : null;
+  const showFirstLoopGuide = !state.activeGame && safeMessages.length <= 1 && !state.loadingReply;
+  const chatLayoutClass = `${esc(meta.cls)} ${state.activePresenceTab === "games" && state.activeGame ? "game-focus-mode" : ""}`.trim();
 
   // Echoes & Charter Logic
   const { currentBond, stageData } = getBondStateForSpiritkin(spiritkin.name);
@@ -6545,7 +6628,7 @@ function buildChatView() {
   const depthEchoes = SPIRITKIN_ECHOES[spiritkin.name];
 
   return `
-    <section class="chat-layout ${esc(meta.cls)}">
+    <section class="chat-layout ${chatLayoutClass}">
       <aside class="presence-panel">
         <div class="presence-panel-head">
           <div class="mode-pill strong">${esc(meta.realm)}</div>
@@ -6792,7 +6875,7 @@ function buildChatView() {
                   `).join('')}
                 </div>
               ` : `
-                <div class="active-game-panel">
+                <div class="active-game-panel" data-focus-anchor="game-panel">
                   ${(() => {
                     const help = getGameHelpContent(state.activeGame.type, state.gameInstructions);
                     const tutorialIntro = buildGameTutorialIntro(spiritkin.name, state.activeGame.type, help);
@@ -7143,6 +7226,18 @@ function buildChatView() {
             ${(meta.prompts || DEFAULT_PROMPTS).map((prompt) => `
               <button data-action="prompt" data-prompt="${esc(prompt)}">${esc(prompt)}</button>
             `).join("")}
+          </div>
+        ` : ""}
+
+        ${showFirstLoopGuide ? `
+          <div class="first-loop-guide">
+            <div class="first-loop-guide-label">What to do here</div>
+            <h3>Talk, play, and deepen the bond.</h3>
+            <p>Start with a question, open a game when you want a shared activity, and watch the bond stage deepen as your sessions become more real.</p>
+            <div class="first-loop-guide-actions">
+              <button class="btn btn-ghost btn-sm" data-action="set-presence-tab" data-tab="games">Try Games</button>
+              <button class="btn btn-ghost btn-sm" data-action="prompt" data-prompt="${esc((meta.prompts || DEFAULT_PROMPTS)[0] || "What do you sense in me right now?")}">Ask Something</button>
+            </div>
           </div>
         ` : ""}
 
