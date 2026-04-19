@@ -40,21 +40,27 @@ export const GAME_ASSET_MANIFEST = {
       })
     },
     pieces: {
-      default: activeAsset("pieces", "chess_pieces_set.png"),
-      crown: activeAsset("pieces", "chess_pieces_set.png"),
-      veil: activeAsset("pieces", "chess_pieces_set.png"),
-      ember: activeAsset("pieces", "chess_pieces_set.png"),
-      astral: activeAsset("pieces", "chess_pieces_set.png"),
-      abyssal: activeAsset("pieces", "chess_pieces_set.png")
+      default: activeAsset("pieces", "chess_white_piece_family_v4a.png", {
+        notes: "Wave 4A family crop used as premium shell support, not as direct board-piece runtime replacement."
+      }),
+      crown: activeAsset("pieces", "chess_white_piece_family_v4a.png"),
+      veil: activeAsset("pieces", "chess_white_piece_family_v4a.png"),
+      ember: activeAsset("pieces", "chess_white_piece_family_v4a.png"),
+      astral: activeAsset("pieces", "chess_white_piece_family_v4a.png"),
+      abyssal: activeAsset("pieces", "chess_white_piece_family_v4a.png")
     },
     cards: {
-      default: activeAsset("pieces", "chess_piece_lineup_alt_v2.png")
+      default: activeAsset("pieces", "chess_dark_piece_family_v4a.png", {
+        notes: "Wave 4A dark family crop used as support-layer shell art."
+      })
     },
     room: {
       default: activeAsset("rooms", "room_chess_lyra_celestial_scene.png")
     },
     overlays: {
-      moveGlow: activeAsset("fx", "move_highlight_ring_blue_v1.png")
+      moveGlow: activeAsset("fx", "chess_overlay_set_v4a.png", {
+        notes: "Wave 4A overlay family used as shell FX overlay."
+      })
     },
     ui: {
       yourMove: activeAsset("ui", "your_move_banner_v2.png"),
@@ -77,7 +83,9 @@ export const GAME_ASSET_MANIFEST = {
       })
     },
     pieces: {
-      default: activeAsset("pieces", "checkers_piece_set_alt_v2.png"),
+      default: activeAsset("pieces", "checkers_piece_family_v4a.png", {
+        notes: "Wave 4A checkers family crop used as shell accent support."
+      }),
       user: activeAsset("pieces", "checkers_piece_light_single_v3.png"),
       spiritkin: activeAsset("pieces", "checkers_piece_dark_single_v3.png"),
       king: activeAsset("pieces", "checkers_piece_set_alt_v2.png")
@@ -89,7 +97,9 @@ export const GAME_ASSET_MANIFEST = {
       default: activeAsset("rooms", "room_checkers_dragonforge_scene.png")
     },
     overlays: {
-      selection: activeAsset("fx", "move_highlight_ring_gold_v2.png")
+      selection: activeAsset("fx", "checkers_move_marker_v4a.png", {
+        notes: "Wave 4A move-marker family used as premium selection FX."
+      })
     },
     ui: {
       yourMove: activeAsset("ui", "your_move_banner_v2.png"),
@@ -110,7 +120,9 @@ export const GAME_ASSET_MANIFEST = {
       })
     },
     pieces: {
-      default: activeAsset("tokens", "tictactoe_token_set_v1.png"),
+      default: activeAsset("tokens", "tictactoe_token_family_v4a.png", {
+        notes: "Wave 4A token family used as shell accent support."
+      }),
       user: activeAsset("tokens", "tictactoe_x_single_v3.png"),
       spiritkin: activeAsset("tokens", "tictactoe_o_single_v3.png")
     },
@@ -142,6 +154,9 @@ export const GAME_ASSET_MANIFEST = {
       })
     },
     pieces: {
+      default: activeAsset("tokens", "connect4_disc_family_v4a.png", {
+        notes: "Wave 4A disc family used as shell accent support."
+      }),
       user: activeAsset("tokens", "connect4_disc_blue_single_v3.png"),
       spiritkin: activeAsset("tokens", "connect4_disc_purple_single_v3.png"),
       accent: activeAsset("tokens", "connect4_disc_gold_single_v3.png")
@@ -153,7 +168,9 @@ export const GAME_ASSET_MANIFEST = {
       default: activeAsset("rooms", "room_connect4_waterfall_scene.png")
     },
     overlays: {
-      dropTrail: activeAsset("fx", "portal_beam_fx_blue_v1.png")
+      dropTrail: activeAsset("fx", "connect4_fx_family_v4a.png", {
+        notes: "Wave 4A Connect Four FX family used as board chrome overlay."
+      })
     },
     ui: {
       yourMove: activeAsset("ui", "your_move_banner_v2.png"),
@@ -174,7 +191,9 @@ export const GAME_ASSET_MANIFEST = {
       })
     },
     pieces: {
-      default: activeAsset("ships", "battleship_ship_set_v2.png"),
+      default: activeAsset("ships", "battleship_ship_family_v4a.png", {
+        notes: "Wave 4A ship family used as shell accent support."
+      }),
       shipSet: activeAsset("ships", "battleship_ship_set_v2.png"),
       user: activeAsset("ships", "battleship_hit_marker_v3.png"),
       spiritkin: activeAsset("ships", "battleship_miss_marker_v3.png")
@@ -186,7 +205,9 @@ export const GAME_ASSET_MANIFEST = {
       default: activeAsset("rooms", "room_battleship_forge_scene.png")
     },
     overlays: {
-      sonar: activeAsset("fx", "portal_beam_fx_blue_v1.png")
+      sonar: activeAsset("fx", "battleship_marker_family_v4a.png", {
+        notes: "Wave 4A marker family used as support-layer sonar overlay."
+      })
     },
     ui: {
       yourMove: activeAsset("ui", "your_move_banner_v2.png"),
@@ -239,20 +260,26 @@ export const GAME_ASSET_MANIFEST = {
       default: activeAsset("boards", "go_board_aquatic_base.png")
     },
     pieces: {
-      default: activeAsset("tokens", "go_stones_set_v2.png"),
+      default: activeAsset("tokens", "go_stone_family_v4a_right.png", {
+        notes: "Wave 4A stone family crop used as shell accent support."
+      }),
       user: activeAsset("tokens", "go_stone_white_single_v3.png"),
       spiritkin: activeAsset("tokens", "go_stone_black_single_v3.png"),
       blackStone: activeAsset("tokens", "go_stone_black_single_v3.png"),
       whiteStone: activeAsset("tokens", "go_stone_white_single_v3.png")
     },
     cards: {
-      default: activeAsset("tokens", "go_stone_layout_preview_v1.png")
+      default: activeAsset("tokens", "go_stone_family_v4a_left.png", {
+        notes: "Wave 4A left stone family used as support-layer shell art."
+      })
     },
     room: {
       default: activeAsset("rooms", "room_go_aquatic_scene.png")
     },
     overlays: {
-      hoshi: activeAsset("fx", "move_highlight_ring_gold_v2.png")
+      hoshi: activeAsset("fx", "go_ring_overlay_family_v4a.png", {
+        notes: "Wave 4A ring family used as preview overlay support."
+      })
     },
     ui: {
       yourMove: activeAsset("ui", "your_move_banner_v2.png"),

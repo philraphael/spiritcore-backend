@@ -252,10 +252,40 @@
     "resolution": "512x512"
   },
   {
+    "filename": "battleship_marker_family_v4a.png",
+    "category": "fx",
+    "originalSourceFolder": "wave4a_production_assets",
+    "resolution": null
+  },
+  {
+    "filename": "checkers_move_marker_v4a.png",
+    "category": "fx",
+    "originalSourceFolder": "wave4a_production_assets",
+    "resolution": null
+  },
+  {
+    "filename": "chess_overlay_set_v4a.png",
+    "category": "fx",
+    "originalSourceFolder": "wave4a_production_assets",
+    "resolution": null
+  },
+  {
+    "filename": "connect4_fx_family_v4a.png",
+    "category": "fx",
+    "originalSourceFolder": "wave4a_production_assets",
+    "resolution": null
+  },
+  {
     "filename": "crosshair_glow_v2.png",
     "category": "fx",
     "originalSourceFolder": "spiritverse_codex_final_asset_pack",
     "resolution": "130x140"
+  },
+  {
+    "filename": "go_ring_overlay_family_v4a.png",
+    "category": "fx",
+    "originalSourceFolder": "wave4a_production_assets",
+    "resolution": null
   },
   {
     "filename": "move_highlight_ring_blue_v1.png",
@@ -297,6 +327,12 @@
     "filename": "checkers_piece_dark_single_v3.png",
     "category": "pieces",
     "originalSourceFolder": "wave3_premium_assets",
+    "resolution": null
+  },
+  {
+    "filename": "checkers_piece_family_v4a.png",
+    "category": "pieces",
+    "originalSourceFolder": "wave4a_production_assets",
     "resolution": null
   },
   {
@@ -345,6 +381,12 @@
     "filename": "chess_dark_pawn_single_v3.png",
     "category": "pieces",
     "originalSourceFolder": "wave3_premium_assets",
+    "resolution": null
+  },
+  {
+    "filename": "chess_dark_piece_family_v4a.png",
+    "category": "pieces",
+    "originalSourceFolder": "wave4a_production_assets",
     "resolution": null
   },
   {
@@ -399,6 +441,12 @@
     "filename": "chess_white_pawn_single_v3.png",
     "category": "pieces",
     "originalSourceFolder": "wave3_premium_assets",
+    "resolution": null
+  },
+  {
+    "filename": "chess_white_piece_family_v4a.png",
+    "category": "pieces",
+    "originalSourceFolder": "wave4a_production_assets",
     "resolution": null
   },
   {
@@ -528,6 +576,12 @@
     "resolution": null
   },
   {
+    "filename": "battleship_ship_family_v4a.png",
+    "category": "ships",
+    "originalSourceFolder": "wave4a_production_assets",
+    "resolution": null
+  },
+  {
     "filename": "battleship_ship_set_v2.png",
     "category": "ships",
     "originalSourceFolder": "spiritverse_codex_final_asset_pack",
@@ -556,6 +610,12 @@
     "category": "tokens",
     "originalSourceFolder": "spiritverse_premium_game_asset_pack",
     "resolution": "195x135"
+  },
+  {
+    "filename": "connect4_disc_family_v4a.png",
+    "category": "tokens",
+    "originalSourceFolder": "wave4a_production_assets",
+    "resolution": null
   },
   {
     "filename": "connect4_disc_gold_single_v3.png",
@@ -594,6 +654,18 @@
     "resolution": null
   },
   {
+    "filename": "go_stone_family_v4a_left.png",
+    "category": "tokens",
+    "originalSourceFolder": "wave4a_production_assets",
+    "resolution": null
+  },
+  {
+    "filename": "go_stone_family_v4a_right.png",
+    "category": "tokens",
+    "originalSourceFolder": "wave4a_production_assets",
+    "resolution": null
+  },
+  {
     "filename": "go_stone_layout_preview_v1.png",
     "category": "tokens",
     "originalSourceFolder": "spiritverse_codex_final_asset_pack",
@@ -615,6 +687,12 @@
     "filename": "tictactoe_o_single_v3.png",
     "category": "tokens",
     "originalSourceFolder": "wave3_premium_assets",
+    "resolution": null
+  },
+  {
+    "filename": "tictactoe_token_family_v4a.png",
+    "category": "tokens",
+    "originalSourceFolder": "wave4a_production_assets",
     "resolution": null
   },
   {
@@ -688,6 +766,12 @@
     "category": "ui",
     "originalSourceFolder": "spiritverse_premium_game_asset_pack",
     "resolution": "390x193"
+  },
+  {
+    "filename": "shared_ui_banner_set_v4a.png",
+    "category": "ui",
+    "originalSourceFolder": "wave4a_production_assets",
+    "resolution": null
   },
   {
     "filename": "spirit_cards_back_placeholder.svg",
