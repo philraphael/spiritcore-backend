@@ -61,6 +61,37 @@ function cssUrlValue(url) {
   return `url("${String(url).replace(/"/g, '\\"')}")`;
 }
 
+function activeRuntimeAsset(category, filename) {
+  return `/app/active-assets/${encodeURIComponent(String(category || "").replace(/\\/g, "/"))}/${encodeURIComponent(String(filename || "").replace(/\\/g, "/"))}`;
+}
+
+const CHESS_PIECE_IMAGES = {
+  wP: activeRuntimeAsset("pieces", "chess-piece-pawn-white.png"),
+  wR: activeRuntimeAsset("pieces", "chess-piece-rook-white.png"),
+  wN: activeRuntimeAsset("pieces", "chess-piece-knight-white.png"),
+  wB: activeRuntimeAsset("pieces", "chess-piece-bishop-white.png"),
+  wQ: activeRuntimeAsset("pieces", "chess-piece-queen-white.png"),
+  wK: activeRuntimeAsset("pieces", "chess-piece-king-white.png"),
+  bP: activeRuntimeAsset("pieces", "chess-piece-pawn-black.png"),
+  bR: activeRuntimeAsset("pieces", "chess-piece-rook-black.png"),
+  bN: activeRuntimeAsset("pieces", "chess-piece-knight-black.png"),
+  bB: activeRuntimeAsset("pieces", "chess-piece-bishop-black.png"),
+  bQ: activeRuntimeAsset("pieces", "chess-piece-queen-black.png"),
+  bK: activeRuntimeAsset("pieces", "chess-piece-king-black.png"),
+};
+
+const CHECKERS_PIECE_IMAGES = {
+  white: activeRuntimeAsset("pieces", "checkers-piece-white.png"),
+  black: activeRuntimeAsset("pieces", "checkers-piece-black.png"),
+  whiteKing: activeRuntimeAsset("pieces", "checkers-piece-white-king.png"),
+  blackKing: activeRuntimeAsset("pieces", "checkers-piece-black-king.png"),
+};
+
+function buildRuntimePieceImage(src, alt, cls = "") {
+  if (!src) return "";
+  return `<img src="${src}" alt="${escapeAttribute(alt)}" class="${cls}" loading="eager" decoding="async" draggable="false" />`;
+}
+
 function themeVarsToStyle(theme, assetUrls = {}) {
   const vars = {
     ...(theme?.cssVars || {}),
@@ -81,6 +112,10 @@ function themeVarsToStyle(theme, assetUrls = {}) {
 
 function resolveThemeAssetPackage(type, theme) {
   return theme?.assets || getGameAssetPackage(type);
+}
+
+function resolveRuntimeTokenUrl(type, variant = "user") {
+  return resolveGameAsset(type, "pieces", variant)?.publicPath || "";
 }
 
 function buildAssetDataAttributes(type, theme) {
@@ -414,24 +449,22 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
       const sq = files[file] + (8 - rank);
-      const isLight = (rank + file) % 2 === 0;
       const piece = board[rank][file];
       const isSelected = selectedSquare === sq;
       const isValidMove = validMoves && validMoves.includes(sq);
       const isLastMove = lastMove && (lastMove.from === sq || lastMove.to === sq);
 
-      let cellClass = `chess-cell ${isLight ? 'chess-light' : 'chess-dark'}`;
+      let cellClass = `chess-cell`;
       if (isSelected) cellClass += ' chess-selected';
       if (isValidMove) cellClass += ' chess-valid-move';
       if (isLastMove) cellClass += ' chess-last-move';
 
       const pieceKey = piece ? `${piece.color}${piece.type}` : null;
-      const themePieces = CHESS_PIECE_THEMES[themeId] || CHESS_PIECE_THEMES['crown'];
-      const pieceSvg = pieceKey && themePieces[pieceKey] ? themePieces[pieceKey] : '';
+      const pieceImage = pieceKey ? CHESS_PIECE_IMAGES[pieceKey] || "" : "";
 
       html += `<div class="${cellClass}" data-sq="${sq}" ${isInteractive ? 'data-action="chess-square-click"' : ''}>`;
       if (isValidMove && !piece) html += `<div class="chess-move-dot"></div>`;
-      if (pieceSvg) html += `<div class="chess-piece ${piece.color === 'w' ? 'piece-white' : 'piece-black'}" data-sq="${sq}">${pieceSvg}</div>`;
+      if (pieceImage) html += `<div class="chess-piece ${piece.color === 'w' ? 'piece-white' : 'piece-black'}" data-sq="${sq}">${buildRuntimePieceImage(pieceImage, `${piece.color === "w" ? "White" : "Black"} chess ${piece.type}`, "chess-piece-image")}</div>`;
       if (isValidMove && piece) html += `<div class="chess-capture-ring"></div>`;
       html += `</div>`;
     }
@@ -518,7 +551,7 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, l
       const isLastFrom = sqIndex !== -1 && lastMove && Number(lastMove.from) === sqIndex;
       const isLastTo = sqIndex !== -1 && lastMove && Number(lastMove.to) === sqIndex;
 
-      let cellClass = `checkers-cell ${isLight ? 'checkers-light' : 'checkers-dark'}`;
+      let cellClass = `checkers-cell ${isLight ? 'checkers-light-zone' : 'checkers-dark-zone'}`;
       if (isSelected) cellClass += ' checkers-selected';
       if (isValid) cellClass += ' checkers-valid';
       if (isLastFrom) cellClass += ' checkers-last-from';
@@ -575,6 +608,8 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, l
 function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpanded = false, theme = resolveGameTheme("go"), isInteractive = true) {
   const size = 13;
   const board = boardArray || Array(size * size).fill(null);
+  const goUserStone = resolveRuntimeTokenUrl("go", "user");
+  const goSpiritStone = resolveRuntimeTokenUrl("go", "spiritkin");
 
   let html = '';
   if (!isExpanded) {
@@ -603,7 +638,8 @@ function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpande
       
       if (piece) {
         const stoneClass = piece === 'black' ? 'go-stone-black' : 'go-stone-white';
-        html += `<div class="go-stone ${stoneClass} ${isLast ? 'go-stone-last' : ''}"></div>`;
+        const stoneImage = piece === 'black' ? goSpiritStone : goUserStone;
+        html += `<div class="go-stone ${stoneClass} ${isLast ? 'go-stone-last' : ''}">${buildRuntimePieceImage(stoneImage, `${piece} go stone`, "go-stone-image")}</div>`;
       }
       html += `</div>`;
     }
@@ -1137,6 +1173,8 @@ export const SpiritverseGames = {
     const winner = gameData.winner || null;
     const finished = Boolean(gameData.result || winner || board.every(Boolean));
     const isUsersTurn = !finished && gameData.turn === 'user';
+    const userToken = resolveRuntimeTokenUrl("tictactoe", "user");
+    const spiritToken = resolveRuntimeTokenUrl("tictactoe", "spiritkin");
     const root = resolveTarget(container);
     if (!root) return;
     const html = `
@@ -1145,10 +1183,10 @@ export const SpiritverseGames = {
           <div class="sv-game-kicker">Quick Pattern Duel</div>
           <div class="sv-game-copy">${isUsersTurn ? 'Place your next echo mark.' : 'The Spiritkin is resolving the next mark.'}</div>
         </div>
-        <div class="sv-mini-grid sv-ttt-grid">
+        <div class="sv-mini-grid sv-ttt-grid sv-visual-board">
           ${board.map((cell, idx) => `
             <button class="sv-mini-cell ttt-cell ${cell === 'X' ? 'mark-user' : cell === 'O' ? 'mark-spiritkin' : ''} ${gameData.lastMove === idx ? 'ttt-last-move' : ''}" data-action="ttt-cell-click" data-idx="${idx}" ${cell || !isUsersTurn ? "disabled" : ""}>
-              ${cell ? `<span class="ttt-token ${cell === 'X' ? 'ttt-token-user' : 'ttt-token-spiritkin'}">${cell}</span>` : ""}
+              ${cell ? `<span class="ttt-token ${cell === 'X' ? 'ttt-token-user' : 'ttt-token-spiritkin'}">${buildRuntimePieceImage(cell === "X" ? userToken : spiritToken, `${cell} token`, "ttt-token-image")}</span>` : ""}
             </button>
           `).join('')}
         </div>
@@ -1198,7 +1236,7 @@ export const SpiritverseGames = {
     if (!root) return;
     const html = `
       <div class="sv-mini-game sv-battleship">
-        <div class="sv-battleship-grid">
+        <div class="sv-battleship-grid sv-visual-board">
           ${Array.from({ length: 25 }, (_, idx) => {
             const guessed = guesses.has(idx);
             const hit = hits.has(idx);
@@ -1221,6 +1259,8 @@ export const SpiritverseGames = {
     const board = gameData.board || Array(42).fill(null);
     const finished = Boolean(gameData.result || gameData.winner || !board.includes(null));
     const isUsersTurn = !finished && gameData.turn === 'user';
+    const userToken = resolveRuntimeTokenUrl("connect_four", "user");
+    const spiritToken = resolveRuntimeTokenUrl("connect_four", "spiritkin");
     const lastDropIndex =
       gameData.lastMove && Number.isInteger(gameData.lastMove.col)
         ? (() => {
@@ -1243,13 +1283,13 @@ export const SpiritverseGames = {
         <div class="sv-connect4-head">
           ${Array.from({ length: 7 }, (_, col) => `<button class="sv-connect4-drop" data-action="connect4-column-click" data-col="${col}" ${!isUsersTurn ? "disabled" : ""}>Drop</button>`).join('')}
         </div>
-        <div class="sv-connect4-grid">
+        <div class="sv-connect4-grid sv-visual-board">
           ${board.map((cell, idx) => {
             const token =
               cell === 'U'
-                ? `<span class="connect4-token connect4-token-user ${lastDropIndex === idx ? 'connect4-token-drop' : ''}" aria-hidden="true"></span>`
+                ? `<span class="connect4-token connect4-token-user ${lastDropIndex === idx ? 'connect4-token-drop' : ''}" aria-hidden="true">${buildRuntimePieceImage(userToken, "User token", "connect4-token-image")}</span>`
                 : cell === 'S'
-                  ? `<span class="connect4-token connect4-token-spiritkin ${lastDropIndex === idx ? 'connect4-token-drop' : ''}" aria-hidden="true"></span>`
+                  ? `<span class="connect4-token connect4-token-spiritkin ${lastDropIndex === idx ? 'connect4-token-drop' : ''}" aria-hidden="true">${buildRuntimePieceImage(spiritToken, "Spiritkin token", "connect4-token-image")}</span>`
                   : '';
             return `<button class="sv-mini-cell connect4-cell ${cell === 'U' ? 'user' : cell === 'S' ? 'spiritkin' : ''} ${lastDropIndex === idx ? 'connect4-last-drop' : ''}" data-action="connect4-column-click" data-col="${idx % 7}" ${!isUsersTurn ? "disabled" : ""}>${token}</button>`;
           }).join('')}
@@ -1271,6 +1311,8 @@ export const SpiritverseGames = {
     const hits = new Set(gameData.hits?.user || []);
     const finished = Boolean(gameData.result || gameData.winner);
     const isUsersTurn = !finished && gameData.turn === 'user';
+    const hitMarker = resolveRuntimeTokenUrl("battleship", "user");
+    const missMarker = resolveRuntimeTokenUrl("battleship", "spiritkin");
     const totalGuesses = guesses.size;
     const totalHits = hits.size;
     const lastStrike = Number.isInteger(gameData.lastMove) ? gameData.lastMove : null;
@@ -1287,11 +1329,16 @@ export const SpiritverseGames = {
             <div class="sv-battleship-pill"><strong>${totalHits}</strong><span>Direct hits</span></div>
             <div class="sv-battleship-pill"><strong>${totalGuesses}</strong><span>Sectors scanned</span></div>
           </div>
-        <div class="sv-battleship-grid">
+        <div class="sv-battleship-grid sv-visual-board">
           ${Array.from({ length: 25 }, (_, idx) => {
             const guessed = guesses.has(idx);
             const hit = hits.has(idx);
-            return `<button class="sv-mini-cell battleship-cell ${hit ? 'hit' : guessed ? 'miss' : ''}" data-action="battleship-cell-click" data-idx="${idx}" ${guessed || !isUsersTurn ? "disabled" : ""}>${hit ? '✦' : guessed ? '•' : ''}</button>`;
+            const marker = hit
+              ? `<span class="battleship-marker battleship-marker-hit">${buildRuntimePieceImage(hitMarker, "Hit marker", "battleship-marker-image")}</span>`
+              : guessed
+                ? `<span class="battleship-marker battleship-marker-miss">${buildRuntimePieceImage(missMarker, "Miss marker", "battleship-marker-image")}</span>`
+                : "";
+            return `<button class="sv-mini-cell battleship-cell ${hit ? 'hit' : guessed ? 'miss' : ''}" data-action="battleship-cell-click" data-idx="${idx}" ${guessed || !isUsersTurn ? "disabled" : ""}>${marker}</button>`;
           }).join('')}
         </div>
         </div>
@@ -1483,3 +1530,4 @@ function getCheckersValidMoves(sq, board, userColor) {
 
 // Make SpiritverseGames globally accessible
 window.SpiritverseGames = SpiritverseGames;
+
