@@ -1046,8 +1046,8 @@ button:disabled {
 
 .selection-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(420px, 0.96fr);
-  gap: 26px;
+  grid-template-columns: minmax(0, 1.12fr) minmax(460px, 0.88fr);
+  gap: 30px;
   align-items: start;
 }
 
@@ -1081,8 +1081,8 @@ button:disabled {
 }
 
 .entry-visual-shell {
-  margin-bottom: 8px;
-  min-height: clamp(112px, 15vw, 148px);
+  margin-bottom: 0;
+  min-height: clamp(220px, 32vw, 360px);
 }
 
 .entry-visual-shell.arrival,
@@ -1407,11 +1407,18 @@ button:disabled {
   align-items: start;
 }
 
+.bonded-home-stage,
+.bonded-home-command-grid,
+.bonded-home-support-grid {
+  display: grid;
+  gap: 24px;
+}
+
 .bond-home-copy {
-  padding: 30px;
+  padding: 34px;
   display: grid;
   align-content: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .bond-home-copy h2 {
@@ -1452,26 +1459,43 @@ button:disabled {
 .bonded-secondary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: 22px;
+  align-items: start;
+}
+
+.bonded-home-command-grid {
+  grid-template-columns: minmax(0, 1.04fr) minmax(0, 0.96fr);
+}
+
+.bonded-home-guidance-column,
+.bonded-home-world-column,
+.bonded-home-support-rail {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.bonded-home-support-grid {
+  grid-template-columns: minmax(0, 1.12fr) minmax(300px, 0.88fr);
   align-items: start;
 }
 
 .chat-layout {
   display: grid;
-  grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(340px, 0.86fr) minmax(0, 1.14fr);
+  gap: 24px;
   align-items: stretch;
 }
 
 .chat-layout.game-focus-mode {
-  grid-template-columns: minmax(420px, 1.08fr) minmax(300px, 0.92fr);
+  grid-template-columns: minmax(360px, 0.72fr) minmax(0, 1.28fr);
 }
 
 .presence-panel {
-  padding: 22px;
+  padding: 24px;
   display: grid;
   align-content: start;
-  gap: 18px;
+  gap: 20px;
   align-self: start;
   position: sticky;
   top: 14px;
@@ -1489,8 +1513,8 @@ button:disabled {
 }
 
 .chat-layout.game-focus-mode .chat-stage {
-  opacity: 0.8;
-  transform: scale(0.995);
+  opacity: 1;
+  transform: none;
 }
 
 .presence-summary {
@@ -1564,10 +1588,10 @@ button:disabled {
 }
 
 .chat-stage {
-  padding: 18px;
+  padding: 24px;
   display: grid;
   grid-template-rows: auto auto auto minmax(280px, 1fr) auto auto auto;
-  min-height: 760px;
+  min-height: 820px;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--realm-accent-soft) 60%, rgba(255,255,255,0.04)) 0%, transparent 22%),
     radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--realm-accent-soft) 80%, transparent) 0%, transparent 55%),
@@ -2206,6 +2230,13 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .entry-hero-stage,
+  .entry-hero-body,
+  .bonded-home-command-grid,
+  .bonded-home-support-grid {
+    grid-template-columns: 1fr;
+  }
+
   .spiritkin-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2265,6 +2296,19 @@ button:disabled {
   .panel-card,
   .bond-modal {
     padding: 20px;
+  }
+
+  .entry-copy {
+    gap: 18px;
+  }
+
+  .entry-hero-stage,
+  .entry-hero-body {
+    gap: 16px;
+  }
+
+  .entry-hero-visual {
+    min-height: 220px;
   }
 
   .entry-title {
@@ -5969,7 +6013,7 @@ button[data-action="begin-quest"]:active,
   inset: 0;
   width: 100%;
   margin: 0;
-  padding: 16px;
+  padding: clamp(16px, 3vw, 34px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5977,22 +6021,92 @@ button[data-action="begin-quest"]:active,
 }
 
 .entry-copy {
-  max-width: 620px;
-  width: min(620px, calc(100% - 24px));
-  padding: 24px 24px 22px;
+  max-width: 1120px;
+  width: min(1120px, calc(100% - 24px));
+  padding: clamp(20px, 2.8vw, 34px);
   border: 1px solid rgba(242, 219, 160, 0.18);
-  border-radius: 28px;
-  background: rgba(7, 13, 22, 0.68);
-  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(16px);
+  border-radius: 34px;
+  background:
+    linear-gradient(145deg, rgba(7, 13, 22, 0.82), rgba(7, 13, 22, 0.58)),
+    radial-gradient(circle at 16% 18%, rgba(242, 219, 160, 0.1), transparent 26%);
+  box-shadow: 0 38px 110px rgba(0, 0, 0, 0.46);
+  backdrop-filter: blur(20px);
   pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  gap: 22px;
   max-height: calc(100dvh - 32px);
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable both-edges;
+}
+
+.entry-hero-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.14fr) minmax(280px, 0.86fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.entry-hero-visual {
+  position: relative;
+  min-height: clamp(260px, 36vw, 420px);
+}
+
+.entry-hero-visual .entry-visual-shell,
+.entry-hero-visual .entry-visual-shell .composite-visual-frame {
+  height: 100%;
+}
+
+.entry-hero-glow {
+  position: absolute;
+  inset: auto 8% -12% 8%;
+  height: 42%;
+  background: radial-gradient(circle, rgba(242, 219, 160, 0.18), transparent 66%);
+  pointer-events: none;
+  filter: blur(26px);
+}
+
+.entry-hero-aside {
+  display: grid;
+  align-content: space-between;
+  gap: 18px;
+  min-height: 100%;
+  padding: 18px;
+  border-radius: 26px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+}
+
+.entry-hero-meta {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.entry-hero-kicker {
+  color: rgba(242, 219, 160, 0.86);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.entry-hero-meta strong {
+  color: var(--text);
+  font-size: 1.04rem;
+  line-height: 1.45;
+}
+
+.entry-hero-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.7fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.entry-hero-copy {
+  display: grid;
+  gap: 10px;
 }
 
 .entry-screen-gate .eyebrow {
@@ -6025,7 +6139,7 @@ button[data-action="begin-quest"]:active,
   margin: 0;
   line-height: 1.42;
   letter-spacing: 0.02em;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 @keyframes spiritgateTitleFade {
@@ -6083,8 +6197,8 @@ button[data-action="begin-quest"]:active,
 }
 
 .entry-main-cta {
-  min-height: 58px;
-  font-size: 1rem;
+  min-height: 60px;
+  font-size: 1.02rem;
 }
 
 .entry-main-cta,

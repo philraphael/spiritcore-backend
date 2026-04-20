@@ -1,6 +1,10 @@
 import { getGameAssetPackage } from "./gameAssetManifest.js";
 
 const baseTheme = {
+  displayName: "Crown Chamber",
+  domainLabel: "SpiritCore Crown",
+  chamberLabel: "The Governing Gate",
+  moodLabel: "Celestial authority",
   boardStyle: "Celestial lacquered board",
   pieceStyle: "Luminous sigils",
   animationStyle: "Measured shimmer",
@@ -24,7 +28,11 @@ const baseTheme = {
 
 export const GAME_THEMES = {
   chess: {
-    boardStyle: "Archive strategy dais",
+    displayName: "Kairo Ember Vault",
+    domainLabel: "Kairo Domain",
+    chamberLabel: "Ember Strategy Vault",
+    moodLabel: "Archive fire and tactical gravity",
+    boardStyle: "Ember strategy dais",
     pieceStyle: "Forged relic pieces",
     animationStyle: "Deliberate ember rise",
     associatedSpiritkin: "Kairo",
@@ -45,6 +53,10 @@ export const GAME_THEMES = {
     }
   },
   checkers: {
+    displayName: "Lyra Veil Crossing",
+    domainLabel: "Lyra Domain",
+    chamberLabel: "Veil Crossing Mosaic",
+    moodLabel: "Velvet intuition and mirror drift",
     boardStyle: "Veil-crossing mosaic",
     pieceStyle: "Pearled shadow discs",
     animationStyle: "Silk-slide drift",
@@ -66,6 +78,10 @@ export const GAME_THEMES = {
     }
   },
   go: {
+    displayName: "Raien Astral Observatory",
+    domainLabel: "Raien Domain",
+    chamberLabel: "Star-Map Observatory",
+    moodLabel: "Sky logic and measured stillness",
     boardStyle: "Observatory star chart",
     pieceStyle: "Orbital star stones",
     animationStyle: "Astral settle pulse",
@@ -87,6 +103,10 @@ export const GAME_THEMES = {
     }
   },
   spirit_cards: {
+    displayName: "Elaria Archive Deck",
+    domainLabel: "Elaria Domain",
+    chamberLabel: "Crown Memory Archive",
+    moodLabel: "Luminous memory and gentle order",
     boardStyle: "Crown-memory spread",
     pieceStyle: "Founder sigil cards",
     animationStyle: "Arcane hand fan",
@@ -108,6 +128,10 @@ export const GAME_THEMES = {
     }
   },
   echo_trials: {
+    displayName: "SpiritCore Echo Chamber",
+    domainLabel: "SpiritCore Domain",
+    chamberLabel: "Resonance Chamber",
+    moodLabel: "Governing resonance and witness",
     boardStyle: "Resonance chamber",
     pieceStyle: "Echo glyphs",
     animationStyle: "Soft ward bloom",
@@ -129,6 +153,10 @@ export const GAME_THEMES = {
     }
   },
   tictactoe: {
+    displayName: "Elaria Glyph Lattice",
+    domainLabel: "Elaria Domain",
+    chamberLabel: "Resonance Glyph Lattice",
+    moodLabel: "Quick archive play and bright recall",
     boardStyle: "Resonance glyph grid",
     pieceStyle: "Founder marks",
     animationStyle: "Quick sigil flare",
@@ -150,6 +178,10 @@ export const GAME_THEMES = {
     }
   },
   connect_four: {
+    displayName: "Raien Constellation Hall",
+    domainLabel: "Raien Domain",
+    chamberLabel: "Constellation Drop Hall",
+    moodLabel: "Skyline momentum and charged rhythm",
     boardStyle: "Constellation lattice",
     pieceStyle: "Falling star discs",
     animationStyle: "Orbital drop trail",
@@ -171,6 +203,10 @@ export const GAME_THEMES = {
     }
   },
   battleship: {
+    displayName: "Thalassar Tide Chamber",
+    domainLabel: "Thalassar Domain",
+    chamberLabel: "Abyssal Tide Map",
+    moodLabel: "Tactical depth and tidal pressure",
     boardStyle: "Abyssal tide map",
     pieceStyle: "Deepwater marks",
     animationStyle: "Submerged pulse wake",

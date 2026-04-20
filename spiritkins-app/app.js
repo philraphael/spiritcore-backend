@@ -62,6 +62,7 @@ import {
 } from "./app-helpers.js";
 import { spiritkins as CANON_SPIRITKINS, realms as CANON_REALMS, charter as CANON_CHARTER, echoes as CANON_ECHOES, governance as CANON_GOVERNANCE, world as CANON_WORLD, bondStages as CANON_BOND_STAGES } from "./data/spiritverseCanon.js";
 import { resolveGameAssetUrl } from "./data/gameAssetManifest.js";
+import { getGameTheme } from "./data/gameThemes.js";
 import { createPendingCreatorMediaSlots, getSpiritkinMediaConfig, SPIRITKIN_CREATOR_FOUNDATION } from "./data/spiritkinRuntimeConfig.js";
 
 function createSpiritverseGamesFallback() {
@@ -5915,42 +5916,84 @@ function buildGamePanelClasses(game) {
 function buildGameModeHero(game, spiritkinName) {
   if (!game?.type) return "";
   const name = spiritkinName || "your Spiritkin";
+  const resolvedTheme = getGameTheme(game.type);
+  const chessVariants = {
+    crown: {
+      displayName: "SpiritCore Crown Chamber",
+      chamberLabel: "The Governing Gate",
+      domainLabel: "SpiritCore Domain",
+      moodLabel: "Celestial authority and radiant order"
+    },
+    veil: {
+      displayName: "Lyra Veil Crossing",
+      chamberLabel: "Veil Crossing Mosaic",
+      domainLabel: "Lyra Domain",
+      moodLabel: "Velvet intuition and mirrored grace"
+    },
+    ember: {
+      displayName: "Kairo Ember Vault",
+      chamberLabel: "Ember Strategy Vault",
+      domainLabel: "Kairo Domain",
+      moodLabel: "Archive fire and tactical gravity"
+    },
+    astral: {
+      displayName: "Raien Astral Observatory",
+      chamberLabel: "Star-Map Observatory",
+      domainLabel: "Raien Domain",
+      moodLabel: "Charged sky logic and horizon motion"
+    },
+    abyssal: {
+      displayName: "Thalassar Tide Chamber",
+      chamberLabel: "Abyssal Tide Map",
+      domainLabel: "Thalassar Domain",
+      moodLabel: "Deepwater pressure and ceremonial calm"
+    }
+  };
+  const chamberTheme = game.type === "chess" && state.pieceTheme
+    ? { ...resolvedTheme, ...(chessVariants[state.pieceTheme] || {}) }
+    : resolvedTheme;
   const heroes = {
     chess: {
       cls: "chess-mode-hero",
-      kicker: "Premium Showcase",
-      title: "Celestial Chess",
-      copy: `The board holds center. Your move lands first, then ${name} answers in full view.`
+      kicker: chamberTheme.domainLabel || "Premium Showcase",
+      title: chamberTheme.displayName || "Celestial Chess",
+      copy: `The board holds center inside ${chamberTheme.chamberLabel || "the chamber"}. Your move lands first, then ${name} answers in full view.`,
+      mood: chamberTheme.moodLabel || "Measured strategy and ceremonial fire"
     },
     checkers: {
       cls: "checkers-mode-hero",
-      kicker: "Live Match",
-      title: "Veil Checkers",
-      copy: `Each jump, crown, and finish now stays framed in the open while ${name} answers the board.`
+      kicker: resolvedTheme.domainLabel || "Live Match",
+      title: resolvedTheme.displayName || "Veil Checkers",
+      copy: `Each jump, crown, and finish now stays framed inside ${resolvedTheme.chamberLabel || "the chamber"} while ${name} answers the board.`,
+      mood: resolvedTheme.moodLabel || "Mirror drift and poised escalation"
     },
     connect_four: {
       cls: "connect4-mode-hero",
-      kicker: "Companion Duel",
-      title: "Connect Four Constellations",
-      copy: `Every token drop lands with visible weight, then ${name} answers the column pattern in sequence.`
+      kicker: resolvedTheme.domainLabel || "Companion Duel",
+      title: resolvedTheme.displayName || "Connect Four Constellations",
+      copy: `Every token drop lands with visible weight inside ${resolvedTheme.chamberLabel || "the chamber"}, then ${name} answers the column pattern in sequence.`,
+      mood: resolvedTheme.moodLabel || "Charged rhythm and orbital pressure"
     },
     battleship: {
       cls: "battleship-mode-hero",
-      kicker: "Deep Grid",
-      title: "Abyssal Battleship",
-      copy: `The sonar grid stays centered, strike feedback stays readable, and each reply from ${name} resolves in place.`
+      kicker: resolvedTheme.domainLabel || "Deep Grid",
+      title: resolvedTheme.displayName || "Abyssal Battleship",
+      copy: `The sonar grid stays centered inside ${resolvedTheme.chamberLabel || "the chamber"}, strike feedback stays readable, and each reply from ${name} resolves in place.`,
+      mood: resolvedTheme.moodLabel || "Tidal suspense and submerged precision"
     },
     tictactoe: {
       cls: "tictactoe-mode-hero",
-      kicker: "Quick Play",
-      title: "TicTacToe of Echoes",
-      copy: `A fast companion duel with immediate mark placement, visible tension, and a clear finish state.`
+      kicker: resolvedTheme.domainLabel || "Quick Play",
+      title: resolvedTheme.displayName || "TicTacToe of Echoes",
+      copy: `A fast companion duel in ${resolvedTheme.chamberLabel || "the chamber"} with immediate mark placement, visible tension, and a clear finish state.`,
+      mood: resolvedTheme.moodLabel || "Bright recall and quick symbolic play"
     },
     go: {
       cls: "go-mode-hero",
-      kicker: "Preview Only",
-      title: "Star-Mapping",
-      copy: `This board remains an intentional preview surface until capture, pass, and scoring are ready for honest live play.`
+      kicker: `${resolvedTheme.domainLabel || "Preview"} · Preview Only`,
+      title: resolvedTheme.displayName || "Star-Mapping",
+      copy: `This board remains an intentional preview surface within ${resolvedTheme.chamberLabel || "the observatory"} until capture, pass, and scoring are ready for honest live play.`,
+      mood: resolvedTheme.moodLabel || "Observatory calm and strategic restraint"
     }
   };
   const hero = heroes[game.type];
@@ -5960,6 +6003,7 @@ function buildGameModeHero(game, spiritkinName) {
       <div class="game-mode-kicker">${esc(hero.kicker)}</div>
       <div class="game-mode-title">${esc(hero.title)}</div>
       <p class="game-mode-copy">${esc(hero.copy)}</p>
+      <div class="game-mode-mood">${esc(hero.mood)}</div>
     </div>
   `;
 }
@@ -6776,17 +6820,31 @@ function buildCrownGateEntry() {
       <div class="entry-gate-scrim"></div>
       <div class="entry-gate-shell">
         <div class="entry-copy ${state.entryVideoStarted ? "entry-copy-hidden" : ""}" data-focus-anchor="entry-copy">
-          ${buildCompositeVisualFrame(
-            COMPOSITE_VISUAL_ASSETS.spiritcore.gate,
-            canonicalWorldAssetUrl(WORLD_ART.baseTheme),
-            "SpiritGate gate shell art",
-            "entry-visual-shell",
-            true
-          )}
-          <div class="entry-glyph-wrap">
-            <div class="entry-glyph">SC</div>
-            <div class="entry-glyph-line">SpiritCore</div>
+          <div class="entry-hero-stage">
+            <div class="entry-hero-visual">
+              ${buildCompositeVisualFrame(
+                COMPOSITE_VISUAL_ASSETS.spiritcore.gate,
+                canonicalWorldAssetUrl(WORLD_ART.baseTheme),
+                "SpiritGate gate shell art",
+                "entry-visual-shell",
+                true
+              )}
+              <div class="entry-hero-glow"></div>
+            </div>
+            <div class="entry-hero-aside">
+              <div class="entry-glyph-wrap">
+                <div class="entry-glyph">SC</div>
+                <div class="entry-glyph-line">SpiritCore</div>
+              </div>
+              <div class="entry-hero-meta">
+                <div class="entry-hero-kicker">Governing threshold</div>
+                <strong>The SpiritGate stands between the ordinary world and the bonded chambers beyond it.</strong>
+                <span>${returning && state.primarySpiritkin ? `${esc(state.primarySpiritkin.name)} remains bonded and waiting beyond the Gate.` : "Every first crossing begins with a single, deliberate entry."}</span>
+              </div>
+            </div>
           </div>
+          <div class="entry-hero-body">
+            <div class="entry-hero-copy">
           <p class="eyebrow">SPIRITGATE</p>
           <h1 class="entry-title">Enter the SpiritVerse</h1>
           <p class="entry-crown-note">Step beyond the Gate… and awaken what awaits you.</p>
@@ -6794,13 +6852,15 @@ function buildCrownGateEntry() {
             Every visit begins at the SpiritGate. Step forward, let the world gather around you, and continue along the path that calls to you.
           </p>
           <p class="entry-sub">
-            The SpiritVerse is a living realm shaped by memory, emotion, and connection. SpiritCore governs the Gate. The companions waiting beyond it remember.
+            The SpiritVerse is a living realm shaped by memory, emotion, and connection. SpiritCore governs the threshold. The companions waiting beyond it remember.
           </p>
+            </div>
           <div class="entry-pillars">
             <span class="entry-pillar">SpiritCore governed</span>
             <span class="entry-pillar">Living audio presence</span>
             <span class="entry-pillar">Bond memory intact</span>
             <span class="entry-pillar">${returning && state.primarySpiritkin ? `Bonded: ${esc(state.primarySpiritkin.name)}` : "First bond ahead"}</span>
+          </div>
           </div>
           ${needsConsent ? `
             <div class="entry-consent-card">
@@ -6994,37 +7054,45 @@ function buildBondedHomeView() {
   const { currentBond } = getBondStateForSpiritkin(spiritkin.name);
   return `
     <section class="selection-view bonded-home ${esc(spiritkin.ui.cls)}" data-focus-anchor="bonded-home">
-      <div class="selection-hero bonded-hero">
-        ${buildBondPreview(spiritkin, false)}
-        <div class="bond-home-copy panel-card">
-          <p class="eyebrow">Primary companion</p>
-          <h2>${esc(spiritkin.name)} is your bonded companion.</h2>
-          <div class="bond-home-realm">${esc(spiritkin.ui.realm)}</div>
-          <p>
-            Every session, every memory, every conversation in this space belongs to ${esc(spiritkin.name)}. To switch, use Manage bond and confirm a rebonding step.
-          </p>
-          <div class="bond-home-orientation">
-            <div class="bond-home-orientation-label">What to do next</div>
-            <p>Talk if you want presence, open games if you want shared action, explore the side panels when you want deeper world context, and return often so the bond keeps building.</p>
+      <div class="bonded-home-stage">
+        <div class="selection-hero bonded-hero">
+          ${buildBondPreview(spiritkin, false)}
+          <div class="bond-home-copy panel-card">
+            <p class="eyebrow">Primary companion</p>
+            <h2>${esc(spiritkin.name)} is your bonded companion.</h2>
+            <div class="bond-home-realm">${esc(spiritkin.ui.realm)}</div>
+            <p>
+              Every session, every memory, every conversation in this space belongs to ${esc(spiritkin.name)}. To switch, use Manage bond and confirm a rebonding step.
+            </p>
+            <div class="bond-home-orientation">
+              <div class="bond-home-orientation-label">What to do next</div>
+              <p>Talk if you want presence, open games if you want shared action, explore the side panels when you want deeper world context, and return often so the bond keeps building.</p>
+            </div>
+            <p class="bond-home-atmosphere">${esc(spiritkin.ui.realmText)}</p>
+            <div class="bond-home-atlas">${esc(spiritkin.ui.atmosphereLine)}</div>
+            <div class="bonded-actions">
+              <button class="btn btn-primary" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
+                ${state.loadingConv ? "Opening bonded channel..." : state.conversationId ? `Resume with ${esc(spiritkin.name)}` : `Begin with ${esc(spiritkin.name)}`}
+              </button>
+              <button class="btn btn-ghost" data-action="open-games-hub" ${state.loadingConv ? "disabled" : ""}>
+                ${state.loadingConv && !state.conversationId ? "Preparing Games..." : "Open Games"}
+              </button>
+              <button class="btn btn-ghost" data-action="open-bond-manager">Manage bond</button>
+            </div>
           </div>
-          <p class="bond-home-atmosphere">${esc(spiritkin.ui.realmText)}</p>
-          <div class="bond-home-atlas">${esc(spiritkin.ui.atmosphereLine)}</div>
-          <div class="bonded-actions">
-            <button class="btn btn-primary" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
-              ${state.loadingConv ? "Opening bonded channel..." : state.conversationId ? `Resume with ${esc(spiritkin.name)}` : `Begin with ${esc(spiritkin.name)}`}
-            </button>
-            <button class="btn btn-ghost" data-action="open-games-hub" ${state.loadingConv ? "disabled" : ""}>
-              ${state.loadingConv && !state.conversationId ? "Preparing Games..." : "Open Games"}
-            </button>
-            <button class="btn btn-ghost" data-action="open-bond-manager">Manage bond</button>
+        </div>
+        <div class="bonded-home-command-grid">
+          <div class="bonded-home-guidance-column">
+            ${buildSpiritCoreGuidanceCard("bonded-home-guidance")}
+            ${buildRetentionHomeStrip()}
+          </div>
+          <div class="bonded-home-world-column">
+            ${buildTemporalWorldStrip()}
+            ${buildEvolutionHomeStrip(spiritkin)}
           </div>
         </div>
       </div>
-      ${buildSpiritCoreGuidanceCard("bonded-home-guidance")}
-      ${buildRetentionHomeStrip()}
-      ${buildTemporalWorldStrip()}
-      ${buildEvolutionHomeStrip(spiritkin)}
-      <div class="bonded-secondary-grid">
+      <div class="bonded-secondary-grid bonded-secondary-grid-founders">
         ${state.spiritkins.filter((item) => item.name !== spiritkin.name).map((item, index) => buildBondCard(item, index, true)).join("")}
       </div>
       ${state.convError ? `<div class="soft-error">${esc(state.convError)}</div>` : ""}
@@ -7054,9 +7122,13 @@ function buildBondedHomeView() {
         </div>
       ` : ''}
       ${buildBondStoryPreview(spiritkin.name, currentBond.stage)}
-      ${buildFounderEnsemblePanel("home")}
-      ${buildSvStrip()}
-      ${buildPremiumSpiritkinCTA()}
+      <div class="bonded-home-support-grid">
+        ${buildFounderEnsemblePanel("home")}
+        <div class="bonded-home-support-rail">
+          ${buildSvStrip()}
+          ${buildPremiumSpiritkinCTA()}
+        </div>
+      </div>
     </section>
   `;
 }
@@ -7299,7 +7371,7 @@ function buildChatView() {
 
   return `
     <section class="chat-layout ${chatLayoutClass}">
-      <aside class="presence-panel">
+      <aside class="presence-panel presence-panel-${esc(state.activePresenceTab)}">
         <div class="presence-panel-head">
           <div class="mode-pill strong">${esc(meta.realm)}</div>
           <button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>
@@ -7781,7 +7853,7 @@ function buildChatView() {
           ` : ''}
         </div>
       </aside>
-      <div class="chat-stage">
+      <div class="chat-stage chat-stage-${esc(state.activePresenceTab)}">
         <div class="chat-header-bar">
           <div class="chat-header-info">
             ${buildSigil(meta, "header", meta.symbol)}

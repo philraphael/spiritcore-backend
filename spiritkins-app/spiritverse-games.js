@@ -32,11 +32,11 @@ const CHESS_PIECES = {
 
 // THEME VARIANTS
 const CHESS_THEME_OPTIONS = [
-  { id: 'crown', label: 'Crown' },
-  { id: 'veil', label: 'Veil' },
-  { id: 'ember', label: 'Ember' },
-  { id: 'astral', label: 'Astral' },
-  { id: 'abyssal', label: 'Abyssal' }
+  { id: 'crown', label: 'SpiritCore Crown' },
+  { id: 'veil', label: 'Lyra Veil' },
+  { id: 'ember', label: 'Kairo Ember' },
+  { id: 'astral', label: 'Raien Astral' },
+  { id: 'abyssal', label: 'Thalassar Abyssal' }
 ];
 
 const CHESS_PIECE_THEMES = {
@@ -162,7 +162,7 @@ function withThemeFrame(content, type, theme, extraClass = "") {
     resolveGameAsset(type, "overlays", "frame");
   const frameAsset = resolveGameAsset(type, "ui", "frame");
   return `
-    <div class="${classes.join(" ")}" data-game-theme="${type}" data-associated-spiritkin="${theme.associatedSpiritkin}" ${assetAttrs} style="${themeVarsToStyle(theme, {
+    <div class="${classes.join(" ")}" data-game-theme="${type}" data-associated-spiritkin="${theme.associatedSpiritkin}" data-theme-variant="${escapeAttribute(theme.boardVariant || "default")}" ${assetAttrs} style="${themeVarsToStyle(theme, {
       boardUrl: boardAsset?.publicPath,
       roomUrl: roomAsset?.publicPath,
       cardUrl: cardAsset?.publicPath,
@@ -173,6 +173,16 @@ function withThemeFrame(content, type, theme, extraClass = "") {
       overlayUrl: overlayAsset?.publicPath,
       frameUrl: frameAsset?.publicPath
     })}">
+      <div class="sv-theme-atlas">
+        <div class="sv-theme-atlas-copy">
+          <span class="sv-theme-atlas-kicker">${escapeAttribute(theme.domainLabel || `${theme.associatedSpiritkin} Domain`)}</span>
+          <strong>${escapeAttribute(theme.chamberLabel || theme.boardStyle || "Spiritverse Chamber")}</strong>
+        </div>
+        <div class="sv-theme-atlas-mark">
+          <span>${escapeAttribute(theme.displayName || type)}</span>
+          <strong>${escapeAttribute(theme.associatedSpiritkin || "SpiritCore")}</strong>
+        </div>
+      </div>
       ${content}
     </div>
   `;
