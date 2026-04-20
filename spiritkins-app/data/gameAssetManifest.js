@@ -1,5 +1,5 @@
 const ACTIVE_ASSET_ROOT = "Spiritverse_MASTER_ASSETS/ACTIVE";
-const ACTIVE_ASSET_PUBLIC_ROOT = "/app/active-assets";
+const ACTIVE_ASSET_PUBLIC_ROOT = "/app/assets";
 
 function assetRecord(sourcePath, options = {}) {
   return {

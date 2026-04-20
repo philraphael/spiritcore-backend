@@ -62,7 +62,7 @@ function cssUrlValue(url) {
 }
 
 function activeRuntimeAsset(category, filename) {
-  return `/app/active-assets/${encodeURIComponent(String(category || "").replace(/\\/g, "/"))}/${encodeURIComponent(String(filename || "").replace(/\\/g, "/"))}`;
+  return `/app/assets/${encodeURIComponent(String(category || "").replace(/\\/g, "/"))}/${encodeURIComponent(String(filename || "").replace(/\\/g, "/"))}`;
 }
 
 const CHESS_PIECE_IMAGES = {

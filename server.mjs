@@ -305,6 +305,10 @@ app.get("/app/active-assets/*", async (req, reply) => {
   return sendStaticAssetFromRoot(reply, ACTIVE_ASSET_DIR, req.params["*"]);
 });
 
+app.get("/app/assets/*", async (req, reply) => {
+  return sendStaticAssetFromRoot(reply, ACTIVE_ASSET_DIR, req.params["*"]);
+});
+
 // Compatibility aliases for older frontend builds. These now resolve from ACTIVE.
 app.get("/app/game-theme-assets/*", async (req, reply) => {
   return sendStaticAssetFromRoot(reply, ACTIVE_ASSET_DIR, req.params["*"]);

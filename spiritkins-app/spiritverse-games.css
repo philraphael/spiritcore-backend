@@ -1387,11 +1387,11 @@
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .piece-user {
-  background: url("/app/active-assets/pieces/checkers-piece-white.png") center / contain no-repeat;
+  background: url("/app/assets/pieces/checkers-piece-white.png") center / contain no-repeat;
   filter: drop-shadow(0 10px 14px rgba(0,0,0,0.34));
 }
 .piece-spiritkin {
-  background: url("/app/active-assets/pieces/checkers-piece-black.png") center / contain no-repeat;
+  background: url("/app/assets/pieces/checkers-piece-black.png") center / contain no-repeat;
   filter: drop-shadow(0 10px 14px rgba(0,0,0,0.38));
 }
 .piece-king {
@@ -1402,11 +1402,11 @@
   transform: translateY(-1px) scale(1.02);
 }
 .checkers-piece.piece-user.piece-king {
-  background-image: url("/app/active-assets/pieces/checkers-piece-white-king.png");
+  background-image: url("/app/assets/pieces/checkers-piece-white-king.png");
 }
 
 .checkers-piece.piece-spiritkin.piece-king {
-  background-image: url("/app/active-assets/pieces/checkers-piece-black-king.png");
+  background-image: url("/app/assets/pieces/checkers-piece-black-king.png");
 }
 
 .checkers-piece-image {

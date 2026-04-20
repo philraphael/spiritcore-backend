@@ -147,11 +147,14 @@ const SPIRITKIN_ECHOES = Object.fromEntries(
 );
 
 function worldArtUrl(filename) {
-  return `/world-art/${encodeURIComponent(filename)}`;
+  if (!filename) return "";
+  const category = filename === WORLD_ART.background || filename === WORLD_ART.baseTheme ? "rooms" : "concepts";
+  return `/app/assets/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`;
 }
 
 function activeAssetUrl(category, filename) {
-  return `/app/active-assets/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`;
+  if (!category || !filename) return "";
+  return `/app/assets/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`;
 }
 
 const COMPOSITE_VISUAL_ASSETS = {
@@ -226,10 +229,12 @@ function getSpiritkinMediaAuthority(name) {
 }
 
 function worldArtImage(filename, alt, cls = "", eager = false) {
+  const src = worldArtUrl(filename);
+  if (!src) return "";
   return `
     <div class="world-art-frame ${esc(cls)}">
       <img
-        src="${worldArtUrl(filename)}"
+        src="${src}"
         alt="${esc(alt)}"
         class="world-art-image"
         ${eager ? 'loading="eager"' : 'loading="lazy"'}
@@ -6644,7 +6649,7 @@ function buildEntry() {
               muted
               playsinline
               preload="auto"
-              poster="/world-art/Spiritverse%20background%20base%20theme.png"
+              poster="/app/assets/rooms/Spiritverse%20background%20base%20theme.png"
             >
               <source src="/videos/gate_entrance_final.mp4" type="video/mp4">
               Your browser does not support the video tag.
@@ -6734,7 +6739,7 @@ function buildCrownGateEntry() {
               muted
               playsinline
               preload="auto"
-              poster="/world-art/Spiritverse%20background%20base%20theme.png"
+              poster="/app/assets/rooms/Spiritverse%20background%20base%20theme.png"
             >
               <source src="/videos/gate_entrance_final.mp4" type="video/mp4">
               Your browser does not support the video tag.

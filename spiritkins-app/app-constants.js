@@ -76,6 +76,7 @@ export const GAME_NAME_OVERRIDES = {
 
 export const WORLD_ART = {
   background: "Spiritverse background base theme.png",
+  baseTheme: "Spiritverse background base theme.png",
   ensemble: "Spiritkins in spiritverse.png",
   mythicEnsemble: "Spiritverse elder gods photo base needs edits.png",
   chroniclesAll: "Book Covers All.png",

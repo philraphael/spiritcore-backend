@@ -89,7 +89,7 @@ button:disabled {
 .sv-bg {
   background:
     linear-gradient(rgba(3, 9, 16, 0.38), rgba(3, 9, 16, 0.7)),
-    url("/world-art/Spiritverse%20background%20base%20theme.png") center/cover no-repeat,
+    url("/app/assets/rooms/Spiritverse%20background%20base%20theme.png") center/cover no-repeat,
     radial-gradient(circle at 12% 18%, var(--realm-glow-b), transparent 28%),
     radial-gradient(circle at 84% 17%, var(--realm-glow-a), transparent 33%),
     radial-gradient(circle at 60% 82%, var(--realm-glow-c), transparent 25%),
@@ -5879,7 +5879,7 @@ button[data-action="begin-quest"]:active,
   background:
     radial-gradient(circle at 50% 34%, rgba(242, 219, 160, 0.16), transparent 30%),
     linear-gradient(180deg, rgba(5, 10, 18, 0.18), rgba(5, 10, 18, 0.84)),
-    url("/world-art/Spiritverse%20background%20base%20theme.png") center/cover no-repeat;
+    url("/app/assets/rooms/Spiritverse%20background%20base%20theme.png") center/cover no-repeat;
 }
 
 .entry-gate-wrapper .video-player-element,
