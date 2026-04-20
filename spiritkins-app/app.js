@@ -178,14 +178,14 @@ const COMPOSITE_VISUAL_ASSETS = {
       card: activeAssetUrl("ui", "kairo_close.png")
     },
     Elaria: {
-      focus: activeAssetUrl("concepts", "Elaria.png"),
-      profile: activeAssetUrl("concepts", "Elaria.png"),
-      card: activeAssetUrl("concepts", "Elaria Left Thalassar right.png")
+      focus: worldArtUrl(WORLD_ART.elaria),
+      profile: worldArtUrl(WORLD_ART.elaria),
+      card: worldArtUrl(WORLD_ART.pairAlt)
     },
     Thalassar: {
-      focus: activeAssetUrl("concepts", "thalassar.png"),
-      profile: activeAssetUrl("concepts", "thalassar.png"),
-      card: activeAssetUrl("concepts", "Elaria Left Thalassar right.png")
+      focus: worldArtUrl(WORLD_ART.thalassar),
+      profile: worldArtUrl(WORLD_ART.thalassar),
+      card: worldArtUrl(WORLD_ART.pairAlt)
     }
   }
 };
@@ -1611,15 +1611,23 @@ function getSpiritkinPortraitPath(name) {
     "Lyra": "/portraits/lyra_portrait.png",
     "Raien": "/portraits/raien_portrait.png",
     "Kairo": "/portraits/kairo_portrait.png",
-    "Elaria": activeAssetUrl("concepts", "Elaria.png"),
-    "Thalassar": activeAssetUrl("concepts", "thalassar.png")
+    "Elaria": worldArtUrl(WORLD_ART.elaria),
+    "Thalassar": worldArtUrl(WORLD_ART.thalassar)
   };
   return portraitMap[name] || "";
+}
+
+function isSpiritkinSpeechActive(name) {
+  const activeName = state.selectedSpiritkin?.name || state.primarySpiritkin?.name || null;
+  if (!name || !activeName || activeName !== name) return false;
+  const speechState = state.sessionModel?.speechState || {};
+  return !!(_audioPlaying || (speechState.isSpeaking && speechState.turnPhase === "spirit_response"));
 }
 
 function buildPortrait(name, cls, size) {
   const portraitPath = getSpiritkinPortraitPath(name);
   const eagerPortrait = size === "portrait-card" || size === "portrait-focus" || size === "portrait-hero";
+  const speakingCls = isSpiritkinSpeechActive(name) ? "is-speaking" : "";
 
   const portraitContent = portraitPath 
     ? `
@@ -1637,7 +1645,7 @@ function buildPortrait(name, cls, size) {
     `
     : portraitSvg(name);
   return `
-    <div class="portrait-frame ${portraitPath ? "has-remote-image" : ""} ${esc(cls)} ${esc(size)}">
+    <div class="portrait-frame ${portraitPath ? "has-remote-image" : ""} ${speakingCls} ${esc(cls)} ${esc(size)}">
       <div class="portrait-backdrop"></div>
       <div class="portrait-art">${portraitContent}</div>
     </div>
@@ -1748,7 +1756,27 @@ function buildSpiritkinMediaPanel(name, surface = "focus") {
   const primarySrc = COMPOSITE_VISUAL_ASSETS.spiritkins[name]?.[surface] || "";
   if (!primarySrc) return "";
   const fallbackPortrait = getSpiritkinPortraitPath(name);
-  return buildCompositeVisualFrame(primarySrc, fallbackPortrait, `${name} visual panel`, `spiritkin-media-panel ${surface}`, surface !== "card");
+  const speakingCls = isSpiritkinSpeechActive(name) ? "is-speaking" : "";
+  return buildCompositeVisualFrame(primarySrc, fallbackPortrait, `${name} visual panel`, `spiritkin-media-panel ${surface} ${speakingCls}`, surface !== "card");
+}
+
+function buildCompanionPresenceDock(spiritkin) {
+  if (!spiritkin?.ui) return "";
+  const meta = spiritkin.ui;
+  const speaking = isSpiritkinSpeechActive(spiritkin.name);
+  return `
+    <div class="companion-presence-dock ${esc(meta.cls)} ${speaking ? "is-speaking" : ""}">
+      <div class="companion-presence-visual">
+        ${buildSpiritkinMediaPanel(spiritkin.name, "card")}
+        ${buildPortrait(spiritkin.name, `companion-dock-portrait ${meta.cls}`, "portrait-mini")}
+      </div>
+      <div class="companion-presence-copy">
+        <div class="companion-presence-label">${speaking ? `${esc(spiritkin.name)} speaking` : `${esc(spiritkin.name)} present`}</div>
+        <strong>${esc(spiritkin.title || spiritkin.role || meta.strap)}</strong>
+        <span>${esc(meta.atmosphereLine || meta.realm)}</span>
+      </div>
+    </div>
+  `;
 }
 
 function getAtmosphereSpiritkin() {
@@ -7186,6 +7214,7 @@ function buildChatView() {
   const showFirstLoopGuide = !state.activeGame && safeMessages.length <= 1 && !state.loadingReply;
   const showSpiritCoreGuidance = !state.loadingReply && !state.showHomeView;
   const chatLayoutClass = `${esc(meta.cls)} ${state.activePresenceTab === "games" && state.activeGame ? "game-focus-mode" : ""}`.trim();
+  const spiritkinSpeaking = isSpiritkinSpeechActive(spiritkin.name);
 
   // Echoes & Charter Logic
   const { currentBond, stageData } = getBondStateForSpiritkin(spiritkin.name);
@@ -7716,7 +7745,7 @@ function buildChatView() {
               ${state.voiceMuted ? '🔇 Voice Off' : '🔊 Voice On'}
             </button>
             <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>
-            <div class="status-chip ${state.loadingReply ? 'live' : ''}">${esc(state.loadingReply ? spiritkin.name + ' is responding…' : spiritkin.name + ' is present')}</div>
+            <div class="status-chip ${(state.loadingReply || spiritkinSpeaking) ? 'live' : ''}">${esc(state.loadingReply ? `${spiritkin.name} is responding…` : (spiritkinSpeaking ? `${spiritkin.name} is speaking…` : `${spiritkin.name} is present`))}</div>
           </div>
         </div>
         <div class="stage-atmosphere ${esc(meta.cls)}">
@@ -7765,6 +7794,8 @@ function buildChatView() {
             })()}
           </div>
         </div>
+
+        ${buildCompanionPresenceDock(spiritkin)}
 
         ${state.showWhisperBanner && state.engagementWhisper ? `
           <div class="whisper-banner ${esc(safeWhisperType)}" data-action="dismiss-whisper">

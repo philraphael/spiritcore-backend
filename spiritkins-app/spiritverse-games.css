@@ -490,7 +490,7 @@
     var(--game-board-art, none);
   background-size: cover;
   background-position: center;
-  opacity: 0.68;
+  opacity: 0.8;
   pointer-events: none;
 }
 
@@ -1600,7 +1600,7 @@
 
 .sv-visual-board {
   background:
-    linear-gradient(180deg, rgba(12,16,24,0.18), rgba(12,16,24,0.08)),
+    linear-gradient(180deg, rgba(12,16,24,0.1), rgba(12,16,24,0.04)),
     var(--game-board-art, none) center / cover no-repeat;
   border-radius: 18px;
   padding: 14px;
@@ -1610,7 +1610,7 @@
 }
 
 .sv-visual-board .sv-mini-cell {
-  background: transparent;
+  background: rgba(8, 12, 20, 0.08);
   border-color: rgba(255,255,255,0.06);
   box-shadow: none;
 }
