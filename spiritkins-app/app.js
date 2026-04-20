@@ -1881,6 +1881,7 @@ function buildCompanionPresenceDock(spiritkin) {
   if (!spiritkin?.ui) return "";
   const meta = spiritkin.ui;
   const speaking = isSpiritkinSpeechActive(spiritkin.name);
+  const roomMeta = getRoomDisplayMeta(state.activePresenceTab, spiritkin);
   return `
     <div class="companion-presence-dock ${esc(meta.cls)} ${speaking ? "is-speaking" : ""}">
       <div class="companion-presence-visual">
@@ -1888,9 +1889,10 @@ function buildCompanionPresenceDock(spiritkin) {
         ${buildPortrait(spiritkin.name, `companion-dock-portrait ${meta.cls}`, "portrait-mini")}
       </div>
       <div class="companion-presence-copy">
-        <div class="companion-presence-label">${speaking ? `${esc(spiritkin.name)} speaking` : `${esc(spiritkin.name)} present`}</div>
+        <div class="companion-presence-label">${speaking ? `${esc(spiritkin.name)} speaking` : `${esc(spiritkin.name)} present in ${esc(roomMeta.label)}`}</div>
         <strong>${esc(spiritkin.title || spiritkin.role || meta.strap)}</strong>
         <span>${esc(meta.atmosphereLine || meta.realm)}</span>
+        <span class="companion-presence-room-copy">${esc(roomMeta.detail)}</span>
       </div>
     </div>
   `;
@@ -2800,6 +2802,7 @@ async function transitionPresenceSurface(tab, options = {}) {
     state.statusText = `Opening ${tab.replace("_", " ")}...`;
     state.statusError = false;
     render();
+    await new Promise((resolve) => window.setTimeout(resolve, 90));
   }
   let session;
   try {
@@ -7835,7 +7838,7 @@ function buildChatView() {
   const depthEchoes = SPIRITKIN_ECHOES[spiritkin.name];
 
   return `
-    <section class="chat-layout ${chatLayoutClass}">
+    <section class="chat-layout ${chatLayoutClass} ${state.pendingPresenceTab ? "room-transitioning" : ""}">
       <div class="world-shell-header panel-card">
         <div class="world-shell-copy">
           <div class="panel-label">${roomMeta.label}</div>
