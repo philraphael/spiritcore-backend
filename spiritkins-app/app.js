@@ -2312,12 +2312,15 @@ const state = {
   showHomeView: false,
   userName: localStorage.getItem(NAME_KEY) || "",
   userNameDraft: localStorage.getItem(NAME_KEY) || "",
+  spiritCoreGreetingText: "",
+  spiritCoreGreetingPending: false,
   spiritkins: [],
   loadingSpirits: false,
   spiritError: null,
   primarySpiritkin: normalizeStoredSpiritkin(readJson(PRIMARY_KEY, null)),
   selectedSpiritkin: null,
   pendingBondSpiritkin: null,
+  selectionOverlaySpiritkin: null,
   rebondSpiritkin: null,
   conversationId: null,
   messages: [],
@@ -4245,8 +4248,6 @@ function openCrownGate() {
     return;
   }
   attemptSpiritGateFullscreen();
-  state.userName = state.userNameDraft.trim();
-  if (state.userName) localStorage.setItem(NAME_KEY, state.userName);
   if (state.consentChecked && !state.consentAccepted) {
     persistEntryConsent();
   }
@@ -4346,28 +4347,67 @@ function completeCrownGateEntry({ skipped = false, source = "unspecified", force
   }, SPIRITGATE_POST_VIDEO_PAUSE_MS);
 }
 
+async function fetchSpiritCoreWelcomeGreeting() {
+  const res = await fetch(`${API}/v1/spiritcore/welcome`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId: state.userId,
+      userName: state.userName,
+      returning: !!state.primarySpiritkin,
+      primarySpiritkinName: state.primarySpiritkin?.name || null,
+    })
+  });
+  const data = await res.json();
+  if (!res.ok || !data?.ok) throw new Error(data?.message || "SpiritCore greeting failed.");
+  return data;
+}
+
+async function finalizeSpiritCoreGreeting() {
+  state.spiritCoreGreetingPending = true;
+  state.statusText = "SpiritCore is greeting you...";
+  state.statusError = false;
+  render();
+
+  try {
+    const payload = await fetchSpiritCoreWelcomeGreeting();
+    state.spiritCoreGreetingText = payload.greeting || SPIRITCORE_WELCOME_TEXT;
+    render();
+    await new Promise((resolve) => window.setTimeout(resolve, 360));
+    if (!state.voiceMuted) {
+      cleanupSpeechLifecycle("spiritcore-welcome", { renderOnFinish: false, clearStatus: false });
+      await speakMoment(state.spiritCoreGreetingText, SPIRITCORE_WELCOME_VOICE);
+    } else {
+      await new Promise((resolve) => window.setTimeout(resolve, 2400));
+    }
+    markOnboardingComplete();
+    state.spiritCoreWelcoming = false;
+    state.spiritCoreGreetingPending = false;
+    state.statusText = "Meet the Founding Pillars. Confirm one founder when the recognition feels real.";
+    state.statusError = false;
+    render();
+  } catch (error) {
+    state.spiritCoreGreetingPending = false;
+    state.statusText = error.message || "SpiritCore could not complete the greeting.";
+    state.statusError = true;
+    render();
+  }
+}
+
 async function beginSpiritCoreWelcome() {
   if (state.spiritCoreWelcoming) return;
   clearSpiritGateArrivalFallback();
   state.spiritverseTrailerActive = false;
   state.spiritCoreWelcoming = true;
-  state.statusText = "SpiritCore is welcoming you...";
+  state.spiritCoreGreetingText = "";
+  state.spiritCoreGreetingPending = false;
+  state.statusText = "SpiritCore is waiting at the threshold.";
   state.statusError = false;
   render();
 
-  await new Promise((resolve) => window.setTimeout(resolve, 700));
-  if (!state.voiceMuted) {
-    cleanupSpeechLifecycle("spiritcore-welcome", { renderOnFinish: false, clearStatus: false });
-    await speakMoment(SPIRITCORE_WELCOME_TEXT, SPIRITCORE_WELCOME_VOICE);
-  } else {
-    await new Promise((resolve) => window.setTimeout(resolve, 4200));
+  if (state.userName) {
+    await finalizeSpiritCoreGreeting();
   }
-
-  markOnboardingComplete();
-  state.spiritCoreWelcoming = false;
-  state.statusText = "Meet the Founding Pillars. Bond with one when the recognition feels real.";
-  state.statusError = false;
-  render();
 }
 
 function goHome() {
@@ -4388,6 +4428,7 @@ function goHome() {
   state.entryTransitioning = false;
   state.spiritverseTrailerActive = false;
   state.spiritCoreWelcoming = false;
+  state.selectionOverlaySpiritkin = null;
   state.showHomeView = true;
   state.realmTravelOpen = false;
   state.activePresenceTab = "profile";
@@ -4419,6 +4460,7 @@ function startFreshSession() {
   state.showHomeView = false;
   state.conversationId = null;
   state.messages = [];
+  state.selectionOverlaySpiritkin = null;
   state.convError = null;
   state.statusText = state.primarySpiritkin
     ? `Session reset. ${state.primarySpiritkin.name} remains your bonded companion.`
@@ -4463,7 +4505,8 @@ async function beginConversation() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId: state.userId,
-        spiritkinName: state.selectedSpiritkin.name
+        spiritkinName: state.selectedSpiritkin.name,
+        userName: state.userName || null,
       })
     });
     const data = await res.json();
@@ -6086,52 +6129,67 @@ function buildGamePanelClasses(game) {
   return classes.join(" ");
 }
 
+function resolveSpiritkinDomainTheme(gameType, spiritkinName) {
+  const baseTheme = getGameTheme(gameType);
+  const domainMap = {
+    Lyra: {
+      displayName: `${baseTheme.displayName} · Lyra Domain`,
+      domainLabel: "Lyra Domain",
+      chamberLabel: "Veil Crossing Mosaic",
+      moodLabel: "Velvet intuition and mirror drift",
+      associatedSpiritkin: "Lyra",
+      boardVariant: "veil"
+    },
+    Raien: {
+      displayName: `${baseTheme.displayName} · Raien Domain`,
+      domainLabel: "Raien Domain",
+      chamberLabel: "Star-Map Observatory",
+      moodLabel: "Charged sky logic and horizon motion",
+      associatedSpiritkin: "Raien",
+      boardVariant: "astral"
+    },
+    Kairo: {
+      displayName: `${baseTheme.displayName} · Kairo Domain`,
+      domainLabel: "Kairo Domain",
+      chamberLabel: "Ember Strategy Vault",
+      moodLabel: "Archive fire and tactical gravity",
+      associatedSpiritkin: "Kairo",
+      boardVariant: "ember"
+    },
+    Elaria: {
+      displayName: `${baseTheme.displayName} · Elaria Domain`,
+      domainLabel: "Elaria Domain",
+      chamberLabel: "Crown Memory Archive",
+      moodLabel: "Luminous memory and gentle order",
+      associatedSpiritkin: "Elaria",
+      boardVariant: "archive"
+    },
+    Thalassar: {
+      displayName: `${baseTheme.displayName} · Thalassar Domain`,
+      domainLabel: "Thalassar Domain",
+      chamberLabel: "Abyssal Tide Map",
+      moodLabel: "Tidal pressure and ceremonial calm",
+      associatedSpiritkin: "Thalassar",
+      boardVariant: "abyssal"
+    }
+  };
+  return {
+    ...baseTheme,
+    ...(domainMap[spiritkinName] || {}),
+  };
+}
+
 function buildGameModeHero(game, spiritkinName) {
   if (!game?.type) return "";
   const name = spiritkinName || "your Spiritkin";
-  const resolvedTheme = getGameTheme(game.type);
-  const chessVariants = {
-    crown: {
-      displayName: "SpiritCore Crown Chamber",
-      chamberLabel: "The Governing Gate",
-      domainLabel: "SpiritCore Domain",
-      moodLabel: "Celestial authority and radiant order"
-    },
-    veil: {
-      displayName: "Lyra Veil Crossing",
-      chamberLabel: "Veil Crossing Mosaic",
-      domainLabel: "Lyra Domain",
-      moodLabel: "Velvet intuition and mirrored grace"
-    },
-    ember: {
-      displayName: "Kairo Ember Vault",
-      chamberLabel: "Ember Strategy Vault",
-      domainLabel: "Kairo Domain",
-      moodLabel: "Archive fire and tactical gravity"
-    },
-    astral: {
-      displayName: "Raien Astral Observatory",
-      chamberLabel: "Star-Map Observatory",
-      domainLabel: "Raien Domain",
-      moodLabel: "Charged sky logic and horizon motion"
-    },
-    abyssal: {
-      displayName: "Thalassar Tide Chamber",
-      chamberLabel: "Abyssal Tide Map",
-      domainLabel: "Thalassar Domain",
-      moodLabel: "Deepwater pressure and ceremonial calm"
-    }
-  };
-  const chamberTheme = game.type === "chess" && state.pieceTheme
-    ? { ...resolvedTheme, ...(chessVariants[state.pieceTheme] || {}) }
-    : resolvedTheme;
+  const resolvedTheme = resolveSpiritkinDomainTheme(game.type, spiritkinName);
   const heroes = {
     chess: {
       cls: "chess-mode-hero",
-      kicker: chamberTheme.domainLabel || "Premium Showcase",
-      title: chamberTheme.displayName || "Celestial Chess",
-      copy: `The board holds center inside ${chamberTheme.chamberLabel || "the chamber"}. Your move lands first, then ${name} answers in full view.`,
-      mood: chamberTheme.moodLabel || "Measured strategy and ceremonial fire"
+      kicker: resolvedTheme.domainLabel || "Premium Showcase",
+      title: resolvedTheme.displayName || "Celestial Chess",
+      copy: `The board holds center inside ${resolvedTheme.chamberLabel || "the chamber"}. Your move lands first, then ${name} answers in full view.`,
+      mood: resolvedTheme.moodLabel || "Measured strategy and ceremonial fire"
     },
     checkers: {
       cls: "checkers-mode-hero",
@@ -6324,7 +6382,7 @@ function render() {
           spiritkin ? spiritkin.name : 'Spiritkin',
           state.gameSpiritkinMessage,
           (move) => submitGameMove(move),
-          state.pieceTheme
+          resolveSpiritkinDomainTheme(state.activeGame?.type, spiritkin?.name)
         );
       });
     }
@@ -6930,14 +6988,9 @@ function buildEntry() {
           <span class="entry-pillar">Living world state</span>
         </div>
         <div class="entry-cta">
-          <div class="entry-name-row">
-            <input
-              type="text"
-              placeholder="Your name (optional)"
-              data-field="entry-name"
-              value="${esc(state.userNameDraft)}"
-              maxlength="40"
-            />
+          <div class="entry-name-row spiritcore-name-handoff">
+            <strong>Identity handoff happens after the Gate.</strong>
+            <span>SpiritCore will ask your name, greet you directly, and then open founder selection.</span>
           </div>
           <button class="btn btn-primary btn-wide entry-main-cta" data-action="continue" ${state.crownGateOpening ? "disabled" : ""}>${state.crownGateOpening ? `<span class="btn-inline-spinner"></span><span>Entering...</span>` : (returning ? "Re-enter the Spiritverse" : "Open the Crown Gate")}</button>
           <p class="entry-disclaimer">Your primary companion can be changed later through an intentional rebonding step — not by accident.</p>
@@ -7133,6 +7186,7 @@ function buildSpiritverseArrival() {
 }
 
 function buildSpiritCoreWelcome() {
+  const needsName = !state.userName;
   return `
     <section class="entry-stage-screen spiritcore-welcome-screen">
       <div class="entry-stage-scrim"></div>
@@ -7146,14 +7200,31 @@ function buildSpiritCoreWelcome() {
           { fallbackMode: "errorOnly", debugSlot: "spiritcore-welcome-hero" }
         )}
         <div class="panel-label">SpiritCore</div>
-        <h2>The realm is now under your witness.</h2>
-        <p class="spiritcore-welcome-text">${esc(SPIRITCORE_WELCOME_TEXT)}</p>
-        <div class="spiritcore-guidance-strip">
-          <span>Meet a founder</span>
-          <span>Begin one bond</span>
-          <span>Talk, explore, play, return</span>
-        </div>
-        ${buildSpiritCoreGuidanceCard("welcome-guidance")}
+        <h2>${needsName ? "Name yourself before the founders appear." : "SpiritCore is greeting you now."}</h2>
+        ${needsName ? `
+          <p class="spiritcore-welcome-text">The Gate is open. Speak your name so SpiritCore can address you directly before founder selection begins.</p>
+          <div class="spiritcore-name-form">
+            <input
+              type="text"
+              placeholder="Your name"
+              data-field="entry-name"
+              value="${esc(state.userNameDraft)}"
+              maxlength="40"
+            />
+            <button class="btn btn-primary btn-wide" data-action="submit-spiritcore-name" ${state.spiritCoreGreetingPending ? "disabled" : ""}>
+              ${state.spiritCoreGreetingPending ? "Greeting..." : "Continue with SpiritCore"}
+            </button>
+          </div>
+        ` : `
+          <p class="spiritcore-welcome-text">${esc(state.spiritCoreGreetingText || SPIRITCORE_WELCOME_TEXT)}</p>
+          <div class="spiritcore-guidance-strip">
+            <span>Speak</span>
+            <span>Play</span>
+            <span>Reflect</span>
+            <span>Explore</span>
+          </div>
+          ${buildSpiritCoreGuidanceCard("welcome-guidance")}
+        `}
       </div>
     </section>
   `;
@@ -7187,6 +7258,7 @@ function buildMain() {
 }
 
 function buildBondSelectionView() {
+  const pending = state.pendingBondSpiritkin;
   return `
     <section class="selection-view ${state.pendingBondSpiritkin ? "selection-has-pending" : ""}" data-focus-anchor="bond-selection">
       <div class="selection-hero">
@@ -7200,10 +7272,26 @@ function buildBondSelectionView() {
             <strong>Main loop:</strong> meet a Spiritkin, begin the bond, talk freely, explore the world, play together, and return to deepen what the realm remembers.
           </div>
         </div>
-        ${state.pendingBondSpiritkin ? buildBondPreview(state.pendingBondSpiritkin, true) : `
+        ${pending ? `
+          <div class="selection-focus selection-selection-confirmed ${esc(pending.ui.cls)}">
+            <div class="selection-focus-copy">
+              <div class="focus-kicker">Selection confirmed</div>
+              <h3>${esc(pending.name)}</h3>
+              <div class="focus-realm">${esc(pending.ui.realm)}</div>
+              <p>${esc(pending.title || pending.ui.bondLine)}</p>
+              <div class="focus-founder-line">Founding Pillar</div>
+              <div class="focus-tone">${esc(getSpiritkinSelfReveal(pending))}</div>
+              <p class="focus-origin-story">${esc(getSpiritkinIntroPrompt(pending))}</p>
+              <div class="intro-next-step-actions">
+                <button class="btn btn-primary btn-sm" data-action="confirm-primary">Bond with ${esc(pending.name)}</button>
+                <button class="btn btn-ghost btn-sm" data-action="clear-pending-bond">Choose another founder</button>
+              </div>
+            </div>
+          </div>
+        ` : `
           <div class="selection-focus selection-placeholder">
             <div class="selection-placeholder-mark">Bond</div>
-            <p>Select a Spiritkin to meet them in view. Then either bond with them or return to meet another.</p>
+            <p>Select a Spiritkin to open the fullscreen reveal stage. SpiritCore will hold the trailer at center so the meeting feels deliberate before you confirm.</p>
           </div>
         `}
       </div>
@@ -7235,7 +7323,70 @@ function buildBondSelectionView() {
       </div>
       ${buildSvStrip()}
       ${buildPremiumSpiritkinCTA()}
+      ${state.selectionOverlaySpiritkin ? buildSpiritkinSelectionOverlay(state.selectionOverlaySpiritkin) : ""}
     </section>
+  `;
+}
+
+function buildSpiritkinSelectionOverlay(spiritkin) {
+  const mediaConfig = getSpiritkinMediaConfig(spiritkin?.name);
+  const trailerPath = mediaConfig?.introTrailer?.path || "";
+  const hasTrailer = !!trailerPath;
+  const authority = getSpiritkinMediaAuthority(spiritkin?.name);
+  const stillSrc = authority.focus || authority.profile || authority.fallbackCard || getSpiritkinPortraitPath(spiritkin?.name);
+  return `
+    <div class="selection-overlay" data-focus-anchor="selection-overlay">
+      <div class="selection-overlay-backdrop" data-action="close-selection-overlay"></div>
+      <div class="selection-overlay-shell ${esc(spiritkin.ui.cls)} ${hasTrailer ? "has-trailer" : "has-still"}">
+        <button class="selection-overlay-close" data-action="close-selection-overlay" aria-label="Close reveal">×</button>
+        <div class="selection-overlay-stage">
+          ${hasTrailer ? `
+            <div class="selection-overlay-video-stage">
+              <div class="selection-overlay-stage-head">
+                <div class="panel-label">Founder reveal</div>
+                <div class="selection-overlay-stage-note">${esc(spiritkin.name)}'s intro trailer is the authoritative selection surface.</div>
+              </div>
+              <div class="video-player-container spiritkin-intro selection-fullscreen-video">
+                <div class="video-player-wrapper spiritkin-intro selection-fullscreen-video">
+                  <video class="video-player-element" autoplay ${state.mediaMuted ? "muted" : ""} playsinline preload="metadata" controls>
+                    <source src="${trailerPath}" type="video/mp4">
+                    Your browser does not support the video tag.
+                  </video>
+                  <div class="video-player-overlay"></div>
+                  <div class="video-player-controls-overlay">
+                    <button class="video-unmute-btn" data-action="toggle-media-audio" title="${esc(getMediaToggleState(state.mediaMuted).title)}" aria-pressed="${state.mediaMuted ? "false" : "true"}">
+                      ${buildMediaToggleInner(state.mediaMuted)}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ` : `
+            <div class="selection-overlay-still-stage">
+              ${buildCompositeVisualFrame(
+                stillSrc,
+                getSpiritkinPortraitPath(spiritkin.name),
+                `${spiritkin.name} reveal still`,
+                "selection-overlay-still-art",
+                true,
+                { fallbackMode: "errorOnly", debugSlot: `${spiritkin.name}-selection-overlay` }
+              )}
+            </div>
+          `}
+        </div>
+        <div class="selection-overlay-copy">
+          <div class="selection-overlay-kicker">Spiritkin Selection</div>
+          <h2>${esc(spiritkin.name)}</h2>
+          <div class="selection-overlay-meta">${esc(spiritkin.title || spiritkin.role || spiritkin.ui.strap)} · ${esc(spiritkin.ui.realm)}</div>
+          <p class="selection-overlay-strap">${esc(spiritkin.ui.strap)}</p>
+          <p class="selection-overlay-domain">${esc(getSpiritkinSelectionContext(spiritkin.name))}</p>
+          <div class="selection-overlay-actions">
+            <button class="btn btn-primary btn-wide" data-action="confirm-selection-overlay" data-name="${esc(spiritkin.name)}">Confirm Selection</button>
+            <button class="btn btn-ghost btn-wide" data-action="close-selection-overlay">Keep exploring</button>
+          </div>
+        </div>
+      </div>
+    </div>
   `;
 }
 
@@ -7276,16 +7427,17 @@ function getRoomDisplayMeta(tab, spiritkin) {
 function buildWorldPrimaryNav(activeTab) {
   const primaryRoom = getPrimaryRoomForTab(activeTab);
   const rooms = [
-    { id: "presence", tab: "profile", label: "Presence Room" },
-    { id: "games", tab: "games", label: "Games Room" },
-    { id: "journal", tab: "journal", label: "Journal Room" },
-    { id: "events", tab: "events", label: "Events Room" }
+    { id: "presence", tab: "profile", label: "Speak", sublabel: "Presence Room" },
+    { id: "games", tab: "games", label: "Play", sublabel: "Games Room" },
+    { id: "journal", tab: "journal", label: "Reflect", sublabel: "Journal Room" },
+    { id: "events", tab: "events", label: "Explore", sublabel: "Events Room" }
   ];
   return `
     <div class="world-primary-nav" aria-label="Spiritverse rooms">
       ${rooms.map((room) => `
         <button class="world-room-tab ${primaryRoom === room.id ? "active" : ""} ${state.pendingPresenceTab === room.tab ? "loading" : ""}" data-action="set-presence-tab" data-tab="${room.tab}">
           <span class="world-room-tab-label">${room.label}</span>
+          <span class="world-room-tab-sublabel">${room.sublabel}</span>
         </button>
       `).join("")}
     </div>
@@ -7327,24 +7479,24 @@ function buildBondedHomeRoomNav(spiritkin) {
   return `
     <div class="bonded-room-nav" aria-label="Bonded home destinations">
       <button class="bonded-room-card active" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
-        <span class="bonded-room-kicker">Presence Room</span>
+        <span class="bonded-room-kicker">Speak</span>
         <strong>${state.conversationId ? `Resume with ${esc(spiritkin.name)}` : `Enter ${esc(spiritkin.name)}'s chamber`}</strong>
-        <span>Conversation, bonded presence, and your main return point.</span>
+        <span>Presence Room. Conversation, bonded presence, and your main return point.</span>
       </button>
       <button class="bonded-room-card" data-action="open-games-hub" ${state.loadingConv ? "disabled" : ""}>
-        <span class="bonded-room-kicker">Games Room</span>
+        <span class="bonded-room-kicker">Play</span>
         <strong>Open the board hall</strong>
-        <span>Shared play without squeezing the active board into a side panel.</span>
+        <span>Games Room. Shared play without squeezing the active board into a side panel.</span>
       </button>
       <button class="bonded-room-card" data-action="begin" data-home-tab="journal" ${state.loadingConv ? "disabled" : ""}>
-        <span class="bonded-room-kicker">Journal Room</span>
+        <span class="bonded-room-kicker">Reflect</span>
         <strong>Review the bond record</strong>
-        <span>Progression, memories, and game unlocks in one archive surface.</span>
+        <span>Journal Room. Progression, memories, and game unlocks in one archive surface.</span>
       </button>
       <button class="bonded-room-card" data-action="begin" data-home-tab="events" ${state.loadingConv ? "disabled" : ""}>
-        <span class="bonded-room-kicker">Events Room</span>
+        <span class="bonded-room-kicker">Explore</span>
         <strong>Check realm movement</strong>
-        <span>Live events, daily quest, and world-cycle context.</span>
+        <span>Events Room. Live events, daily quest, and world-cycle context.</span>
       </button>
     </div>
   `;
@@ -7478,64 +7630,15 @@ function buildResonanceDepth(spiritkinName, cls) {
 
 function buildBondPreview(spiritkin, pending) {
   const essence = Array.isArray(spiritkin.essence) ? spiritkin.essence.slice(0, 3) : [];
-  const mediaConfig = getSpiritkinMediaConfig(spiritkin.name);
-  const introVideoFailed = pending && selectionTrailerFailures.has(spiritkin.name);
-  const introVideo = pending && !introVideoFailed ? (mediaConfig?.introTrailer?.path || null) : null;
-  const introTrailerPending = pending && mediaConfig?.introTrailer?.status === "awaiting_media";
   const primaryMediaSurface = pending ? "focus" : "bonded";
-  const showStagePortrait = !pending || !introVideo;
-  const showStageMediaPanel = !introVideo;
   const selfReveal = getSpiritkinSelfReveal(spiritkin);
   const introPrompt = getSpiritkinIntroPrompt(spiritkin);
   return `
     <div class="selection-focus ${esc(spiritkin.ui.cls)} ${pending ? "pending" : "bonded"}">
-      <div class="selection-focus-stage ${introVideo ? "has-trailer" : "has-still"}">
-        ${introVideo ? `
-          <div class="spiritkin-intro-video" data-focus-anchor="spiritkin-trailer">
-            <div class="spiritkin-intro-stage-head">
-              <div class="panel-label">Primary reveal</div>
-              <div class="spiritkin-intro-stage-note">This is the main trailer surface for ${esc(spiritkin.name)} before bonding.</div>
-            </div>
-            <div class="video-player-container spiritkin-intro">
-              <div class="video-player-wrapper spiritkin-intro">
-                <video
-                  class="video-player-element"
-                  data-trailer-kind="intro"
-                  data-trailer-owner="${esc(spiritkin.name)}"
-                  autoplay
-                  ${state.mediaMuted ? "muted" : ""}
-                  playsinline
-                  preload="metadata"
-                >
-                  <source src="${introVideo}" type="video/mp4">
-                  Your browser does not support the video tag.
-                </video>
-                <div class="video-player-overlay"></div>
-                <div class="video-player-controls-overlay">
-                  <button class="video-unmute-btn" data-action="toggle-media-audio" title="${esc(getMediaToggleState(state.mediaMuted).title)}" aria-pressed="${state.mediaMuted ? "false" : "true"}">
-                    <span class="unmute-icon">🔊</span>
-                    <span class="unmute-text">${esc(getMediaToggleState(state.mediaMuted).text)}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ` : ''}
-        ${introTrailerPending ? `
-          <div class="spiritkin-media-slot-note">
-            <strong>${esc(mediaConfig.introTrailer.label)}</strong>
-            <span>${esc(`${spiritkin.name}'s self-reveal pipeline is wired and waiting for final trailer media.`)}</span>
-          </div>
-        ` : ""}
-        ${introVideoFailed ? `
-          <div class="spiritkin-media-slot-note">
-            <strong>Trailer fallback engaged</strong>
-            <span>${esc(`${spiritkin.name}'s reveal trailer could not start in this browser state, so the authoritative still reveal is shown instead.`)}</span>
-          </div>
-        ` : ""}
-        ${showStageMediaPanel ? buildSpiritkinMediaPanel(spiritkin.name, primaryMediaSurface) : ""}
+      <div class="selection-focus-stage has-still">
+        ${buildSpiritkinMediaPanel(spiritkin.name, primaryMediaSurface)}
         ${buildSigil(spiritkin.ui, "focus", spiritkin.ui.symbol)}
-        ${showStagePortrait ? buildPortrait(spiritkin.name, "portrait-focus", spiritkin.ui.cls) : ""}
+        ${buildPortrait(spiritkin.name, "portrait-focus", spiritkin.ui.cls)}
       </div>
         <div class="selection-focus-copy">
           <div class="focus-kicker">${pending ? "Pending bond" : "Bonded companion"}</div>
@@ -8718,22 +8821,47 @@ async function onClick(event) {
   if (action === "preview-primary" || action === "select-spiritkin") {
     const candidate = state.spiritkins[Number(element.dataset.index)] ?? null;
     clearSelectionTrailerFailure(candidate?.name);
-    state.pendingBondSpiritkin = candidate;
     state.selectedSpiritkin = candidate || state.selectedSpiritkin;
+    state.selectionOverlaySpiritkin = candidate;
     state.showHomeView = !!state.primarySpiritkin;
-    state.statusText = candidate ? `${candidate.name} is in view. Bond now or keep meeting the others.` : "";
+    state.statusText = candidate ? `${candidate.name} is in view. Confirm the selection from the fullscreen reveal.` : "";
     state.statusError = false;
     normalizeInteractionState("select-spiritkin");
     persistSession();
     render();
-    const hasIntroTrailer = !!getSpiritkinMediaConfig(candidate?.name)?.introTrailer?.path;
-    revealCurrentFocus({ selector: hasIntroTrailer ? "[data-focus-anchor='spiritkin-trailer'], .selection-focus.pending" : ".selection-focus.pending, .selection-focus" });
+    revealCurrentFocus({ selector: ".selection-overlay-shell, [data-focus-anchor='selection-overlay']" });
+    return;
+  }
+
+  if (action === "close-selection-overlay") {
+    state.selectionOverlaySpiritkin = null;
+    state.statusText = "Keep meeting the founders until one feels right.";
+    state.statusError = false;
+    render();
+    revealCurrentFocus({ selector: ".spiritkin-grid" });
+    return;
+  }
+
+  if (action === "confirm-selection-overlay") {
+    const spiritkinName = element.dataset.name || state.selectionOverlaySpiritkin?.name || null;
+    const candidate = state.spiritkins.find((item) => item.name === spiritkinName) || state.selectionOverlaySpiritkin;
+    if (candidate) {
+      state.pendingBondSpiritkin = candidate;
+      state.selectedSpiritkin = candidate;
+      state.selectionOverlaySpiritkin = null;
+      state.statusText = `${candidate.name} is selected. Bond now or keep meeting the others before you decide.`;
+      state.statusError = false;
+      persistSession();
+      render();
+      revealCurrentFocus({ selector: ".selection-selection-confirmed, .selection-hero" });
+    }
     return;
   }
 
   if (action === "confirm-primary") {
     if (state.pendingBondSpiritkin) {
       const bondedSpiritkin = state.pendingBondSpiritkin;
+      state.selectionOverlaySpiritkin = null;
       setPrimarySpiritkin(bondedSpiritkin);
       render();
       revealCurrentFocus({ selector: ".bond-home-copy" });
@@ -8754,6 +8882,7 @@ async function onClick(event) {
     state.selectedSpiritkin = state.primarySpiritkin || state.selectedSpiritkin;
     state.conversationId = null;
     state.messages = [];
+    state.selectionOverlaySpiritkin = null;
     state.pendingBondSpiritkin = null;
     state.rebondSpiritkin = null;
     state.statusText = state.primarySpiritkin
@@ -8957,8 +9086,6 @@ async function onClick(event) {
       render();
       return;
     }
-    state.userName = state.userNameDraft.trim();
-    if (state.userName) localStorage.setItem(NAME_KEY, state.userName);
     if (state.consentChecked && !state.consentAccepted) {
       persistEntryConsent();
     }
@@ -8989,11 +9116,26 @@ async function onClick(event) {
 
   if (action === "clear-pending-bond") {
     state.pendingBondSpiritkin = null;
+    state.selectionOverlaySpiritkin = null;
     state.statusText = "Meet another Spiritkin before you decide.";
     state.statusError = false;
     persistSession();
     render();
     revealCurrentFocus({ selector: ".spiritkin-grid" });
+    return;
+  }
+
+  if (action === "submit-spiritcore-name") {
+    const submittedName = state.userNameDraft.trim();
+    if (!submittedName) {
+      state.statusText = "Enter your name so SpiritCore can greet you directly.";
+      state.statusError = true;
+      render();
+      return;
+    }
+    state.userName = submittedName;
+    localStorage.setItem(NAME_KEY, state.userName);
+    await finalizeSpiritCoreGreeting();
     return;
   }
 
@@ -9268,7 +9410,8 @@ async function onClick(event) {
           guide: state.gameEchoGuide
         },
         spiritkin ? spiritkin.name : 'Spiritkin',
-        (move) => submitGameMove(move)
+        (move) => submitGameMove(move),
+        resolveSpiritkinDomainTheme(state.activeGame?.type, spiritkin?.name)
       );
     }
     return;

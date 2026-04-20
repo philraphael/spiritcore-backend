@@ -49,6 +49,18 @@ const CHESS_PIECE_THEMES = {
 };
 
 function resolveGameTheme(type, overrideTheme) {
+  if (overrideTheme && typeof overrideTheme === "object" && !Array.isArray(overrideTheme)) {
+    const baseTheme = getGameTheme(type);
+    return {
+      ...baseTheme,
+      ...overrideTheme,
+      assets: overrideTheme.assets || baseTheme.assets,
+      cssVars: {
+        ...(baseTheme.cssVars || {}),
+        ...(overrideTheme.cssVars || {})
+      }
+    };
+  }
   const gameTheme = getGameTheme(type);
   if (type === "chess" && overrideTheme && CHESS_THEME_OPTIONS.some((option) => option.id === overrideTheme)) {
     return { ...gameTheme, boardVariant: overrideTheme };
@@ -146,6 +158,11 @@ function resolveThemeEnvironmentOverrides(theme) {
       roomUrl: runtime("rooms", "Spiritverse background base theme.png"),
       boardUrl: runtime("concepts", "Spiritkins in spiritverse.png"),
       accentUrl: runtime("ui", "welcome_close.png")
+    },
+    archive: {
+      roomUrl: runtime("concepts", "Elaria.png"),
+      boardUrl: runtime("concepts", "Elaria.png"),
+      accentUrl: runtime("concepts", "Elaria Left Thalassar right.png")
     },
     veil: {
       roomUrl: runtime("rooms", "room_chess_lyra_celestial_scene.png"),

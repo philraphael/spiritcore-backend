@@ -41,6 +41,7 @@ import { bondJournalRoutes }      from "./src/routes/bondJournal.mjs";
 import { spiritverseEventRoutes } from "./src/routes/spiritverseEvents.mjs";
 import { dailyQuestRoutes }       from "./src/routes/dailyQuests.mjs";
 import { healthRoutes }           from "./src/routes/health.mjs";
+import { spiritCoreRoutes }       from "./src/routes/spiritcore.mjs";
 
 // Fail fast on missing required env vars
 try { validateConfig(); } catch (err) { console.error("[SpiritCore] Config error:", err.message); process.exit(1); }
@@ -706,6 +707,8 @@ await app.register(issueRoutes, {
 await app.register(sessionRoutes, {
   sessionControlService: container.sessionControlService,
 });
+
+await app.register(spiritCoreRoutes);
 
 await app.register(conversationRoutes, {
   prefix: "/",

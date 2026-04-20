@@ -5,8 +5,9 @@
  * GET  /v1/conversations/:userId  — list conversations for a user
  */
 
-function buildOpeningGreeting(spiritkinName) {
+function buildOpeningGreeting(spiritkinName, userName = "") {
   const normalized = String(spiritkinName || "").trim();
+  const normalizedName = String(userName || "").trim();
   const greetings = {
     Lyra: "This is our first conversation. I'd like to know: what brought you here today?",
     Raien: "New energy. New possibilities. What's calling you?",
@@ -14,7 +15,8 @@ function buildOpeningGreeting(spiritkinName) {
     Elaria: "A new record is opening. What truth belongs here first?",
     Thalassar: "The tide is new tonight. What rises first when you listen inward?",
   };
-  return greetings[normalized] || "This is our first conversation. What brought you here today?";
+  const greeting = greetings[normalized] || "This is our first conversation. What brought you here today?";
+  return normalizedName ? `${normalizedName}, ${greeting}` : greeting;
 }
 
 export async function conversationRoutes(fastify, opts) {
@@ -33,11 +35,12 @@ export async function conversationRoutes(fastify, opts) {
           userId:       { type: "string", minLength: 1 },
           spiritkinName: { type: "string", minLength: 1 },
           title:        { type: "string", nullable: true },
+          userName:     { type: "string", nullable: true },
         },
       },
     },
   }, async (req, reply) => {
-    const { userId, spiritkinName, title } = req.body;
+    const { userId, spiritkinName, title, userName } = req.body;
     try {
       const result = await conversationService.bootstrap({ userId, spiritkinName, title });
 
@@ -67,7 +70,7 @@ export async function conversationRoutes(fastify, opts) {
       }
 
       if (messageService && result?.conversation_id) {
-        const greetingText = buildOpeningGreeting(spiritkinName);
+        const greetingText = buildOpeningGreeting(spiritkinName, userName);
         await messageService.persist({
           conversationId: result.conversation_id,
           role: "assistant",

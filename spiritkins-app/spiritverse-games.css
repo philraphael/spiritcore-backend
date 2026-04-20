@@ -629,6 +629,10 @@
   --game-theme-tint: rgba(84, 178, 194, 0.16);
 }
 
+.sv-theme-shell[data-theme="archive"] {
+  --game-theme-tint: rgba(215, 228, 167, 0.16);
+}
+
 .sv-theme-shell[data-theme="crown"]::before {
   background:
     linear-gradient(180deg, rgba(255,250,238,0.1), rgba(4,7,14,0.12) 100%),
@@ -671,6 +675,15 @@
     radial-gradient(circle at 22% 18%, rgba(98,214,224,0.24) 0%, transparent 34%),
     radial-gradient(circle at 80% 22%, rgba(179,236,255,0.08), transparent 22%),
     linear-gradient(135deg, rgba(255,255,255,0.03), transparent 38%, transparent 68%, rgba(88,181,205,0.08)),
+    var(--game-overlay-fx, none) center / 46% no-repeat;
+}
+
+.sv-theme-shell[data-theme="archive"]::before {
+  background:
+    linear-gradient(180deg, rgba(250,245,220,0.08), rgba(10,16,12,0.2) 100%),
+    radial-gradient(circle at 22% 18%, rgba(215,228,167,0.24) 0%, transparent 34%),
+    radial-gradient(circle at 80% 22%, rgba(255,255,255,0.08), transparent 22%),
+    linear-gradient(135deg, rgba(255,255,255,0.04), transparent 38%, transparent 68%, rgba(201,178,109,0.08)),
     var(--game-overlay-fx, none) center / 46% no-repeat;
 }
 
@@ -720,6 +733,14 @@
     radial-gradient(circle at center top, rgba(98,214,224,0.24) 0%, transparent 64%),
     var(--game-room-art, none) center / cover no-repeat,
     rgba(4, 12, 18, 0.78);
+}
+
+.sv-theme-shell[data-theme="archive"] .game-board-container {
+  background:
+    linear-gradient(180deg, rgba(245,242,213,0.08), rgba(255,255,255,0.015)),
+    radial-gradient(circle at center top, rgba(215,228,167,0.24) 0%, transparent 64%),
+    var(--game-room-art, none) center / cover no-repeat,
+    rgba(12, 18, 12, 0.78);
 }
 
 .sv-theme-shell::before {
@@ -900,6 +921,14 @@
     var(--game-room-art, none),
     radial-gradient(circle at top, rgba(84,178,194,0.32) 0%, transparent 46%),
     radial-gradient(circle at center, rgba(6, 18, 26, 0.94) 0%, rgba(5, 8, 16, 1) 100%);
+}
+
+.game-fullscreen-overlay[data-theme="archive"] {
+  background:
+    linear-gradient(180deg, rgba(18, 20, 10, 0.28), rgba(4, 7, 14, 0.68)),
+    var(--game-room-art, none),
+    radial-gradient(circle at top, rgba(215,228,167,0.3) 0%, transparent 46%),
+    radial-gradient(circle at center, rgba(20, 24, 14, 0.94) 0%, rgba(5, 8, 16, 1) 100%);
 }
 
 @keyframes stageIn {
