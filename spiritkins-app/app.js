@@ -350,6 +350,20 @@ function supportsSpeechRecognition() {
   return typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
 
+const VOICE_WAKE_NAMES = ["kairo", "elaria", "lyra", "raien", "thalassar"];
+
+function findWakeTriggeredSpiritkin(transcript = "") {
+  const normalized = String(transcript || "").trim().toLowerCase();
+  if (!normalized) return null;
+  const wakeName = VOICE_WAKE_NAMES.find((name) => normalized.includes(name));
+  if (!wakeName) return null;
+  return (state.spiritkins || []).find((spiritkin) => String(spiritkin?.name || "").trim().toLowerCase() === wakeName) || wakeName;
+}
+
+function hasActiveVoiceConversationSession() {
+  return !!(state.selectedSpiritkin && state.conversationId);
+}
+
 function isConstrainedGameType(gameType) {
   return String(gameType || "").trim().toLowerCase() === "go";
 }
@@ -9589,6 +9603,38 @@ function startListening(options = {}) {
     state.voiceTranscriptPreview = transcript;
     render();
     if (!transcript) return;
+    const sessionActive = hasActiveVoiceConversationSession();
+    const wakeTarget = findWakeTriggeredSpiritkin(transcript);
+    const wakeDetected = !!wakeTarget;
+    if (!wakeDetected && !sessionActive) {
+      console.info("[Voice] wake-not-detected", { source, runId, transcriptLength: transcript.length });
+      logContinuityDebug("wake-not-detected", {
+        source,
+        runId,
+        transcriptLength: transcript.length,
+      });
+      stopListening();
+      setVoiceWaitingStatus("Voice input ignored until a Spiritkin is named or a live session is active.");
+      return;
+    }
+    if (wakeDetected) {
+      console.info("[Voice] wake-detected", {
+        source,
+        runId,
+        wakeTarget: typeof wakeTarget === "string" ? wakeTarget : wakeTarget?.name || null,
+      });
+      logContinuityDebug("wake-detected", {
+        source,
+        runId,
+        wakeTarget: typeof wakeTarget === "string" ? wakeTarget : wakeTarget?.name || null,
+      });
+      if (!sessionActive && wakeTarget && typeof wakeTarget === "object") {
+        state.selectedSpiritkin = wakeTarget;
+      }
+    } else if (sessionActive) {
+      console.info("[Voice] session-active-bypass", { source, runId });
+      logContinuityDebug("session-active-bypass", { source, runId });
+    }
     setVoiceTurnRuntimeState({ awaitingUserTurn: false, captureAfterAudio: false });
     setAuthoritativeTurnPhase("processing", {
       isSpeaking: false,
@@ -9613,6 +9659,12 @@ function startListening(options = {}) {
     state.statusText = `Captured: "${transcript}"`;
     state.statusError = false;
     render();
+    if (!sessionActive && wakeDetected && !state.conversationId && state.selectedSpiritkin) {
+      beginConversation().then(() => {
+        if (state.conversationId) sendMessage(transcript);
+      });
+      return;
+    }
     sendMessage(transcript);
   };
 
