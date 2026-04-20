@@ -7067,6 +7067,10 @@ function buildCrownGateEntry() {
                 : "Your prior consent is remembered. Cross when you are ready."}
             </div>
           `}
+          <div class="entry-requirement-bar ${consentBlocked ? "is-blocked" : "is-ready"}">
+            <strong>${consentBlocked ? "Before entering:" : "Ready to enter:"}</strong>
+            <span>${consentBlocked ? "Check the consent box above to unlock Enter SpiritVerse and Skip Intro." : "Consent is complete. You can enter now."}</span>
+          </div>
           <div class="entry-action-rail">
             <button class="entry-skip-btn ${consentBlocked ? "is-guarded" : ""}" data-action="skip-gate" aria-disabled="${consentBlocked ? "true" : "false"}">Skip Intro</button>
             <div class="entry-cta">
@@ -7235,84 +7239,207 @@ function buildBondSelectionView() {
   `;
 }
 
+function getPrimaryRoomForTab(tab) {
+  if (tab === "games") return "games";
+  if (tab === "journal") return "journal";
+  if (tab === "events" || tab === "quest") return "events";
+  return "presence";
+}
+
+function getRoomDisplayMeta(tab, spiritkin) {
+  const primaryRoom = getPrimaryRoomForTab(tab);
+  const roomCopy = {
+    presence: {
+      label: "Presence Room",
+      title: spiritkin ? `${spiritkin.name}'s bonded chamber` : "Presence Room",
+      detail: "Profile, echoes, and charter live together here as one readable presence space."
+    },
+    games: {
+      label: "Games Room",
+      title: spiritkin ? `Shared play with ${spiritkin.name}` : "Games Room",
+      detail: "The active board takes the room. Supporting context stays secondary."
+    },
+    journal: {
+      label: "Journal Room",
+      title: "Bond Journal archive",
+      detail: "Memory, progression, and preserved milestones stay together in one archive surface."
+    },
+    events: {
+      label: "Events Room",
+      title: "Realm events and daily quest",
+      detail: "Live world motion, current quests, and temporal context are grouped here."
+    }
+  };
+  return roomCopy[primaryRoom] || roomCopy.presence;
+}
+
+function buildWorldPrimaryNav(activeTab) {
+  const primaryRoom = getPrimaryRoomForTab(activeTab);
+  const rooms = [
+    { id: "presence", tab: "profile", label: "Presence Room" },
+    { id: "games", tab: "games", label: "Games Room" },
+    { id: "journal", tab: "journal", label: "Journal Room" },
+    { id: "events", tab: "events", label: "Events Room" }
+  ];
+  return `
+    <div class="world-primary-nav" aria-label="Spiritverse rooms">
+      ${rooms.map((room) => `
+        <button class="world-room-tab ${primaryRoom === room.id ? "active" : ""} ${state.pendingPresenceTab === room.tab ? "loading" : ""}" data-action="set-presence-tab" data-tab="${room.tab}">
+          <span class="world-room-tab-label">${room.label}</span>
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function buildRoomSubnav(activeTab) {
+  const currentPrimary = getPrimaryRoomForTab(activeTab);
+  const groups = {
+    presence: [
+      { tab: "profile", label: "Profile" },
+      { tab: "echoes", label: "Echoes" },
+      { tab: "charter", label: "Charter" }
+    ],
+    games: [
+      { tab: "games", label: "Games Room" }
+    ],
+    journal: [
+      { tab: "journal", label: "Bond Journal" }
+    ],
+    events: [
+      { tab: "events", label: "Realm Events" },
+      { tab: "quest", label: "Daily Quest" }
+    ]
+  };
+  const items = groups[currentPrimary] || groups.presence;
+  return `
+    <div class="world-subnav" aria-label="Current room surfaces">
+      ${items.map((item) => `
+        <button class="world-subnav-tab ${activeTab === item.tab ? "active" : ""} ${state.pendingPresenceTab === item.tab ? "loading" : ""}" data-action="set-presence-tab" data-tab="${item.tab}">
+          ${item.label}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function buildBondedHomeRoomNav(spiritkin) {
+  return `
+    <div class="bonded-room-nav" aria-label="Bonded home destinations">
+      <button class="bonded-room-card active" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
+        <span class="bonded-room-kicker">Presence Room</span>
+        <strong>${state.conversationId ? `Resume with ${esc(spiritkin.name)}` : `Enter ${esc(spiritkin.name)}'s chamber`}</strong>
+        <span>Conversation, bonded presence, and your main return point.</span>
+      </button>
+      <button class="bonded-room-card" data-action="open-games-hub" ${state.loadingConv ? "disabled" : ""}>
+        <span class="bonded-room-kicker">Games Room</span>
+        <strong>Open the board hall</strong>
+        <span>Shared play without squeezing the active board into a side panel.</span>
+      </button>
+      <button class="bonded-room-card" data-action="begin" data-home-tab="journal" ${state.loadingConv ? "disabled" : ""}>
+        <span class="bonded-room-kicker">Journal Room</span>
+        <strong>Review the bond record</strong>
+        <span>Progression, memories, and game unlocks in one archive surface.</span>
+      </button>
+      <button class="bonded-room-card" data-action="begin" data-home-tab="events" ${state.loadingConv ? "disabled" : ""}>
+        <span class="bonded-room-kicker">Events Room</span>
+        <strong>Check realm movement</strong>
+        <span>Live events, daily quest, and world-cycle context.</span>
+      </button>
+    </div>
+  `;
+}
+
 function buildBondedHomeView() {
   const spiritkin = state.primarySpiritkin;
   const { currentBond } = getBondStateForSpiritkin(spiritkin.name);
   return `
     <section class="selection-view bonded-home ${esc(spiritkin.ui.cls)}" data-focus-anchor="bonded-home">
-      <div class="bonded-home-stage">
-        <div class="selection-hero bonded-hero">
-          ${buildBondPreview(spiritkin, false)}
-          <div class="bond-home-copy panel-card">
-            <p class="eyebrow">Primary companion</p>
-            <h2>${esc(spiritkin.name)} is your bonded companion.</h2>
-            <div class="bond-home-realm">${esc(spiritkin.ui.realm)}</div>
-            <p>
-              Every session, every memory, every conversation in this space belongs to ${esc(spiritkin.name)}. To switch, use Manage bond and confirm a rebonding step.
-            </p>
-            <div class="bond-home-orientation">
-              <div class="bond-home-orientation-label">What to do next</div>
-              <p>Talk if you want presence, open games if you want shared action, explore the side panels when you want deeper world context, and return often so the bond keeps building.</p>
-            </div>
-            <p class="bond-home-atmosphere">${esc(spiritkin.ui.realmText)}</p>
-            <div class="bond-home-atlas">${esc(spiritkin.ui.atmosphereLine)}</div>
-            <div class="bonded-actions">
-              <button class="btn btn-primary" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
-                ${state.loadingConv ? "Opening bonded channel..." : state.conversationId ? `Resume with ${esc(spiritkin.name)}` : `Begin with ${esc(spiritkin.name)}`}
-              </button>
-              <button class="btn btn-ghost" data-action="open-games-hub" ${state.loadingConv ? "disabled" : ""}>
-                ${state.loadingConv && !state.conversationId ? "Preparing Games..." : "Open Games"}
-              </button>
-              <button class="btn btn-ghost" data-action="open-bond-manager">Manage bond</button>
-            </div>
+      <div class="bonded-world-shell">
+        <div class="bonded-world-header panel-card">
+          <div class="bonded-world-heading">
+            <p class="eyebrow">Spiritverse World Shell</p>
+            <h2>${esc(spiritkin.name)} anchors your active world.</h2>
+            <p>One primary room at a time. Presence leads, games claim space when opened, and archive surfaces stay readable instead of stacking into cramped strips.</p>
+          </div>
+          <div class="bonded-world-actions">
+            <button class="btn btn-primary" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
+              ${state.loadingConv ? "Opening bonded channel..." : state.conversationId ? `Resume with ${esc(spiritkin.name)}` : "Enter Presence Room"}
+            </button>
+            <button class="btn btn-ghost" data-action="open-games-hub" ${state.loadingConv ? "disabled" : ""}>
+              ${state.loadingConv && !state.conversationId ? "Preparing Games..." : "Open Games Room"}
+            </button>
+            <button class="btn btn-ghost" data-action="open-bond-manager">Manage bond</button>
           </div>
         </div>
-        <div class="bonded-home-command-grid">
-          <div class="bonded-home-guidance-column">
+
+        ${buildBondedHomeRoomNav(spiritkin)}
+
+        <div class="bonded-world-grid">
+          <div class="bonded-room-stage">
+            <div class="selection-hero bonded-hero">
+              ${buildBondPreview(spiritkin, false)}
+              <div class="bond-home-copy panel-card">
+                <p class="eyebrow">Primary companion</p>
+                <h2>${esc(spiritkin.name)} is your bonded companion.</h2>
+                <div class="bond-home-realm">${esc(spiritkin.ui.realm)}</div>
+                <p>
+                  Every session, every memory, every conversation in this space belongs to ${esc(spiritkin.name)}. To switch, use Manage bond and confirm a rebonding step.
+                </p>
+                <div class="bond-home-orientation">
+                  <div class="bond-home-orientation-label">World orientation</div>
+                  <p>Use Presence for conversation, Games for shared action, Journal for preserved bond memory, and Events for live realm movement and quests.</p>
+                </div>
+                <p class="bond-home-atmosphere">${esc(spiritkin.ui.realmText)}</p>
+                <div class="bond-home-atlas">${esc(spiritkin.ui.atmosphereLine)}</div>
+              </div>
+            </div>
+            ${state.convError ? `<div class="soft-error">${esc(state.convError)}</div>` : ""}
+            ${state.spiritverseEvent ? `
+              <div class="sv-event-banner">
+                <span class="sv-event-banner-icon">${esc(state.spiritverseEvent.icon)}</span>
+                <div class="sv-event-banner-text">
+                  <div class="sv-event-banner-title">${esc(state.spiritverseEvent.title)}</div>
+                  <div class="sv-event-banner-sub">${esc(state.spiritverseEvent.description.slice(0, 80))}${state.spiritverseEvent.description.length > 80 ? '...' : ''}</div>
+                </div>
+                <div class="sv-event-banner-badge">Live Event</div>
+              </div>
+            ` : ''}
+            ${state.dailyQuest && !state.dailyQuestStarted ? `
+              <div class="sv-quest-home-banner">
+                <span class="sv-quest-home-icon">${esc(state.dailyQuest.icon || '\u25ce')}</span>
+                <div class="sv-quest-home-body">
+                  <div class="sv-quest-home-label">Daily Quest</div>
+                  <div class="sv-quest-home-title">${esc(state.dailyQuest.title)}</div>
+                  <p class="sv-quest-home-desc">${esc(state.dailyQuest.description)}</p>
+                  ${state.dailyQuest.prompt ? `
+                    <button class="btn btn-primary sv-quest-home-begin" data-action="begin-daily-quest" data-prompt="${esc(state.dailyQuest.prompt)}">
+                      Begin Quest
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+            ` : ''}
+            ${buildBondStoryPreview(spiritkin.name, currentBond.stage)}
+          </div>
+
+          <aside class="bonded-support-rail">
             ${buildSpiritCoreGuidanceCard("bonded-home-guidance")}
             ${buildRetentionHomeStrip()}
-          </div>
-          <div class="bonded-home-world-column">
             ${buildTemporalWorldStrip()}
             ${buildEvolutionHomeStrip(spiritkin)}
-          </div>
+            ${buildFounderEnsemblePanel("home")}
+          </aside>
         </div>
-      </div>
-      <div class="bonded-secondary-grid bonded-secondary-grid-founders">
-        ${state.spiritkins.filter((item) => item.name !== spiritkin.name).map((item, index) => buildBondCard(item, index, true)).join("")}
-      </div>
-      ${state.convError ? `<div class="soft-error">${esc(state.convError)}</div>` : ""}
-      ${state.spiritverseEvent ? `
-        <div class="sv-event-banner">
-          <span class="sv-event-banner-icon">${esc(state.spiritverseEvent.icon)}</span>
-          <div class="sv-event-banner-text">
-            <div class="sv-event-banner-title">${esc(state.spiritverseEvent.title)}</div>
-            <div class="sv-event-banner-sub">${esc(state.spiritverseEvent.description.slice(0, 80))}${state.spiritverseEvent.description.length > 80 ? '...' : ''}</div>
+
+        <div class="bonded-world-lower">
+          <div class="bonded-secondary-grid bonded-secondary-grid-founders">
+            ${state.spiritkins.filter((item) => item.name !== spiritkin.name).map((item, index) => buildBondCard(item, index, true)).join("")}
           </div>
-          <div class="sv-event-banner-badge">Live Event</div>
-        </div>
-      ` : ''}
-      ${state.dailyQuest && !state.dailyQuestStarted ? `
-        <div class="sv-quest-home-banner">
-          <span class="sv-quest-home-icon">${esc(state.dailyQuest.icon || '\u25ce')}</span>
-          <div class="sv-quest-home-body">
-            <div class="sv-quest-home-label">Daily Quest</div>
-            <div class="sv-quest-home-title">${esc(state.dailyQuest.title)}</div>
-            <p class="sv-quest-home-desc">${esc(state.dailyQuest.description)}</p>
-            ${state.dailyQuest.prompt ? `
-              <button class="btn btn-primary sv-quest-home-begin" data-action="begin-daily-quest" data-prompt="${esc(state.dailyQuest.prompt)}">
-                Begin Quest
-              </button>
-            ` : ''}
+          <div class="bonded-home-support-rail">
+            ${buildSvStrip()}
+            ${buildPremiumSpiritkinCTA()}
           </div>
-        </div>
-      ` : ''}
-      ${buildBondStoryPreview(spiritkin.name, currentBond.stage)}
-      <div class="bonded-home-support-grid">
-        ${buildFounderEnsemblePanel("home")}
-        <div class="bonded-home-support-rail">
-          ${buildSvStrip()}
-          ${buildPremiumSpiritkinCTA()}
         </div>
       </div>
     </section>
@@ -7559,6 +7686,7 @@ function buildChatView() {
   const showSpiritCoreGuidance = !state.loadingReply && !state.showHomeView;
   const chatLayoutClass = `${esc(meta.cls)} ${state.activePresenceTab === "games" && state.activeGame ? "game-focus-mode" : ""}`.trim();
   const spiritkinSpeaking = isSpiritkinSpeechActive(spiritkin.name);
+  const roomMeta = getRoomDisplayMeta(state.activePresenceTab, spiritkin);
 
   // Echoes & Charter Logic
   const { currentBond, stageData } = getBondStateForSpiritkin(spiritkin.name);
@@ -7567,20 +7695,27 @@ function buildChatView() {
 
   return `
     <section class="chat-layout ${chatLayoutClass}">
-      <aside class="presence-panel presence-panel-${esc(state.activePresenceTab)}">
-        <div class="presence-panel-head">
-          <div class="mode-pill strong">${esc(meta.realm)}</div>
-          <button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>
+      <div class="world-shell-header panel-card">
+        <div class="world-shell-copy">
+          <div class="panel-label">${roomMeta.label}</div>
+          <h2>${esc(roomMeta.title)}</h2>
+          <p>${esc(roomMeta.detail)}</p>
         </div>
-
-        <div class="presence-tabs">
-          <button class="presence-tab ${state.activePresenceTab === 'profile' ? 'active' : ''} ${state.pendingPresenceTab === 'profile' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="profile">Profile</button>
-          <button class="presence-tab ${state.activePresenceTab === 'echoes' ? 'active' : ''} ${state.pendingPresenceTab === 'echoes' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="echoes">Echoes (${unlockedEchoes.length})</button>
-          <button class="presence-tab ${state.activePresenceTab === 'charter' ? 'active' : ''} ${state.pendingPresenceTab === 'charter' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="charter">Charter</button>
-          <button class="presence-tab ${state.activePresenceTab === 'games' ? 'active' : ''} ${state.pendingPresenceTab === 'games' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="games">Games</button>
-          <button class="presence-tab ${state.activePresenceTab === 'journal' ? 'active' : ''} ${state.pendingPresenceTab === 'journal' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="journal">Bond Journal</button>
-          <button class="presence-tab ${state.activePresenceTab === 'events' ? 'active' : ''} ${state.pendingPresenceTab === 'events' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="events">Realm Events</button>
-          <button class="presence-tab ${state.activePresenceTab === 'quest' ? 'active' : ''} ${state.pendingPresenceTab === 'quest' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="quest">Daily Quest</button>
+        <div class="world-shell-nav-wrap">
+          ${buildWorldPrimaryNav(state.activePresenceTab)}
+          ${buildRoomSubnav(state.activePresenceTab)}
+        </div>
+      </div>
+      <div class="world-shell-body">
+      <section class="presence-panel presence-panel-${esc(state.activePresenceTab)}">
+        <div class="presence-panel-head">
+          <div>
+            <div class="mode-pill strong">${esc(meta.realm)}</div>
+            <div class="presence-panel-room">${roomMeta.label}</div>
+          </div>
+          <div class="presence-panel-actions">
+            <button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>
+          </div>
         </div>
 
         <div class="presence-tab-content ${state.pendingPresenceTab ? 'is-switching' : ''}" data-focus-anchor="presence-${esc(state.activePresenceTab)}" data-presence-surface="${esc(state.activePresenceTab)}">
@@ -8048,8 +8183,8 @@ function buildChatView() {
             </div>
           ` : ''}
         </div>
-      </aside>
-      <div class="chat-stage chat-stage-${esc(state.activePresenceTab)}">
+      </section>
+      <aside class="chat-stage chat-stage-${esc(state.activePresenceTab)}">
         <div class="chat-header-bar">
           <div class="chat-header-info">
             ${buildSigil(meta, "header", meta.symbol)}
@@ -8135,7 +8270,9 @@ function buildChatView() {
           </div>
         </div>
 
-        ${buildCompanionPresenceDock(spiritkin)}
+        <div class="chat-rail-section">
+          ${buildCompanionPresenceDock(spiritkin)}
+        </div>
 
         ${state.showWhisperBanner && state.engagementWhisper ? `
           <div class="whisper-banner ${esc(safeWhisperType)}" data-action="dismiss-whisper">
@@ -8264,6 +8401,7 @@ function buildChatView() {
         </div>
 
         ${state.statusText ? `<div class="status-bar ${state.statusError ? "error" : ""}">${esc(state.statusText)}</div>` : ""}
+      </aside>
       </div>
     </section>
 
@@ -8729,7 +8867,14 @@ async function onClick(event) {
     return;
   }
 
-  if (action === "begin") { await beginConversation(); return; }
+  if (action === "begin") {
+    const requestedTab = element.dataset.homeTab;
+    if (requestedTab && VALID_PRESENCE_TABS.includes(requestedTab)) {
+      state.activePresenceTab = requestedTab;
+    }
+    await beginConversation();
+    return;
+  }
   if (action === "open-games-hub") {
     state.showHomeView = false;
     state.selectedSpiritkin = state.primarySpiritkin || state.selectedSpiritkin;

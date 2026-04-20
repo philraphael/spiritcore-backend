@@ -3918,6 +3918,372 @@ button:disabled {
   transition: height 0.15s ease;
 }
 
+/* ============================================================
+   PHASE 1 ROOM-BASED WORLD SHELL
+   ============================================================ */
+
+.bonded-world-shell,
+.chat-layout {
+  display: grid;
+  gap: 24px;
+}
+
+.bonded-world-header,
+.world-shell-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.bonded-world-heading,
+.world-shell-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.bonded-world-heading h2,
+.world-shell-copy h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 3.4vw, 3rem);
+}
+
+.bonded-world-heading p,
+.world-shell-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.bonded-world-actions,
+.world-shell-nav-wrap {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.bonded-world-actions {
+  justify-items: stretch;
+}
+
+.bonded-room-nav,
+.world-primary-nav,
+.world-subnav {
+  display: grid;
+  gap: 10px;
+}
+
+.bonded-room-nav {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.bonded-room-card,
+.world-room-tab,
+.world-subnav-tab {
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.bonded-room-card:hover,
+.world-room-tab:hover,
+.world-subnav-tab:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--realm-accent) 34%, rgba(255,255,255,0.18));
+  background: color-mix(in srgb, var(--realm-accent-soft) 64%, rgba(255,255,255,0.05));
+}
+
+.bonded-room-card.active,
+.world-room-tab.active,
+.world-subnav-tab.active {
+  border-color: color-mix(in srgb, var(--realm-accent) 42%, rgba(255,255,255,0.18));
+  background: color-mix(in srgb, var(--realm-accent-soft) 88%, rgba(255,255,255,0.06));
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.16);
+}
+
+.bonded-room-card span,
+.bonded-room-card strong {
+  display: block;
+}
+
+.bonded-room-kicker,
+.world-room-tab-label {
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--realm-accent) 74%, white);
+}
+
+.bonded-room-card strong {
+  margin: 6px 0;
+  font-size: 1rem;
+}
+
+.bonded-room-card span:last-child {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.world-primary-nav {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.world-subnav {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.world-room-tab,
+.world-subnav-tab {
+  min-height: 58px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.world-subnav-tab {
+  min-height: 46px;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.bonded-world-grid,
+.world-shell-body,
+.bonded-world-lower {
+  display: grid;
+  gap: 24px;
+}
+
+.bonded-world-grid {
+  grid-template-columns: minmax(0, 1.34fr) minmax(300px, 0.66fr);
+  align-items: start;
+}
+
+.bonded-room-stage,
+.bonded-support-rail {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.bonded-world-lower {
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  align-items: start;
+}
+
+.chat-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.world-shell-body {
+  grid-template-columns: minmax(0, 1.24fr) minmax(320px, 0.76fr);
+  align-items: start;
+}
+
+.chat-layout.game-focus-mode .world-shell-body {
+  grid-template-columns: minmax(0, 1.58fr) minmax(260px, 0.42fr);
+}
+
+.presence-panel {
+  position: relative;
+  top: auto;
+  max-height: none;
+  min-height: 920px;
+  padding: 28px;
+  border-left: none;
+  border-top: 2px solid color-mix(in srgb, var(--realm-accent) 30%, transparent);
+  border-radius: 30px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.22);
+}
+
+.presence-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.presence-panel-room {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.presence-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.presence-tab-content {
+  padding: 0 0 12px;
+}
+
+.chat-stage {
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 28px);
+  min-height: 920px;
+  overflow: auto;
+  border-radius: 30px;
+  box-shadow: 0 26px 66px rgba(0, 0, 0, 0.24);
+}
+
+.chat-rail-section {
+  display: grid;
+  gap: 12px;
+}
+
+.chat-layout.game-focus-mode .chat-stage {
+  opacity: 0.62;
+  transform: scale(0.985);
+}
+
+.chat-layout.game-focus-mode .chat-stage .thread-wrap,
+.chat-layout.game-focus-mode .chat-stage .composer-shell,
+.chat-layout.game-focus-mode .chat-stage .starter-prompts,
+.chat-layout.game-focus-mode .chat-stage .voice-guidance,
+.chat-layout.game-focus-mode .chat-stage .spiritcore-guidance-card,
+.chat-layout.game-focus-mode .chat-stage .auto-open-mic-banner,
+.chat-layout.game-focus-mode .chat-stage .chat-warning,
+.chat-layout.game-focus-mode .chat-stage .chat-error {
+  opacity: 0.76;
+}
+
+.selection-view.bonded-home {
+  gap: 24px;
+}
+
+.selection-hero.bonded-hero {
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  align-items: stretch;
+  gap: 24px;
+}
+
+.selection-focus.pending,
+.selection-focus.bonded {
+  grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.selection-focus-stage {
+  min-height: clamp(430px, 50vw, 760px);
+}
+
+.selection-focus.pending .spiritkin-media-panel.focus,
+.selection-focus.bonded .spiritkin-media-panel.bonded {
+  min-height: clamp(430px, 50vw, 720px);
+}
+
+.spiritkin-intro-video .video-player-wrapper {
+  min-height: clamp(480px, 58vw, 760px);
+}
+
+.entry-stage-copy,
+.spiritcore-welcome-copy {
+  width: min(920px, calc(100% - 32px));
+  padding: 34px 36px;
+}
+
+.entry-requirement-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+}
+
+.entry-requirement-bar strong {
+  color: rgba(255, 244, 220, 0.96);
+}
+
+.entry-requirement-bar span {
+  color: rgba(214, 224, 239, 0.88);
+  line-height: 1.45;
+}
+
+.entry-requirement-bar.is-blocked {
+  border-color: rgba(242, 219, 160, 0.22);
+  background: rgba(242, 219, 160, 0.08);
+}
+
+.entry-requirement-bar.is-ready {
+  border-color: rgba(111, 208, 227, 0.24);
+  background: rgba(111, 208, 227, 0.08);
+}
+
+@media (max-width: 1180px) {
+  .bonded-world-header,
+  .world-shell-header,
+  .bonded-world-grid,
+  .bonded-world-lower,
+  .world-shell-body,
+  .selection-hero.bonded-hero,
+  .selection-focus.pending,
+  .selection-focus.bonded {
+    grid-template-columns: 1fr;
+  }
+
+  .bonded-room-nav,
+  .world-primary-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chat-stage {
+    position: relative;
+    top: auto;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .presence-panel {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .bonded-room-nav,
+  .world-primary-nav,
+  .world-subnav {
+    grid-template-columns: 1fr;
+  }
+
+  .bonded-world-header,
+  .world-shell-header {
+    gap: 16px;
+  }
+
+  .presence-panel,
+  .chat-stage {
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .selection-focus-stage {
+    min-height: clamp(320px, 78vw, 520px);
+  }
+
+  .spiritkin-intro-video .video-player-wrapper {
+    min-height: clamp(340px, 68vw, 520px);
+  }
+
+  .entry-stage-copy,
+  .spiritcore-welcome-copy {
+    width: calc(100% - 20px);
+    padding: 24px 18px;
+  }
+}
+
 /* --- Improved Button Transitions --- */
 .btn {
   transition: background 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease, opacity 0.18s ease;
@@ -4045,6 +4411,232 @@ button:disabled {
 
 .prompt-card:hover {
   transform: translateY(-2px);
+}
+
+/* ============================================================
+   PHASE 1 ROOM-BASED WORLD SHELL OVERRIDES
+   ============================================================ */
+
+.chat-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+
+.world-shell-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.world-shell-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.24fr) minmax(320px, 0.76fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.chat-layout.game-focus-mode .world-shell-body {
+  grid-template-columns: minmax(0, 1.58fr) minmax(260px, 0.42fr);
+}
+
+.presence-panel {
+  position: relative;
+  top: auto;
+  max-height: none;
+  min-height: 920px;
+  padding: 28px;
+  border-left: none;
+  border-top: 2px solid color-mix(in srgb, var(--realm-accent) 30%, transparent);
+  border-radius: 30px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.22);
+}
+
+.presence-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.presence-panel-room {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.presence-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.presence-tab-content {
+  padding: 0 0 12px;
+}
+
+.chat-stage {
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 28px);
+  min-height: 920px;
+  overflow: auto;
+  border-radius: 30px;
+  box-shadow: 0 26px 66px rgba(0, 0, 0, 0.24);
+}
+
+.chat-layout.game-focus-mode .chat-stage {
+  opacity: 0.62;
+  transform: scale(0.985);
+}
+
+.bonded-world-shell,
+.bonded-world-grid,
+.bonded-world-lower,
+.bonded-room-stage,
+.bonded-support-rail {
+  display: grid;
+  gap: 24px;
+}
+
+.bonded-world-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.84fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.bonded-room-nav,
+.world-primary-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.world-subnav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.bonded-world-grid {
+  grid-template-columns: minmax(0, 1.34fr) minmax(300px, 0.66fr);
+  align-items: start;
+}
+
+.bonded-world-lower {
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  align-items: start;
+}
+
+.selection-hero.bonded-hero {
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.selection-focus.pending,
+.selection-focus.bonded {
+  grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.selection-focus-stage {
+  min-height: clamp(430px, 50vw, 760px);
+}
+
+.spiritkin-intro-video .video-player-wrapper {
+  min-height: clamp(480px, 58vw, 760px);
+}
+
+.entry-stage-copy,
+.spiritcore-welcome-copy {
+  width: min(920px, calc(100% - 32px));
+  padding: 34px 36px;
+}
+
+.entry-requirement-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+}
+
+.entry-requirement-bar.is-blocked {
+  border-color: rgba(242, 219, 160, 0.22);
+  background: rgba(242, 219, 160, 0.08);
+}
+
+.entry-requirement-bar.is-ready {
+  border-color: rgba(111, 208, 227, 0.24);
+  background: rgba(111, 208, 227, 0.08);
+}
+
+@media (max-width: 1180px) {
+  .world-shell-header,
+  .world-shell-body,
+  .bonded-world-header,
+  .bonded-world-grid,
+  .bonded-world-lower,
+  .selection-hero.bonded-hero,
+  .selection-focus.pending,
+  .selection-focus.bonded {
+    grid-template-columns: 1fr;
+  }
+
+  .bonded-room-nav,
+  .world-primary-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chat-stage {
+    position: relative;
+    top: auto;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .presence-panel {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .bonded-room-nav,
+  .world-primary-nav,
+  .world-subnav {
+    grid-template-columns: 1fr;
+  }
+
+  .presence-panel,
+  .chat-stage {
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .selection-focus-stage {
+    min-height: clamp(320px, 78vw, 520px);
+  }
+
+  .spiritkin-intro-video .video-player-wrapper {
+    min-height: clamp(340px, 68vw, 520px);
+  }
+
+  .entry-stage-copy,
+  .spiritcore-welcome-copy {
+    width: calc(100% - 20px);
+    padding: 24px 18px;
+  }
 }
 
 /* ============================================================
@@ -7088,7 +7680,197 @@ button[data-action="begin-quest"]:active,
     justify-content: flex-start;
   }
 
-  .temporal-world-head {
+.temporal-world-head {
     flex-direction: column;
+  }
+}
+
+/* ============================================================
+   PHASE 1 FINAL LAYOUT OVERRIDES
+   ============================================================ */
+
+.chat-layout {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+
+.world-shell-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.world-shell-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.24fr) minmax(320px, 0.76fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.chat-layout.game-focus-mode .world-shell-body {
+  grid-template-columns: minmax(0, 1.58fr) minmax(260px, 0.42fr);
+}
+
+.presence-panel {
+  position: relative;
+  top: auto;
+  max-height: none;
+  min-height: 920px;
+  padding: 28px;
+  border-left: none;
+  border-top: 2px solid color-mix(in srgb, var(--realm-accent) 30%, transparent);
+  border-radius: 30px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.22);
+}
+
+.presence-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.presence-tab-content {
+  padding: 0 0 12px;
+}
+
+.chat-stage {
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 28px);
+  min-height: 920px;
+  overflow: auto;
+  border-radius: 30px;
+  box-shadow: 0 26px 66px rgba(0, 0, 0, 0.24);
+}
+
+.chat-layout.game-focus-mode .chat-stage {
+  opacity: 0.62;
+  transform: scale(0.985);
+}
+
+.bonded-world-shell {
+  display: grid;
+  gap: 24px;
+}
+
+.bonded-world-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.84fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.bonded-room-nav,
+.world-primary-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.world-subnav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.bonded-world-grid,
+.bonded-world-lower {
+  display: grid;
+  gap: 24px;
+}
+
+.bonded-world-grid {
+  grid-template-columns: minmax(0, 1.34fr) minmax(300px, 0.66fr);
+  align-items: start;
+}
+
+.bonded-world-lower {
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  align-items: start;
+}
+
+.selection-hero.bonded-hero {
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.selection-focus.pending,
+.selection-focus.bonded {
+  grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.selection-focus-stage {
+  min-height: clamp(430px, 50vw, 760px);
+}
+
+.spiritkin-intro-video .video-player-wrapper {
+  min-height: clamp(480px, 58vw, 760px);
+}
+
+.entry-stage-copy,
+.spiritcore-welcome-copy {
+  width: min(920px, calc(100% - 32px));
+  padding: 34px 36px;
+}
+
+@media (max-width: 1180px) {
+  .world-shell-header,
+  .world-shell-body,
+  .bonded-world-header,
+  .bonded-world-grid,
+  .bonded-world-lower,
+  .selection-hero.bonded-hero,
+  .selection-focus.pending,
+  .selection-focus.bonded {
+    grid-template-columns: 1fr;
+  }
+
+  .bonded-room-nav,
+  .world-primary-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chat-stage {
+    position: relative;
+    top: auto;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .presence-panel {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .bonded-room-nav,
+  .world-primary-nav,
+  .world-subnav {
+    grid-template-columns: 1fr;
+  }
+
+  .presence-panel,
+  .chat-stage {
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .selection-focus-stage {
+    min-height: clamp(320px, 78vw, 520px);
+  }
+
+  .spiritkin-intro-video .video-player-wrapper {
+    min-height: clamp(340px, 68vw, 520px);
+  }
+
+  .entry-stage-copy,
+  .spiritcore-welcome-copy {
+    width: calc(100% - 20px);
+    padding: 24px 18px;
   }
 }
