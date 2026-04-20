@@ -454,19 +454,28 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 8px 0;
-  border-radius: 18px;
+  padding: 16px 14px;
+  border-radius: 24px;
   overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)),
+    radial-gradient(circle at center top, var(--game-accent-soft) 0%, transparent 58%),
+    var(--game-room-art, none) center / cover no-repeat,
+    rgba(5, 10, 18, 0.68);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 20px 42px rgba(0,0,0,0.26);
 }
 .game-board-container::after {
   content: "";
   position: absolute;
-  inset: 2px;
-  border-radius: 16px;
+  inset: 8px;
+  border-radius: 20px;
   background:
     var(--game-board-fx, none) center / 34% no-repeat,
     var(--game-ui-frame, none) center / cover no-repeat;
-  opacity: 0.14;
+  opacity: 0.18;
   pointer-events: none;
 }
 
@@ -484,13 +493,16 @@
 .game-board-container::before {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: 12px;
+  border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(6, 10, 18, 0.08), rgba(6, 10, 18, 0.18)),
-    var(--game-board-art, none);
-  background-size: cover;
-  background-position: center;
-  opacity: 0.96;
+    linear-gradient(180deg, rgba(6, 10, 18, 0.02), rgba(6, 10, 18, 0.1)),
+    var(--game-board-art, none) center / cover no-repeat;
+  opacity: 0.98;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.05),
+    inset 0 22px 30px rgba(255,255,255,0.03),
+    inset 0 -26px 36px rgba(4, 8, 16, 0.26);
   pointer-events: none;
 }
 
@@ -525,19 +537,19 @@
   display: grid;
   gap: 12px;
   width: 100%;
-  padding: 14px;
-  border-radius: 22px;
+  padding: 18px;
+  border-radius: 26px;
   border: 1px solid rgba(255,255,255,0.08);
   background:
-    linear-gradient(180deg, rgba(4, 7, 14, 0.16), rgba(4, 7, 14, 0.34)),
-    var(--game-room-art, none),
+    linear-gradient(180deg, rgba(4, 7, 14, 0.08), rgba(4, 7, 14, 0.2)),
     radial-gradient(circle at top, var(--game-accent-soft) 0%, transparent 56%),
+    var(--game-room-art, none),
     linear-gradient(180deg, var(--game-surface-top) 0%, var(--game-surface-bottom) 100%);
-  background-size: cover, cover, auto, auto;
+  background-size: cover, auto, cover, auto;
   background-position: center, center, center, center;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.06),
-    0 18px 36px var(--game-shadow),
+    0 24px 46px var(--game-shadow),
     0 0 0 1px rgba(255,255,255,0.03);
   overflow: hidden;
 }
@@ -547,11 +559,12 @@
   position: absolute;
   inset: 0;
   background:
+    linear-gradient(180deg, rgba(255,255,255,0.08), transparent 30%, rgba(4,7,14,0.12) 100%),
     radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--game-accent) 20%, transparent) 0%, transparent 28%),
     radial-gradient(circle at 82% 18%, rgba(255,255,255,0.08), transparent 24%),
     linear-gradient(135deg, rgba(255,255,255,0.08), transparent 34%, transparent 66%, rgba(255,255,255,0.03)),
     var(--game-overlay-fx, none) center / 46% no-repeat;
-  opacity: 0.96;
+  opacity: 0.9;
   pointer-events: none;
 }
 
@@ -564,7 +577,7 @@
   background:
     var(--game-modal-frame, none) center / cover no-repeat,
     var(--game-accent-art, none) right -12px top 10px / min(38%, 220px) auto no-repeat;
-  opacity: 0.38;
+  opacity: 0.5;
   pointer-events: none;
 }
 

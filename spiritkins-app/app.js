@@ -2695,6 +2695,21 @@ function syncSessionControlSoon(overrides = {}, options = {}) {
   Promise.resolve().then(() => syncSessionControl(overrides, options)).catch(() => {});
 }
 
+function getPresenceSurfaceFocusSelector(tab) {
+  if (tab === "games") {
+    return state.activeGame
+      ? ".active-game-panel, [data-focus-anchor='presence-games']"
+      : "[data-focus-anchor='presence-games'], .games-view";
+  }
+  if (tab === "profile") return "[data-focus-anchor='presence-profile'], .presence-summary";
+  if (tab === "echoes") return "[data-focus-anchor='presence-echoes'], .echoes-library";
+  if (tab === "charter") return "[data-focus-anchor='presence-charter'], .charter-view";
+  if (tab === "journal") return "[data-focus-anchor='presence-journal'], .bond-journal-view";
+  if (tab === "events") return "[data-focus-anchor='presence-events'], .sv-events-panel";
+  if (tab === "quest") return "[data-focus-anchor='presence-quest'], .sv-quest-panel";
+  return ".presence-tab-content";
+}
+
 function deriveModeForSurface(surface) {
   if (!state.entryAccepted || state.showCrownGateHome || state.spiritverseTrailerActive || state.spiritCoreWelcoming) return "entry";
   if (surface === "games" && state.activeGame?.status === "active") return "game";
@@ -2738,9 +2753,7 @@ async function transitionPresenceSurface(tab, options = {}) {
   persistSession();
   render();
   revealCurrentFocus({
-    selector: tab === "games" && state.activeGame
-      ? ".active-game-panel"
-      : ".presence-tab-content",
+    selector: getPresenceSurfaceFocusSelector(tab),
   });
   if (announce && tab !== previousTab) {
     narratePresenceTab(tab).catch(() => {});
@@ -4225,6 +4238,7 @@ function goHome() {
     speechState: { turnPhase: "complete" },
   });
   render();
+  revealCurrentFocus({ selector: "[data-focus-anchor='entry-copy'], .entry-screen-gate" });
 }
 
 function startFreshSession() {
@@ -6503,6 +6517,11 @@ async function submitIssueReport() {
   } finally {
     state.issueReportSubmitting = false;
     render();
+    revealCurrentFocus({
+      selector: state.issueReportStatus
+        ? "[data-focus-anchor='issue-status'], [data-focus-anchor='issue-fab']"
+        : "[data-focus-anchor='issue-panel'], [data-focus-anchor='issue-fab']",
+    });
   }
 }
 
@@ -6560,7 +6579,7 @@ function buildWorldPulse() {
 function buildTopbar() {
   const active = state.primarySpiritkin;
   return `
-    <header class="topbar">
+    <header class="topbar" data-focus-anchor="topbar">
       <button class="topbar-brand topbar-home" data-action="go-home" title="Return to the Spiritverse home">
         <div class="topbar-logo">SV</div>
         <div>
@@ -6588,16 +6607,16 @@ function buildIssueReporter() {
   return `
     <div class="issue-reporter ${state.issueReporterOpen ? "open" : ""}">
       ${status ? `
-        <div class="issue-status issue-status-${esc(status.kind)}">
+        <div class="issue-status issue-status-${esc(status.kind)}" data-focus-anchor="issue-status">
           <span>${esc(status.text)}</span>
           <button class="issue-status-close" data-action="dismiss-issue-status" aria-label="Dismiss issue status">×</button>
         </div>
       ` : ""}
-      <button class="issue-reporter-fab" data-action="toggle-issue-reporter" aria-expanded="${state.issueReporterOpen ? "true" : "false"}">
+      <button class="issue-reporter-fab" data-action="toggle-issue-reporter" aria-expanded="${state.issueReporterOpen ? "true" : "false"}" data-focus-anchor="issue-fab">
         <span class="issue-reporter-fab-label">Something not working right?</span>
       </button>
       ${state.issueReporterOpen ? `
-        <div class="issue-reporter-panel">
+        <div class="issue-reporter-panel" data-focus-anchor="issue-panel">
           <div class="issue-reporter-head">
             <div>
               <div class="panel-label">Beta Feedback</div>
@@ -6756,7 +6775,7 @@ function buildCrownGateEntry() {
       </div>
       <div class="entry-gate-scrim"></div>
       <div class="entry-gate-shell">
-        <div class="entry-copy ${state.entryVideoStarted ? "entry-copy-hidden" : ""}">
+        <div class="entry-copy ${state.entryVideoStarted ? "entry-copy-hidden" : ""}" data-focus-anchor="entry-copy">
           ${buildCompositeVisualFrame(
             COMPOSITE_VISUAL_ASSETS.spiritcore.gate,
             canonicalWorldAssetUrl(WORLD_ART.baseTheme),
@@ -6919,7 +6938,7 @@ function buildMain() {
 
 function buildBondSelectionView() {
   return `
-    <section class="selection-view">
+    <section class="selection-view" data-focus-anchor="bond-selection">
       <div class="selection-hero">
         <div class="selection-copy">
           <p class="eyebrow">Primary companion</p>
@@ -6974,7 +6993,7 @@ function buildBondedHomeView() {
   const spiritkin = state.primarySpiritkin;
   const { currentBond } = getBondStateForSpiritkin(spiritkin.name);
   return `
-    <section class="selection-view bonded-home ${esc(spiritkin.ui.cls)}">
+    <section class="selection-view bonded-home ${esc(spiritkin.ui.cls)}" data-focus-anchor="bonded-home">
       <div class="selection-hero bonded-hero">
         ${buildBondPreview(spiritkin, false)}
         <div class="bond-home-copy panel-card">
@@ -7085,7 +7104,11 @@ function buildBondPreview(spiritkin, pending) {
     <div class="selection-focus ${esc(spiritkin.ui.cls)} ${pending ? "pending" : "bonded"}">
       <div class="selection-focus-stage">
         ${introVideo ? `
-          <div class="spiritkin-intro-video">
+          <div class="spiritkin-intro-video" data-focus-anchor="spiritkin-trailer">
+            <div class="spiritkin-intro-stage-head">
+              <div class="panel-label">Primary reveal</div>
+              <div class="spiritkin-intro-stage-note">This is the main trailer surface for ${esc(spiritkin.name)} before bonding.</div>
+            </div>
             <div class="video-player-container spiritkin-intro">
               <div class="video-player-wrapper spiritkin-intro">
                 <video
@@ -7292,7 +7315,7 @@ function buildChatView() {
           <button class="presence-tab ${state.activePresenceTab === 'quest' ? 'active' : ''} ${state.pendingPresenceTab === 'quest' ? 'loading' : ''}" data-action="set-presence-tab" data-tab="quest">Daily Quest</button>
         </div>
 
-        <div class="presence-tab-content ${state.pendingPresenceTab ? 'is-switching' : ''}">
+        <div class="presence-tab-content ${state.pendingPresenceTab ? 'is-switching' : ''}" data-focus-anchor="presence-${esc(state.activePresenceTab)}" data-presence-surface="${esc(state.activePresenceTab)}">
           <div class="presence-tab-tools">
             ${state.pendingPresenceTab ? `<div class="surface-loading-chip"><div class="spinner-sm"></div><span>Opening ${esc(state.pendingPresenceTab.replace("_", " "))}...</span></div>` : ""}
             ${buildReadAloudButton(state.activePresenceTab)}

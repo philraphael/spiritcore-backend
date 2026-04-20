@@ -268,6 +268,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 20px;
   padding: 14px 18px;
   margin-bottom: 20px;
@@ -292,6 +293,7 @@ button:disabled {
 
 .topbar-brand {
   gap: 14px;
+  min-width: 0;
 }
 
 .topbar-home {
@@ -367,6 +369,7 @@ button:disabled {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+  max-width: 100%;
 }
 
 .presence-panel-head,
@@ -1030,7 +1033,8 @@ button:disabled {
 
 .selection-view {
   display: grid;
-  gap: 22px;
+  gap: 26px;
+  scroll-margin-top: 88px;
 }
 
 .selection-heading {
@@ -1042,8 +1046,8 @@ button:disabled {
 
 .selection-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(380px, 0.9fr);
-  gap: 22px;
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 0.96fr);
+  gap: 26px;
   align-items: start;
 }
 
@@ -1077,13 +1081,26 @@ button:disabled {
 }
 
 .entry-visual-shell {
-  margin-bottom: 16px;
-  min-height: 160px;
+  margin-bottom: 8px;
+  min-height: clamp(112px, 15vw, 148px);
 }
 
 .entry-visual-shell.arrival,
 .entry-visual-shell.spiritcore {
   min-height: 180px;
+}
+
+.entry-visual-shell .composite-visual-frame {
+  min-height: inherit;
+  border-color: rgba(242, 219, 160, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015)),
+    radial-gradient(circle at center top, rgba(242, 219, 160, 0.18), transparent 54%);
+}
+
+.entry-visual-shell .composite-visual-primary,
+.entry-visual-shell .composite-visual-fallback {
+  object-position: center 18%;
 }
 
 .spiritkin-media-panel {
@@ -1387,7 +1404,7 @@ button:disabled {
 }
 
 .bonded-hero {
-  align-items: stretch;
+  align-items: start;
 }
 
 .bond-home-copy {
@@ -1436,6 +1453,7 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+  align-items: start;
 }
 
 .chat-layout {
@@ -2203,6 +2221,18 @@ button:disabled {
   .presence-panel {
     order: -1;
   }
+
+  .topbar-right {
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .topbar-right::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @media (max-width: 760px) {
@@ -2214,6 +2244,15 @@ button:disabled {
   .topbar {
     border-radius: 28px;
     padding: 14px;
+  }
+
+  .topbar-name {
+    font-size: 1.2rem;
+  }
+
+  .topbar-right {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .entry-copy,
@@ -3263,6 +3302,18 @@ button:disabled {
   animation: slideInUp 0.5s ease-out;
 }
 
+.spiritkin-intro-stage-head {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.spiritkin-intro-stage-note {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 @keyframes slideInUp {
   from {
     opacity: 0;
@@ -3295,7 +3346,7 @@ button:disabled {
 
 .spiritkin-intro-video .video-player-wrapper {
   max-width: 100%;
-  min-height: clamp(240px, 34vw, 420px);
+  min-height: clamp(260px, 36vw, 440px);
   border-radius: 22px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
   overflow: hidden;
@@ -3960,6 +4011,7 @@ button:disabled {
   transition: opacity 0.18s ease, transform 0.18s ease;
   min-width: 0;
   overscroll-behavior: contain;
+  scroll-margin-top: 84px;
 }
 
 .presence-tab-content.is-switching {
@@ -4329,6 +4381,7 @@ button:disabled {
   flex-direction: column;
   gap: 16px;
   animation: fadeIn 0.4s ease-out;
+  scroll-margin-top: 88px;
 }
 
 .games-intro {
@@ -4380,6 +4433,7 @@ button:disabled {
   flex-direction: column;
   gap: 14px;
   animation: fadeIn 0.35s ease-out;
+  scroll-margin-top: 88px;
 }
 
 .game-help-panel {
@@ -6441,6 +6495,7 @@ button[data-action="begin-quest"]:active,
   width: min(420px, calc(100vw - 24px));
   padding: 18px;
   border-radius: 22px;
+  scroll-margin-bottom: 24px;
 }
 
 .issue-reporter-head,
