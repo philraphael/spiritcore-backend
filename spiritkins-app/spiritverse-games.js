@@ -103,7 +103,8 @@ function themeVarsToStyle(theme, assetUrls = {}) {
     "--game-token-spirit": cssUrlValue(assetUrls.tokenSpiritUrl),
     "--game-token-accent": cssUrlValue(assetUrls.tokenAccentUrl),
     "--game-overlay-fx": cssUrlValue(assetUrls.overlayUrl),
-    "--game-modal-frame": cssUrlValue(assetUrls.frameUrl)
+    "--game-modal-frame": cssUrlValue(assetUrls.frameUrl),
+    "--game-ui-frame": cssUrlValue(assetUrls.frameUrl)
   };
   return Object.entries(vars)
     .map(([key, value]) => `${key}: ${value}`)
@@ -116,6 +117,25 @@ function resolveThemeAssetPackage(type, theme) {
 
 function resolveRuntimeTokenUrl(type, variant = "user") {
   return resolveGameAsset(type, "pieces", variant)?.publicPath || "";
+}
+
+function findConnectFourWinningLine(board = []) {
+  if (!Array.isArray(board) || board.length !== 42) return [];
+  const lines = [];
+  for (let row = 0; row < 6; row++) {
+    for (let col = 0; col < 7; col++) {
+      if (col <= 3) lines.push([row * 7 + col, row * 7 + col + 1, row * 7 + col + 2, row * 7 + col + 3]);
+      if (row <= 2) lines.push([row * 7 + col, (row + 1) * 7 + col, (row + 2) * 7 + col, (row + 3) * 7 + col]);
+      if (row <= 2 && col <= 3) lines.push([row * 7 + col, (row + 1) * 7 + col + 1, (row + 2) * 7 + col + 2, (row + 3) * 7 + col + 3]);
+      if (row <= 2 && col >= 3) lines.push([row * 7 + col, (row + 1) * 7 + col - 1, (row + 2) * 7 + col - 2, (row + 3) * 7 + col - 3]);
+    }
+  }
+  for (const line of lines) {
+    const token = board[line[0]];
+    if (!token) continue;
+    if (line.every((index) => board[index] === token)) return line;
+  }
+  return [];
 }
 
 function resolveThemeEnvironmentOverrides(theme) {
@@ -609,9 +629,7 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, l
       if (piece) {
         const isKing = piece.includes('king');
         const colorClass = piece.includes('white') ? 'piece-user' : 'piece-spiritkin';
-        html += `<div class="checkers-piece ${colorClass} ${isKing ? 'piece-king' : ''}">
-          ${isKing ? '<span class="king-crown">♔</span>' : ''}
-        </div>`;
+        html += `<div class="checkers-piece ${colorClass} ${isKing ? 'piece-king' : ''}"></div>`;
       }
       if (isValid && !piece) html += `<div class="checkers-move-dot"></div>`;
       html += `</div>`;
@@ -658,6 +676,7 @@ function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpande
   const board = boardArray || Array(size * size).fill(null);
   const goUserStone = resolveRuntimeTokenUrl("go", "user");
   const goSpiritStone = resolveRuntimeTokenUrl("go", "spiritkin");
+  const goHintOverlay = resolveGameAsset("go", "overlays", "hoshi")?.publicPath || "";
 
   let html = '';
   if (!isExpanded) {
@@ -682,7 +701,7 @@ function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpande
       html += `<div class="${cellClass}" data-idx="${idx}" ${isInteractive ? 'data-action="go-square-click"' : ''}>
         <div class="go-line-h"></div>
         <div class="go-line-v"></div>
-        <div class="go-hover-indicator"></div>`;
+        <div class="go-hover-indicator"${goHintOverlay ? ` style="background-image:url('${escapeAttribute(goHintOverlay)}')"` : ""}></div>`;
       
       if (piece) {
         const stoneClass = piece === 'black' ? 'go-stone-black' : 'go-stone-white';
@@ -1309,6 +1328,8 @@ export const SpiritverseGames = {
     const isUsersTurn = !finished && gameData.turn === 'user';
     const userToken = resolveRuntimeTokenUrl("connect_four", "user");
     const spiritToken = resolveRuntimeTokenUrl("connect_four", "spiritkin");
+    const emptyToken = resolveRuntimeTokenUrl("connect_four", "empty");
+    const winningLine = new Set(findConnectFourWinningLine(board));
     const lastDropIndex =
       gameData.lastMove && Number.isInteger(gameData.lastMove.col)
         ? (() => {
@@ -1338,8 +1359,8 @@ export const SpiritverseGames = {
                 ? `<span class="connect4-token connect4-token-user ${lastDropIndex === idx ? 'connect4-token-drop' : ''}" aria-hidden="true">${buildRuntimePieceImage(userToken, "User token", "connect4-token-image")}</span>`
                 : cell === 'S'
                   ? `<span class="connect4-token connect4-token-spiritkin ${lastDropIndex === idx ? 'connect4-token-drop' : ''}" aria-hidden="true">${buildRuntimePieceImage(spiritToken, "Spiritkin token", "connect4-token-image")}</span>`
-                  : '';
-            return `<button class="sv-mini-cell connect4-cell ${cell === 'U' ? 'user' : cell === 'S' ? 'spiritkin' : ''} ${lastDropIndex === idx ? 'connect4-last-drop' : ''}" data-action="connect4-column-click" data-col="${idx % 7}" ${!isUsersTurn ? "disabled" : ""}>${token}</button>`;
+                  : `<span class="connect4-token connect4-token-empty" aria-hidden="true">${buildRuntimePieceImage(emptyToken, "Empty slot", "connect4-token-image")}</span>`;
+            return `<button class="sv-mini-cell connect4-cell ${cell === 'U' ? 'user' : cell === 'S' ? 'spiritkin' : ''} ${lastDropIndex === idx ? 'connect4-last-drop' : ''} ${winningLine.has(idx) ? 'connect4-winning-cell' : ''}" data-action="connect4-column-click" data-col="${idx % 7}" ${!isUsersTurn ? "disabled" : ""}>${token}</button>`;
           }).join('')}
         </div>
         <div class="sv-mini-caption">${gameData.result?.isDraw ? 'The board filled into a draw.' : gameData.winner ? `${gameData.winner === 'U' ? 'You' : 'Spiritkin'} connected four.` : (isUsersTurn ? 'Drop a star into any column.' : 'The Spiritkin is reading the column structure.')}</div>

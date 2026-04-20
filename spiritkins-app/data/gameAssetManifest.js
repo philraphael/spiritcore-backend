@@ -69,7 +69,9 @@ export const GAME_ASSET_MANIFEST = {
       loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
       check: activeAsset("ui", "chess_check_banner.png"),
       checkmate: activeAsset("ui", "chess_checkmate_banner.png"),
-      frame: activeAsset("ui", "modal_frame_premium.png")
+      frame: activeAsset("ui", "ui-board-frame-ornate.png", {
+        notes: "Wave 4B ornate board frame is the authoritative shared game frame."
+      })
     },
     fallback: runtimeFallback("chess", "Current chess renderer uses inline SVG pieces and ACTIVE shell art.")
   },
@@ -86,9 +88,13 @@ export const GAME_ASSET_MANIFEST = {
       default: activeAsset("pieces", "checkers_piece_family_v4a.png", {
         notes: "Wave 4A checkers family crop used as shell accent support."
       }),
-      user: activeAsset("pieces", "checkers_piece_light_single_v3.png"),
-      spiritkin: activeAsset("pieces", "checkers_piece_dark_single_v3.png"),
-      king: activeAsset("pieces", "checkers_piece_set_alt_v2.png")
+      user: activeAsset("pieces", "checkers-piece-white.png"),
+      spiritkin: activeAsset("pieces", "checkers-piece-black.png"),
+      userKing: activeAsset("pieces", "checkers-piece-white-king.png"),
+      spiritkinKing: activeAsset("pieces", "checkers-piece-black-king.png"),
+      king: activeAsset("pieces", "checkers-piece-white-king.png", {
+        notes: "Wave 4B king render promoted for direct runtime use; renderer selects color-specific king slots."
+      })
     },
     cards: {
       default: activeAsset("pieces", "checkers_pieces_set.png")
@@ -97,8 +103,8 @@ export const GAME_ASSET_MANIFEST = {
       default: activeAsset("rooms", "room_checkers_dragonforge_scene.png")
     },
     overlays: {
-      selection: activeAsset("fx", "checkers_move_marker_v4a.png", {
-        notes: "Wave 4A move-marker family used as premium selection FX."
+      selection: activeAsset("fx", "checkers-overlay-selected.png", {
+        notes: "Wave 4B selected overlay replaces the earlier Wave 4A support marker."
       })
     },
     ui: {
@@ -106,7 +112,7 @@ export const GAME_ASSET_MANIFEST = {
       thinking: activeAsset("ui", "spiritkin_thinking_banner_v1.png"),
       win: activeAsset("ui", "checkers_you_won_banner.png"),
       loss: activeAsset("ui", "checkers_you_lost_banner.png"),
-      frame: activeAsset("ui", "modal_frame_premium.png")
+      frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
     fallback: runtimeFallback("checkers", "Current checkers renderer uses CSS discs over ACTIVE board and room art.")
   },
@@ -123,8 +129,8 @@ export const GAME_ASSET_MANIFEST = {
       default: activeAsset("tokens", "tictactoe_token_family_v4a.png", {
         notes: "Wave 4A token family used as shell accent support."
       }),
-      user: activeAsset("tokens", "tictactoe_x_single_v3.png"),
-      spiritkin: activeAsset("tokens", "tictactoe_o_single_v3.png")
+      user: activeAsset("tokens", "tictactoe-x.png"),
+      spiritkin: activeAsset("tokens", "tictactoe-o.png")
     },
     cards: {
       default: activeAsset("tokens", "tictactoe_tokens_forest_set.png")
@@ -140,7 +146,7 @@ export const GAME_ASSET_MANIFEST = {
       thinking: activeAsset("ui", "spiritkin_thinking_banner_v1.png"),
       win: activeAsset("ui", "generic_you_won_banner_large.png"),
       loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
-      frame: activeAsset("ui", "modal_frame_premium.png")
+      frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
     fallback: runtimeFallback("tictactoe", "Current tic-tac-toe renderer uses CSS cells over ACTIVE concept and room art.")
   },
@@ -154,12 +160,13 @@ export const GAME_ASSET_MANIFEST = {
       })
     },
     pieces: {
-      default: activeAsset("tokens", "connect4_disc_family_v4a.png", {
-        notes: "Wave 4A disc family used as shell accent support."
+      default: activeAsset("tokens", "connect4-disc-empty.png", {
+        notes: "Wave 4B empty slot disc is now the primary direct runtime placeholder token."
       }),
-      user: activeAsset("tokens", "connect4_disc_blue_single_v3.png"),
-      spiritkin: activeAsset("tokens", "connect4_disc_purple_single_v3.png"),
-      accent: activeAsset("tokens", "connect4_disc_gold_single_v3.png")
+      user: activeAsset("tokens", "connect4-disc-yellow.png"),
+      spiritkin: activeAsset("tokens", "connect4-disc-red.png"),
+      empty: activeAsset("tokens", "connect4-disc-empty.png"),
+      accent: activeAsset("tokens", "connect4-disc-empty.png")
     },
     cards: {
       default: activeAsset("tokens", "connect4_disc_set_v1.png")
@@ -168,8 +175,11 @@ export const GAME_ASSET_MANIFEST = {
       default: activeAsset("rooms", "room_connect4_waterfall_scene.png")
     },
     overlays: {
-      dropTrail: activeAsset("fx", "connect4_fx_family_v4a.png", {
-        notes: "Wave 4A Connect Four FX family used as board chrome overlay."
+      dropTrail: activeAsset("fx", "connect4-overlay-hover.png", {
+        notes: "Wave 4B column hover overlay replaces the interim Wave 4A FX family for direct board interaction."
+      }),
+      winLine: activeAsset("fx", "connect4-overlay-win.png", {
+        notes: "Wave 4B win overlay used on resolved winning cells."
       })
     },
     ui: {
@@ -177,7 +187,7 @@ export const GAME_ASSET_MANIFEST = {
       thinking: activeAsset("ui", "spiritkin_thinking_banner_v1.png"),
       win: activeAsset("ui", "generic_you_won_banner_large.png"),
       loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
-      frame: activeAsset("ui", "modal_frame_premium.png")
+      frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
     fallback: runtimeFallback("connect_four", "Current connect-four renderer uses ACTIVE token discs and shell art.")
   },
@@ -191,15 +201,17 @@ export const GAME_ASSET_MANIFEST = {
       })
     },
     pieces: {
-      default: activeAsset("ships", "battleship_ship_family_v4a.png", {
-        notes: "Wave 4A ship family used as shell accent support."
+      default: activeAsset("ships", "battleship-ship-battleship.png", {
+        notes: "Wave 4B isolated battleship-class ship is now the primary shell accent."
       }),
-      shipSet: activeAsset("ships", "battleship_ship_set_v2.png"),
-      user: activeAsset("ships", "battleship_hit_marker_v3.png"),
-      spiritkin: activeAsset("ships", "battleship_miss_marker_v3.png")
+      shipSet: activeAsset("ships", "battleship-ship-carrier.png"),
+      user: activeAsset("ships", "battleship-marker-hit.png"),
+      spiritkin: activeAsset("ships", "battleship-marker-miss.png")
     },
     cards: {
-      default: activeAsset("ships", "battleship_forge_ships_set.png")
+      default: activeAsset("ships", "battleship-ship-cruiser.png", {
+        notes: "Wave 4B cruiser fills the support card slot because the final pack delivers isolated ships rather than a family sheet."
+      })
     },
     room: {
       default: activeAsset("rooms", "room_battleship_forge_scene.png")
@@ -214,7 +226,7 @@ export const GAME_ASSET_MANIFEST = {
       thinking: activeAsset("ui", "spiritkin_thinking_banner_v1.png"),
       win: activeAsset("ui", "generic_you_won_banner_large.png"),
       loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
-      frame: activeAsset("ui", "modal_frame_premium.png")
+      frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
     fallback: runtimeFallback("battleship", "Current battleship renderer uses CSS grid markers over ACTIVE forge scene art.")
   },
@@ -273,25 +285,25 @@ export const GAME_ASSET_MANIFEST = {
       default: activeAsset("boards", "go_board_aquatic_base.png")
     },
     pieces: {
-      default: activeAsset("tokens", "go_stone_family_v4a_right.png", {
-        notes: "Wave 4A stone family crop used as shell accent support."
+      default: activeAsset("tokens", "go-stone-white.png", {
+        notes: "Wave 4B isolated stones replace interim v3 singles for direct runtime use."
       }),
-      user: activeAsset("tokens", "go_stone_white_single_v3.png"),
-      spiritkin: activeAsset("tokens", "go_stone_black_single_v3.png"),
-      blackStone: activeAsset("tokens", "go_stone_black_single_v3.png"),
-      whiteStone: activeAsset("tokens", "go_stone_white_single_v3.png")
+      user: activeAsset("tokens", "go-stone-white.png"),
+      spiritkin: activeAsset("tokens", "go-stone-black.png"),
+      blackStone: activeAsset("tokens", "go-stone-black.png"),
+      whiteStone: activeAsset("tokens", "go-stone-white.png")
     },
     cards: {
       default: activeAsset("tokens", "go_stone_family_v4a_left.png", {
-        notes: "Wave 4A left stone family used as support-layer shell art."
+        notes: "Wave 4A support sheet is preserved as shell art because Wave 4B only supplies isolated stones."
       })
     },
     room: {
       default: activeAsset("rooms", "room_go_aquatic_scene.png")
     },
     overlays: {
-      hoshi: activeAsset("fx", "go_ring_overlay_family_v4a.png", {
-        notes: "Wave 4A ring family used as preview overlay support."
+      hoshi: activeAsset("fx", "go-overlay-hint.png", {
+        notes: "Wave 4B hint overlay replaces the earlier Wave 4A preview ring as the direct hover cue."
       })
     },
     ui: {
@@ -299,7 +311,7 @@ export const GAME_ASSET_MANIFEST = {
       thinking: activeAsset("ui", "spiritkin_thinking_banner_v1.png"),
       win: activeAsset("ui", "generic_you_won_banner_large.png"),
       loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
-      frame: activeAsset("ui", "modal_frame_premium.png")
+      frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
     fallback: runtimeFallback("go", "Current go renderer uses CSS stones over ACTIVE board and room art.")
   },
@@ -319,10 +331,10 @@ export const GAME_ASSET_MANIFEST = {
     },
     overlays: {
       spotlight: activeAsset("fx", "portal_beam_fx_blue_v1.png"),
-      frame: activeAsset("ui", "modal_frame_premium.png")
+      frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
     ui: {
-      frame: activeAsset("ui", "modal_frame_premium.png")
+      frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
     fallback: runtimeFallback("grand_stage", "Current grand-stage experience uses ACTIVE fullscreen shell assets.")
   }

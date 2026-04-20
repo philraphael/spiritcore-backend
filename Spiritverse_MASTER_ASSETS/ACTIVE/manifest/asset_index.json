@@ -278,8 +278,8 @@
     {
         "filename":  "checkers-overlay-selected.png",
         "category":  "fx",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess_overlay_set_v4a.png",
@@ -290,26 +290,38 @@
     {
         "filename":  "chess-overlay-capture.png",
         "category":  "fx",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-overlay-selected.png",
         "category":  "fx",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-overlay-valid-move.png",
         "category":  "fx",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "connect4_fx_family_v4a.png",
         "category":  "fx",
         "originalSourceFolder":  "wave4a_production_assets",
         "resolution":  null
+    },
+    {
+        "filename":  "connect4-overlay-hover.png",
+        "category":  "fx",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
+        "filename":  "connect4-overlay-win.png",
+        "category":  "fx",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "crosshair_glow_v2.png",
@@ -322,6 +334,12 @@
         "category":  "fx",
         "originalSourceFolder":  "wave4a_production_assets",
         "resolution":  null
+    },
+    {
+        "filename":  "go-overlay-hint.png",
+        "category":  "fx",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "move_highlight_ring.png",
@@ -358,6 +376,24 @@
         "category":  "fx",
         "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
         "resolution":  "270x150"
+    },
+    {
+        "filename":  "ui-defeat-shadow.png",
+        "category":  "fx",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
+        "filename":  "ui-particle-glow.png",
+        "category":  "fx",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
+        "filename":  "ui-victory-aura.png",
+        "category":  "fx",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "checkers_piece_dark_single_v3.png",
@@ -398,26 +434,26 @@
     {
         "filename":  "checkers-piece-black.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "checkers-piece-black-king.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "checkers-piece-white.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "checkers-piece-white-king.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess_dark_bishop_single_v3.png",
@@ -524,74 +560,74 @@
     {
         "filename":  "chess-piece-bishop-black.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-piece-bishop-white.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-piece-king-black.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-piece-king-white.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-piece-knight-black.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-piece-knight-white.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-piece-pawn-black.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-piece-pawn-white.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-piece-queen-black.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-piece-queen-white.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-piece-rook-black.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "chess-piece-rook-white.png",
         "category":  "pieces",
-        "originalSourceFolder":  "images.zip",
-        "resolution":  null
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "spiritverse-checkers-pieces-premium.png",
@@ -732,6 +768,36 @@
         "resolution":  "610x320"
     },
     {
+        "filename":  "battleship-marker-hit.png",
+        "category":  "ships",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
+        "filename":  "battleship-marker-miss.png",
+        "category":  "ships",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
+        "filename":  "battleship-ship-battleship.png",
+        "category":  "ships",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
+        "filename":  "battleship-ship-carrier.png",
+        "category":  "ships",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
+        "filename":  "battleship-ship-cruiser.png",
+        "category":  "ships",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
         "filename":  "connect4_disc_blue.png",
         "category":  "tokens",
         "originalSourceFolder":  "spiritverse_premium_game_asset_pack",
@@ -792,6 +858,24 @@
         "resolution":  "295x180"
     },
     {
+        "filename":  "connect4-disc-empty.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
+        "filename":  "connect4-disc-red.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
+        "filename":  "connect4-disc-yellow.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
         "filename":  "go_stone_black_single_v3.png",
         "category":  "tokens",
         "originalSourceFolder":  "wave3_premium_assets",
@@ -828,6 +912,18 @@
         "resolution":  "435x225"
     },
     {
+        "filename":  "go-stone-black.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
+        "filename":  "go-stone-white.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
         "filename":  "spiritverse-go-stones-premium.png",
         "category":  "tokens",
         "originalSourceFolder":  "images.zip",
@@ -862,6 +958,18 @@
         "category":  "tokens",
         "originalSourceFolder":  "wave3_premium_assets",
         "resolution":  null
+    },
+    {
+        "filename":  "tictactoe-o.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
+    },
+    {
+        "filename":  "tictactoe-x.png",
+        "category":  "tokens",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "check_banner_v2.png",
@@ -1000,6 +1108,12 @@
         "category":  "ui",
         "originalSourceFolder":  "spiritverse_codex_final_asset_pack",
         "resolution":  "400x80"
+    },
+    {
+        "filename":  "ui-board-frame-ornate.png",
+        "category":  "ui",
+        "originalSourceFolder":  "wave-4b-assets",
+        "resolution":  "2048x2048"
     },
     {
         "filename":  "welcome_close.png",
