@@ -373,6 +373,69 @@ function buildTemporalContinuityLayer(ctx) {
   return parts.join("\n");
 }
 
+function buildSpiritCoreUserModelLayer(ctx) {
+  const model = ctx?.context?.spiritCoreUserModel ?? null;
+  if (!model || typeof model !== "object") return null;
+  const favored = Array.isArray(model.favoredSpiritkins) ? model.favoredSpiritkins.filter(Boolean).slice(0, 3) : [];
+  return [
+    "SPIRITCORE USER MODEL",
+    `Interaction style preference: ${sanitizeText(model.interactionStylePreference || "grounded")}`,
+    `Emotional interaction style: ${sanitizeText(model.emotionalInteractionStyle || "balanced")}`,
+    `Guidance receptivity: ${numberOrDefault(model.guidanceReceptivity, 0.5).toFixed(2)}`,
+    `Pacing tolerance: ${numberOrDefault(model.pacingTolerance, 0.5).toFixed(2)}`,
+    `Overwhelm sensitivity: ${numberOrDefault(model.overwhelmSensitivity, 0.3).toFixed(2)}`,
+    `Engagement depth: ${sanitizeText(model.engagementDepth || "early")}`,
+    `Current mood context: ${sanitizeText(model.currentMoodContext || "steady")}`,
+    favored.length ? `Favored Spiritkins right now: ${favored.map((item) => sanitizeText(item)).join(", ")}` : "",
+    model.worldDomainPreference ? `Domain affinity: ${sanitizeText(model.worldDomainPreference)}` : "",
+    model.returnBehavior?.cadence ? `Return rhythm: ${sanitizeText(model.returnBehavior.cadence)}` : "",
+    "Use this as a bounded guide for pacing, warmth, directness, and what kind of next-step pressure is appropriate. Never sound like a profiler."
+  ].filter(Boolean).join("\n");
+}
+
+function buildSpiritCoreSignalsLayer(ctx) {
+  const signals = ctx?.context?.spiritCoreSignals ?? null;
+  if (!signals || typeof signals !== "object") return null;
+  const ordered = Object.entries(signals)
+    .filter(([, value]) => Number.isFinite(Number(value)))
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
+    .slice(0, 4);
+  if (!ordered.length) return null;
+  return [
+    "SPIRITCORE CONTEXT SIGNALS",
+    ...ordered.map(([key, value]) => `${sanitizeText(key.replace(/_/g, " "))}: ${numberOrDefault(value, 0).toFixed(2)}`),
+    "Treat these as weighted atmosphere and intent cues, not labels to announce back to the user."
+  ].join("\n");
+}
+
+function buildSpiritCoreGuidanceLayer(ctx) {
+  const guidance = ctx?.context?.spiritCoreGuidance ?? null;
+  if (!guidance || typeof guidance !== "object") return null;
+  return [
+    "SPIRITCORE EXPERIENCE GUIDANCE",
+    guidance.title ? `Current next-step emphasis: ${sanitizeText(guidance.title)}` : "",
+    guidance.text ? `Why: ${sanitizeText(guidance.text).slice(0, 220)}` : "",
+    guidance.foregroundSurface ? `Foreground surface: ${sanitizeText(guidance.foregroundSurface)}` : "",
+    guidance.reduceClutter ? "Reduce clutter pressure. Prefer one clean move over many competing suggestions." : "Normal branching is acceptable if it feels natural.",
+    "Let this influence pacing and whether you gently steer toward conversation, play, reflection, or a quieter pause."
+  ].filter(Boolean).join("\n");
+}
+
+function buildSpiritCoreWorldHooksLayer(ctx) {
+  const hooks = ctx?.context?.spiritCoreWorldHooks ?? null;
+  if (!hooks || typeof hooks !== "object") return null;
+  return [
+    "SPIRITCORE WORLD-SHAPING HOOKS",
+    hooks.chamberEmphasis ? `Chamber emphasis: ${sanitizeText(hooks.chamberEmphasis)}` : "",
+    hooks.moodEmphasis ? `Mood emphasis: ${sanitizeText(hooks.moodEmphasis)}` : "",
+    hooks.surfacedActivity ? `Surfaced activity: ${sanitizeText(hooks.surfacedActivity)}` : "",
+    hooks.revealPacing ? `Reveal pacing: ${sanitizeText(hooks.revealPacing)}` : "",
+    hooks.promptCadence ? `Prompt cadence: ${sanitizeText(hooks.promptCadence)}` : "",
+    hooks.clutterReduction ? "Favor cleaner, simpler language and fewer branching invitations." : "",
+    "Use these as subtle environmental and pacing cues. Do not narrate UI or system state."
+  ].filter(Boolean).join("\n");
+}
+
 function buildHierarchicalMemoryLayer(ctx) {
   const hm = ctx?.context?.hierarchical_memory ?? null;
   if (!hm) return null;
@@ -429,6 +492,10 @@ function buildContextBlock(ctx, memoryLayer) {
   const adaptiveLayer = buildAdaptiveLayer(ctx);
   const evolutionLayer = buildEvolutionLayer(ctx);
   const temporalContinuityLayer = buildTemporalContinuityLayer(ctx);
+  const spiritCoreUserModelLayer = buildSpiritCoreUserModelLayer(ctx);
+  const spiritCoreSignalsLayer = buildSpiritCoreSignalsLayer(ctx);
+  const spiritCoreGuidanceLayer = buildSpiritCoreGuidanceLayer(ctx);
+  const spiritCoreWorldHooksLayer = buildSpiritCoreWorldHooksLayer(ctx);
   const hierarchicalMemoryLayer = buildHierarchicalMemoryLayer(ctx);
   const spiritMemoryBriefLayer = buildSpiritMemoryBriefLayer(ctx);
 
@@ -460,6 +527,10 @@ function buildContextBlock(ctx, memoryLayer) {
     adaptiveLayer,
     evolutionLayer,
     temporalContinuityLayer,
+    spiritCoreUserModelLayer,
+    spiritCoreSignalsLayer,
+    spiritCoreGuidanceLayer,
+    spiritCoreWorldHooksLayer,
     "MEMORY / CONTEXT",
     [
       sceneName ? `Current scene: ${sceneName}` : "Current scene: default",

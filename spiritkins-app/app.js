@@ -1388,8 +1388,16 @@ function getSpiritCoreGuidanceModel() {
   };
 }
 
+function getSpiritCoreGuidancePayload() {
+  const backendGuidance = state.spiritCore?.guidance;
+  if (backendGuidance && typeof backendGuidance === "object" && (backendGuidance.title || backendGuidance.text)) {
+    return backendGuidance;
+  }
+  return getSpiritCoreGuidanceModel();
+}
+
 function buildSpiritCoreGuidanceCard(extraClass = "") {
-  const guidance = getSpiritCoreGuidanceModel();
+  const guidance = getSpiritCoreGuidancePayload();
   if (!guidance) return "";
   const className = ["spiritcore-next-step-card", extraClass].filter(Boolean).join(" ");
   return `
@@ -2262,6 +2270,7 @@ function createDefaultSessionModel() {
       turnPhase: "idle",
     },
     memoryContext: null,
+    spiritCore: null,
     recentMessages: [],
     hydrated: false,
     source: "local-default",
@@ -2388,6 +2397,7 @@ const state = {
   retentionInsight: null,
   showReturnSummary: false,
   adaptiveProfile: normalizeAdaptiveProfile(readJson(ADAPTIVE_PROFILE_KEY, null)),
+  spiritCore: null,
   lastReactionTimestamp: 0,
   reactionCooldownMs: 0,
   recentReactionKeys: [],
@@ -2584,10 +2594,12 @@ function applySessionSnapshot(session, source = "backend") {
       turnPhase: normalizeTurnPhaseValue(speechState.turnPhase),
     },
     memoryContext: session.memoryContext || null,
+    spiritCore: session.spiritCore || null,
     recentMessages,
     hydrated: true,
     source,
   };
+  state.spiritCore = session.spiritCore || null;
 
   return true;
 }
@@ -4573,6 +4585,13 @@ async function sendMessage(overrideText) {
     const data = await res.json();
     if (!data.ok) throw new Error(data.message || "Reply interrupted.");
     const sessionApplied = !!(data.session && applySessionSnapshot(data.session, "backend-interact"));
+    if (!sessionApplied && data.metadata?.spiritCore) {
+      state.spiritCore = data.metadata.spiritCore;
+      state.sessionModel = {
+        ...(state.sessionModel || createDefaultSessionModel()),
+        spiritCore: data.metadata.spiritCore,
+      };
+    }
     const reply = data.message ?? data.output ?? data.response?.text ?? data.response ?? "...";
     const tags = Array.isArray(data.metadata?.tags) ? data.metadata.tags.filter((tag) => typeof tag === "string") : [];
     const emotionTone = sanitizeTone(data.metadata?.emotion?.tone);
@@ -6560,6 +6579,16 @@ function normalizeIssueReportField(value, maxLength = 120) {
 
 function buildRetentionPanel() {
   const sections = [];
+  if (state.spiritCore?.returnPackage?.highlight) {
+    sections.push({
+      type: "spiritcore-return",
+      title: "SpiritCore Return Path",
+      lines: [
+        { label: "Resume", text: state.spiritCore.returnPackage.highlight },
+        ...(state.spiritCore.returnPackage.stillMattersNow ? [{ label: "Still live", text: state.spiritCore.returnPackage.stillMattersNow }] : []),
+      ],
+    });
+  }
   if (state.returnSummary) sections.push({ type: "summary", ...state.returnSummary });
   if (state.dailyMoment) sections.push({ type: "daily", title: state.dailyMoment.title, lines: [{ label: "Daily", text: state.dailyMoment.text }] });
   if (state.weeklyMoment) sections.push({ type: "weekly", title: state.weeklyMoment.title, lines: [{ label: "Weekly", text: state.weeklyMoment.text }] });
@@ -6612,8 +6641,8 @@ function buildRetentionPanel() {
 
 function buildRetentionHomeStrip() {
   if (state.showReturnSummary) return "";
-  if (!(state.returnSummary || state.dailyMoment || state.weeklyMoment || (state.retentionUnlocks || []).length)) return "";
-  const headline = state.retentionInsight?.highlight || state.returnSummary?.lines?.[0]?.text || state.dailyMoment?.text || state.weeklyMoment?.text || "Your bond has movement waiting.";
+  if (!(state.spiritCore?.returnPackage?.highlight || state.returnSummary || state.dailyMoment || state.weeklyMoment || (state.retentionUnlocks || []).length)) return "";
+  const headline = state.spiritCore?.returnPackage?.highlight || state.retentionInsight?.highlight || state.returnSummary?.lines?.[0]?.text || state.dailyMoment?.text || state.weeklyMoment?.text || "Your bond has movement waiting.";
   const newUnlockCount = (state.retentionUnlocks || []).filter((unlock) => unlock.isNew).length;
   return `
     <div class="retention-home-strip panel-card">

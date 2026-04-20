@@ -42,6 +42,7 @@ export const interactRoutes = async (app) => {
               ...(context?.speechState || {}),
               turnPhase: "processing",
             },
+            requestContext: context || null,
           }).catch(() => {});
         }
 
@@ -98,6 +99,7 @@ export const interactRoutes = async (app) => {
               isPaused: false,
               turnPhase: "spirit_response",
             },
+            requestContext: context || null,
           }).catch(() => null);
 
           if (sessionSnapshot?.session) {

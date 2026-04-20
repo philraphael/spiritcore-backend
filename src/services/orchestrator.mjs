@@ -44,6 +44,7 @@ export const createOrchestrator = ({
   engagementEngine,
   spiritMemoryEngine,
   responseEngine,
+  spiritCoreAdaptiveService,
 }) => {
   const interact = async ({ userId, input, spiritkin, conversationId, context = {} }) => {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
@@ -239,6 +240,47 @@ export const createOrchestrator = ({
       worldState: nextWorldState,
     }) ?? null;
 
+    const spiritCoreEnvelope = spiritCoreAdaptiveService
+      ? await spiritCoreAdaptiveService.buildRuntimeEnvelope({
+          userId,
+          spiritkinIdentity: resolvedIdentity,
+          conversationId: convId,
+          currentSurface: context?.surfaceContext?.activeSurface ?? context?.activeTab ?? "profile",
+          currentMode: context?.activeGameType ? "game" : "conversation",
+          activeTab: context?.surfaceContext?.activeTab ?? context?.activeTab ?? null,
+          worldState: nextWorldState,
+          recentMessages: [
+            ...((contextBundle?.episodes || []).slice(-2).map((episode) => ({
+              role: "user",
+              content: episode?.text || "",
+            }))),
+            { role: "user", content: input },
+          ],
+          currentGame: nextWorldState?.flags?.active_game || null,
+          requestContext: {
+            ...context,
+            recentText: input,
+            emotion: contextBundle?.emotion || null,
+          },
+          storedAdaptiveProfile: nextWorldState?.flags?.spiritcore_adaptive_profile || null,
+        })
+      : null;
+
+    if (spiritCoreEnvelope) {
+      nextWorldState = spiritCoreAdaptiveService.applyWorldStateEnhancements(nextWorldState, spiritCoreEnvelope);
+    }
+
+    const authoritativeContext = {
+      ...(context || {}),
+      adaptiveProfile: spiritCoreEnvelope?.adaptiveProfile || context?.adaptiveProfile || null,
+      spiritCoreUserModel: spiritCoreEnvelope?.userModel || null,
+      spiritCoreSignals: spiritCoreEnvelope?.emotionalSignals || null,
+      spiritCoreGuidance: spiritCoreEnvelope?.guidance || null,
+      spiritCoreSurfacePriority: spiritCoreEnvelope?.surfacePriority || null,
+      spiritCoreReturnPackage: spiritCoreEnvelope?.returnPackage || null,
+      spiritCoreWorldHooks: spiritCoreEnvelope?.worldHooks || null,
+    };
+
     const rawAdapterResult = await withTimeout(
       adapter.generate({
         traceId,
@@ -268,7 +310,7 @@ export const createOrchestrator = ({
           memoryCorrections: contextBundle?.structured_memory?.corrections ?? [],
           memoryMilestones: contextBundle?.structured_memory?.milestones ?? [],
           memoryPreferences: contextBundle?.structured_memory?.preferences ?? [],
-          ...context,
+          ...authoritativeContext,
         },
       }),
       config.timeouts.adapter,
@@ -511,6 +553,15 @@ export const createOrchestrator = ({
       }).catch(() => {});
     }
 
+    if (spiritCoreEnvelope && world?.upsert) {
+      world.upsert({
+        userId,
+        conversationId: convId,
+        spiritkinId,
+        state: nextWorldState,
+      }).catch((err) => console.warn("[Orchestrator] spiritCore adaptive state persist failed:", err.message));
+    }
+
     // Stage 13: Ensure emotion.tone and world.scene.name are always meaningful
     const finalEmotion = adapterResult.emotion ?? {};
     const finalTone = (() => {
@@ -558,6 +609,16 @@ export const createOrchestrator = ({
         memoryUsage: adapterResult.memoryUsage ?? { used: false, selected: [] },
         entitlement,
         policy: policyState,
+        spiritCore: spiritCoreEnvelope
+          ? {
+              userModel: spiritCoreEnvelope.userModel,
+              emotionalSignals: spiritCoreEnvelope.emotionalSignals,
+              guidance: spiritCoreEnvelope.guidance,
+              surfacePriority: spiritCoreEnvelope.surfacePriority,
+              returnPackage: spiritCoreEnvelope.returnPackage,
+              worldHooks: spiritCoreEnvelope.worldHooks,
+            }
+          : null,
       },
     };
   };

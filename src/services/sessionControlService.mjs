@@ -125,7 +125,7 @@ function deriveDefaults({ conversationId, activeGame, spiritkinIdentity, control
   };
 }
 
-export function createSessionControlService({ conversationService, messageService, world, registry }) {
+export function createSessionControlService({ conversationService, messageService, world, registry, spiritCoreAdaptiveService = null }) {
   async function safeResolveSpiritkinById(id) {
     if (!id) return null;
     try {
@@ -166,6 +166,7 @@ export function createSessionControlService({ conversationService, messageServic
     currentMode = null,
     activeTab = null,
     speechStateOverride = null,
+    requestContext = null,
     messageLimit = 40,
   }) {
     const limit = clampMessageLimit(messageLimit);
@@ -175,6 +176,7 @@ export function createSessionControlService({ conversationService, messageServic
     let messages = [];
     let spiritkinIdentity = null;
     let storedControl = null;
+    let storedAdaptiveProfile = null;
     let resolvedConversationId = conversationId ? String(conversationId) : null;
 
     try {
@@ -205,6 +207,7 @@ export function createSessionControlService({ conversationService, messageServic
 
         activeGame = worldData?.state?.flags?.active_game || null;
         storedControl = normalizeStoredControl(worldData?.state?.flags?.spiritcore_session || {});
+        storedAdaptiveProfile = worldData?.state?.flags?.spiritcore_adaptive_profile || null;
         if (conversation?.spiritkin_id) {
           spiritkinIdentity = await safeResolveSpiritkinById(conversation.spiritkin_id);
         }
@@ -261,6 +264,23 @@ export function createSessionControlService({ conversationService, messageServic
         controlUpdatedAt: storedControl?.updatedAt || null,
       };
 
+      if (spiritCoreAdaptiveService) {
+        const spiritCore = await spiritCoreAdaptiveService.buildRuntimeEnvelope({
+          userId,
+          spiritkinIdentity,
+          conversationId: resolvedConversationId,
+          currentSurface: resolvedSurface,
+          currentMode: resolvedMode,
+          activeTab: resolvedActiveTab,
+          worldState: worldData?.state || createDefaultWorldState(),
+          recentMessages: messages,
+          currentGame: activeGame || null,
+          requestContext: requestContext || null,
+          storedAdaptiveProfile,
+        }).catch(() => null);
+        if (spiritCore) snapshot.spiritCore = spiritCore;
+      }
+
       return { ok: true, session: snapshot };
     } catch (error) {
       console.error("[SessionControl] getSnapshot fallback", {
@@ -308,6 +328,20 @@ export function createSessionControlService({ conversationService, messageServic
           memoryContext: buildMemoryContext(fallbackWorldState),
           recentMessages: [],
           controlUpdatedAt: null,
+          ...(spiritCoreAdaptiveService ? {
+            spiritCore: await spiritCoreAdaptiveService.buildRuntimeEnvelope({
+              userId,
+              spiritkinIdentity,
+              conversationId: resolvedConversationId,
+              currentSurface: hasExplicitValue(currentSurface) ? normalizeSurface(currentSurface) : defaults.currentSurface,
+              currentMode: hasExplicitValue(currentMode) ? normalizeMode(currentMode) : defaults.currentMode,
+              activeTab: hasExplicitValue(activeTab) ? String(activeTab).trim().toLowerCase() : null,
+              worldState: fallbackWorldState,
+              recentMessages: [],
+              currentGame: null,
+              requestContext: requestContext || null,
+            }).catch(() => null),
+          } : {}),
         },
       };
     }
@@ -321,6 +355,7 @@ export function createSessionControlService({ conversationService, messageServic
     currentMode = null,
     activeTab = null,
     speechState = null,
+    requestContext = null,
   }) {
     const normalizedSpeech = normalizeSpeechState(speechState || {});
     if (!conversationId) {
@@ -332,6 +367,7 @@ export function createSessionControlService({ conversationService, messageServic
         currentMode,
         activeTab,
         speechStateOverride: normalizedSpeech,
+        requestContext,
       });
     }
 
@@ -369,6 +405,7 @@ export function createSessionControlService({ conversationService, messageServic
       currentMode,
       activeTab,
       speechStateOverride: normalizedSpeech,
+      requestContext,
     });
   }
 
