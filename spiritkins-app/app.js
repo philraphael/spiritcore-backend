@@ -351,6 +351,7 @@ function supportsSpeechRecognition() {
 }
 
 const VOICE_WAKE_NAMES = ["kairo", "elaria", "lyra", "raien", "thalassar"];
+const VOICE_FILLER_PATTERNS = ["yeah", "ok", "okay", "uh", "uh huh", "mm", "hmm"];
 
 function findWakeTriggeredSpiritkin(transcript = "") {
   const normalized = String(transcript || "").trim().toLowerCase();
@@ -362,6 +363,19 @@ function findWakeTriggeredSpiritkin(transcript = "") {
 
 function hasActiveVoiceConversationSession() {
   return !!(state.selectedSpiritkin && state.conversationId);
+}
+
+function isDirectedSpeech(transcript = "") {
+  const normalized = String(transcript || "").trim().toLowerCase();
+  if (!normalized) return false;
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  const hasWakeWord = !!findWakeTriggeredSpiritkin(normalized);
+  const isFillerSpeech = VOICE_FILLER_PATTERNS.includes(normalized);
+  if (hasWakeWord) return true;
+  if (normalized.includes("?")) return true;
+  if (wordCount < 3 && !hasWakeWord) return false;
+  if (isFillerSpeech) return false;
+  return wordCount > 6;
 }
 
 function isConstrainedGameType(gameType) {
@@ -9606,7 +9620,18 @@ function startListening(options = {}) {
     const sessionActive = hasActiveVoiceConversationSession();
     const wakeTarget = findWakeTriggeredSpiritkin(transcript);
     const wakeDetected = !!wakeTarget;
-    if (!wakeDetected && !sessionActive) {
+    const directedSpeech = isDirectedSpeech(transcript);
+    console.info(`[Voice] ${directedSpeech ? "directed-speech-true" : "directed-speech-false"}`, {
+      source,
+      runId,
+      transcriptLength: transcript.length,
+    });
+    logContinuityDebug(directedSpeech ? "directed-speech-true" : "directed-speech-false", {
+      source,
+      runId,
+      transcriptLength: transcript.length,
+    });
+    if (!wakeDetected && !(sessionActive && directedSpeech)) {
       console.info("[Voice] wake-not-detected", { source, runId, transcriptLength: transcript.length });
       logContinuityDebug("wake-not-detected", {
         source,
@@ -9631,7 +9656,7 @@ function startListening(options = {}) {
       if (!sessionActive && wakeTarget && typeof wakeTarget === "object") {
         state.selectedSpiritkin = wakeTarget;
       }
-    } else if (sessionActive) {
+    } else if (sessionActive && directedSpeech) {
       console.info("[Voice] session-active-bypass", { source, runId });
       logContinuityDebug("session-active-bypass", { source, runId });
     }
