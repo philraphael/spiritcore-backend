@@ -7025,7 +7025,7 @@ function buildMain() {
 
 function buildBondSelectionView() {
   return `
-    <section class="selection-view" data-focus-anchor="bond-selection">
+    <section class="selection-view ${state.pendingBondSpiritkin ? "selection-has-pending" : ""}" data-focus-anchor="bond-selection">
       <div class="selection-hero">
         <div class="selection-copy">
           <p class="eyebrow">Primary companion</p>
@@ -7054,7 +7054,7 @@ function buildBondSelectionView() {
 
       ${buildSpiritCoreGuidanceCard("selection-guidance")}
 
-      <div class="spiritkin-grid">
+      <div class="spiritkin-grid ${state.pendingBondSpiritkin ? "has-pending" : ""}">
         ${state.spiritkins.map((spiritkin, index) => buildBondCard(spiritkin, index, false)).join("")}
       </div>
       ${buildChronicleShelf("The Spiritverse Chronicles", WORLD_ART.chroniclesAll, "The living chronicle preserves all five founders as one canon-locked ensemble.")}
@@ -7202,7 +7202,7 @@ function buildBondPreview(spiritkin, pending) {
   const introPrompt = getSpiritkinIntroPrompt(spiritkin);
   return `
     <div class="selection-focus ${esc(spiritkin.ui.cls)} ${pending ? "pending" : "bonded"}">
-      <div class="selection-focus-stage">
+      <div class="selection-focus-stage ${introVideo ? "has-trailer" : "has-still"}">
         ${introVideo ? `
           <div class="spiritkin-intro-video" data-focus-anchor="spiritkin-trailer">
             <div class="spiritkin-intro-stage-head">
@@ -8419,7 +8419,8 @@ async function onClick(event) {
     normalizeInteractionState("select-spiritkin");
     persistSession();
     render();
-    revealCurrentFocus({ selector: ".selection-focus" });
+    const hasIntroTrailer = !!getSpiritkinMediaConfig(candidate?.name)?.introTrailer?.path;
+    revealCurrentFocus({ selector: hasIntroTrailer ? "[data-focus-anchor='spiritkin-trailer'], .selection-focus.pending" : ".selection-focus.pending, .selection-focus" });
     return;
   }
 

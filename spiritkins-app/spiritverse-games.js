@@ -118,16 +118,50 @@ function resolveRuntimeTokenUrl(type, variant = "user") {
   return resolveGameAsset(type, "pieces", variant)?.publicPath || "";
 }
 
+function resolveThemeEnvironmentOverrides(theme) {
+  const variant = String(theme?.boardVariant || "default").toLowerCase();
+  const runtime = (category, filename) => filename ? activeRuntimeAsset(category, filename) : "";
+  const overrides = {
+    crown: {
+      roomUrl: runtime("ui", "spiritcore-media-hero.png"),
+      boardUrl: runtime("ui", "welcome_open.png"),
+      accentUrl: runtime("ui", "welcome_close.png")
+    },
+    veil: {
+      roomUrl: runtime("ui", "lyra_open.png"),
+      boardUrl: runtime("concepts", "spiritverse_chess_lyra_theme.png"),
+      accentUrl: runtime("ui", "lyra_close.png")
+    },
+    ember: {
+      roomUrl: runtime("ui", "kairo_open.png"),
+      boardUrl: runtime("concepts", "spiritverse_battleship_forge_theme.png"),
+      accentUrl: runtime("ui", "kairo_close.png")
+    },
+    astral: {
+      roomUrl: runtime("ui", "raien_open.png"),
+      boardUrl: runtime("concepts", "spiritverse_connect_four_waterfall_theme.png"),
+      accentUrl: runtime("ui", "raien_close.png")
+    },
+    abyssal: {
+      roomUrl: runtime("concepts", "thalassar.png"),
+      boardUrl: runtime("concepts", "spiritverse_go_aquatic_theme.png"),
+      accentUrl: runtime("concepts", "Elaria Left Thalassar right.png")
+    }
+  };
+  return overrides[variant] || {};
+}
+
 function buildAssetDataAttributes(type, theme) {
   const assets = resolveThemeAssetPackage(type, theme);
   if (!assets) return "";
   const boardAsset = resolveGameAsset(type, "board");
   const roomAsset = resolveGameAsset(type, "room");
+  const environment = resolveThemeEnvironmentOverrides(theme);
   const fallbackAsset = assets.fallback || null;
   const attrs = [
     ["data-asset-root", assets.sourceRoot],
-    ["data-asset-board", boardAsset?.publicPath || boardAsset?.sourcePath || ""],
-    ["data-asset-room", roomAsset?.publicPath || roomAsset?.sourcePath || ""],
+    ["data-asset-board", environment.boardUrl || boardAsset?.publicPath || boardAsset?.sourcePath || ""],
+    ["data-asset-room", environment.roomUrl || roomAsset?.publicPath || roomAsset?.sourcePath || ""],
     ["data-asset-fallback", fallbackAsset?.fallbackKey || fallbackAsset?.renderer || ""]
   ];
   return attrs
@@ -142,6 +176,7 @@ function withThemeFrame(content, type, theme, extraClass = "") {
   const assetAttrs = buildAssetDataAttributes(type, theme);
   const boardAsset = resolveGameAsset(type, "board");
   const roomAsset = resolveGameAsset(type, "room");
+  const environment = resolveThemeEnvironmentOverrides(theme);
   const cardAsset = resolveGameAsset(type, "cards");
   const accentAsset =
     resolveGameAsset(type, "pieces", theme?.boardVariant || "default") ||
@@ -172,7 +207,7 @@ function withThemeFrame(content, type, theme, extraClass = "") {
       tokenAccentUrl: tokenAccentAsset?.publicPath,
       overlayUrl: overlayAsset?.publicPath,
       frameUrl: frameAsset?.publicPath
-    })}">
+    })}; --game-room-art: ${cssUrlValue(environment.roomUrl || roomAsset?.publicPath)}; --game-board-art: ${cssUrlValue(environment.boardUrl || boardAsset?.publicPath)}; --game-accent-art: ${cssUrlValue(environment.accentUrl || accentAsset?.publicPath)};">
       <div class="sv-theme-atlas">
         <div class="sv-theme-atlas-copy">
           <span class="sv-theme-atlas-kicker">${escapeAttribute(theme.domainLabel || `${theme.associatedSpiritkin} Domain`)}</span>
@@ -253,19 +288,22 @@ const GrandStage = {
     overlay.id = 'grand-stage';
     overlay.dataset.gameTheme = gameType;
     overlay.dataset.associatedSpiritkin = theme.associatedSpiritkin;
+    overlay.dataset.theme = theme.boardVariant || "default";
     const assetPackage = resolveThemeAssetPackage(gameType, theme);
+    const environment = resolveThemeEnvironmentOverrides(theme);
     if (assetPackage?.sourceRoot) overlay.dataset.assetRoot = assetPackage.sourceRoot;
     const boardAsset = resolveGameAsset(gameType, "board");
     const roomAsset = resolveGameAsset(gameType, "room");
     const fallbackAsset = assetPackage?.fallback || null;
-    if (boardAsset?.publicPath || boardAsset?.sourcePath) overlay.dataset.assetBoard = boardAsset?.publicPath || boardAsset.sourcePath;
-    if (roomAsset?.publicPath || roomAsset?.sourcePath) overlay.dataset.assetRoom = roomAsset?.publicPath || roomAsset.sourcePath;
+    if (environment.boardUrl || boardAsset?.publicPath || boardAsset?.sourcePath) overlay.dataset.assetBoard = environment.boardUrl || boardAsset?.publicPath || boardAsset.sourcePath;
+    if (environment.roomUrl || roomAsset?.publicPath || roomAsset?.sourcePath) overlay.dataset.assetRoom = environment.roomUrl || roomAsset?.publicPath || roomAsset.sourcePath;
     if (fallbackAsset?.fallbackKey || fallbackAsset?.renderer) overlay.dataset.assetFallback = fallbackAsset?.fallbackKey || fallbackAsset?.renderer;
     for (const [key, value] of Object.entries(theme.cssVars || {})) {
       overlay.style.setProperty(key, value);
     }
-    overlay.style.setProperty("--game-board-art", cssUrlValue(boardAsset?.publicPath));
-    overlay.style.setProperty("--game-room-art", cssUrlValue(roomAsset?.publicPath));
+    overlay.style.setProperty("--game-board-art", cssUrlValue(environment.boardUrl || boardAsset?.publicPath));
+    overlay.style.setProperty("--game-room-art", cssUrlValue(environment.roomUrl || roomAsset?.publicPath));
+    overlay.style.setProperty("--game-accent-art", cssUrlValue(environment.accentUrl || ""));
     
     overlay.innerHTML = `
       <div class="game-fullscreen-header">

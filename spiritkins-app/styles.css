@@ -1070,6 +1070,24 @@ button:disabled {
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), var(--shadow);
 }
 
+.selection-has-pending .selection-copy {
+  opacity: 0.9;
+}
+
+.spiritkin-grid.has-pending .sk-card {
+  opacity: 0.52;
+  transform: scale(0.985);
+  filter: saturate(0.82);
+  transition: opacity 0.22s ease, transform 0.22s ease, filter 0.22s ease;
+}
+
+.spiritkin-grid.has-pending .sk-card.pending {
+  opacity: 1;
+  transform: scale(1.02);
+  filter: none;
+  box-shadow: 0 26px 58px rgba(0,0,0,0.28), inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+
 .selection-copy h2 {
   margin: 10px 0 12px;
   font-size: clamp(2.3rem, 4vw, 3.2rem);
@@ -3407,7 +3425,7 @@ button:disabled {
 }
 
 .selection-focus.pending .spiritkin-media-panel.focus {
-  min-height: 240px;
+  min-height: 320px;
 }
 
 .selection-focus.pending .portrait-focus {
@@ -3415,11 +3433,19 @@ button:disabled {
   justify-self: center;
 }
 
+.selection-focus.pending.has-trailer {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.selection-focus.pending.has-trailer .selection-focus-stage {
+  gap: 20px;
+}
+
 .spiritkin-intro-video .video-player-wrapper {
   max-width: 100%;
-  min-height: clamp(260px, 36vw, 440px);
-  border-radius: 22px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
+  min-height: clamp(360px, 48vw, 620px);
+  border-radius: 26px;
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.42);
   overflow: hidden;
 }
 
@@ -3428,7 +3454,16 @@ button:disabled {
   height: 100%;
   display: block;
   object-fit: cover;
-  object-position: center 24%;
+  object-position: center center;
+}
+
+.selection-focus.pending.has-trailer .selection-focus-copy {
+  padding-top: 4px;
+}
+
+.selection-focus.pending.has-trailer .spiritkin-media-panel.focus,
+.selection-focus.pending.has-trailer .portrait-focus {
+  display: none;
 }
 
 /* Hover effect for intro video */
