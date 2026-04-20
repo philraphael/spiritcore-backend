@@ -178,14 +178,14 @@ const COMPOSITE_VISUAL_ASSETS = {
       card: activeAssetUrl("ui", "kairo_close.png")
     },
     Elaria: {
-      focus: worldArtUrl(WORLD_ART.elaria),
-      profile: worldArtUrl(WORLD_ART.elaria),
-      card: worldArtUrl(WORLD_ART.pairAlt)
+      focus: activeAssetUrl("concepts", "Elaria.png"),
+      profile: activeAssetUrl("concepts", "Elaria.png"),
+      card: activeAssetUrl("concepts", "Elaria Left Thalassar right.png")
     },
     Thalassar: {
-      focus: worldArtUrl(WORLD_ART.thalassar),
-      profile: worldArtUrl(WORLD_ART.thalassar),
-      card: worldArtUrl(WORLD_ART.pairAlt)
+      focus: activeAssetUrl("concepts", "thalassar.png"),
+      profile: activeAssetUrl("concepts", "thalassar.png"),
+      card: activeAssetUrl("concepts", "Elaria Left Thalassar right.png")
     }
   }
 };
@@ -1611,8 +1611,8 @@ function getSpiritkinPortraitPath(name) {
     "Lyra": "/portraits/lyra_portrait.png",
     "Raien": "/portraits/raien_portrait.png",
     "Kairo": "/portraits/kairo_portrait.png",
-    "Elaria": worldArtUrl(WORLD_ART.elaria),
-    "Thalassar": worldArtUrl(WORLD_ART.thalassar)
+    "Elaria": activeAssetUrl("concepts", "Elaria.png"),
+    "Thalassar": activeAssetUrl("concepts", "thalassar.png")
   };
   return portraitMap[name] || "";
 }
@@ -4399,13 +4399,9 @@ async function sendMessage(overrideText) {
       resonance[state.selectedSpiritkin.name] = (resonance[state.selectedSpiritkin.name] || 0) + 1;
       writeJson(RESONANCE_KEY, resonance);
     }
-    // Auto-speak the response unless muted
+    // Auto-speak through the scheduler so one assistant turn only produces one playback lifecycle.
     if (!state.voiceMuted) {
-      speakMessage(resolvedAssistantMessageId, { armUserTurn: shouldKeepVoiceLoopActive() }).catch(() => {
-        if (shouldKeepVoiceLoopActive()) {
-          setVoiceWaitingStatus();
-        }
-      });
+      maybeSpeakMessageLater(resolvedAssistantMessageId, { armUserTurn: shouldKeepVoiceLoopActive() });
     }
   } catch (error) {
     logContinuityDebug("send-message-failed", {

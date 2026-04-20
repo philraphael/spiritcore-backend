@@ -1441,6 +1441,11 @@ button:disabled {
   display: grid;
   align-content: start;
   gap: 18px;
+  align-self: start;
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 28px);
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.05), transparent 28%),
     color-mix(in srgb, var(--realm-panel) 92%, rgba(255,255,255,0.03));
@@ -1639,6 +1644,7 @@ button:disabled {
   max-height: 56vh;
   padding: 18px 8px 18px 0;
   margin-top: 8px;
+  scroll-padding-top: 108px;
 }
 
 .companion-presence-dock {
@@ -1654,6 +1660,9 @@ button:disabled {
     linear-gradient(180deg, color-mix(in srgb, var(--realm-accent-soft) 34%, transparent), rgba(255,255,255,0.03)),
     rgba(8, 16, 28, 0.42);
   box-shadow: 0 16px 38px rgba(0,0,0,0.18);
+  position: sticky;
+  top: 14px;
+  z-index: 3;
 }
 
 .companion-presence-dock.is-speaking {
@@ -3919,6 +3928,7 @@ button:disabled {
   padding: 0 16px 24px;
   transition: opacity 0.18s ease, transform 0.18s ease;
   min-width: 0;
+  overscroll-behavior: contain;
 }
 
 .presence-tab-content.is-switching {
