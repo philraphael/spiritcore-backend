@@ -9909,12 +9909,13 @@ async function playAudio(buffer, options = {}) {
     audio.src = url;
     audio.volume = 1.0;
     audio.onended = () => {
+      const userVoiceSessionActive = shouldKeepVoiceLoopActive();
       if (_activeAudioRequestId !== requestId) {
         URL.revokeObjectURL(url);
         return;
       }
       logContinuityDebug("speech-playback-ended", {
-        autoResumeListening: !!_voiceTurnCaptureAfterAudio,
+        autoResumeListening: !!_voiceTurnCaptureAfterAudio || userVoiceSessionActive,
         requestId,
       });
       _currentAudio = null;
@@ -9935,8 +9936,8 @@ async function playAudio(buffer, options = {}) {
         },
       });
       URL.revokeObjectURL(url);
-      if (_voiceTurnCaptureAfterAudio) {
-        setVoiceTurnRuntimeState({ awaitingUserTurn: _voiceAwaitingUserTurn, captureAfterAudio: false });
+      if (_voiceTurnCaptureAfterAudio || userVoiceSessionActive) {
+        setVoiceTurnRuntimeState({ awaitingUserTurn: userVoiceSessionActive || _voiceAwaitingUserTurn, captureAfterAudio: false });
         requestVoiceTurnCapture({ delay: 220 });
       }
     };
