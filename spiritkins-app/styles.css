@@ -785,6 +785,14 @@ button:disabled {
   opacity: 1;
 }
 
+.composite-visual-fallback.fallback-error-only {
+  opacity: 0;
+}
+
+.composite-visual-frame.visual-fallback-only .composite-visual-fallback.fallback-error-only {
+  opacity: 1;
+}
+
 .founder-ensemble-copy p,
 .chronicle-shelf-copy p {
   margin: 0;

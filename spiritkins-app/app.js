@@ -1748,11 +1748,12 @@ function buildFounderEnsemblePanel(kind = "entry") {
   return `
     <div class="founder-ensemble-panel ${esc(kind)}">
       ${buildCompositeVisualFrame(
-        COMPOSITE_VISUAL_ASSETS.spiritcore.founders,
         canonicalWorldAssetUrl(WORLD_ART.ensemble),
+        COMPOSITE_VISUAL_ASSETS.spiritcore.founders,
         "The Five Founding Pillars gathered within the Spiritverse",
         `founder-ensemble-art ${kind}`,
-        kind === "entry"
+        kind === "entry",
+        { fallbackMode: "errorOnly", debugSlot: `founder-ensemble-${kind}` }
       )}
       <div class="founder-ensemble-copy">
         <div class="panel-label">${title}</div>
@@ -1774,11 +1775,21 @@ function buildChronicleShelf(title = "Spiritverse Chronicles", filename = WORLD_
   `;
 }
 
-function buildCompositeVisualFrame(primarySrc, fallbackSrc, alt, cls = "", eager = false) {
+function buildCompositeVisualFrame(primarySrc, fallbackSrc, alt, cls = "", eager = false, options = {}) {
   if (!primarySrc) return "";
+  const fallbackMode = options?.fallbackMode === "errorOnly" ? "errorOnly" : "immediate";
+  const debugSlot = typeof options?.debugSlot === "string" ? options.debugSlot : "";
+  const debugAttr = debugSlot ? ` data-media-slot="${esc(debugSlot)}"` : "";
+  const fallbackClass = fallbackMode === "errorOnly" ? " fallback-error-only" : "";
+  const onLoad = debugSlot
+    ? `this.classList.add('is-loaded'); this.parentElement.classList.add('visual-loaded'); console.info('[MediaAuthority]', { slot: '${esc(debugSlot)}', primary: this.currentSrc || this.src, fallback: '${esc(fallbackSrc || "")}', event: 'primary-loaded' });`
+    : `this.classList.add('is-loaded'); this.parentElement.classList.add('visual-loaded');`;
+  const onError = debugSlot
+    ? `this.style.display='none'; this.parentElement.classList.add('visual-fallback-only'); console.warn('[MediaAuthority]', { slot: '${esc(debugSlot)}', primary: this.currentSrc || this.src, fallback: '${esc(fallbackSrc || "")}', event: 'primary-error-fallback' });`
+    : `this.style.display='none'; this.parentElement.classList.add('visual-fallback-only');`;
   return `
-    <div class="composite-visual-frame ${esc(cls)} ${fallbackSrc ? "has-fallback" : ""}">
-      ${fallbackSrc ? `<img src="${fallbackSrc}" alt="${esc(alt)}" class="composite-visual-image composite-visual-fallback" loading="${eager ? "eager" : "lazy"}" decoding="async" ${eager ? 'fetchpriority="high"' : ""} />` : ""}
+    <div class="composite-visual-frame ${esc(cls)} ${fallbackSrc ? "has-fallback" : ""}"${debugAttr}>
+      ${fallbackSrc ? `<img src="${fallbackSrc}" alt="${esc(alt)}" class="composite-visual-image composite-visual-fallback${fallbackClass}" loading="${eager ? "eager" : "lazy"}" decoding="async" ${eager ? 'fetchpriority="high"' : ""} />` : ""}
       <img
         src="${primarySrc}"
         alt="${esc(alt)}"
@@ -1786,8 +1797,8 @@ function buildCompositeVisualFrame(primarySrc, fallbackSrc, alt, cls = "", eager
         loading="${eager ? "eager" : "lazy"}"
         decoding="async"
         ${eager ? 'fetchpriority="high"' : ""}
-        onload="this.classList.add('is-loaded'); this.parentElement.classList.add('visual-loaded');"
-        onerror="this.style.display='none'; this.parentElement.classList.add('visual-fallback-only');"
+        onload="${onLoad}"
+        onerror="${onError}"
       />
     </div>
   `;
@@ -1805,14 +1816,28 @@ function buildSpiritkinMediaPanel(name, surface = "focus") {
   if (!primarySrc) return "";
   const fallbackPortrait = authority.fallbackCard || getSpiritkinPortraitPath(name);
   const speakingCls = isSpiritkinSpeechActive(name) ? "is-speaking" : "";
-  return buildCompositeVisualFrame(primarySrc, fallbackPortrait, `${name} visual panel`, `spiritkin-media-panel ${surface} ${speakingCls}`, surface !== "card");
+  return buildCompositeVisualFrame(
+    primarySrc,
+    fallbackPortrait,
+    `${name} visual panel`,
+    `spiritkin-media-panel ${surface} ${speakingCls}`,
+    surface !== "card",
+    { fallbackMode: "errorOnly", debugSlot: `${name}-${surface}` }
+  );
 }
 
 function buildSpiritkinCanonPanel(name, cls = "profile-canon-art") {
   const authority = getSpiritkinMediaAuthority(name);
   const primarySrc = authority.canonSupplement || authority.fallbackCard || authority.profile || authority.focus || "";
   if (!primarySrc) return "";
-  return buildCompositeVisualFrame(primarySrc, getSpiritkinPortraitPath(name), `${name} canon panel`, cls, false);
+  return buildCompositeVisualFrame(
+    primarySrc,
+    getSpiritkinPortraitPath(name),
+    `${name} canon panel`,
+    cls,
+    false,
+    { fallbackMode: "errorOnly", debugSlot: `${name}-canon` }
+  );
 }
 
 function buildCompanionPresenceDock(spiritkin) {
@@ -6930,7 +6955,8 @@ function buildSpiritverseArrival() {
           canonicalWorldAssetUrl(WORLD_ART.baseTheme),
           "Spiritverse arrival shell art",
           "entry-visual-shell arrival",
-          true
+          true,
+          { fallbackMode: "errorOnly", debugSlot: "spiritgate-arrival" }
         )}
         <div class="panel-label">Spiritverse Arrival</div>
         <h2>The realm is revealing itself.</h2>
@@ -6950,10 +6976,11 @@ function buildSpiritCoreWelcome() {
       <div class="spiritcore-welcome-copy">
         ${buildCompositeVisualFrame(
           COMPOSITE_VISUAL_ASSETS.spiritcore.hero,
-          COMPOSITE_VISUAL_ASSETS.spiritcore.founders,
+          canonicalWorldAssetUrl(WORLD_ART.ensemble),
           "SpiritCore welcome hero",
           "entry-visual-shell spiritcore",
-          true
+          true,
+          { fallbackMode: "errorOnly", debugSlot: "spiritcore-welcome-hero" }
         )}
         <div class="panel-label">SpiritCore</div>
         <h2>The realm is now under your witness.</h2>
@@ -7170,6 +7197,7 @@ function buildBondPreview(spiritkin, pending) {
   const introTrailerPending = pending && mediaConfig?.introTrailer?.status === "awaiting_media";
   const primaryMediaSurface = pending ? "focus" : "bonded";
   const showStagePortrait = !pending || !introVideo;
+  const showStageMediaPanel = !introVideo;
   const selfReveal = getSpiritkinSelfReveal(spiritkin);
   const introPrompt = getSpiritkinIntroPrompt(spiritkin);
   return `
@@ -7210,7 +7238,7 @@ function buildBondPreview(spiritkin, pending) {
             <span>${esc(`${spiritkin.name}'s self-reveal pipeline is wired and waiting for final trailer media.`)}</span>
           </div>
         ` : ""}
-        ${buildSpiritkinMediaPanel(spiritkin.name, primaryMediaSurface)}
+        ${showStageMediaPanel ? buildSpiritkinMediaPanel(spiritkin.name, primaryMediaSurface) : ""}
         ${buildSigil(spiritkin.ui, "focus", spiritkin.ui.symbol)}
         ${showStagePortrait ? buildPortrait(spiritkin.name, "portrait-focus", spiritkin.ui.cls) : ""}
       </div>
