@@ -19,11 +19,11 @@
 }
 
 .chat-layout.game-focus-mode .active-game-panel {
-  padding: 12px;
-  border-radius: 20px;
+  padding: 18px;
+  border-radius: 28px;
   border: 1px solid rgba(255,255,255,0.08);
-  background: linear-gradient(180deg, rgba(6, 12, 22, 0.62), rgba(6, 12, 22, 0.3));
-  box-shadow: 0 24px 52px rgba(0, 0, 0, 0.26);
+  background: linear-gradient(180deg, rgba(6, 12, 22, 0.76), rgba(6, 12, 22, 0.34));
+  box-shadow: 0 30px 72px rgba(0, 0, 0, 0.34);
 }
 
 .chat-layout.game-focus-mode .active-game-panel.chess-showcase-panel {
@@ -461,18 +461,19 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 16px 14px;
-  border-radius: 24px;
+  padding: 20px 18px;
+  border-radius: 30px;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid color-mix(in srgb, var(--game-accent) 26%, rgba(255,255,255,0.08));
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)),
-    radial-gradient(circle at center top, var(--game-accent-soft) 0%, transparent 58%),
+    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015)),
+    radial-gradient(circle at center top, var(--game-accent-soft) 0%, transparent 62%),
     var(--game-room-art, none) center / cover no-repeat,
     rgba(5, 10, 18, 0.68);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.05),
-    0 20px 42px rgba(0,0,0,0.26);
+    0 26px 56px rgba(0,0,0,0.34),
+    0 0 0 1px color-mix(in srgb, var(--game-accent) 12%, transparent);
 }
 .game-board-container::after {
   content: "";
@@ -500,16 +501,16 @@
 .game-board-container::before {
   content: "";
   position: absolute;
-  inset: 12px;
-  border-radius: 18px;
+  inset: 10px;
+  border-radius: 24px;
   background:
-    linear-gradient(180deg, rgba(6, 10, 18, 0.02), rgba(6, 10, 18, 0.1)),
+    linear-gradient(180deg, rgba(6, 10, 18, 0.02), rgba(6, 10, 18, 0.14)),
     var(--game-board-art, none) center / cover no-repeat;
-  opacity: 0.98;
+  opacity: 1;
   box-shadow:
     inset 0 0 0 1px rgba(255,255,255,0.05),
-    inset 0 22px 30px rgba(255,255,255,0.03),
-    inset 0 -26px 36px rgba(4, 8, 16, 0.26);
+    inset 0 28px 34px rgba(255,255,255,0.04),
+    inset 0 -34px 42px rgba(4, 8, 16, 0.34);
   pointer-events: none;
 }
 
@@ -540,6 +541,8 @@
   --game-token-accent: none;
   --game-overlay-fx: none;
   --game-modal-frame: none;
+  --game-theme-tint: rgba(255,255,255,0.06);
+  --game-theme-shadow: rgba(4,7,14,0.22);
   position: relative;
   display: grid;
   gap: 16px;
@@ -548,7 +551,7 @@
   border-radius: 30px;
   border: 1px solid rgba(255,255,255,0.08);
   background:
-    linear-gradient(180deg, rgba(4, 7, 14, 0.08), rgba(4, 7, 14, 0.2)),
+    linear-gradient(180deg, var(--game-theme-tint), rgba(4, 7, 14, 0.26)),
     radial-gradient(circle at top, var(--game-accent-soft) 0%, transparent 56%),
     var(--game-room-art, none),
     linear-gradient(180deg, var(--game-surface-top) 0%, var(--game-surface-bottom) 100%);
@@ -568,6 +571,10 @@
   gap: 12px;
   padding: 10px 12px 14px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--game-accent-soft) 64%, transparent), rgba(255,255,255,0.02)),
+    linear-gradient(135deg, rgba(255,255,255,0.04), transparent 44%);
+  border-radius: 18px;
 }
 
 .sv-theme-atlas-copy,
@@ -600,6 +607,119 @@
   font-size: 0.72rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.sv-theme-shell[data-theme="crown"] {
+  --game-theme-tint: rgba(242, 219, 160, 0.12);
+}
+
+.sv-theme-shell[data-theme="veil"] {
+  --game-theme-tint: rgba(209, 169, 224, 0.14);
+}
+
+.sv-theme-shell[data-theme="ember"] {
+  --game-theme-tint: rgba(242, 153, 74, 0.16);
+}
+
+.sv-theme-shell[data-theme="astral"] {
+  --game-theme-tint: rgba(120, 190, 255, 0.16);
+}
+
+.sv-theme-shell[data-theme="abyssal"] {
+  --game-theme-tint: rgba(84, 178, 194, 0.16);
+}
+
+.sv-theme-shell[data-theme="crown"]::before {
+  background:
+    linear-gradient(180deg, rgba(255,250,238,0.1), rgba(4,7,14,0.12) 100%),
+    radial-gradient(circle at 18% 22%, rgba(242,219,160,0.26) 0%, transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(255,255,255,0.1), transparent 24%),
+    linear-gradient(135deg, rgba(255,255,255,0.08), transparent 34%, transparent 66%, rgba(255,255,255,0.03)),
+    var(--game-overlay-fx, none) center / 46% no-repeat;
+}
+
+.sv-theme-shell[data-theme="veil"]::before {
+  background:
+    linear-gradient(180deg, rgba(248,232,255,0.09), rgba(6,6,18,0.18) 100%),
+    radial-gradient(circle at 20% 16%, rgba(222,188,242,0.28) 0%, transparent 32%),
+    radial-gradient(circle at 80% 22%, rgba(255,255,255,0.08), transparent 22%),
+    linear-gradient(135deg, rgba(255,255,255,0.05), transparent 38%, transparent 68%, rgba(214,192,255,0.06)),
+    var(--game-overlay-fx, none) center / 46% no-repeat;
+}
+
+.sv-theme-shell[data-theme="ember"]::before {
+  background:
+    linear-gradient(180deg, rgba(255,235,212,0.08), rgba(22,8,4,0.22) 100%),
+    radial-gradient(circle at 24% 20%, rgba(255,172,99,0.28) 0%, transparent 34%),
+    radial-gradient(circle at 78% 18%, rgba(255,216,150,0.09), transparent 22%),
+    linear-gradient(135deg, rgba(255,255,255,0.04), transparent 38%, transparent 68%, rgba(255,133,66,0.08)),
+    var(--game-overlay-fx, none) center / 46% no-repeat;
+}
+
+.sv-theme-shell[data-theme="astral"]::before {
+  background:
+    linear-gradient(180deg, rgba(233,245,255,0.08), rgba(5,10,24,0.2) 100%),
+    radial-gradient(circle at 22% 18%, rgba(129,198,255,0.28) 0%, transparent 34%),
+    radial-gradient(circle at 82% 20%, rgba(255,255,255,0.09), transparent 22%),
+    linear-gradient(135deg, rgba(255,255,255,0.04), transparent 38%, transparent 68%, rgba(95,168,255,0.08)),
+    var(--game-overlay-fx, none) center / 46% no-repeat;
+}
+
+.sv-theme-shell[data-theme="abyssal"]::before {
+  background:
+    linear-gradient(180deg, rgba(224,255,255,0.06), rgba(2,12,18,0.24) 100%),
+    radial-gradient(circle at 22% 18%, rgba(98,214,224,0.24) 0%, transparent 34%),
+    radial-gradient(circle at 80% 22%, rgba(179,236,255,0.08), transparent 22%),
+    linear-gradient(135deg, rgba(255,255,255,0.03), transparent 38%, transparent 68%, rgba(88,181,205,0.08)),
+    var(--game-overlay-fx, none) center / 46% no-repeat;
+}
+
+.sv-theme-shell[data-theme="crown"] .sv-theme-atlas,
+.sv-theme-shell[data-theme="veil"] .sv-theme-atlas,
+.sv-theme-shell[data-theme="ember"] .sv-theme-atlas,
+.sv-theme-shell[data-theme="astral"] .sv-theme-atlas,
+.sv-theme-shell[data-theme="abyssal"] .sv-theme-atlas {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+.sv-theme-shell[data-theme="crown"] .game-board-container {
+  background:
+    linear-gradient(180deg, rgba(255,245,223,0.08), rgba(255,255,255,0.015)),
+    radial-gradient(circle at center top, rgba(242,219,160,0.22) 0%, transparent 64%),
+    var(--game-room-art, none) center / cover no-repeat,
+    rgba(5, 10, 18, 0.72);
+}
+
+.sv-theme-shell[data-theme="veil"] .game-board-container {
+  background:
+    linear-gradient(180deg, rgba(244,226,255,0.08), rgba(255,255,255,0.015)),
+    radial-gradient(circle at center top, rgba(222,188,242,0.22) 0%, transparent 64%),
+    var(--game-room-art, none) center / cover no-repeat,
+    rgba(9, 8, 20, 0.74);
+}
+
+.sv-theme-shell[data-theme="ember"] .game-board-container {
+  background:
+    linear-gradient(180deg, rgba(255,225,196,0.08), rgba(255,255,255,0.015)),
+    radial-gradient(circle at center top, rgba(255,172,99,0.24) 0%, transparent 64%),
+    var(--game-room-art, none) center / cover no-repeat,
+    rgba(18, 8, 4, 0.76);
+}
+
+.sv-theme-shell[data-theme="astral"] .game-board-container {
+  background:
+    linear-gradient(180deg, rgba(225,241,255,0.08), rgba(255,255,255,0.015)),
+    radial-gradient(circle at center top, rgba(129,198,255,0.24) 0%, transparent 64%),
+    var(--game-room-art, none) center / cover no-repeat,
+    rgba(5, 10, 24, 0.76);
+}
+
+.sv-theme-shell[data-theme="abyssal"] .game-board-container {
+  background:
+    linear-gradient(180deg, rgba(214,255,255,0.07), rgba(255,255,255,0.015)),
+    radial-gradient(circle at center top, rgba(98,214,224,0.24) 0%, transparent 64%),
+    var(--game-room-art, none) center / cover no-repeat,
+    rgba(4, 12, 18, 0.78);
 }
 
 .sv-theme-shell::before {
@@ -635,7 +755,7 @@
 }
 
 .chess-showcase-shell {
-  width: min(100%, 880px);
+  width: min(100%, 1120px);
   margin: 0 auto;
   gap: 14px;
   padding: 22px;
@@ -665,7 +785,7 @@
 }
 
 .chess-showcase-meta {
-  width: min(100%, 620px);
+  width: min(100%, 760px);
   margin: 0 auto;
   display: grid;
   gap: 4px;
@@ -687,21 +807,21 @@
 }
 
 .chess-showcase-footer {
-  width: min(100%, 620px);
+  width: min(100%, 760px);
   margin: 0 auto;
   text-align: center;
   opacity: 0.92;
 }
 
 .sv-theme-expanded {
-  width: min(100%, 1080px);
-  min-width: min(100%, 820px);
+  width: min(100%, 1240px);
+  min-width: min(100%, 900px);
   max-width: 100%;
   padding: 24px;
 }
 
 .board-standard {
-  width: min(100%, 620px);
+  width: min(100%, 760px);
 }
 
 .board-grand {

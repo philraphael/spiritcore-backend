@@ -1488,7 +1488,8 @@ button:disabled {
 }
 
 .chat-layout.game-focus-mode {
-  grid-template-columns: minmax(360px, 0.72fr) minmax(0, 1.28fr);
+  grid-template-columns: minmax(0, 1.58fr) minmax(280px, 0.42fr);
+  align-items: start;
 }
 
 .presence-panel {
@@ -1509,12 +1510,30 @@ button:disabled {
 }
 
 .chat-layout.game-focus-mode .presence-panel {
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 28px);
+  overflow: auto;
   box-shadow: 0 28px 72px rgba(0, 0, 0, 0.28);
 }
 
 .chat-layout.game-focus-mode .chat-stage {
-  opacity: 1;
-  transform: none;
+  opacity: 0.68;
+  transform: scale(0.985);
+  min-height: 0;
+  max-height: calc(100vh - 28px);
+  overflow: auto;
+}
+
+.chat-layout.game-focus-mode .chat-stage .thread-wrap,
+.chat-layout.game-focus-mode .chat-stage .composer-shell,
+.chat-layout.game-focus-mode .chat-stage .starter-prompts,
+.chat-layout.game-focus-mode .chat-stage .voice-guidance,
+.chat-layout.game-focus-mode .chat-stage .spiritcore-guidance-card,
+.chat-layout.game-focus-mode .chat-stage .auto-open-mic-banner,
+.chat-layout.game-focus-mode .chat-stage .chat-warning,
+.chat-layout.game-focus-mode .chat-stage .chat-error {
+  opacity: 0.72;
 }
 
 .presence-summary {
@@ -2308,7 +2327,7 @@ button:disabled {
   }
 
   .entry-hero-visual {
-    min-height: 220px;
+    min-height: 300px;
   }
 
   .entry-title {
@@ -3995,19 +4014,22 @@ button:disabled {
 
 .presence-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-wrap: nowrap;
+  gap: 8px;
   padding: 0 0 12px;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--line);
-  overflow-x: visible;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scroll-padding-inline: 12px;
 }
 .presence-tabs::-webkit-scrollbar {
   display: none;
 }
 .presence-tab {
-  padding: 7px 9px;
-  font-size: 0.71rem;
+  padding: 9px 12px;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--muted);
   background: transparent;
@@ -6015,9 +6037,11 @@ button[data-action="begin-quest"]:active,
   margin: 0;
   padding: clamp(16px, 3vw, 34px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   pointer-events: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .entry-copy {
@@ -6034,10 +6058,9 @@ button[data-action="begin-quest"]:active,
   pointer-events: auto;
   display: grid;
   gap: 22px;
-  max-height: calc(100dvh - 32px);
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable both-edges;
+  min-height: calc(100dvh - 32px);
+  overflow: visible;
+  margin: auto 0;
 }
 
 .entry-hero-stage {
@@ -6049,12 +6072,14 @@ button[data-action="begin-quest"]:active,
 
 .entry-hero-visual {
   position: relative;
-  min-height: clamp(260px, 36vw, 420px);
+  min-height: clamp(360px, 48vw, 560px);
+  overflow: visible;
 }
 
 .entry-hero-visual .entry-visual-shell,
 .entry-hero-visual .entry-visual-shell .composite-visual-frame {
   height: 100%;
+  min-height: inherit;
 }
 
 .entry-hero-glow {
@@ -6140,6 +6165,10 @@ button[data-action="begin-quest"]:active,
   line-height: 1.42;
   letter-spacing: 0.02em;
   font-size: 1rem;
+}
+
+.entry-pillars {
+  align-content: start;
 }
 
 @keyframes spiritgateTitleFade {

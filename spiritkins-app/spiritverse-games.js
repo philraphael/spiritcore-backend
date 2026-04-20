@@ -162,7 +162,7 @@ function withThemeFrame(content, type, theme, extraClass = "") {
     resolveGameAsset(type, "overlays", "frame");
   const frameAsset = resolveGameAsset(type, "ui", "frame");
   return `
-    <div class="${classes.join(" ")}" data-game-theme="${type}" data-associated-spiritkin="${theme.associatedSpiritkin}" data-theme-variant="${escapeAttribute(theme.boardVariant || "default")}" ${assetAttrs} style="${themeVarsToStyle(theme, {
+    <div class="${classes.join(" ")}" data-game-theme="${type}" data-associated-spiritkin="${theme.associatedSpiritkin}" data-theme="${escapeAttribute(theme.boardVariant || "default")}" data-theme-variant="${escapeAttribute(theme.boardVariant || "default")}" ${assetAttrs} style="${themeVarsToStyle(theme, {
       boardUrl: boardAsset?.publicPath,
       roomUrl: roomAsset?.publicPath,
       cardUrl: cardAsset?.publicPath,
