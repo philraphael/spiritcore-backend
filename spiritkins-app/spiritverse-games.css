@@ -551,9 +551,9 @@
   border-radius: 30px;
   border: 1px solid rgba(255,255,255,0.08);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--game-theme-tint) 84%, transparent), rgba(4, 7, 14, 0.14)),
-    radial-gradient(circle at top, color-mix(in srgb, var(--game-accent-soft) 128%, transparent) 0%, transparent 58%),
-    var(--game-room-art, none),
+    linear-gradient(180deg, rgba(4, 7, 14, 0.18), rgba(4, 7, 14, 0.58)),
+    var(--game-room-art, none) center / cover no-repeat,
+    radial-gradient(circle at top, color-mix(in srgb, var(--game-accent-soft) 108%, transparent) 0%, transparent 62%),
     linear-gradient(180deg, var(--game-surface-top) 0%, var(--game-surface-bottom) 100%);
   background-size: cover, auto, cover, auto;
   background-position: center, center, center, center;
@@ -572,9 +572,10 @@
   padding: 10px 12px 14px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--game-accent-soft) 64%, transparent), rgba(255,255,255,0.02)),
+    linear-gradient(180deg, color-mix(in srgb, var(--game-accent-soft) 48%, transparent), rgba(4,7,14,0.12)),
     linear-gradient(135deg, rgba(255,255,255,0.04), transparent 44%);
   border-radius: 18px;
+  backdrop-filter: blur(8px);
 }
 
 .sv-theme-atlas-copy,
@@ -748,12 +749,10 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.08), transparent 30%, rgba(4,7,14,0.12) 100%),
-    radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--game-accent) 20%, transparent) 0%, transparent 28%),
-    radial-gradient(circle at 82% 18%, rgba(255,255,255,0.08), transparent 24%),
-    linear-gradient(135deg, rgba(255,255,255,0.08), transparent 34%, transparent 66%, rgba(255,255,255,0.03)),
-    var(--game-overlay-fx, none) center / 46% no-repeat;
-  opacity: 0.72;
+    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 26%, rgba(4,7,14,0.22) 100%),
+    radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--game-accent) 16%, transparent) 0%, transparent 30%),
+    linear-gradient(135deg, rgba(255,255,255,0.04), transparent 42%, transparent 70%, rgba(255,255,255,0.02));
+  opacity: 0.52;
   pointer-events: none;
 }
 
@@ -763,10 +762,8 @@
   inset: 1px;
   border-radius: 20px;
   border: 1px solid rgba(255,255,255,0.05);
-  background:
-    var(--game-modal-frame, none) center / cover no-repeat,
-    var(--game-accent-art, none) right -12px top 10px / min(38%, 220px) auto no-repeat;
-  opacity: 0.68;
+  background: var(--game-modal-frame, none) center / cover no-repeat;
+  opacity: 0.26;
   pointer-events: none;
 }
 
@@ -857,9 +854,9 @@
   position: fixed;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(4, 7, 14, 0.34), rgba(4, 7, 14, 0.64)),
-    var(--game-room-art, none),
-    radial-gradient(circle at top, var(--game-accent-soft, rgba(214, 192, 141, 0.16)) 0%, transparent 40%),
+    linear-gradient(180deg, rgba(4, 7, 14, 0.24), rgba(4, 7, 14, 0.68)),
+    var(--game-room-art, none) center / cover no-repeat,
+    radial-gradient(circle at top, var(--game-accent-soft, rgba(214, 192, 141, 0.12)) 0%, transparent 44%),
     radial-gradient(circle at center, rgba(15, 25, 45, 0.98) 0%, rgba(5, 8, 16, 1) 100%);
   background-size: cover, cover, auto, auto;
   background-position: center, center, center, center;
@@ -877,9 +874,9 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--game-accent-soft) 64%, transparent), transparent 42%),
-    var(--game-accent-art, none) right 3vw top 8vh / min(32vw, 420px) auto no-repeat;
-  opacity: 0.64;
+    linear-gradient(135deg, color-mix(in srgb, var(--game-accent-soft) 52%, transparent), transparent 42%),
+    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--game-accent) 12%, transparent), transparent 28%);
+  opacity: 0.42;
   pointer-events: none;
 }
 
@@ -1008,11 +1005,21 @@
 
 .game-fullscreen-title {
   font-family: 'Cormorant Garamond', serif;
+  display: grid;
+  gap: 2px;
   font-size: 1.6rem;
   font-weight: 700;
   color: var(--game-accent, #82b7d9);
   letter-spacing: 0.08em;
   text-shadow: 0 0 15px var(--game-glow, rgba(130,183,217,0.28));
+}
+
+.game-fullscreen-domain {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(236,245,255,0.68);
 }
 
 .game-fullscreen-close {
@@ -1163,23 +1170,24 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(6, 10, 18, 0.2), rgba(6, 10, 18, 0.38)),
+    linear-gradient(180deg, rgba(6, 10, 18, 0.12), rgba(6, 10, 18, 0.28)),
     var(--game-board-art, none);
   background-size: cover;
   background-position: center;
-  opacity: 0.56;
+  opacity: 0.46;
   pointer-events: none;
 }
 
 /* Spiritkin Sidebar in Grand Stage */
 .game-fullscreen-sidebar {
-  background: rgba(0,0,0,0.3);
+  background: linear-gradient(180deg, rgba(4,7,14,0.54), rgba(4,7,14,0.78));
   border-left: 1px solid rgba(255,255,255,0.08);
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
   overflow-y: auto;
+  backdrop-filter: blur(10px);
 }
 
 .gs-sidebar-section {

@@ -111,7 +111,7 @@ export const GAME_THEMES = {
     pieceStyle: "Founder sigil cards",
     animationStyle: "Arcane hand fan",
     associatedSpiritkin: "Elaria",
-    boardVariant: "crown",
+    boardVariant: "archive",
     cssVars: {
       "--game-accent": "#d7e4a7",
       "--game-accent-soft": "rgba(215, 228, 167, 0.2)",
@@ -161,7 +161,7 @@ export const GAME_THEMES = {
     pieceStyle: "Founder marks",
     animationStyle: "Quick sigil flare",
     associatedSpiritkin: "Elaria",
-    boardVariant: "crown",
+    boardVariant: "archive",
     cssVars: {
       "--game-accent": "#bfe4b7",
       "--game-accent-soft": "rgba(191, 228, 183, 0.18)",

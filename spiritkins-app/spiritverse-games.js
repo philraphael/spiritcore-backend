@@ -155,14 +155,14 @@ function resolveThemeEnvironmentOverrides(theme) {
   const runtime = (category, filename) => filename ? activeRuntimeAsset(category, filename) : "";
   const overrides = {
     crown: {
-      roomUrl: runtime("rooms", "Spiritverse background base theme.png"),
-      boardUrl: runtime("concepts", "Spiritkins in spiritverse.png"),
-      accentUrl: runtime("ui", "welcome_close.png")
+      roomUrl: runtime("ui", "spiritcore-media-hero.png"),
+      boardUrl: "",
+      accentUrl: runtime("ui", "welcome_open.png")
     },
     archive: {
       roomUrl: runtime("concepts", "Elaria.png"),
-      boardUrl: runtime("concepts", "Elaria.png"),
-      accentUrl: runtime("concepts", "Elaria Left Thalassar right.png")
+      boardUrl: "",
+      accentUrl: runtime("concepts", "Elaria.png")
     },
     veil: {
       roomUrl: runtime("rooms", "room_chess_lyra_celestial_scene.png"),
@@ -182,7 +182,7 @@ function resolveThemeEnvironmentOverrides(theme) {
     abyssal: {
       roomUrl: runtime("rooms", "room_go_aquatic_scene.png"),
       boardUrl: runtime("concepts", "spiritverse_go_aquatic_theme.png"),
-      accentUrl: runtime("concepts", "Elaria Left Thalassar right.png")
+      accentUrl: runtime("concepts", "thalassar.png")
     }
   };
   return overrides[variant] || {};
@@ -344,7 +344,7 @@ const GrandStage = {
     
     overlay.innerHTML = `
       <div class="game-fullscreen-header">
-        <div class="game-fullscreen-title">${this.getGameTitle(gameType)}</div>
+        <div class="game-fullscreen-title">${this.getGameTitle(gameType)}<span class="game-fullscreen-domain">${escapeAttribute(theme.chamberLabel || theme.domainLabel || "Spiritverse Chamber")}</span></div>
         <button class="game-fullscreen-close" id="gs-close">✕ End Experience</button>
       </div>
       <div class="game-fullscreen-stage">
