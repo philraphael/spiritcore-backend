@@ -3957,7 +3957,7 @@ function resolveReadAloudPayload(scope = state.activePresenceTab) {
     if (!state.activeGame) {
       return {
         voice: spiritkin.ui.voice || "nova",
-        text: `The Games Chamber is quiet. You can begin Celestial Chess, Veil Checkers, Spirit Cards, Echo Trials, TicTacToe of Echoes, Connect Four Constellations, or Abyssal Battleship with ${spiritkin.name}.`
+        text: `The Games Room is quiet. You can begin Kairo Ember Vault, Lyra Veil Crossing, Elaria Archive Deck, SpiritCore Echo Chamber, Elaria Glyph Lattice, Raien Constellation Hall, or Thalassar Tide Chamber with ${spiritkin.name}.`
       };
     }
     const lastMoves = summarizeEntries((state.activeGame.history || []).slice(-3).map((entry) => {
@@ -6215,35 +6215,35 @@ function buildGameModeHero(game, spiritkinName) {
     chess: {
       cls: "chess-mode-hero",
       kicker: resolvedTheme.domainLabel || "Premium Showcase",
-      title: resolvedTheme.displayName || "Celestial Chess",
+      title: resolvedTheme.displayName || "Kairo Ember Vault",
       copy: `The board holds center inside ${resolvedTheme.chamberLabel || "the chamber"}. Your move lands first, then ${name} answers in full view.`,
       mood: resolvedTheme.moodLabel || "Measured strategy and ceremonial fire"
     },
     checkers: {
       cls: "checkers-mode-hero",
       kicker: resolvedTheme.domainLabel || "Live Match",
-      title: resolvedTheme.displayName || "Veil Checkers",
+      title: resolvedTheme.displayName || "Lyra Veil Crossing",
       copy: `Each jump, crown, and finish now stays framed inside ${resolvedTheme.chamberLabel || "the chamber"} while ${name} answers the board.`,
       mood: resolvedTheme.moodLabel || "Mirror drift and poised escalation"
     },
     connect_four: {
       cls: "connect4-mode-hero",
       kicker: resolvedTheme.domainLabel || "Companion Duel",
-      title: resolvedTheme.displayName || "Connect Four Constellations",
+      title: resolvedTheme.displayName || "Raien Constellation Hall",
       copy: `Every token drop lands with visible weight inside ${resolvedTheme.chamberLabel || "the chamber"}, then ${name} answers the column pattern in sequence.`,
       mood: resolvedTheme.moodLabel || "Charged rhythm and orbital pressure"
     },
     battleship: {
       cls: "battleship-mode-hero",
       kicker: resolvedTheme.domainLabel || "Deep Grid",
-      title: resolvedTheme.displayName || "Abyssal Battleship",
+      title: resolvedTheme.displayName || "Thalassar Tide Chamber",
       copy: `The sonar grid stays centered inside ${resolvedTheme.chamberLabel || "the chamber"}, strike feedback stays readable, and each reply from ${name} resolves in place.`,
       mood: resolvedTheme.moodLabel || "Tidal suspense and submerged precision"
     },
     tictactoe: {
       cls: "tictactoe-mode-hero",
       kicker: resolvedTheme.domainLabel || "Quick Play",
-      title: resolvedTheme.displayName || "TicTacToe of Echoes",
+      title: resolvedTheme.displayName || "Elaria Glyph Lattice",
       copy: `A fast companion duel in ${resolvedTheme.chamberLabel || "the chamber"} with immediate mark placement, visible tension, and a clear finish state.`,
       mood: resolvedTheme.moodLabel || "Bright recall and quick symbolic play"
     },
@@ -7431,22 +7431,22 @@ function getRoomDisplayMeta(tab, spiritkin) {
     presence: {
       label: "Presence Room",
       title: spiritkin ? `${spiritkin.name}'s bonded chamber` : "Presence Room",
-      detail: "Profile, echoes, and charter live together here as one readable presence space."
+      detail: "Speak with your bonded companion, hold presence, and open deeper founder surfaces without losing orientation."
     },
     games: {
       label: "Games Room",
-      title: spiritkin ? `Shared play with ${spiritkin.name}` : "Games Room",
-      detail: "The active board takes the room. Supporting context stays secondary."
+      title: spiritkin ? `Play inside ${spiritkin.name}'s active chamber` : "Games Room",
+      detail: "The active board holds center, chamber identity stays visible, and supporting context remains secondary."
     },
     journal: {
       label: "Journal Room",
-      title: "Bond Journal archive",
-      detail: "Memory, progression, and preserved milestones stay together in one archive surface."
+      title: "Bond Journal Archive",
+      detail: "Memory, progression, and preserved milestones stay together in one readable archive surface."
     },
     events: {
       label: "Events Room",
-      title: "Realm events and daily quest",
-      detail: "Live world motion, current quests, and temporal context are grouped here."
+      title: "Realm Events and Daily Quest",
+      detail: "Live world motion, current quests, and temporal context stay grouped in one exploration surface."
     }
   };
   return roomCopy[primaryRoom] || roomCopy.presence;
@@ -7455,19 +7455,24 @@ function getRoomDisplayMeta(tab, spiritkin) {
 function buildWorldPrimaryNav(activeTab) {
   const primaryRoom = getPrimaryRoomForTab(activeTab);
   const rooms = [
-    { id: "presence", tab: "profile", label: "Speak", sublabel: "Presence Room" },
-    { id: "games", tab: "games", label: "Play", sublabel: "Games Room" },
-    { id: "journal", tab: "journal", label: "Reflect", sublabel: "Journal Room" },
-    { id: "events", tab: "events", label: "Explore", sublabel: "Events Room" }
+    { id: "presence", tab: "profile", label: "Speak", sublabel: "Presence Room", copy: "Conversation, companion presence, and bonded return point." },
+    { id: "games", tab: "games", label: "Play", sublabel: "Games Room", copy: "Shared boards and chamber-led play." },
+    { id: "journal", tab: "journal", label: "Reflect", sublabel: "Journal Room", copy: "Bond record, milestones, and preserved memory." },
+    { id: "events", tab: "events", label: "Explore", sublabel: "Events Room", copy: "Realm motion, quests, and daily world context." }
   ];
   return `
-    <div class="world-primary-nav" aria-label="Spiritverse rooms">
-      ${rooms.map((room) => `
-        <button class="world-room-tab ${primaryRoom === room.id ? "active" : ""} ${state.pendingPresenceTab === room.tab ? "loading" : ""}" data-action="set-presence-tab" data-tab="${room.tab}">
-          <span class="world-room-tab-label">${room.label}</span>
-          <span class="world-room-tab-sublabel">${room.sublabel}</span>
-        </button>
-      `).join("")}
+    <div class="world-nav-block">
+      <div class="world-nav-heading">Major Rooms</div>
+      <div class="world-nav-subheading">Choose the main room you want to enter.</div>
+      <div class="world-primary-nav" aria-label="Spiritverse rooms">
+        ${rooms.map((room) => `
+          <button class="world-room-tab ${primaryRoom === room.id ? "active" : ""} ${state.pendingPresenceTab === room.tab ? "loading" : ""}" data-action="set-presence-tab" data-tab="${room.tab}">
+            <span class="world-room-tab-label">${room.label}</span>
+            <span class="world-room-tab-sublabel">${room.sublabel}</span>
+            <span class="world-room-tab-copy">${room.copy}</span>
+          </button>
+        `).join("")}
+      </div>
     </div>
   `;
 }
@@ -7476,29 +7481,34 @@ function buildRoomSubnav(activeTab) {
   const currentPrimary = getPrimaryRoomForTab(activeTab);
   const groups = {
     presence: [
-      { tab: "profile", label: "Profile" },
-      { tab: "echoes", label: "Echoes" },
-      { tab: "charter", label: "Charter" }
+      { tab: "profile", label: "Profile", copy: "Companion presence and bonded overview." },
+      { tab: "echoes", label: "Echoes", copy: "Revealed fragments, growth, and story depth." },
+      { tab: "charter", label: "Charter", copy: "Founder law, canon, and SpiritCore authority." }
     ],
     games: [
-      { tab: "games", label: "Games Room" }
+      { tab: "games", label: "Games Room", copy: "Boards, game state, and chamber-led play." }
     ],
     journal: [
-      { tab: "journal", label: "Bond Journal" }
+      { tab: "journal", label: "Bond Journal", copy: "Preserved memories, stages, and unlocks." }
     ],
     events: [
-      { tab: "events", label: "Realm Events" },
-      { tab: "quest", label: "Daily Quest" }
+      { tab: "events", label: "Realm Events", copy: "Current world motion and live event state." },
+      { tab: "quest", label: "Daily Quest", copy: "Today's guided task shaped by your bond." }
     ]
   };
   const items = groups[currentPrimary] || groups.presence;
   return `
-    <div class="world-subnav" aria-label="Current room surfaces">
-      ${items.map((item) => `
-        <button class="world-subnav-tab ${activeTab === item.tab ? "active" : ""} ${state.pendingPresenceTab === item.tab ? "loading" : ""}" data-action="set-presence-tab" data-tab="${item.tab}">
-          ${item.label}
-        </button>
-      `).join("")}
+    <div class="world-nav-block">
+      <div class="world-nav-heading">Current Room Surfaces</div>
+      <div class="world-nav-subheading">Move within this room without losing your place.</div>
+      <div class="world-subnav" aria-label="Current room surfaces">
+        ${items.map((item) => `
+          <button class="world-subnav-tab ${activeTab === item.tab ? "active" : ""} ${state.pendingPresenceTab === item.tab ? "loading" : ""}" data-action="set-presence-tab" data-tab="${item.tab}">
+            <span class="world-subnav-label">${item.label}</span>
+            <span class="world-subnav-copy">${item.copy}</span>
+          </button>
+        `).join("")}
+      </div>
     </div>
   `;
 }
@@ -7513,18 +7523,18 @@ function buildBondedHomeRoomNav(spiritkin) {
       </button>
       <button class="bonded-room-card" data-action="open-games-hub" ${state.loadingConv ? "disabled" : ""}>
         <span class="bonded-room-kicker">Play</span>
-        <strong>Open the board hall</strong>
-        <span>Games Room. Shared play without squeezing the active board into a side panel.</span>
+        <strong>Open the Games Room</strong>
+        <span>Games Room. Shared play with the active board given clear chamber priority.</span>
       </button>
       <button class="bonded-room-card" data-action="begin" data-home-tab="journal" ${state.loadingConv ? "disabled" : ""}>
         <span class="bonded-room-kicker">Reflect</span>
-        <strong>Review the bond record</strong>
+        <strong>Review the bond archive</strong>
         <span>Journal Room. Progression, memories, and game unlocks in one archive surface.</span>
       </button>
       <button class="bonded-room-card" data-action="begin" data-home-tab="events" ${state.loadingConv ? "disabled" : ""}>
         <span class="bonded-room-kicker">Explore</span>
         <strong>Check realm movement</strong>
-        <span>Events Room. Live events, daily quest, and world-cycle context.</span>
+        <span>Events Room. Live events, daily quests, and current world-cycle context.</span>
       </button>
     </div>
   `;
@@ -8057,14 +8067,14 @@ function buildChatView() {
                 <p class="games-intro">Choose a game to play with ${esc(spiritkin.name)}.</p>
                 <div class="games-list">
                   ${[
-                    { id: "chess", name: "Celestial Chess", icon: "\u265F", desc: "Classic strategy on a celestial board" },
-                    { id: "checkers", name: "Veil Checkers", icon: "\uD83C\uDFF1", desc: "Light against shadow across the Veil" },
+                    { id: "chess", name: "Kairo Ember Vault", icon: "\u265F", desc: "Classic strategy inside the Ember Strategy Vault" },
+                    { id: "checkers", name: "Lyra Veil Crossing", icon: "\uD83C\uDFF1", desc: "Light against shadow across the Veil Crossing Mosaic" },
                     { id: "go", name: "Star-Mapping (Go)", icon: "\uD83C\uDF0C", desc: "Preview only — not in live rotation while scoring is unfinished", previewOnly: true },
-                    { id: "spirit_cards", name: "Spirit-Cards", icon: "\uD83C\uDCCF", desc: "Spiritverse trading card game" },
-                    { id: "echo_trials", name: "Echo Trials", icon: "\uD83D\uDD14", desc: "Echoes riddles from the deep Spiritverse" },
-                    { id: "tictactoe", name: "TicTacToe of Echoes", icon: "\u25A6", desc: "Quick pattern duel with your companion" },
-                    { id: "connect_four", name: "Connect Four Constellations", icon: "\u25CF", desc: "Drop stars and connect four first" },
-                    { id: "battleship", name: "Abyssal Battleship", icon: "\u2693", desc: "Trade hidden strikes across the deep grid" }
+                    { id: "spirit_cards", name: "Elaria Archive Deck", icon: "\uD83C\uDCCF", desc: "Founder sigil cards inside the Crown Memory Archive" },
+                    { id: "echo_trials", name: "SpiritCore Echo Chamber", icon: "\uD83D\uDD14", desc: "Echo trials inside the Resonance Chamber" },
+                    { id: "tictactoe", name: "Elaria Glyph Lattice", icon: "\u25A6", desc: "Quick archive duel across the glyph lattice" },
+                    { id: "connect_four", name: "Raien Constellation Hall", icon: "\u25CF", desc: "Drop stars and connect four inside the Constellation Drop Hall" },
+                    { id: "battleship", name: "Thalassar Tide Chamber", icon: "\u2693", desc: "Trade hidden strikes across the Abyssal Tide Map" }
                   ].map(game => `
                     <button class="ritual-card ${esc(meta.cls)} ${state.pendingGameType === game.id ? 'loading' : ''} ${game.previewOnly ? 'preview-only' : ''}" data-action="start-game" data-game="${game.id}" ${(state.gameLoading || game.previewOnly) ? "disabled" : ""}>
                       <span class="ritual-icon">${game.icon}</span>

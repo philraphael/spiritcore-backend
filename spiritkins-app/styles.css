@@ -3962,6 +3962,29 @@ button:disabled {
   align-content: start;
 }
 
+.world-shell-nav-wrap {
+  max-width: 520px;
+  width: 100%;
+}
+
+.world-nav-block {
+  display: grid;
+  gap: 8px;
+}
+
+.world-nav-heading {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--realm-accent) 76%, white);
+}
+
+.world-nav-subheading {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 .bonded-world-actions {
   justify-items: stretch;
 }
@@ -3974,13 +3997,13 @@ button:disabled {
 }
 
 .bonded-room-nav {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
 .bonded-room-card,
 .world-room-tab,
 .world-subnav-tab {
-  padding: 14px 16px;
+  padding: 16px 18px;
   border-radius: 20px;
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.04);
@@ -4012,7 +4035,7 @@ button:disabled {
 
 .bonded-room-kicker,
 .world-room-tab-label {
-  font-size: 0.74rem;
+  font-size: 0.76rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--realm-accent) 74%, white);
@@ -4029,24 +4052,43 @@ button:disabled {
 }
 
 .world-primary-nav {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
 .world-subnav {
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .world-room-tab,
 .world-subnav-tab {
-  min-height: 58px;
-  font-size: 0.95rem;
+  min-height: 82px;
+  font-size: 0.98rem;
   font-weight: 700;
 }
 
 .world-subnav-tab {
-  min-height: 46px;
-  font-size: 0.86rem;
+  min-height: 68px;
+  font-size: 0.9rem;
   font-weight: 600;
+}
+
+.world-room-tab,
+.world-subnav-tab {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.world-room-tab-copy,
+.world-subnav-copy {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.world-subnav-label {
+  color: var(--text);
 }
 
 .bonded-world-grid,
@@ -4068,6 +4110,12 @@ button:disabled {
   align-content: start;
 }
 
+.bonded-support-rail,
+.bonded-home-support-rail,
+.chat-stage {
+  scrollbar-gutter: stable;
+}
+
 .bonded-world-lower {
   grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
   align-items: start;
@@ -4078,12 +4126,12 @@ button:disabled {
 }
 
 .world-shell-body {
-  grid-template-columns: minmax(0, 1.24fr) minmax(320px, 0.76fr);
+  grid-template-columns: minmax(0, 1.18fr) minmax(360px, 0.82fr);
   align-items: start;
 }
 
 .chat-layout.game-focus-mode .world-shell-body {
-  grid-template-columns: minmax(0, 1.58fr) minmax(260px, 0.42fr);
+  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.5fr);
 }
 
 .presence-panel {
@@ -4132,6 +4180,15 @@ button:disabled {
   overflow: auto;
   border-radius: 30px;
   box-shadow: 0 26px 66px rgba(0, 0, 0, 0.24);
+  padding-right: 6px;
+}
+
+.bonded-support-rail {
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 28px);
+  overflow: auto;
+  padding-right: 6px;
 }
 
 .chat-rail-section {

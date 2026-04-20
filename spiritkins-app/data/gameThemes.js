@@ -28,7 +28,7 @@ const baseTheme = {
 
 export const GAME_THEMES = {
   chess: {
-    displayName: "Kairo Ember Vault",
+    displayName: "Kairo Ember Strategy Vault",
     domainLabel: "Kairo Domain",
     chamberLabel: "Ember Strategy Vault",
     moodLabel: "Archive fire and tactical gravity",
@@ -53,7 +53,7 @@ export const GAME_THEMES = {
     }
   },
   checkers: {
-    displayName: "Lyra Veil Crossing",
+    displayName: "Lyra Veil Crossing Mosaic",
     domainLabel: "Lyra Domain",
     chamberLabel: "Veil Crossing Mosaic",
     moodLabel: "Velvet intuition and mirror drift",
@@ -78,7 +78,7 @@ export const GAME_THEMES = {
     }
   },
   go: {
-    displayName: "Raien Astral Observatory",
+    displayName: "Raien Star-Map Observatory",
     domainLabel: "Raien Domain",
     chamberLabel: "Star-Map Observatory",
     moodLabel: "Sky logic and measured stillness",
@@ -103,7 +103,7 @@ export const GAME_THEMES = {
     }
   },
   spirit_cards: {
-    displayName: "Elaria Archive Deck",
+    displayName: "Elaria Crown Memory Archive",
     domainLabel: "Elaria Domain",
     chamberLabel: "Crown Memory Archive",
     moodLabel: "Luminous memory and gentle order",
@@ -153,9 +153,9 @@ export const GAME_THEMES = {
     }
   },
   tictactoe: {
-    displayName: "Elaria Glyph Lattice",
+    displayName: "Elaria Archive Glyph Lattice",
     domainLabel: "Elaria Domain",
-    chamberLabel: "Resonance Glyph Lattice",
+    chamberLabel: "Archive Glyph Lattice",
     moodLabel: "Quick archive play and bright recall",
     boardStyle: "Resonance glyph grid",
     pieceStyle: "Founder marks",
@@ -178,7 +178,7 @@ export const GAME_THEMES = {
     }
   },
   connect_four: {
-    displayName: "Raien Constellation Hall",
+    displayName: "Raien Constellation Drop Hall",
     domainLabel: "Raien Domain",
     chamberLabel: "Constellation Drop Hall",
     moodLabel: "Skyline momentum and charged rhythm",
@@ -203,7 +203,7 @@ export const GAME_THEMES = {
     }
   },
   battleship: {
-    displayName: "Thalassar Tide Chamber",
+    displayName: "Thalassar Abyssal Tide Map",
     domainLabel: "Thalassar Domain",
     chamberLabel: "Abyssal Tide Map",
     moodLabel: "Tactical depth and tidal pressure",
