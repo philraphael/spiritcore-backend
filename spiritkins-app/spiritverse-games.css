@@ -529,9 +529,9 @@
   border-radius: 22px;
   border: 1px solid rgba(255,255,255,0.08);
   background:
-    linear-gradient(180deg, rgba(4, 7, 14, 0.34), rgba(4, 7, 14, 0.56)),
+    linear-gradient(180deg, rgba(4, 7, 14, 0.16), rgba(4, 7, 14, 0.34)),
     var(--game-room-art, none),
-    radial-gradient(circle at top, var(--game-accent-soft) 0%, transparent 48%),
+    radial-gradient(circle at top, var(--game-accent-soft) 0%, transparent 56%),
     linear-gradient(180deg, var(--game-surface-top) 0%, var(--game-surface-bottom) 100%);
   background-size: cover, cover, auto, auto;
   background-position: center, center, center, center;
@@ -547,9 +547,11 @@
   position: absolute;
   inset: 0;
   background:
+    radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--game-accent) 20%, transparent) 0%, transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(255,255,255,0.08), transparent 24%),
     linear-gradient(135deg, rgba(255,255,255,0.08), transparent 34%, transparent 66%, rgba(255,255,255,0.03)),
-    var(--game-overlay-fx, none) center / 42% no-repeat;
-  opacity: 0.9;
+    var(--game-overlay-fx, none) center / 46% no-repeat;
+  opacity: 0.96;
   pointer-events: none;
 }
 
@@ -562,8 +564,13 @@
   background:
     var(--game-modal-frame, none) center / cover no-repeat,
     var(--game-accent-art, none) right -12px top 10px / min(38%, 220px) auto no-repeat;
-  opacity: 0.3;
+  opacity: 0.38;
   pointer-events: none;
+}
+
+.sv-theme-shell > * {
+  position: relative;
+  z-index: 1;
 }
 
 .chess-showcase-shell {

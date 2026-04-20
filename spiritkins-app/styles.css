@@ -1044,6 +1044,7 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(380px, 0.9fr);
   gap: 22px;
+  align-items: start;
 }
 
 .selection-copy,
@@ -1067,7 +1068,7 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(180px, 240px) 1fr;
   gap: 20px;
-  align-items: center;
+  align-items: start;
 }
 
 .selection-focus-stage,
@@ -1090,11 +1091,16 @@ button:disabled {
   width: 100%;
   margin-bottom: 14px;
   min-height: 150px;
+  isolation: isolate;
 }
 
 .spiritkin-media-panel.focus,
 .spiritkin-media-panel.profile {
   min-height: 190px;
+}
+
+.spiritkin-media-panel.bonded {
+  min-height: 220px;
 }
 
 .sk-card .spiritkin-media-panel.card {
@@ -1304,8 +1310,15 @@ button:disabled {
 }
 
 .founder-pair-inline img,
-.profile-canon-art img {
+.profile-canon-art img,
+.spiritkin-media-panel .composite-visual-primary,
+.spiritkin-media-panel .composite-visual-fallback {
   aspect-ratio: 16 / 10;
+}
+
+.spiritkin-media-panel .composite-visual-primary,
+.spiritkin-media-panel .composite-visual-fallback {
+  object-position: center 26%;
 }
 
 .chronicle-shelf-art img {
@@ -3246,7 +3259,7 @@ button:disabled {
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
 .spiritkin-intro-video {
-  margin-bottom: 24px;
+  margin-bottom: 12px;
   animation: slideInUp 0.5s ease-out;
 }
 
@@ -3267,16 +3280,33 @@ button:disabled {
   gap: 16px;
 }
 
+.selection-focus.pending .selection-focus-stage {
+  gap: 18px;
+}
+
+.selection-focus.pending .spiritkin-media-panel.focus {
+  min-height: 240px;
+}
+
+.selection-focus.pending .portrait-focus {
+  max-width: 220px;
+  justify-self: center;
+}
+
 .spiritkin-intro-video .video-player-wrapper {
   max-width: 100%;
-  border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  min-height: clamp(240px, 34vw, 420px);
+  border-radius: 22px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
+  overflow: hidden;
 }
 
 .spiritkin-intro-video .video-player-element {
   width: 100%;
-  height: auto;
+  height: 100%;
   display: block;
+  object-fit: cover;
+  object-position: center 24%;
 }
 
 /* Hover effect for intro video */
@@ -3872,7 +3902,7 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 0 16px;
+  padding: 0 0 12px;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--line);
   overflow-x: visible;
@@ -3889,6 +3919,7 @@ button:disabled {
   border-bottom: 2px solid transparent;
   transition: all 0.2s ease;
   white-space: nowrap;
+  flex: 0 0 auto;
   flex-shrink: 0;
 }
 

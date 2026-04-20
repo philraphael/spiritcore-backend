@@ -190,6 +190,41 @@ const COMPOSITE_VISUAL_ASSETS = {
   }
 };
 
+const AUTHORITATIVE_FOUNDER_MEDIA = {
+  Elaria: {
+    founderCard: activeAssetUrl("concepts", "Elaria.png"),
+    focus: activeAssetUrl("concepts", "Elaria.png"),
+    profile: activeAssetUrl("concepts", "Elaria.png"),
+    bonded: activeAssetUrl("concepts", "Elaria.png"),
+    fallbackCard: activeAssetUrl("concepts", "Elaria Left Thalassar right.png"),
+    portrait: activeAssetUrl("concepts", "Elaria.png"),
+    canonSupplement: activeAssetUrl("concepts", "Elaria Left Thalassar right.png")
+  },
+  Thalassar: {
+    founderCard: activeAssetUrl("concepts", "thalassar.png"),
+    focus: activeAssetUrl("concepts", "thalassar.png"),
+    profile: activeAssetUrl("concepts", "thalassar.png"),
+    bonded: activeAssetUrl("concepts", "thalassar.png"),
+    fallbackCard: activeAssetUrl("concepts", "Elaria Left Thalassar right.png"),
+    portrait: activeAssetUrl("concepts", "thalassar.png"),
+    canonSupplement: activeAssetUrl("concepts", "Elaria Left Thalassar right.png")
+  }
+};
+
+function getSpiritkinMediaAuthority(name) {
+  const composite = COMPOSITE_VISUAL_ASSETS.spiritkins[String(name || "").trim()] || {};
+  const override = AUTHORITATIVE_FOUNDER_MEDIA[String(name || "").trim()] || {};
+  return {
+    founderCard: override.founderCard || composite.card || "",
+    focus: override.focus || composite.focus || composite.profile || "",
+    profile: override.profile || composite.profile || composite.focus || "",
+    bonded: override.bonded || composite.profile || composite.focus || "",
+    fallbackCard: override.fallbackCard || composite.card || composite.focus || "",
+    portrait: override.portrait || "",
+    canonSupplement: override.canonSupplement || composite.card || ""
+  };
+}
+
 function worldArtImage(filename, alt, cls = "", eager = false) {
   return `
     <div class="world-art-frame ${esc(cls)}">
@@ -1607,12 +1642,12 @@ function portraitSvg(name) {
 }
 
 function getSpiritkinPortraitPath(name) {
+  const authority = getSpiritkinMediaAuthority(name);
+  if (authority.portrait) return authority.portrait;
   const portraitMap = {
     "Lyra": "/portraits/lyra_portrait.png",
     "Raien": "/portraits/raien_portrait.png",
     "Kairo": "/portraits/kairo_portrait.png",
-    "Elaria": activeAssetUrl("concepts", "Elaria.png"),
-    "Thalassar": activeAssetUrl("concepts", "thalassar.png")
   };
   return portraitMap[name] || "";
 }
@@ -1753,11 +1788,25 @@ function buildCompositeVisualFrame(primarySrc, fallbackSrc, alt, cls = "", eager
 }
 
 function buildSpiritkinMediaPanel(name, surface = "focus") {
-  const primarySrc = COMPOSITE_VISUAL_ASSETS.spiritkins[name]?.[surface] || "";
+  const authority = getSpiritkinMediaAuthority(name);
+  const primarySrc =
+    (surface === "card" ? authority.founderCard
+      : surface === "profile" ? authority.profile
+      : surface === "bonded" ? authority.bonded
+      : authority.focus) ||
+    COMPOSITE_VISUAL_ASSETS.spiritkins[name]?.[surface] ||
+    "";
   if (!primarySrc) return "";
-  const fallbackPortrait = getSpiritkinPortraitPath(name);
+  const fallbackPortrait = authority.fallbackCard || getSpiritkinPortraitPath(name);
   const speakingCls = isSpiritkinSpeechActive(name) ? "is-speaking" : "";
   return buildCompositeVisualFrame(primarySrc, fallbackPortrait, `${name} visual panel`, `spiritkin-media-panel ${surface} ${speakingCls}`, surface !== "card");
+}
+
+function buildSpiritkinCanonPanel(name, cls = "profile-canon-art") {
+  const authority = getSpiritkinMediaAuthority(name);
+  const primarySrc = authority.canonSupplement || authority.fallbackCard || authority.profile || authority.focus || "";
+  if (!primarySrc) return "";
+  return buildCompositeVisualFrame(primarySrc, getSpiritkinPortraitPath(name), `${name} canon panel`, cls, false);
 }
 
 function buildCompanionPresenceDock(spiritkin) {
@@ -4288,6 +4337,7 @@ async function beginConversation() {
   state.loadingConv = false;
   normalizeInteractionState("beginConversation");
   render();
+  revealCurrentFocus({ selector: ".chat-stage, .thread-wrap" });
   scrollThread({ reveal: true });
   if (!state.convError && state.conversationId) {
     await deliverConversationGreeting("newSession");
@@ -7020,8 +7070,10 @@ function buildResonanceDepth(spiritkinName, cls) {
 function buildBondPreview(spiritkin, pending) {
   const essence = Array.isArray(spiritkin.essence) ? spiritkin.essence.slice(0, 3) : [];
   const mediaConfig = getSpiritkinMediaConfig(spiritkin.name);
-  const introVideo = mediaConfig?.introTrailer?.path || null;
-  const introTrailerPending = mediaConfig?.introTrailer?.status === "awaiting_media";
+  const introVideo = pending ? (mediaConfig?.introTrailer?.path || null) : null;
+  const introTrailerPending = pending && mediaConfig?.introTrailer?.status === "awaiting_media";
+  const primaryMediaSurface = pending ? "focus" : "bonded";
+  const showStagePortrait = !pending || !introVideo;
   const selfReveal = getSpiritkinSelfReveal(spiritkin);
   const introPrompt = getSpiritkinIntroPrompt(spiritkin);
   return `
@@ -7058,9 +7110,9 @@ function buildBondPreview(spiritkin, pending) {
             <span>${esc(`${spiritkin.name}'s self-reveal pipeline is wired and waiting for final trailer media.`)}</span>
           </div>
         ` : ""}
-        ${buildSpiritkinMediaPanel(spiritkin.name, pending ? "card" : "focus")}
+        ${buildSpiritkinMediaPanel(spiritkin.name, primaryMediaSurface)}
         ${buildSigil(spiritkin.ui, "focus", spiritkin.ui.symbol)}
-        ${buildPortrait(spiritkin.name, "portrait-focus", spiritkin.ui.cls)}
+        ${showStagePortrait ? buildPortrait(spiritkin.name, "portrait-focus", spiritkin.ui.cls) : ""}
       </div>
         <div class="selection-focus-copy">
           <div class="focus-kicker">${pending ? "Pending bond" : "Bonded companion"}</div>
@@ -7305,11 +7357,7 @@ function buildChatView() {
               
               <p class="presence-atmosphere">${esc(meta.realmText)}</p>
               ${buildGovernanceSummary()}
-              ${worldArtImage(
-                spiritkin.name === "Elaria" ? WORLD_ART.elaria : spiritkin.name === "Thalassar" ? WORLD_ART.thalassar : WORLD_ART.ensemble,
-                `${spiritkin.name} within the Spiritverse canon art`,
-                "profile-canon-art"
-              )}
+              ${buildSpiritkinCanonPanel(spiritkin.name, "profile-canon-art")}
               
               ${currentBond.stage >= 1 ? `
                 <div class="realm-travel-section">
@@ -8151,6 +8199,7 @@ async function onClick(event) {
     writeJson(RETENTION_TELEMETRY_KEY, telemetry);
     state.retentionTelemetry = telemetry;
     render();
+    revealCurrentFocus({ selector: ".return-summary-card, .return-layer, .selection-view" });
     return;
   }
 
@@ -8278,6 +8327,7 @@ async function onClick(event) {
     normalizeInteractionState("open-bond-manager");
     persistSession();
     render();
+    revealCurrentFocus({ selector: ".selection-view, .spiritkin-grid" });
     return;
   }
 
@@ -8299,6 +8349,7 @@ async function onClick(event) {
       state.statusError = false;
       normalizeInteractionState("bonded-card");
       render();
+      revealCurrentFocus({ selector: ".selection-view.bonded-home, .bond-home-copy" });
     }
     return;
   }
@@ -8355,6 +8406,9 @@ async function onClick(event) {
     state.issueReporterOpen = !state.issueReporterOpen;
     if (!state.issueReporterOpen) state.issueReportContextNote = "";
     render();
+    if (state.issueReporterOpen) {
+      revealCurrentFocus({ selector: ".issue-reporter-panel, .issue-reporter-sheet, .issue-reporter-fab" });
+    }
     return;
   }
 
@@ -8518,6 +8572,7 @@ async function onClick(event) {
       state.dailyQuestStarted = true;
       await transitionPresenceSurface("profile", { announce: false });
       render();
+      revealCurrentFocus({ selector: ".composer-bar, [data-field='chat-input']" });
       // Focus the textarea
       setTimeout(() => {
         const textarea = document.querySelector('[data-field="chat-input"]');
@@ -8541,6 +8596,7 @@ async function onClick(event) {
   if (action === "open-realm-travel") {
     state.realmTravelOpen = true;
     render();
+    revealCurrentFocus({ selector: ".realm-travel-modal, .realm-travel-content" });
     return;
   }
 
