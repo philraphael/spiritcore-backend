@@ -55,7 +55,7 @@ const ACTIVE_WORLD_ART_DIRS = [
   path.join(ACTIVE_ASSET_DIR, "rooms"),
   path.join(ACTIVE_ASSET_DIR, "concepts")
 ];
-const SPIRITVERSE_APP_BUILD = "20260417033000";
+const SPIRITVERSE_APP_BUILD = "20260419223000";
 
 const PORT = config.port;
 const USE_LLM = config.useLLM;
@@ -249,7 +249,7 @@ app.get("/operator/:asset", { preHandler: app.requireAdminAccess }, async (req, 
 });
 
 app.get("/app", async (_req, reply) => {
-  const html = await readFile(path.join(USER_APP_DIR, "index.html"), "utf8");
+  const html = injectSpiritverseBuild(await readFile(path.join(USER_APP_DIR, "index.html"), "utf8"));
   reply.header("Cache-Control", "no-store, max-age=0, must-revalidate");
   reply.header("X-Spiritverse-Build", SPIRITVERSE_APP_BUILD);
   return reply.type("text/html; charset=utf-8").send(html);
@@ -257,7 +257,7 @@ app.get("/app", async (_req, reply) => {
 
 app.get("/command-center", { preHandler: app.requireAdminAccess }, async (req, reply) => {
   setAdminSessionCookie(req, reply);
-  const html = await readFile(path.join(USER_APP_DIR, "command-center.html"), "utf8");
+  const html = injectSpiritverseBuild(await readFile(path.join(USER_APP_DIR, "command-center.html"), "utf8"));
   return reply.type("text/html; charset=utf-8").send(html);
 });
 
@@ -891,4 +891,7 @@ try {
 } catch (e) {
   app.log.error(e, "Failed to start");
   process.exit(1);
+}
+function injectSpiritverseBuild(content) {
+  return String(content).replaceAll("__SPIRITVERSE_APP_BUILD__", SPIRITVERSE_APP_BUILD);
 }

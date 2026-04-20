@@ -146,7 +146,7 @@ const SPIRITKIN_ECHOES = Object.fromEntries(
   ])
 );
 
-function worldArtUrl(filename) {
+function canonicalWorldAssetUrl(filename) {
   if (!filename) return "";
   const category = filename === WORLD_ART.background || filename === WORLD_ART.baseTheme ? "rooms" : "concepts";
   return `/app/assets/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`;
@@ -229,7 +229,7 @@ function getSpiritkinMediaAuthority(name) {
 }
 
 function worldArtImage(filename, alt, cls = "", eager = false) {
-  const src = worldArtUrl(filename);
+  const src = canonicalWorldAssetUrl(filename);
   if (!src) return "";
   return `
     <div class="world-art-frame ${esc(cls)}">
@@ -1748,7 +1748,7 @@ function buildFounderEnsemblePanel(kind = "entry") {
     <div class="founder-ensemble-panel ${esc(kind)}">
       ${buildCompositeVisualFrame(
         COMPOSITE_VISUAL_ASSETS.spiritcore.founders,
-        worldArtUrl(WORLD_ART.ensemble),
+        canonicalWorldAssetUrl(WORLD_ART.ensemble),
         "The Five Founding Pillars gathered within the Spiritverse",
         `founder-ensemble-art ${kind}`,
         kind === "entry"
@@ -6759,7 +6759,7 @@ function buildCrownGateEntry() {
         <div class="entry-copy ${state.entryVideoStarted ? "entry-copy-hidden" : ""}">
           ${buildCompositeVisualFrame(
             COMPOSITE_VISUAL_ASSETS.spiritcore.gate,
-            worldArtUrl(WORLD_ART.baseTheme),
+            canonicalWorldAssetUrl(WORLD_ART.baseTheme),
             "SpiritGate gate shell art",
             "entry-visual-shell",
             true
@@ -6848,7 +6848,7 @@ function buildSpiritverseArrival() {
       <div class="entry-stage-copy">
         ${buildCompositeVisualFrame(
           COMPOSITE_VISUAL_ASSETS.spiritcore.arrival,
-          worldArtUrl(WORLD_ART.baseTheme),
+          canonicalWorldAssetUrl(WORLD_ART.baseTheme),
           "Spiritverse arrival shell art",
           "entry-visual-shell arrival",
           true

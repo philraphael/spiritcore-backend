@@ -363,7 +363,7 @@ function renderGeneratorTab() {
             <label>Shot style<input name="shotStyle" value="cinematic reveal" /></label>
             <label>Script / voice line<textarea name="scriptVoiceLine" rows="3">${escapeHtml(spiritkin?.ui?.bondLine || "")}</textarea></label>
             <label>Music mood<input name="musicMood" value="mythic restrained wonder" /></label>
-            <label>Attached assets<textarea name="attachedAssets" rows="2" placeholder="/world-art/..., /generated-spiritkins/..."></textarea></label>
+            <label>Attached assets<textarea name="attachedAssets" rows="2" placeholder="/app/assets/..., /generated-spiritkins/..."></textarea></label>
             <label>Seed<input type="number" name="seed" value="" placeholder="auto" /></label>
             <label>Slot
               <select name="slotName">
