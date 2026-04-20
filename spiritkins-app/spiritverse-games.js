@@ -123,27 +123,27 @@ function resolveThemeEnvironmentOverrides(theme) {
   const runtime = (category, filename) => filename ? activeRuntimeAsset(category, filename) : "";
   const overrides = {
     crown: {
-      roomUrl: runtime("ui", "spiritcore-media-hero.png"),
-      boardUrl: runtime("ui", "welcome_open.png"),
+      roomUrl: runtime("rooms", "Spiritverse background base theme.png"),
+      boardUrl: runtime("concepts", "Spiritkins in spiritverse.png"),
       accentUrl: runtime("ui", "welcome_close.png")
     },
     veil: {
-      roomUrl: runtime("ui", "lyra_open.png"),
+      roomUrl: runtime("rooms", "room_chess_lyra_celestial_scene.png"),
       boardUrl: runtime("concepts", "spiritverse_chess_lyra_theme.png"),
       accentUrl: runtime("ui", "lyra_close.png")
     },
     ember: {
-      roomUrl: runtime("ui", "kairo_open.png"),
+      roomUrl: runtime("rooms", "room_battleship_forge_scene.png"),
       boardUrl: runtime("concepts", "spiritverse_battleship_forge_theme.png"),
       accentUrl: runtime("ui", "kairo_close.png")
     },
     astral: {
-      roomUrl: runtime("ui", "raien_open.png"),
+      roomUrl: runtime("rooms", "room_connect4_waterfall_scene.png"),
       boardUrl: runtime("concepts", "spiritverse_connect_four_waterfall_theme.png"),
       accentUrl: runtime("ui", "raien_close.png")
     },
     abyssal: {
-      roomUrl: runtime("concepts", "thalassar.png"),
+      roomUrl: runtime("rooms", "room_go_aquatic_scene.png"),
       boardUrl: runtime("concepts", "spiritverse_go_aquatic_theme.png"),
       accentUrl: runtime("concepts", "Elaria Left Thalassar right.png")
     }

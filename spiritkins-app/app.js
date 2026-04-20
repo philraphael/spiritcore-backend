@@ -113,6 +113,7 @@ let spiritGateArrivalPlaybackSafetyTimer = null;
 let spiritGateActiveAttemptId = 0;
 let spiritGateTransitionRevealTimer = null;
 let spiritGateTransitionRouteTimer = null;
+const selectionTrailerFailures = new Set();
 const VOICE_GUIDANCE_KEY = "sk_voice_guidance_dismissed";
 
 const CANON_SPIRITKIN_MAP = Object.fromEntries(CANON_SPIRITKINS.map((spiritkin) => [spiritkin.name, spiritkin]));
@@ -3170,6 +3171,134 @@ function syncMountedMedia({ attemptPlay = false } = {}) {
   });
 }
 
+function clearSelectionTrailerFailure(name) {
+  if (!name) return;
+  selectionTrailerFailures.delete(String(name));
+}
+
+function markSelectionTrailerFailure(name, detail = {}) {
+  const normalizedName = String(name || "").trim();
+  if (!normalizedName || selectionTrailerFailures.has(normalizedName)) return;
+  selectionTrailerFailures.add(normalizedName);
+  console.warn("TRAILER_PLAY_FAIL", {
+    spiritkin: normalizedName,
+    fallback: "still",
+    ...detail
+  });
+  if (state.pendingBondSpiritkin?.name === normalizedName) {
+    render();
+  }
+}
+
+function syncSelectionTrailers() {
+  const pendingName = state.pendingBondSpiritkin?.name || "";
+  if (!pendingName || selectionTrailerFailures.has(pendingName)) return;
+  const mediaConfig = getSpiritkinMediaConfig(pendingName);
+  const trailerPath = mediaConfig?.introTrailer?.path || "";
+  if (!trailerPath) return;
+
+  console.info("TRAILER_SELECTED", {
+    spiritkin: pendingName,
+    src: trailerPath,
+    muted: state.mediaMuted
+  });
+
+  const trailers = Array.from(document.querySelectorAll(".spiritkin-intro-video .video-player-element[data-trailer-kind='intro']"));
+  trailers.forEach((video) => {
+    const owner = video.dataset.trailerOwner || pendingName;
+    const src = video.currentSrc || video.querySelector("source")?.src || trailerPath;
+    console.info("TRAILER_MOUNTED", {
+      spiritkin: owner,
+      src,
+      muted: video.muted,
+      hidden: video.offsetParent === null
+    });
+
+    if (video.dataset.trailerBound !== "1") {
+      video.dataset.trailerBound = "1";
+      video.addEventListener("error", () => {
+        markSelectionTrailerFailure(owner, {
+          spiritkin: owner,
+          src,
+          reason: "element-error",
+          mediaError: video.error?.message || video.error?.code || "unknown"
+        });
+      });
+      video.addEventListener("loadedmetadata", () => {
+        console.info("TRAILER_PLAY_ATTEMPT", {
+          spiritkin: owner,
+          src,
+          phase: "metadata-ready",
+          muted: video.muted
+        });
+      });
+    }
+
+    video.defaultMuted = !!state.mediaMuted;
+    video.muted = !!state.mediaMuted;
+    video.playsInline = true;
+
+    const attemptPlayback = (label, forceMuted = state.mediaMuted) => {
+      video.defaultMuted = !!forceMuted;
+      video.muted = !!forceMuted;
+      video.volume = forceMuted ? 0 : 1;
+      console.info("TRAILER_PLAY_ATTEMPT", {
+        spiritkin: owner,
+        src,
+        phase: label,
+        muted: video.muted
+      });
+      const playback = video.play?.();
+      if (!playback?.then) {
+        console.info("TRAILER_PLAY_SUCCESS", {
+          spiritkin: owner,
+          src,
+          phase: label,
+          muted: video.muted,
+          mode: "sync"
+        });
+        return Promise.resolve();
+      }
+      return playback.then(() => {
+        console.info("TRAILER_PLAY_SUCCESS", {
+          spiritkin: owner,
+          src,
+          phase: label,
+          muted: video.muted
+        });
+      });
+    };
+
+    if (!video.paused && !video.ended && video.readyState >= 2) {
+      console.info("TRAILER_PLAY_SUCCESS", {
+        spiritkin: owner,
+        src,
+        phase: "already-playing",
+        muted: video.muted
+      });
+      return;
+    }
+
+    attemptPlayback("initial", state.mediaMuted).catch((error) => {
+      if (!state.mediaMuted) {
+        attemptPlayback("muted-retry", true).catch((retryError) => {
+          markSelectionTrailerFailure(owner, {
+            src,
+            reason: "play-rejected-after-muted-retry",
+            error: retryError?.message || retryError?.name || "unknown"
+          });
+        });
+        return;
+      }
+      markSelectionTrailerFailure(owner, {
+        src,
+        reason: "play-rejected",
+        error: error?.message || error?.name || "unknown"
+      });
+    });
+  });
+}
+
 function logSpiritGate(stage, detail = {}) {
   const snapshot = {
     entryAccepted: state.entryAccepted,
@@ -6137,6 +6266,7 @@ function render() {
     enforceEntryVoiceSilence();
     root.innerHTML = buildApp();
     syncMountedMedia({ attemptPlay: false });
+    syncSelectionTrailers();
     syncEntryCinematics();
     if (state.voiceMode) maybeAutoOpenGameMic();
     if (typeof window.__svMarkBootReady === "function") {
@@ -7193,7 +7323,8 @@ function buildResonanceDepth(spiritkinName, cls) {
 function buildBondPreview(spiritkin, pending) {
   const essence = Array.isArray(spiritkin.essence) ? spiritkin.essence.slice(0, 3) : [];
   const mediaConfig = getSpiritkinMediaConfig(spiritkin.name);
-  const introVideo = pending ? (mediaConfig?.introTrailer?.path || null) : null;
+  const introVideoFailed = pending && selectionTrailerFailures.has(spiritkin.name);
+  const introVideo = pending && !introVideoFailed ? (mediaConfig?.introTrailer?.path || null) : null;
   const introTrailerPending = pending && mediaConfig?.introTrailer?.status === "awaiting_media";
   const primaryMediaSurface = pending ? "focus" : "bonded";
   const showStagePortrait = !pending || !introVideo;
@@ -7213,6 +7344,8 @@ function buildBondPreview(spiritkin, pending) {
               <div class="video-player-wrapper spiritkin-intro">
                 <video
                   class="video-player-element"
+                  data-trailer-kind="intro"
+                  data-trailer-owner="${esc(spiritkin.name)}"
                   autoplay
                   ${state.mediaMuted ? "muted" : ""}
                   playsinline
@@ -7236,6 +7369,12 @@ function buildBondPreview(spiritkin, pending) {
           <div class="spiritkin-media-slot-note">
             <strong>${esc(mediaConfig.introTrailer.label)}</strong>
             <span>${esc(`${spiritkin.name}'s self-reveal pipeline is wired and waiting for final trailer media.`)}</span>
+          </div>
+        ` : ""}
+        ${introVideoFailed ? `
+          <div class="spiritkin-media-slot-note">
+            <strong>Trailer fallback engaged</strong>
+            <span>${esc(`${spiritkin.name}'s reveal trailer could not start in this browser state, so the authoritative still reveal is shown instead.`)}</span>
           </div>
         ` : ""}
         ${showStageMediaPanel ? buildSpiritkinMediaPanel(spiritkin.name, primaryMediaSurface) : ""}
@@ -8411,6 +8550,7 @@ async function onClick(event) {
 
   if (action === "preview-primary" || action === "select-spiritkin") {
     const candidate = state.spiritkins[Number(element.dataset.index)] ?? null;
+    clearSelectionTrailerFailure(candidate?.name);
     state.pendingBondSpiritkin = candidate;
     state.selectedSpiritkin = candidate || state.selectedSpiritkin;
     state.showHomeView = !!state.primarySpiritkin;
