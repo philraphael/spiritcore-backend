@@ -44,3 +44,7 @@ tmp-*
 tmp-live-* 
 tmp-chrome-* 
 *.png 
+!Spiritverse_MASTER_ASSETS/ACTIVE/concepts/Elaria.png
+!Spiritverse_MASTER_ASSETS/ACTIVE/concepts/thalassar.png
+!Spiritverse_MASTER_ASSETS/ACTIVE/concepts/Elaria Left Thalassar right.png
+!Spiritverse_MASTER_ASSETS/ACTIVE/rooms/Spiritverse background base theme.png
