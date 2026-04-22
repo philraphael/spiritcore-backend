@@ -51,12 +51,13 @@ const __dirname = path.dirname(__filename);
 const OPERATOR_CONSOLE_DIR = path.join(__dirname, "operator-console");
 const USER_APP_DIR = path.join(__dirname, "spiritkins-app");
 const ACTIVE_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "ACTIVE");
+const SPIRITKIN_VIDEO_ASSET_DIR = path.join(__dirname, "Spiritverse_MASTER_ASSETS", "Spiritkin_Videos");
 const GENERATED_SPIRITKIN_DIR = path.join(__dirname, "runtime_data", "generated-spiritkins");
 const ACTIVE_WORLD_ART_DIRS = [
   path.join(ACTIVE_ASSET_DIR, "rooms"),
   path.join(ACTIVE_ASSET_DIR, "concepts")
 ];
-const SPIRITVERSE_APP_BUILD = "20260422134500";
+const SPIRITVERSE_APP_BUILD = "20260422151500";
 
 const PORT = config.port;
 const USE_LLM = config.useLLM;
@@ -105,6 +106,8 @@ function getStaticAssetMimeType(filePath) {
   if (ext === ".png") return "image/png";
   if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
   if (ext === ".webp") return "image/webp";
+  if (ext === ".mp4") return "video/mp4";
+  if (ext === ".webm") return "video/webm";
   return "application/octet-stream";
 }
 
@@ -291,7 +294,7 @@ app.get("/app/:asset", async (req, reply) => {
 
 app.get("/app/data/:asset", async (req, reply) => {
   const { asset } = req.params;
-  if (!["spiritverseCanon.js", "gameThemes.js", "gameAssetManifest.js", "spiritkinRuntimeConfig.js"].includes(asset)) {
+  if (!["spiritverseCanon.js", "gameThemes.js", "gameAssetManifest.js", "spiritkinRuntimeConfig.js", "spiritkinVideoManifest.js"].includes(asset)) {
     return reply.code(404).send({ ok: false, error: "Not found" });
   }
 
@@ -308,6 +311,12 @@ app.get("/app/active-assets/*", async (req, reply) => {
 
 app.get("/app/assets/*", async (req, reply) => {
   return sendStaticAssetFromRoot(reply, ACTIVE_ASSET_DIR, req.params["*"]);
+});
+
+app.get("/app/spiritkin-videos/*", async (req, reply) => {
+  reply.header("Cache-Control", "no-store, max-age=0, must-revalidate");
+  reply.header("X-Spiritverse-Build", SPIRITVERSE_APP_BUILD);
+  return sendStaticAssetFromRoot(reply, SPIRITKIN_VIDEO_ASSET_DIR, req.params["*"]);
 });
 
 // Compatibility aliases for older frontend builds. These now resolve from ACTIVE.

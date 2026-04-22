@@ -64,6 +64,7 @@ import { spiritkins as CANON_SPIRITKINS, realms as CANON_REALMS, charter as CANO
 import { resolveGameAssetUrl } from "./data/gameAssetManifest.js";
 import { getGameTheme } from "./data/gameThemes.js";
 import { createPendingCreatorMediaSlots, getSpiritkinMediaConfig, SPIRITKIN_CREATOR_FOUNDATION } from "./data/spiritkinRuntimeConfig.js";
+import { getSpiritkinVideoSet, resolveSpiritkinVideo } from "./data/spiritkinVideoManifest.js";
 
 function createSpiritverseGamesFallback() {
   return {
@@ -1702,10 +1703,126 @@ function isSpiritkinSpeechActive(name) {
   return !!(_audioPlaying || (speechState.isSpeaking && speechState.turnPhase === "spirit_response"));
 }
 
+function getLatestSpiritkinEmotionTone(name) {
+  const activeName = state.selectedSpiritkin?.name || state.primarySpiritkin?.name || null;
+  if (!name || !activeName || activeName !== name) return "";
+  for (let index = state.messages.length - 1; index >= 0; index -= 1) {
+    const message = state.messages[index];
+    if (message?.role !== "assistant") continue;
+    const tone = sanitizeTone(message.emotionTone);
+    if (tone) return tone;
+  }
+  return "";
+}
+
+function mapEmotionToneToVideoState(tone) {
+  const normalized = String(tone || "").trim().toLowerCase();
+  if (!normalized) return "";
+  if (/(calm|gentle|soft|warm|peace|still|steady|measured|composed|tender|quiet|resonant)/.test(normalized)) {
+    return "calm";
+  }
+  if (/(excite|bright|playful|charged|electric|bold|urgent|curious|wonder|light|open|dream|teasing|confident)/.test(normalized)) {
+    return "excited";
+  }
+  if (/(serious|firm|direct|clear|sharp|regal|lawful|solemn|focused|commanding|precise|deep|protective|challenging)/.test(normalized)) {
+    return "serious";
+  }
+  return "";
+}
+
+function buildSpiritkinVideoFailureKey(name, src) {
+  return `${String(name || "").trim().toLowerCase()}::${String(src || "").trim()}`;
+}
+
+function rememberSpiritkinVideoFailure(name, src) {
+  if (!name || !src) return;
+  state.spiritkinVideoFailures = {
+    ...(state.spiritkinVideoFailures || {}),
+    [buildSpiritkinVideoFailureKey(name, src)]: true
+  };
+}
+
+function isSpiritkinVideoFailed(name, src) {
+  if (!name || !src) return false;
+  return !!state.spiritkinVideoFailures?.[buildSpiritkinVideoFailureKey(name, src)];
+}
+
+function canRenderSpiritkinVideo(name, classSignature = "") {
+  const activeName = state.selectedSpiritkin?.name || state.primarySpiritkin?.name || null;
+  if (!name || !activeName || activeName !== name) return false;
+  const classes = String(classSignature || "");
+  if (/portrait-card|portrait-md/.test(classes)) return false;
+  return true;
+}
+
+function getSpiritkinVisualState(name) {
+  const speaking = isSpiritkinSpeechActive(name);
+  const emotionTone = getLatestSpiritkinEmotionTone(name);
+  const emotionalState = mapEmotionToneToVideoState(emotionTone);
+  if (speaking && emotionalState) {
+    return { state: emotionalState, phase: "emotional", emotionTone };
+  }
+  if (speaking) {
+    return { state: "speaking", phase: "speaking", emotionTone };
+  }
+  return { state: "idle", phase: "idle", emotionTone };
+}
+
+function getSpiritkinVideoCandidates(name, desiredState) {
+  const set = getSpiritkinVideoSet(name);
+  if (!set) return [];
+  const normalizedState = String(desiredState || "").trim().toLowerCase();
+  if (normalizedState === "idle") return set.states.idle || [];
+  if (normalizedState === "speaking") return set.states.speaking || [];
+  if (normalizedState === "calm" || normalizedState === "excited" || normalizedState === "serious") {
+    return set.states.emotional?.[normalizedState] || [];
+  }
+  if (normalizedState === "special") return set.states.special || [];
+  return [];
+}
+
+function resolveSpiritkinVideoClip(name, desiredState) {
+  const candidates = getSpiritkinVideoCandidates(name, desiredState).filter((src) => !isSpiritkinVideoFailed(name, src));
+  if (candidates.length) return candidates[0];
+  const manifestResolved = resolveSpiritkinVideo(name, desiredState);
+  return manifestResolved && !isSpiritkinVideoFailed(name, manifestResolved) ? manifestResolved : "";
+}
+
+function buildSpiritkinVideoLayer(name, classSignature = "") {
+  if (!canRenderSpiritkinVideo(name, classSignature)) return "";
+  const visualState = getSpiritkinVisualState(name);
+  const desiredSrc = resolveSpiritkinVideoClip(name, visualState.state);
+  const speakingSrc = visualState.state !== "speaking" ? resolveSpiritkinVideoClip(name, "speaking") : "";
+  const idleSrc = visualState.state !== "idle" ? resolveSpiritkinVideoClip(name, "idle") : "";
+  const src = visualState.phase === "idle"
+    ? desiredSrc
+    : (desiredSrc || speakingSrc || idleSrc);
+  if (!src) return "";
+  return `
+    <div class="spiritkin-video-layer ${esc(visualState.phase)}" data-video-state="${esc(visualState.state)}" data-spiritkin-video-name="${esc(name)}">
+      <video
+        class="spiritkin-video-element"
+        src="${src}"
+        muted
+        autoplay
+        playsinline
+        ${visualState.phase === "idle" ? "loop" : "loop"}
+        preload="metadata"
+        poster="${esc(getSpiritkinPortraitPath(name))}"
+        onloadeddata="this.closest('.portrait-frame')?.classList.add('video-ready'); this.closest('.portrait-frame')?.classList.remove('video-fallback-only');"
+        onerror="this.pause(); this.removeAttribute('src'); this.load(); this.closest('.portrait-frame')?.classList.add('video-fallback-only'); window.__svSpiritkinVideoFailure && window.__svSpiritkinVideoFailure('${esc(name)}', '${esc(src)}');"
+      ></video>
+    </div>
+  `;
+}
+
 function buildPortrait(name, cls, size) {
   const portraitPath = getSpiritkinPortraitPath(name);
-  const eagerPortrait = size === "portrait-card" || size === "portrait-focus" || size === "portrait-hero";
+  const classSignature = `${cls || ""} ${size || ""}`.trim();
+  const eagerPortrait = /portrait-card|portrait-focus|portrait-hero/.test(classSignature);
   const speakingCls = isSpiritkinSpeechActive(name) ? "is-speaking" : "";
+  const videoLayer = buildSpiritkinVideoLayer(name, classSignature);
+  const videoEnabledCls = videoLayer ? "has-video" : "";
 
   const portraitContent = portraitPath 
     ? `
@@ -1723,9 +1840,9 @@ function buildPortrait(name, cls, size) {
     `
     : portraitSvg(name);
   return `
-    <div class="portrait-frame ${portraitPath ? "has-remote-image" : ""} ${speakingCls} ${esc(cls)} ${esc(size)}">
+    <div class="portrait-frame ${portraitPath ? "has-remote-image" : ""} ${videoEnabledCls} ${speakingCls} ${esc(cls)} ${esc(size)}">
       <div class="portrait-backdrop"></div>
-      <div class="portrait-art">${portraitContent}</div>
+      <div class="portrait-art">${portraitContent}${videoLayer}</div>
     </div>
   `;
 }
@@ -2369,6 +2486,7 @@ const state = {
   voiceTranscriptPreview: "",
   voicePermissionBlocked: false,
   pendingVoiceResume: false,
+  spiritkinVideoFailures: {},
   // Premium: Custom Spiritkin Matching
   surveyOpen: false,
   surveyStep: 0,
@@ -2444,6 +2562,12 @@ const state = {
   activeConversation: null,
   gameActive: false,
 };
+
+if (typeof window !== "undefined") {
+  window.__svSpiritkinVideoFailure = (name, src) => {
+    rememberSpiritkinVideoFailure(name, src);
+  };
+}
 
 (function hydrateSession() {
   const session = readJson(SESSION_KEY, null);
