@@ -1,3 +1,5 @@
+import { createHash } from "crypto";
+
 function createId(prefix = "iss") {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -412,6 +414,112 @@ function normalizeStoredRecord(record = {}) {
   };
 }
 
+function isUuid(value) {
+  return typeof value === "string"
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
+}
+
+function normalizeUserUuid(value) {
+  if (!value) return null;
+  if (isUuid(value)) return String(value).trim().toLowerCase();
+  const hash = createHash("sha1").update(String(value).trim()).digest("hex");
+  return [
+    hash.slice(0, 8),
+    hash.slice(8, 12),
+    `5${hash.slice(13, 16)}`,
+    `a${hash.slice(17, 20)}`,
+    hash.slice(20, 32),
+  ].join("-");
+}
+
+function describeSupabaseError(error) {
+  if (!error) return "unknown supabase error";
+  const parts = [
+    error.code,
+    error.message,
+    error.details,
+    error.hint,
+  ].filter(Boolean);
+  return parts.join(" | ") || "unknown supabase error";
+}
+
+function isMissingIssueReportsTableError(error) {
+  const text = describeSupabaseError(error).toLowerCase();
+  return text.includes("issue_reports")
+    && (
+      text.includes("schema cache")
+      || text.includes("could not find the table")
+      || text.includes("relation")
+      || text.includes("does not exist")
+    );
+}
+
+function buildMemoryIssueReportContent(record) {
+  return `ISSUE_REPORT::${JSON.stringify({
+    id: record.id,
+    user_id: record.user_id,
+    conversation_id: record.conversation_id,
+    spiritkin_name: record.spiritkin_name,
+    report_text: record.report_text,
+    classification: record.classification,
+    route: record.route,
+    confidence: record.confidence,
+    status: record.status,
+    source: record.source,
+    reason: record.reason,
+    signals: record.signals,
+    repair_summary: record.repair_summary,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+  })}`;
+}
+
+function buildMemoryIssueReportRow(record, spiritkinId) {
+  return {
+    user_id: normalizeUserUuid(record.user_id),
+    spiritkin_id: spiritkinId,
+    content: buildMemoryIssueReportContent(record),
+    importance: 8,
+    tags: uniqueStrings([
+      "issue_report",
+      `source:${record.source || "unknown"}`,
+      `classification:${record.classification || "unknown"}`,
+      `route:${record.route || "unknown"}`,
+    ], 6),
+    created_at: record.created_at,
+    resonance_score: 0.1,
+  };
+}
+
+function normalizeMemoryIssueReport(row = {}) {
+  const content = String(row.content || "");
+  if (!content.startsWith("ISSUE_REPORT::")) return null;
+  let issueReport = null;
+  try {
+    issueReport = JSON.parse(content.slice("ISSUE_REPORT::".length));
+  } catch {
+    return null;
+  }
+  if (!issueReport || typeof issueReport !== "object") return null;
+  return normalizeStoredRecord({
+    id: issueReport.id || row.id || null,
+    user_id: issueReport.user_id ?? row.user_id ?? null,
+    conversation_id: issueReport.conversation_id ?? null,
+    spiritkin_name: issueReport.spiritkin_name ?? null,
+    report_text: issueReport.report_text ?? "",
+    classification: issueReport.classification ?? "unknown",
+    route: issueReport.route ?? "ignore",
+    confidence: issueReport.confidence ?? 0,
+    status: issueReport.status ?? "logged",
+    source: issueReport.source ?? null,
+    reason: issueReport.reason ?? null,
+    signals: Array.isArray(issueReport.signals) ? issueReport.signals : [],
+    repair_summary: issueReport.repair_summary ?? {},
+    created_at: issueReport.created_at ?? row.created_at ?? nowIso(),
+    updated_at: issueReport.updated_at ?? row.created_at ?? nowIso(),
+  });
+}
+
 function summarizeGroup(group = []) {
   const first = group[0] || {};
   const averageConfidence = clamp01(
@@ -570,52 +678,163 @@ function buildRepairPacket(group = []) {
 
 export function createIssueReportService({ supabase, logger = console }) {
   const memoryStore = [];
+  let fallbackSpiritkinIdPromise = null;
+
+  async function resolveFallbackSpiritkinId(preferredSpiritkinName = null) {
+    if (preferredSpiritkinName) {
+      const { data, error } = await supabase
+        .from("spiritkins")
+        .select("id")
+        .eq("name", String(preferredSpiritkinName))
+        .limit(1)
+        .maybeSingle();
+      if (!error && data?.id) return data.id;
+    }
+
+    if (!fallbackSpiritkinIdPromise) {
+      fallbackSpiritkinIdPromise = (async () => {
+        const { data, error } = await supabase
+          .from("spiritkins")
+          .select("id")
+          .eq("is_canon", true)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (error) throw error;
+        if (!data?.id) throw new Error("No canonical spiritkin available for issue-report persistence fallback");
+        return data.id;
+      })().catch((error) => {
+        fallbackSpiritkinIdPromise = null;
+        throw error;
+      });
+    }
+
+    return fallbackSpiritkinIdPromise;
+  }
+
+  async function persistRecordToPrimaryTable(record) {
+    const { error } = await supabase.from("issue_reports").insert({
+      id: record.id,
+      user_id: record.user_id,
+      conversation_id: record.conversation_id,
+      spiritkin_name: record.spiritkin_name,
+      report_text: record.report_text,
+      classification: record.classification,
+      route: record.route,
+      confidence: record.confidence,
+      status: record.status,
+      source: record.source,
+      reason: record.reason,
+      signals: record.signals,
+      repair_summary: record.repair_summary,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+    });
+    if (error) throw error;
+    return { storage: "supabase", backend: "issue_reports" };
+  }
+
+  async function persistRecordToMemories(record) {
+    const spiritkinId = await resolveFallbackSpiritkinId(record.spiritkin_name);
+    const payload = buildMemoryIssueReportRow(record, spiritkinId);
+    const { error } = await supabase.from("memories").insert(payload);
+    if (error) throw error;
+    return { storage: "supabase", backend: "memories" };
+  }
 
   async function persistRecord(record) {
     try {
-      const { error } = await supabase.from("issue_reports").insert({
-        id: record.id,
-        user_id: record.user_id,
-        conversation_id: record.conversation_id,
-        spiritkin_name: record.spiritkin_name,
-        report_text: record.report_text,
-        classification: record.classification,
-        route: record.route,
-        confidence: record.confidence,
-        status: record.status,
-        source: record.source,
-        reason: record.reason,
-        signals: record.signals,
-        repair_summary: record.repair_summary,
-        created_at: record.created_at,
-        updated_at: record.updated_at,
-      });
-      if (error) throw error;
-      return { storage: "supabase" };
+      return await persistRecordToPrimaryTable(record);
     } catch (error) {
+      const primaryFailure = describeSupabaseError(error);
+      logger.warn?.({
+        issue_report_id: record.id,
+        storage_backend: "issue_reports",
+        error_code: error?.code || null,
+        error_message: error?.message || primaryFailure,
+        error_details: error?.details || null,
+        error_hint: error?.hint || null,
+      }, "[IssueReportService] issue_reports persistence failed");
+
+      if (isMissingIssueReportsTableError(error)) {
+        try {
+          const fallback = await persistRecordToMemories(record);
+          logger.info?.({
+            issue_report_id: record.id,
+            storage_backend: fallback.backend,
+            reason: primaryFailure,
+          }, "issue_report_logged");
+          return fallback;
+        } catch (fallbackError) {
+          const fallbackFailure = describeSupabaseError(fallbackError);
+          logger.error?.({
+            issue_report_id: record.id,
+            storage_backend: "memories",
+            error_code: fallbackError?.code || null,
+            error_message: fallbackError?.message || fallbackFailure,
+            error_details: fallbackError?.details || null,
+            error_hint: fallbackError?.hint || null,
+          }, "[IssueReportService] memories fallback failed");
+        }
+      }
+
       memoryStore.unshift({ ...record, storage: "memory" });
       if (memoryStore.length > 250) memoryStore.pop();
-      logger.warn?.(`[IssueReportService] Falling back to memory store: ${error.message}`);
+      logger.warn?.({
+        issue_report_id: record.id,
+        storage_backend: "memory",
+        reason: primaryFailure,
+      }, "[IssueReportService] Falling back to memory store");
       logger.info?.({ issue_report: record }, "issue_report_logged");
-      return { storage: "memory", error: error.message };
+      return { storage: "memory", error: primaryFailure, backend: "memory" };
     }
+  }
+
+  async function countRecentUserReportsTodayFromPrimary(userId, { startIso, endIso }) {
+    const { count, error } = await supabase
+      .from("issue_reports")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", String(userId))
+      .eq("source", "user_report")
+      .gte("created_at", startIso)
+      .lt("created_at", endIso);
+    if (error) throw error;
+    if (!Number.isFinite(count)) throw new Error("issue report count unavailable");
+    return Number(count || 0);
+  }
+
+  async function countRecentUserReportsTodayFromMemories(userId, { startIso, endIso }) {
+    const { count, error } = await supabase
+      .from("memories")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", normalizeUserUuid(userId))
+      .contains("tags", ["issue_report", "source:user_report"])
+      .gte("created_at", startIso)
+      .lt("created_at", endIso);
+    if (error) throw error;
+    if (!Number.isFinite(count)) throw new Error("issue report fallback count unavailable");
+    return Number(count || 0);
   }
 
   async function countRecentUserReportsToday(userId) {
     if (!userId) return 0;
     const { startIso, endIso } = currentUtcDayBounds();
     try {
-      const { count, error } = await supabase
-        .from("issue_reports")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", String(userId))
-        .eq("source", "user_report")
-        .gte("created_at", startIso)
-        .lt("created_at", endIso);
-      if (error) throw error;
-      if (!Number.isFinite(count)) throw new Error("issue report count unavailable");
-      return Number(count || 0);
-    } catch (_) {
+      return await countRecentUserReportsTodayFromPrimary(userId, { startIso, endIso });
+    } catch (error) {
+      if (!isMissingIssueReportsTableError(error)) {
+        logger.warn?.({
+          user_id: String(userId),
+          storage_backend: "issue_reports",
+          error_code: error?.code || null,
+          error_message: error?.message || describeSupabaseError(error),
+        }, "[IssueReportService] issue_reports count failed");
+      }
+      try {
+        return await countRecentUserReportsTodayFromMemories(userId, { startIso, endIso });
+      } catch (_) {
+        // Fall through to memory store.
+      }
       return memoryStore.filter((record) => (
         String(record.user_id || "") === String(userId) &&
         record.source === "user_report" &&
@@ -721,18 +940,64 @@ export function createIssueReportService({ supabase, logger = console }) {
     });
   }
 
+  async function listRecentFromPrimary({ limit }) {
+    const { data, error } = await supabase
+      .from("issue_reports")
+      .select("id, user_id, conversation_id, spiritkin_name, report_text, classification, route, confidence, status, source, reason, signals, repair_summary, created_at, updated_at")
+      .order("created_at", { ascending: false })
+      .limit(Math.min(Number(limit) || 50, 200));
+    if (error) throw error;
+    return (data ?? []).map(normalizeStoredRecord);
+  }
+
+  async function listRecentFromMemories({ limit }) {
+    const { data, error } = await supabase
+      .from("memories")
+      .select("id, user_id, spiritkin_id, content, importance, tags, created_at, resonance_score")
+      .contains("tags", ["issue_report"])
+      .order("created_at", { ascending: false })
+      .limit(Math.min(Number(limit) || 50, 200));
+    if (error) throw error;
+    return (data ?? [])
+      .map(normalizeMemoryIssueReport)
+      .filter(Boolean);
+  }
+
   async function listRecent({ limit = 50 } = {}) {
+    const safeLimit = Math.min(Number(limit) || 50, 200);
+    const combined = [];
+
     try {
-      const { data, error } = await supabase
-        .from("issue_reports")
-        .select("id, user_id, conversation_id, spiritkin_name, report_text, classification, route, confidence, status, source, reason, signals, repair_summary, created_at, updated_at")
-        .order("created_at", { ascending: false })
-        .limit(Math.min(Number(limit) || 50, 200));
-      if (error) throw error;
-      return (data ?? []).map(normalizeStoredRecord);
-    } catch (_) {
-      return memoryStore.slice(0, Math.min(Number(limit) || 50, 200)).map(normalizeStoredRecord);
+      combined.push(...await listRecentFromPrimary({ limit: safeLimit }));
+    } catch (error) {
+      if (!isMissingIssueReportsTableError(error)) {
+        logger.warn?.({
+          storage_backend: "issue_reports",
+          error_code: error?.code || null,
+          error_message: error?.message || describeSupabaseError(error),
+        }, "[IssueReportService] issue_reports read failed");
+      }
     }
+
+    try {
+      combined.push(...await listRecentFromMemories({ limit: safeLimit }));
+    } catch (error) {
+      logger.warn?.({
+        storage_backend: "memories",
+        error_code: error?.code || null,
+        error_message: error?.message || describeSupabaseError(error),
+      }, "[IssueReportService] memories issue-report read failed");
+    }
+
+    if (combined.length > 0) {
+      return [...new Map(
+        combined
+          .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
+          .map((record) => [record.id, record])
+      ).values()].slice(0, safeLimit);
+    }
+
+    return memoryStore.slice(0, safeLimit).map(normalizeStoredRecord);
   }
 
   async function getDigest() {
