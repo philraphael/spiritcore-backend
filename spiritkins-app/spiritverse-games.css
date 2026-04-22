@@ -4,7 +4,7 @@
    ============================================================ */
 
 /* ---- GAME CONTAINER ---- */
-.games-view {
+.presence-tab-content[data-presence-surface="games"] .games-view {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -12,7 +12,7 @@
   overflow-y: auto;
 }
 
-.active-game-panel {
+.presence-tab-content[data-presence-surface="games"] .active-game-panel {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -937,55 +937,55 @@
    PHASE 1 ROOM DOMINANCE OVERRIDES
    ============================================================ */
 
-.presence-panel[data-presence-surface="games"] .games-view {
+.presence-tab-content[data-presence-surface="games"] .games-view {
   gap: 18px;
   min-height: 100%;
 }
 
-.presence-panel[data-presence-surface="games"] .active-game-panel {
+.presence-tab-content[data-presence-surface="games"] .active-game-panel {
   gap: 16px;
 }
 
-.presence-panel[data-presence-surface="games"] .sv-theme-shell {
+.presence-tab-content[data-presence-surface="games"] .sv-theme-shell {
   gap: 20px;
   padding: 28px;
   border-radius: 36px;
 }
 
-.presence-panel[data-presence-surface="games"] .game-panel-header {
+.presence-tab-content[data-presence-surface="games"] .game-panel-header {
   padding-bottom: 12px;
 }
 
-.presence-panel[data-presence-surface="games"] .game-board-container {
+.presence-tab-content[data-presence-surface="games"] .game-board-container {
   min-height: clamp(560px, 62vw, 980px);
   padding: 28px 24px;
   border-radius: 36px;
 }
 
-.presence-panel[data-presence-surface="games"] .board-standard {
+.presence-tab-content[data-presence-surface="games"] .board-standard {
   width: min(100%, 980px);
 }
 
-.presence-panel[data-presence-surface="games"] .board-grand {
+.presence-tab-content[data-presence-surface="games"] .board-grand {
   width: min(100%, 1120px);
   max-width: min(100%, calc(100vw - 420px));
 }
 
-.presence-panel[data-presence-surface="games"] #spiritverse-game-board {
+.presence-tab-content[data-presence-surface="games"] #spiritverse-game-board {
   width: 100%;
 }
 
-.presence-panel[data-presence-surface="games"] .game-history {
+.presence-tab-content[data-presence-surface="games"] .game-history {
   margin-top: 8px;
 }
 
 @media (max-width: 760px) {
-  .presence-panel[data-presence-surface="games"] .sv-theme-shell {
+  .presence-tab-content[data-presence-surface="games"] .sv-theme-shell {
     padding: 18px;
     border-radius: 24px;
   }
 
-  .presence-panel[data-presence-surface="games"] .game-board-container {
+  .presence-tab-content[data-presence-surface="games"] .game-board-container {
     min-height: clamp(360px, 88vw, 620px);
     padding: 16px;
     border-radius: 24px;
@@ -2520,16 +2520,16 @@
   opacity: 0.1;
 }
 
-.presence-panel[data-presence-surface="games"] .active-game-panel {
+.presence-tab-content[data-presence-surface="games"] .active-game-panel {
   gap: 20px;
 }
 
-.presence-panel[data-presence-surface="games"] .sv-theme-shell {
+.presence-tab-content[data-presence-surface="games"] .sv-theme-shell {
   gap: 24px;
   padding: 32px;
 }
 
-.presence-panel[data-presence-surface="games"] .game-board-container {
+.presence-tab-content[data-presence-surface="games"] .game-board-container {
   min-height: clamp(620px, 64vw, 1000px);
   padding: 34px 28px;
 }
@@ -2569,11 +2569,11 @@
 }
 
 @media (max-width: 760px) {
-  .presence-panel[data-presence-surface="games"] .sv-theme-shell {
+  .presence-tab-content[data-presence-surface="games"] .sv-theme-shell {
     padding: 20px;
   }
 
-  .presence-panel[data-presence-surface="games"] .game-board-container {
+  .presence-tab-content[data-presence-surface="games"] .game-board-container {
     min-height: clamp(380px, 92vw, 660px);
     padding: 18px;
   }
