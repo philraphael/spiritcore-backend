@@ -8260,13 +8260,14 @@ button[data-action="begin-quest"]:active,
 
 .world-shell-body {
   display: grid;
-  grid-template-columns: minmax(0, 1.24fr) minmax(320px, 0.76fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1.14fr) minmax(360px, 0.86fr);
+  gap: 28px;
   align-items: start;
 }
 
 .chat-layout.game-focus-mode .world-shell-body {
-  grid-template-columns: minmax(0, 1.58fr) minmax(260px, 0.42fr);
+  grid-template-columns: minmax(0, 1.18fr) minmax(360px, 0.82fr);
+  gap: 28px;
 }
 
 .presence-panel {
@@ -8292,12 +8293,18 @@ button[data-action="begin-quest"]:active,
   padding: 0 0 12px;
 }
 
+.presence-panel,
+.chat-stage {
+  min-width: 0;
+}
+
 .chat-stage {
   position: sticky;
   top: 14px;
   max-height: calc(100vh - 28px);
   min-height: 920px;
   overflow: auto;
+  padding: 28px 18px 28px 24px;
   border-radius: 30px;
   box-shadow: 0 26px 66px rgba(0, 0, 0, 0.24);
 }
@@ -8305,6 +8312,77 @@ button[data-action="begin-quest"]:active,
 .chat-layout.game-focus-mode .chat-stage {
   opacity: 0.62;
   transform: scale(0.985);
+}
+
+.chat-rail-section {
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+
+.companion-presence-dock {
+  grid-template-columns: minmax(156px, 208px) minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+  padding: 20px;
+  overflow: visible;
+  max-width: 100%;
+}
+
+.companion-presence-visual {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  align-content: start;
+  min-width: 0;
+}
+
+.companion-presence-visual .spiritkin-media-panel.card {
+  width: 100%;
+  max-width: 208px;
+  min-height: 176px;
+  margin-bottom: 0;
+}
+
+.companion-dock-portrait {
+  width: min(176px, 100%);
+  max-width: 176px;
+}
+
+.companion-presence-copy {
+  gap: 10px;
+  align-content: start;
+}
+
+.companion-presence-copy strong {
+  font-size: 1.12rem;
+}
+
+.companion-presence-copy span {
+  overflow-wrap: anywhere;
+}
+
+.companion-presence-room-copy {
+  -webkit-line-clamp: 4;
+  font-size: 0.88rem;
+}
+
+.presence-tab-content[data-presence-surface="games"] .active-game-panel {
+  gap: 24px;
+}
+
+.presence-tab-content[data-presence-surface="games"] .sv-theme-shell {
+  gap: 20px;
+  padding: 24px;
+}
+
+.presence-tab-content[data-presence-surface="games"] .game-board-container {
+  min-height: clamp(520px, 56vw, 920px);
+  padding: 24px 20px;
+}
+
+.presence-tab-content[data-presence-surface="games"] .board-grand {
+  max-width: min(100%, calc(100vw - 520px));
 }
 
 .bonded-world-shell {
@@ -8397,10 +8475,27 @@ button[data-action="begin-quest"]:active,
     top: auto;
     max-height: none;
     min-height: 0;
+    padding-right: 12px;
   }
 
   .presence-panel {
     min-height: 0;
+  }
+
+  .companion-presence-dock {
+    grid-template-columns: minmax(136px, 180px) minmax(0, 1fr);
+    gap: 16px;
+    padding: 18px;
+  }
+
+  .companion-presence-visual .spiritkin-media-panel.card {
+    max-width: 180px;
+    min-height: 152px;
+  }
+
+  .companion-dock-portrait {
+    width: min(152px, 100%);
+    max-width: 152px;
   }
 }
 
@@ -8417,6 +8512,20 @@ button[data-action="begin-quest"]:active,
     border-radius: 22px;
   }
 
+  .chat-stage {
+    padding: 20px 14px 20px 18px;
+  }
+
+  .companion-presence-dock {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .companion-presence-copy {
+    justify-items: center;
+  }
+
   .selection-focus-stage {
     min-height: clamp(320px, 78vw, 520px);
   }
@@ -8429,5 +8538,9 @@ button[data-action="begin-quest"]:active,
   .spiritcore-welcome-copy {
     width: calc(100% - 20px);
     padding: 24px 18px;
+  }
+
+  .presence-tab-content[data-presence-surface="games"] .board-grand {
+    max-width: 100%;
   }
 }
