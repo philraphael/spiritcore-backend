@@ -20,6 +20,9 @@ function createSpiritkinVideoSet(name) {
       speaking: [
         buildVideoUrl(name, "speaking", "speaking_01.mp4"),
       ],
+      attentive: [],
+      reflective: [],
+      gameFocused: [],
       emotional: {
         calm: [
           buildVideoUrl(name, "emotional", "calm_01.mp4"),
@@ -32,6 +35,12 @@ function createSpiritkinVideoSet(name) {
         ],
       },
       special: []
+    },
+    aliases: {
+      attentive: ["attentive", "idle"],
+      reflective: ["reflective", "calm", "idle"],
+      gameFocused: ["gameFocused", "idle"],
+      fallback: ["idle"]
     }
   };
 }
@@ -48,6 +57,29 @@ function cloneStateList(entries) {
   return Array.isArray(entries) ? entries.filter(Boolean).map((entry) => String(entry)) : [];
 }
 
+function normalizeStateKey(state) {
+  return String(state || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-");
+}
+
+function getStateEntries(set, normalizedState) {
+  if (!set || !normalizedState) return [];
+  if (normalizedState === "idle") return cloneStateList(set.states?.idle);
+  if (normalizedState === "speaking") return cloneStateList(set.states?.speaking);
+  if (normalizedState === "attentive") return cloneStateList(set.states?.attentive);
+  if (normalizedState === "reflective") return cloneStateList(set.states?.reflective);
+  if (normalizedState === "game-focused" || normalizedState === "gamefocused") {
+    return cloneStateList(set.states?.gameFocused);
+  }
+  if (normalizedState === "calm" || normalizedState === "excited" || normalizedState === "serious") {
+    return cloneStateList(set.states?.emotional?.[normalizedState]);
+  }
+  if (normalizedState === "special") return cloneStateList(set.states?.special);
+  return [];
+}
+
 export function getSpiritkinVideoSet(spiritkin) {
   const resolvedName = String(spiritkin || "").trim();
   const set = SPIRITKIN_VIDEO_MANIFEST[resolvedName];
@@ -58,33 +90,52 @@ export function getSpiritkinVideoSet(spiritkin) {
     states: {
       idle: cloneStateList(set.states?.idle),
       speaking: cloneStateList(set.states?.speaking),
+      attentive: cloneStateList(set.states?.attentive),
+      reflective: cloneStateList(set.states?.reflective),
+      gameFocused: cloneStateList(set.states?.gameFocused),
       emotional: {
         calm: cloneStateList(set.states?.emotional?.calm),
         excited: cloneStateList(set.states?.emotional?.excited),
         serious: cloneStateList(set.states?.emotional?.serious),
       },
       special: cloneStateList(set.states?.special),
+    },
+    aliases: {
+      attentive: [...(set.aliases?.attentive || ["attentive", "idle"])],
+      reflective: [...(set.aliases?.reflective || ["reflective", "calm", "idle"])],
+      gameFocused: [...(set.aliases?.gameFocused || ["gameFocused", "idle"])],
+      fallback: [...(set.aliases?.fallback || ["idle"])]
     }
   };
 }
 
-export function resolveSpiritkinVideo(spiritkin, state) {
+export function getSpiritkinVideoCandidates(spiritkin, state) {
   const set = getSpiritkinVideoSet(spiritkin);
-  if (!set) return "";
-  const normalizedState = String(state || "").trim().toLowerCase();
-  if (normalizedState === "idle") {
-    return set.states.idle[0] || "";
-  }
-  if (normalizedState === "speaking") {
-    return set.states.speaking[0] || "";
-  }
-  if (normalizedState === "calm" || normalizedState === "excited" || normalizedState === "serious") {
-    return set.states.emotional[normalizedState][0] || "";
-  }
-  if (normalizedState === "special") {
-    return set.states.special[0] || "";
-  }
-  return "";
+  if (!set) return [];
+  const normalizedState = normalizeStateKey(state);
+  const aliasMap = {
+    attentive: set.aliases?.attentive || ["attentive", "idle"],
+    reflective: set.aliases?.reflective || ["reflective", "calm", "idle"],
+    "game-focused": set.aliases?.gameFocused || ["gameFocused", "idle"],
+    gamefocused: set.aliases?.gameFocused || ["gameFocused", "idle"],
+    fallback: set.aliases?.fallback || ["idle"]
+  };
+  const lookupStates = aliasMap[normalizedState] || [normalizedState];
+  const unique = new Set();
+  const resolved = [];
+  lookupStates.forEach((candidateState) => {
+    const entries = getStateEntries(set, normalizeStateKey(candidateState));
+    entries.forEach((entry) => {
+      if (!entry || unique.has(entry)) return;
+      unique.add(entry);
+      resolved.push(entry);
+    });
+  });
+  return resolved;
+}
+
+export function resolveSpiritkinVideo(spiritkin, state) {
+  return getSpiritkinVideoCandidates(spiritkin, state)[0] || "";
 }
 
 export { SPIRITKIN_VIDEO_MANIFEST };

@@ -64,7 +64,7 @@ import { spiritkins as CANON_SPIRITKINS, realms as CANON_REALMS, charter as CANO
 import { resolveGameAssetUrl } from "./data/gameAssetManifest.js";
 import { getGameTheme } from "./data/gameThemes.js";
 import { createPendingCreatorMediaSlots, getSpiritkinMediaConfig, SPIRITKIN_CREATOR_FOUNDATION } from "./data/spiritkinRuntimeConfig.js";
-import { getSpiritkinVideoSet, resolveSpiritkinVideo } from "./data/spiritkinVideoManifest.js";
+import { getSpiritkinVideoCandidates as getManifestSpiritkinVideoCandidates, resolveSpiritkinVideo } from "./data/spiritkinVideoManifest.js";
 
 function createSpiritverseGamesFallback() {
   return {
@@ -1734,6 +1734,10 @@ function buildSpiritkinVideoFailureKey(name, src) {
   return `${String(name || "").trim().toLowerCase()}::${String(src || "").trim()}`;
 }
 
+function buildSpiritkinMediaFailureKey(name, surface, src) {
+  return `${String(name || "").trim().toLowerCase()}::${String(surface || "").trim().toLowerCase()}::${String(src || "").trim()}`;
+}
+
 function rememberSpiritkinVideoFailure(name, src) {
   if (!name || !src) return;
   state.spiritkinVideoFailures = {
@@ -1742,9 +1746,22 @@ function rememberSpiritkinVideoFailure(name, src) {
   };
 }
 
+function rememberSpiritkinMediaFailure(name, surface, src) {
+  if (!name || !surface || !src) return;
+  state.spiritkinMediaFailures = {
+    ...(state.spiritkinMediaFailures || {}),
+    [buildSpiritkinMediaFailureKey(name, surface, src)]: true
+  };
+}
+
 function isSpiritkinVideoFailed(name, src) {
   if (!name || !src) return false;
   return !!state.spiritkinVideoFailures?.[buildSpiritkinVideoFailureKey(name, src)];
+}
+
+function isSpiritkinMediaFailed(name, surface, src) {
+  if (!name || !surface || !src) return false;
+  return !!state.spiritkinMediaFailures?.[buildSpiritkinMediaFailureKey(name, surface, src)];
 }
 
 function canRenderSpiritkinVideo(name, classSignature = "") {
@@ -1759,30 +1776,72 @@ function getSpiritkinVisualState(name) {
   const speaking = isSpiritkinSpeechActive(name);
   const emotionTone = getLatestSpiritkinEmotionTone(name);
   const emotionalState = mapEmotionToneToVideoState(emotionTone);
+  const speechTurn = normalizeTurnPhaseValue(state.sessionModel?.speechState?.turnPhase || "idle");
+  const isGameFocused = state.activePresenceTab === "games" && !!state.activeGame;
+  const recentUserTurn = !!_lastUserSubmission.at && (Date.now() - _lastUserSubmission.at) < 45000;
+  const attentive = !!(state.loadingReply || state.voiceListening || recentUserTurn || speechTurn === "user_turn" || speechTurn === "processing");
   if (speaking && emotionalState) {
-    return { state: emotionalState, phase: "emotional", emotionTone };
+    return {
+      state: "speaking",
+      mediaState: emotionalState,
+      phase: "speaking",
+      emotionTone,
+      statusLabel: `${name} speaking`,
+      statusDetail: "Voice playback is active right now."
+    };
   }
   if (speaking) {
-    return { state: "speaking", phase: "speaking", emotionTone };
+    return {
+      state: "speaking",
+      mediaState: "speaking",
+      phase: "speaking",
+      emotionTone,
+      statusLabel: `${name} speaking`,
+      statusDetail: "Voice playback is active right now."
+    };
   }
-  return { state: "idle", phase: "idle", emotionTone };
-}
-
-function getSpiritkinVideoCandidates(name, desiredState) {
-  const set = getSpiritkinVideoSet(name);
-  if (!set) return [];
-  const normalizedState = String(desiredState || "").trim().toLowerCase();
-  if (normalizedState === "idle") return set.states.idle || [];
-  if (normalizedState === "speaking") return set.states.speaking || [];
-  if (normalizedState === "calm" || normalizedState === "excited" || normalizedState === "serious") {
-    return set.states.emotional?.[normalizedState] || [];
+  if (isGameFocused) {
+    return {
+      state: "game-focused",
+      mediaState: "game-focused",
+      phase: "game-focused",
+      emotionTone,
+      statusLabel: `${name} game-focused`,
+      statusDetail: "Present beside the current match without pulling focus."
+    };
   }
-  if (normalizedState === "special") return set.states.special || [];
-  return [];
+  if (attentive) {
+    return {
+      state: "attentive",
+      mediaState: "attentive",
+      phase: "attentive",
+      emotionTone,
+      statusLabel: `${name} attentive`,
+      statusDetail: state.loadingReply ? "Tracking your last message and preparing a response." : "Holding attention on your latest input."
+    };
+  }
+  if (emotionalState === "calm" || speechTurn === "complete") {
+    return {
+      state: "reflective",
+      mediaState: "reflective",
+      phase: "reflective",
+      emotionTone,
+      statusLabel: `${name} reflective`,
+      statusDetail: "Settled after the last exchange, with a quieter emotional tone."
+    };
+  }
+  return {
+    state: "idle",
+    mediaState: "idle",
+    phase: "idle",
+    emotionTone,
+    statusLabel: `${name} present`,
+    statusDetail: "Visible in the rail during normal navigation."
+  };
 }
 
 function resolveSpiritkinVideoClip(name, desiredState) {
-  const candidates = getSpiritkinVideoCandidates(name, desiredState).filter((src) => !isSpiritkinVideoFailed(name, src));
+  const candidates = getManifestSpiritkinVideoCandidates(name, desiredState).filter((src) => !isSpiritkinVideoFailed(name, src));
   if (candidates.length) return candidates[0];
   const manifestResolved = resolveSpiritkinVideo(name, desiredState);
   return manifestResolved && !isSpiritkinVideoFailed(name, manifestResolved) ? manifestResolved : "";
@@ -1791,7 +1850,7 @@ function resolveSpiritkinVideoClip(name, desiredState) {
 function buildSpiritkinVideoLayer(name, classSignature = "") {
   if (!canRenderSpiritkinVideo(name, classSignature)) return "";
   const visualState = getSpiritkinVisualState(name);
-  const desiredSrc = resolveSpiritkinVideoClip(name, visualState.state);
+  const desiredSrc = resolveSpiritkinVideoClip(name, visualState.mediaState || visualState.state);
   const speakingSrc = visualState.state !== "speaking" ? resolveSpiritkinVideoClip(name, "speaking") : "";
   const idleSrc = visualState.state !== "idle" ? resolveSpiritkinVideoClip(name, "idle") : "";
   const src = visualState.phase === "idle"
@@ -1799,7 +1858,7 @@ function buildSpiritkinVideoLayer(name, classSignature = "") {
     : (desiredSrc || speakingSrc || idleSrc);
   if (!src) return "";
   return `
-    <div class="spiritkin-video-layer ${esc(visualState.phase)}" data-video-state="${esc(visualState.state)}" data-spiritkin-video-name="${esc(name)}">
+    <div class="spiritkin-video-layer ${esc(visualState.phase)} ${esc(visualState.state)}" data-video-state="${esc(visualState.state)}" data-spiritkin-video-name="${esc(name)}">
       <video
         class="spiritkin-video-element"
         src="${src}"
@@ -1821,13 +1880,14 @@ function buildPortrait(name, cls, size) {
   const classSignature = `${cls || ""} ${size || ""}`.trim();
   const eagerPortrait = /portrait-card|portrait-focus|portrait-hero/.test(classSignature);
   const speakingCls = isSpiritkinSpeechActive(name) ? "is-speaking" : "";
+  const portraitFailed = isSpiritkinMediaFailed(name, "portrait", portraitPath);
   const videoLayer = buildSpiritkinVideoLayer(name, classSignature);
   const videoEnabledCls = videoLayer ? "has-video" : "";
 
   const portraitContent = portraitPath 
     ? `
       <div class="portrait-fallback-svg">${portraitSvg(name)}</div>
-      <img
+      ${portraitFailed ? "" : `<img
         src="${portraitPath}"
         alt="Portrait of ${name}"
         class="portrait-image"
@@ -1835,12 +1895,12 @@ function buildPortrait(name, cls, size) {
         decoding="async"
         ${eagerPortrait ? 'fetchpriority="high"' : ""}
         onload="this.classList.add('is-loaded'); this.parentElement.classList.add('portrait-loaded');"
-        onerror="this.style.display='none'; this.parentElement.classList.add('portrait-fallback-only');"
-      />
+        onerror="this.style.display='none'; this.parentElement.classList.add('portrait-fallback-only'); window.__svSpiritkinMediaFailure && window.__svSpiritkinMediaFailure('${esc(name)}', 'portrait', '${esc(portraitPath)}');"
+      />`}
     `
     : portraitSvg(name);
   return `
-    <div class="portrait-frame ${portraitPath ? "has-remote-image" : ""} ${videoEnabledCls} ${speakingCls} ${esc(cls)} ${esc(size)}">
+    <div class="portrait-frame ${portraitPath ? "has-remote-image" : ""} ${portraitFailed ? "portrait-fallback-only" : ""} ${videoEnabledCls} ${speakingCls} ${esc(cls)} ${esc(size)}">
       <div class="portrait-backdrop"></div>
       <div class="portrait-art">${portraitContent}${videoLayer}</div>
     </div>
@@ -1930,20 +1990,34 @@ function buildChronicleShelf(title = "Spiritverse Chronicles", filename = WORLD_
 }
 
 function buildCompositeVisualFrame(primarySrc, fallbackSrc, alt, cls = "", eager = false, options = {}) {
-  if (!primarySrc) return "";
+  if (!primarySrc && !fallbackSrc) return "";
   const fallbackMode = options?.fallbackMode === "errorOnly" ? "errorOnly" : "immediate";
   const debugSlot = typeof options?.debugSlot === "string" ? options.debugSlot : "";
+  const enableDebugLogging = !!options?.debugLogging;
   const debugAttr = debugSlot ? ` data-media-slot="${esc(debugSlot)}"` : "";
   const fallbackClass = fallbackMode === "errorOnly" ? " fallback-error-only" : "";
-  const onLoad = debugSlot
+  const onPrimaryErrorJS = typeof options?.onPrimaryErrorJS === "string" && options.onPrimaryErrorJS.trim()
+    ? `${options.onPrimaryErrorJS.trim()} `
+    : "";
+  const onLoad = debugSlot && enableDebugLogging
     ? `this.classList.add('is-loaded'); this.parentElement.classList.add('visual-loaded'); console.info('[MediaAuthority]', { slot: '${esc(debugSlot)}', primary: this.currentSrc || this.src, fallback: '${esc(fallbackSrc || "")}', event: 'primary-loaded' });`
     : `this.classList.add('is-loaded'); this.parentElement.classList.add('visual-loaded');`;
-  const onError = debugSlot
-    ? `this.style.display='none'; this.parentElement.classList.add('visual-fallback-only'); console.warn('[MediaAuthority]', { slot: '${esc(debugSlot)}', primary: this.currentSrc || this.src, fallback: '${esc(fallbackSrc || "")}', event: 'primary-error-fallback' });`
-    : `this.style.display='none'; this.parentElement.classList.add('visual-fallback-only');`;
+  const onError = debugSlot && enableDebugLogging
+    ? `${onPrimaryErrorJS}this.style.display='none'; this.parentElement.classList.add('visual-fallback-only'); console.warn('[MediaAuthority]', { slot: '${esc(debugSlot)}', primary: this.currentSrc || this.src, fallback: '${esc(fallbackSrc || "")}', event: 'primary-error-fallback' });`
+    : `${onPrimaryErrorJS}this.style.display='none'; this.parentElement.classList.add('visual-fallback-only');`;
+  const fallbackImage = fallbackSrc
+    ? `<img src="${fallbackSrc}" alt="${esc(alt)}" class="composite-visual-image composite-visual-fallback${fallbackClass}" loading="${eager ? "eager" : "lazy"}" decoding="async" ${eager ? 'fetchpriority="high"' : ""} />`
+    : "";
+  if (!primarySrc) {
+    return `
+      <div class="composite-visual-frame ${esc(cls)} ${fallbackSrc ? "has-fallback visual-fallback-only is-fallback-only" : ""}"${debugAttr}>
+        ${fallbackImage}
+      </div>
+    `;
+  }
   return `
     <div class="composite-visual-frame ${esc(cls)} ${fallbackSrc ? "has-fallback" : ""}"${debugAttr}>
-      ${fallbackSrc ? `<img src="${fallbackSrc}" alt="${esc(alt)}" class="composite-visual-image composite-visual-fallback${fallbackClass}" loading="${eager ? "eager" : "lazy"}" decoding="async" ${eager ? 'fetchpriority="high"' : ""} />` : ""}
+      ${fallbackImage}
       <img
         src="${primarySrc}"
         alt="${esc(alt)}"
@@ -1960,55 +2034,62 @@ function buildCompositeVisualFrame(primarySrc, fallbackSrc, alt, cls = "", eager
 
 function buildSpiritkinMediaPanel(name, surface = "focus") {
   const authority = getSpiritkinMediaAuthority(name);
-  const primarySrc =
+  const resolvedPrimarySrc =
     (surface === "card" ? authority.founderCard
       : surface === "profile" ? authority.profile
       : surface === "bonded" ? authority.bonded
       : authority.focus) ||
     COMPOSITE_VISUAL_ASSETS.spiritkins[name]?.[surface] ||
     "";
-  if (!primarySrc) return "";
   const fallbackPortrait = authority.fallbackCard || getSpiritkinPortraitPath(name);
+  const primarySrc = isSpiritkinMediaFailed(name, surface, resolvedPrimarySrc) ? "" : resolvedPrimarySrc;
   const speakingCls = isSpiritkinSpeechActive(name) ? "is-speaking" : "";
+  const visualState = getSpiritkinVisualState(name);
   return buildCompositeVisualFrame(
     primarySrc,
     fallbackPortrait,
     `${name} visual panel`,
-    `spiritkin-media-panel ${surface} ${speakingCls}`,
+    `spiritkin-media-panel ${surface} ${speakingCls} is-${esc(visualState.state)}`,
     surface !== "card",
-    { fallbackMode: "errorOnly", debugSlot: `${name}-${surface}` }
+    {
+      fallbackMode: "errorOnly",
+      onPrimaryErrorJS: `window.__svSpiritkinMediaFailure && window.__svSpiritkinMediaFailure('${esc(name)}', '${esc(surface)}', '${esc(resolvedPrimarySrc)}');`
+    }
   );
 }
 
 function buildSpiritkinCanonPanel(name, cls = "profile-canon-art") {
   const authority = getSpiritkinMediaAuthority(name);
-  const primarySrc = authority.canonSupplement || authority.fallbackCard || authority.profile || authority.focus || "";
-  if (!primarySrc) return "";
+  const resolvedPrimarySrc = authority.canonSupplement || authority.fallbackCard || authority.profile || authority.focus || "";
+  const primarySrc = isSpiritkinMediaFailed(name, "canon", resolvedPrimarySrc) ? "" : resolvedPrimarySrc;
   return buildCompositeVisualFrame(
     primarySrc,
     getSpiritkinPortraitPath(name),
     `${name} canon panel`,
     cls,
     false,
-    { fallbackMode: "errorOnly", debugSlot: `${name}-canon` }
+    {
+      fallbackMode: "errorOnly",
+      onPrimaryErrorJS: `window.__svSpiritkinMediaFailure && window.__svSpiritkinMediaFailure('${esc(name)}', 'canon', '${esc(resolvedPrimarySrc)}');`
+    }
   );
 }
 
 function buildCompanionPresenceDock(spiritkin) {
   if (!spiritkin?.ui) return "";
   const meta = spiritkin.ui;
-  const speaking = isSpiritkinSpeechActive(spiritkin.name);
+  const visualState = getSpiritkinVisualState(spiritkin.name);
   const roomMeta = getRoomDisplayMeta(state.activePresenceTab, spiritkin);
   return `
-    <div class="companion-presence-dock ${esc(meta.cls)} ${speaking ? "is-speaking" : ""}">
+    <div class="companion-presence-dock ${esc(meta.cls)} is-${esc(visualState.state)} ${visualState.state === "speaking" ? "is-speaking" : ""}" data-presence-state="${esc(visualState.state)}">
       <div class="companion-presence-visual">
         ${buildSpiritkinMediaPanel(spiritkin.name, "card")}
         ${buildPortrait(spiritkin.name, `companion-dock-portrait ${meta.cls}`, "portrait-mini")}
       </div>
       <div class="companion-presence-copy">
-        <div class="companion-presence-label">${speaking ? `${esc(spiritkin.name)} speaking` : `${esc(spiritkin.name)} present in ${esc(roomMeta.label)}`}</div>
+        <div class="companion-presence-label">${esc(visualState.statusLabel || `${spiritkin.name} present`)}</div>
         <strong>${esc(spiritkin.title || spiritkin.role || meta.strap)}</strong>
-        <span>${esc(meta.atmosphereLine || meta.realm)}</span>
+        <span>${esc(visualState.statusDetail || meta.atmosphereLine || meta.realm)}</span>
         <span class="companion-presence-room-copy">${esc(roomMeta.detail)}</span>
       </div>
     </div>
@@ -2487,6 +2568,7 @@ const state = {
   voicePermissionBlocked: false,
   pendingVoiceResume: false,
   spiritkinVideoFailures: {},
+  spiritkinMediaFailures: {},
   // Premium: Custom Spiritkin Matching
   surveyOpen: false,
   surveyStep: 0,
@@ -2566,6 +2648,9 @@ const state = {
 if (typeof window !== "undefined") {
   window.__svSpiritkinVideoFailure = (name, src) => {
     rememberSpiritkinVideoFailure(name, src);
+  };
+  window.__svSpiritkinMediaFailure = (name, surface, src) => {
+    rememberSpiritkinMediaFailure(name, surface, src);
   };
 }
 
@@ -8742,7 +8827,7 @@ function buildChatView() {
               ${state.voiceMuted ? '🔇 Voice Off' : '🔊 Voice On'}
             </button>
             <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>
-            <div class="status-chip ${(state.loadingReply || spiritkinSpeaking) ? 'live' : ''}">${esc(state.loadingReply ? `${spiritkin.name} is responding…` : (spiritkinSpeaking ? `${spiritkin.name} is speaking…` : `${spiritkin.name} is present`))}</div>
+            <div class="status-chip ${(state.loadingReply || spiritkinSpeaking) ? 'live' : ''}">${esc(state.loadingReply ? `${spiritkin.name} is responding…` : getSpiritkinVisualState(spiritkin.name).statusLabel)}</div>
           </div>
         </div>
         <div class="stage-atmosphere ${esc(meta.cls)}">
