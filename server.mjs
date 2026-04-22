@@ -58,7 +58,7 @@ const ACTIVE_WORLD_ART_DIRS = [
   path.join(ACTIVE_ASSET_DIR, "rooms"),
   path.join(ACTIVE_ASSET_DIR, "concepts")
 ];
-const SPIRITVERSE_APP_BUILD = "20260422163500";
+const SPIRITVERSE_APP_BUILD = "20260422174500";
 
 const PORT = config.port;
 const USE_LLM = config.useLLM;

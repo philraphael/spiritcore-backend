@@ -3364,24 +3364,28 @@ function markSelectionTrailerFailure(name, detail = {}) {
   if (state.pendingBondSpiritkin?.name === normalizedName) {
     render();
   }
+  if (state.selectionOverlaySpiritkin?.name === normalizedName) {
+    render();
+  }
 }
 
 function syncSelectionTrailers() {
-  const pendingName = state.pendingBondSpiritkin?.name || "";
-  if (!pendingName || selectionTrailerFailures.has(pendingName)) return;
-  const mediaConfig = getSpiritkinMediaConfig(pendingName);
+  const activeRevealSpiritkin = state.selectionOverlaySpiritkin || state.pendingBondSpiritkin || null;
+  const revealName = activeRevealSpiritkin?.name || "";
+  if (!revealName || selectionTrailerFailures.has(revealName)) return;
+  const mediaConfig = getSpiritkinMediaConfig(revealName);
   const trailerPath = mediaConfig?.introTrailer?.path || "";
   if (!trailerPath) return;
 
   console.info("TRAILER_SELECTED", {
-    spiritkin: pendingName,
+    spiritkin: revealName,
     src: trailerPath,
     muted: state.mediaMuted
   });
 
   const trailers = Array.from(document.querySelectorAll(".spiritkin-intro-video .video-player-element[data-trailer-kind='intro']"));
   trailers.forEach((video) => {
-    const owner = video.dataset.trailerOwner || pendingName;
+    const owner = video.dataset.trailerOwner || revealName;
     const src = video.currentSrc || video.querySelector("source")?.src || trailerPath;
     console.info("TRAILER_MOUNTED", {
       spiritkin: owner,
@@ -7729,7 +7733,7 @@ function buildBondSelectionView() {
 function buildSpiritkinSelectionOverlay(spiritkin) {
   const mediaConfig = getSpiritkinMediaConfig(spiritkin?.name);
   const trailerPath = mediaConfig?.introTrailer?.path || "";
-  const hasTrailer = !!trailerPath;
+  const hasTrailer = !!trailerPath && !selectionTrailerFailures.has(String(spiritkin?.name || "").trim());
   const authority = getSpiritkinMediaAuthority(spiritkin?.name);
   const stillSrc = authority.focus || authority.profile || authority.fallbackCard || getSpiritkinPortraitPath(spiritkin?.name);
   return `
@@ -7744,9 +7748,9 @@ function buildSpiritkinSelectionOverlay(spiritkin) {
                 <div class="panel-label">Founder reveal</div>
                 <div class="selection-overlay-stage-note">${esc(spiritkin.name)}'s intro trailer is the authoritative selection surface.</div>
               </div>
-              <div class="video-player-container spiritkin-intro selection-fullscreen-video">
-                <div class="video-player-wrapper spiritkin-intro selection-fullscreen-video">
-                  <video class="video-player-element" autoplay ${state.mediaMuted ? "muted" : ""} playsinline preload="metadata" controls>
+              <div class="video-player-container spiritkin-intro spiritkin-intro-video selection-fullscreen-video">
+                <div class="video-player-wrapper spiritkin-intro spiritkin-intro-video selection-fullscreen-video">
+                  <video class="video-player-element" data-trailer-kind="intro" data-trailer-owner="${esc(spiritkin.name)}" autoplay ${state.mediaMuted ? "muted" : ""} playsinline preload="metadata" loop poster="${esc(stillSrc || getSpiritkinPortraitPath(spiritkin.name) || "")}">
                     <source src="${trailerPath}" type="video/mp4">
                     Your browser does not support the video tag.
                   </video>
@@ -7757,6 +7761,7 @@ function buildSpiritkinSelectionOverlay(spiritkin) {
                     </button>
                   </div>
                 </div>
+                <div class="selection-overlay-media-note">${state.mediaMuted ? "Trailer playing muted. Use audio to hear the reveal." : "Trailer audio is on. Toggle audio if you want silent preview."}</div>
               </div>
             </div>
           ` : `
