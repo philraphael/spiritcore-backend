@@ -1491,7 +1491,7 @@
   position: absolute;
   inset: 8%;
   border-radius: 14px;
-  background: url("/app/assets/fx/chess-overlay-selected.png") center / contain no-repeat;
+  background: var(--game-overlay-selected, none) center / contain no-repeat;
   filter: drop-shadow(0 0 14px rgba(242,219,160,0.22));
   pointer-events: none;
 }
@@ -1499,7 +1499,7 @@
 .chess-move-dot {
   width: 52%;
   height: 52%;
-  background: url("/app/assets/fx/chess-overlay-valid-move.png") center / contain no-repeat;
+  background: var(--game-overlay-valid, none) center / contain no-repeat;
   filter: drop-shadow(0 0 10px rgba(242,219,160,0.16));
 }
 
@@ -1507,7 +1507,7 @@
   position: absolute;
   inset: 8%;
   border-radius: 50%;
-  background: url("/app/assets/fx/chess-overlay-capture.png") center / contain no-repeat;
+  background: var(--game-overlay-capture, none) center / contain no-repeat;
   filter: drop-shadow(0 0 14px rgba(255,128,128,0.18));
   pointer-events: none;
 }
@@ -1688,7 +1688,7 @@
   position: absolute;
   inset: 8%;
   border-radius: 50%;
-  background: url("/app/assets/fx/checkers-overlay-selected.png") center / contain no-repeat;
+  background: var(--game-overlay-selected, none) center / contain no-repeat;
   filter: drop-shadow(0 0 12px rgba(242,219,160,0.18));
   pointer-events: none;
 }
@@ -1718,14 +1718,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 50%;
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .piece-user {
-  background: url("/app/assets/pieces/checkers-piece-white.png") center / contain no-repeat;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255,255,255,0.72), rgba(255,255,255,0.08) 44%, rgba(255,255,255,0.02) 64%),
+    linear-gradient(180deg, rgba(244,231,196,0.96), rgba(210,190,140,0.9));
   filter: drop-shadow(0 10px 14px rgba(0,0,0,0.34));
 }
 .piece-spiritkin {
-  background: url("/app/assets/pieces/checkers-piece-black.png") center / contain no-repeat;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(174,215,255,0.32), rgba(174,215,255,0.04) 42%, rgba(0,0,0,0) 62%),
+    linear-gradient(180deg, rgba(33,46,64,0.96), rgba(13,22,34,0.92));
   filter: drop-shadow(0 10px 14px rgba(0,0,0,0.38));
 }
 .piece-king {
@@ -1734,13 +1739,6 @@
     0 0 18px rgba(242,219,160,0.45),
     inset 0 2px 4px rgba(255,255,255,0.24);
   transform: translateY(-1px) scale(1.02);
-}
-.checkers-piece.piece-user.piece-king {
-  background-image: url("/app/assets/pieces/checkers-piece-white-king.png");
-}
-
-.checkers-piece.piece-spiritkin.piece-king {
-  background-image: url("/app/assets/pieces/checkers-piece-black-king.png");
 }
 
 .checkers-piece-image {
@@ -1809,12 +1807,12 @@
 }
 
 .connect4-cell:not(.user):not(.spiritkin):not([disabled]):hover::after {
-  background-image: url("/app/assets/fx/connect4-overlay-hover.png");
+  background-image: var(--game-overlay-hover, none);
   opacity: 0.84;
 }
 
 .connect4-winning-cell::after {
-  background-image: url("/app/assets/fx/connect4-overlay-win.png");
+  background-image: var(--game-overlay-win, none);
   opacity: 0.92;
 }
 
@@ -2094,6 +2092,8 @@
 }
 
 .spirit-card-tile {
+  position: relative;
+  overflow: hidden;
   border-radius: 14px;
   padding: 0.85rem 0.7rem;
   color: #fff;
@@ -2108,6 +2108,35 @@
   text-align: left;
 }
 
+.spirit-card-tile::before,
+.spirit-card-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.spirit-card-tile::before {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)),
+    var(--game-card-frame, none) center / cover no-repeat;
+  opacity: 0.42;
+}
+
+.spirit-card-tile::after {
+  inset: 8px;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at top, rgba(255,255,255,0.08), transparent 56%),
+    var(--game-card-back, none) center / cover no-repeat;
+  opacity: 0.2;
+}
+
+.spirit-card-tile > * {
+  position: relative;
+  z-index: 1;
+}
+
 .spirit-card-glyph {
   font-size: 1.2rem;
   opacity: 0.9;
@@ -2120,6 +2149,13 @@
 .spirit-card-spiritkin {
   background: linear-gradient(160deg, var(--game-secondary), var(--game-board-top));
   cursor: default;
+}
+
+.spirit-card-spiritkin::after {
+  background:
+    radial-gradient(circle at top, rgba(255,255,255,0.08), transparent 56%),
+    var(--game-card-founder, var(--game-card-back, none)) center / cover no-repeat;
+  opacity: 0.14;
 }
 
 .spirit-card-player:hover {

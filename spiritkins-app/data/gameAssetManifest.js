@@ -1,12 +1,15 @@
 const ACTIVE_ASSET_ROOT = "Spiritverse_MASTER_ASSETS/ACTIVE";
 const ACTIVE_ASSET_PUBLIC_ROOT = "/app/assets";
+const GAME_THEME_ASSET_ROOT = "Spiritverse_MASTER_ASSETS/Game_Themes";
+const GAME_THEME_ASSET_PUBLIC_ROOT = "/app/game-theme-assets";
 
 function assetRecord(sourcePath, options = {}) {
   return {
     sourcePath,
     publicPath: options.publicPath || null,
     status: options.status || "active",
-    notes: options.notes || ""
+    notes: options.notes || "",
+    fallbackAsset: options.fallbackAsset || null
   };
 }
 
@@ -25,23 +28,76 @@ function activeAsset(category, relativePath, options = {}) {
   return assetRecord(`${ACTIVE_ASSET_ROOT}/${normalizedCategory}/${normalizedPath}`, {
     publicPath: `${ACTIVE_ASSET_PUBLIC_ROOT}/${normalizedCategory}/${normalizedPath}`,
     status: options.status || "active",
-    notes: options.notes || ""
+    notes: options.notes || "",
+    fallbackAsset: options.fallbackAsset || null
   });
 }
+
+function gameThemeAsset(gameDir, category, filename, options = {}) {
+  const normalizedGameDir = String(gameDir || "").replace(/\\/g, "/");
+  const normalizedCategory = String(category || "").replace(/\\/g, "/");
+  const normalizedFilename = String(filename || "").replace(/\\/g, "/");
+  return assetRecord(`${GAME_THEME_ASSET_ROOT}/${normalizedGameDir}/${normalizedCategory}/${normalizedFilename}`, {
+    publicPath: `${GAME_THEME_ASSET_PUBLIC_ROOT}/${encodeURIComponent(normalizedGameDir)}/${encodeURIComponent(normalizedCategory)}/${encodeURIComponent(normalizedFilename)}`,
+    status: options.status || "live placeholder source",
+    notes: options.notes || "",
+    fallbackAsset: options.fallbackAsset || null
+  });
+}
+
+function resolveAssetPublicPath(asset) {
+  if (!asset) return null;
+  if (asset.publicPath) return asset.publicPath;
+  return asset.fallbackAsset?.publicPath || null;
+}
+
+const THEME_VARIANT_ENVIRONMENT = {
+  crown: {
+    room: activeAsset("ui", "spiritcore-media-hero.png"),
+    accent: activeAsset("ui", "welcome_open.png")
+  },
+  archive: {
+    room: activeAsset("concepts", "Elaria.png"),
+    accent: activeAsset("concepts", "Elaria.png")
+  },
+  veil: {
+    room: activeAsset("rooms", "room_chess_lyra_celestial_scene.png"),
+    board: activeAsset("concepts", "spiritverse_chess_lyra_theme.png"),
+    accent: activeAsset("ui", "lyra_close.png")
+  },
+  ember: {
+    room: activeAsset("rooms", "room_battleship_forge_scene.png"),
+    board: activeAsset("concepts", "spiritverse_battleship_forge_theme.png"),
+    accent: activeAsset("ui", "kairo_close.png")
+  },
+  astral: {
+    room: activeAsset("rooms", "room_connect4_waterfall_scene.png"),
+    board: activeAsset("concepts", "spiritverse_connect_four_waterfall_theme.png"),
+    accent: activeAsset("ui", "raien_close.png")
+  },
+  abyssal: {
+    room: activeAsset("rooms", "room_go_aquatic_scene.png"),
+    board: activeAsset("concepts", "spiritverse_go_aquatic_theme.png"),
+    accent: activeAsset("concepts", "thalassar.png")
+  }
+};
 
 export const GAME_ASSET_MANIFEST = {
   chess: {
     label: "Chess",
-    sourceRoot: ACTIVE_ASSET_ROOT,
+    sourceRoot: GAME_THEME_ASSET_ROOT,
     variants: ["crown", "veil", "ember", "astral", "abyssal"],
     board: {
-      default: activeAsset("boards", "chess_board_lyra_base.png", {
-        notes: "Canonical premium-active chess board surface."
+      default: gameThemeAsset("Chess", "boards", "chess_board_premium_placeholder.svg", {
+        notes: "Premium board placeholder is now the primary named source file for chess.",
+        fallbackAsset: activeAsset("boards", "chess_board_lyra_base.png", {
+          notes: "ACTIVE chess board remains the live fallback if the premium placeholder is unavailable."
+        })
       })
     },
     pieces: {
       default: activeAsset("pieces", "chess_white_piece_family_v4a.png", {
-        notes: "Wave 4A family crop used as premium shell support, not as direct board-piece runtime replacement."
+        notes: "Premium chess piece sheets still need final authored assets; runtime SVG pieces remain the functional fallback."
       }),
       crown: activeAsset("pieces", "chess_white_piece_family_v4a.png"),
       veil: activeAsset("pieces", "chess_white_piece_family_v4a.png"),
@@ -51,16 +107,20 @@ export const GAME_ASSET_MANIFEST = {
     },
     cards: {
       default: activeAsset("pieces", "chess_dark_piece_family_v4a.png", {
-        notes: "Wave 4A dark family crop used as support-layer shell art."
+        notes: "Support-layer family art remains available for shell treatment."
       })
     },
     room: {
-      default: activeAsset("rooms", "room_chess_lyra_celestial_scene.png")
+      default: gameThemeAsset("Chess", "room_backdrops", "chess_room_premium_placeholder.svg", {
+        notes: "Premium chess chamber placeholder is now manifest-driven.",
+        fallbackAsset: activeAsset("rooms", "room_chess_lyra_celestial_scene.png")
+      })
     },
     overlays: {
-      moveGlow: activeAsset("fx", "chess_overlay_set_v4a.png", {
-        notes: "Wave 4A overlay family used as shell FX overlay."
-      })
+      moveGlow: activeAsset("fx", "chess_overlay_set_v4a.png"),
+      selected: activeAsset("fx", "chess-overlay-selected.png"),
+      validMove: activeAsset("fx", "chess-overlay-valid-move.png"),
+      capture: activeAsset("fx", "chess-overlay-capture.png")
     },
     ui: {
       yourMove: activeAsset("ui", "your_move_banner_v2.png"),
@@ -69,43 +129,39 @@ export const GAME_ASSET_MANIFEST = {
       loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
       check: activeAsset("ui", "chess_check_banner.png"),
       checkmate: activeAsset("ui", "chess_checkmate_banner.png"),
-      frame: activeAsset("ui", "ui-board-frame-ornate.png", {
-        notes: "Wave 4B ornate board frame is the authoritative shared game frame."
-      })
+      frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
-    fallback: runtimeFallback("chess", "Current chess renderer uses inline SVG pieces and ACTIVE shell art.")
+    fallback: runtimeFallback("chess", "Current chess renderer keeps inline SVG pieces as the no-regression fallback.")
   },
   checkers: {
     label: "Checkers",
-    sourceRoot: ACTIVE_ASSET_ROOT,
+    sourceRoot: GAME_THEME_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("boards", "checkers_board_dragonforge_base.png", {
-        notes: "Dragonforge board base promoted into live runtime."
+      default: gameThemeAsset("Checkers", "boards", "checkers_board_premium_placeholder.svg", {
+        notes: "Premium checkers board placeholder is now the primary named source file.",
+        fallbackAsset: activeAsset("boards", "checkers_board_dragonforge_base.png")
       })
     },
     pieces: {
-      default: activeAsset("pieces", "checkers_piece_family_v4a.png", {
-        notes: "Wave 4A checkers family crop used as shell accent support."
-      }),
+      default: activeAsset("pieces", "checkers_piece_family_v4a.png"),
       user: activeAsset("pieces", "checkers-piece-white.png"),
       spiritkin: activeAsset("pieces", "checkers-piece-black.png"),
       userKing: activeAsset("pieces", "checkers-piece-white-king.png"),
       spiritkinKing: activeAsset("pieces", "checkers-piece-black-king.png"),
-      king: activeAsset("pieces", "checkers-piece-white-king.png", {
-        notes: "Wave 4B king render promoted for direct runtime use; renderer selects color-specific king slots."
-      })
+      king: activeAsset("pieces", "checkers-piece-white-king.png")
     },
     cards: {
       default: activeAsset("pieces", "checkers_pieces_set.png")
     },
     room: {
-      default: activeAsset("rooms", "room_checkers_dragonforge_scene.png")
+      default: gameThemeAsset("Checkers", "room_backdrops", "checkers_room_premium_placeholder.svg", {
+        notes: "Premium checkers chamber placeholder is manifest-driven.",
+        fallbackAsset: activeAsset("rooms", "room_checkers_dragonforge_scene.png")
+      })
     },
     overlays: {
-      selection: activeAsset("fx", "checkers-overlay-selected.png", {
-        notes: "Wave 4B selected overlay replaces the earlier Wave 4A support marker."
-      })
+      selection: activeAsset("fx", "checkers-overlay-selected.png")
     },
     ui: {
       yourMove: activeAsset("ui", "your_move_banner_v2.png"),
@@ -114,21 +170,20 @@ export const GAME_ASSET_MANIFEST = {
       loss: activeAsset("ui", "checkers_you_lost_banner.png"),
       frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
-    fallback: runtimeFallback("checkers", "Current checkers renderer uses CSS discs over ACTIVE board and room art.")
+    fallback: runtimeFallback("checkers", "Current checkers renderer keeps CSS disc styling if premium piece art is missing.")
   },
   tictactoe: {
     label: "TicTacToe of Echoes",
-    sourceRoot: ACTIVE_ASSET_ROOT,
+    sourceRoot: GAME_THEME_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("concepts", "spiritverse_tictactoe_forest_theme.png", {
-        notes: "Concept-board layer remains the best available active asset for TicTacToe."
+      default: gameThemeAsset("TicTacToe_of_Echoes", "boards", "tictactoe_echoes_board_premium_placeholder.svg", {
+        notes: "Premium TicTacToe board placeholder is now the primary named source file.",
+        fallbackAsset: activeAsset("concepts", "spiritverse_tictactoe_forest_theme.png")
       })
     },
     pieces: {
-      default: activeAsset("tokens", "tictactoe_token_family_v4a.png", {
-        notes: "Wave 4A token family used as shell accent support."
-      }),
+      default: activeAsset("tokens", "tictactoe_token_family_v4a.png"),
       user: activeAsset("tokens", "tictactoe-x.png"),
       spiritkin: activeAsset("tokens", "tictactoe-o.png")
     },
@@ -136,7 +191,10 @@ export const GAME_ASSET_MANIFEST = {
       default: activeAsset("tokens", "tictactoe_tokens_forest_set.png")
     },
     room: {
-      default: activeAsset("rooms", "room_tictactoe_forest_scene.png")
+      default: gameThemeAsset("TicTacToe_of_Echoes", "room_backdrops", "tictactoe_room_premium_placeholder.svg", {
+        notes: "Premium TicTacToe room placeholder is manifest-driven.",
+        fallbackAsset: activeAsset("rooms", "room_tictactoe_forest_scene.png")
+      })
     },
     overlays: {
       winLine: activeAsset("fx", "tictactoe_glow_marks.png")
@@ -148,21 +206,20 @@ export const GAME_ASSET_MANIFEST = {
       loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
       frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
-    fallback: runtimeFallback("tictactoe", "Current tic-tac-toe renderer uses CSS cells over ACTIVE concept and room art.")
+    fallback: runtimeFallback("tictactoe", "Current TicTacToe renderer keeps CSS grid and token fallbacks.")
   },
   connect_four: {
     label: "Connect Four",
-    sourceRoot: ACTIVE_ASSET_ROOT,
+    sourceRoot: GAME_THEME_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("boards", "connect4_board_waterfall_base.png", {
-        notes: "Waterfall board base is the current live board shell."
+      default: gameThemeAsset("Connect_Four", "boards", "connect_four_board_premium_placeholder.svg", {
+        notes: "Premium Connect Four board placeholder is now the primary named source file.",
+        fallbackAsset: activeAsset("boards", "connect4_board_waterfall_base.png")
       })
     },
     pieces: {
-      default: activeAsset("tokens", "connect4-disc-empty.png", {
-        notes: "Wave 4B empty slot disc is now the primary direct runtime placeholder token."
-      }),
+      default: activeAsset("tokens", "connect4-disc-empty.png"),
       user: activeAsset("tokens", "connect4-disc-yellow.png"),
       spiritkin: activeAsset("tokens", "connect4-disc-red.png"),
       empty: activeAsset("tokens", "connect4-disc-empty.png"),
@@ -172,15 +229,14 @@ export const GAME_ASSET_MANIFEST = {
       default: activeAsset("tokens", "connect4_disc_set_v1.png")
     },
     room: {
-      default: activeAsset("rooms", "room_connect4_waterfall_scene.png")
+      default: gameThemeAsset("Connect_Four", "room_backdrops", "connect_four_room_premium_placeholder.svg", {
+        notes: "Premium Connect Four room placeholder is manifest-driven.",
+        fallbackAsset: activeAsset("rooms", "room_connect4_waterfall_scene.png")
+      })
     },
     overlays: {
-      dropTrail: activeAsset("fx", "connect4-overlay-hover.png", {
-        notes: "Wave 4B column hover overlay replaces the interim Wave 4A FX family for direct board interaction."
-      }),
-      winLine: activeAsset("fx", "connect4-overlay-win.png", {
-        notes: "Wave 4B win overlay used on resolved winning cells."
-      })
+      dropTrail: activeAsset("fx", "connect4-overlay-hover.png"),
+      winLine: activeAsset("fx", "connect4-overlay-win.png")
     },
     ui: {
       yourMove: activeAsset("ui", "your_move_banner_v2.png"),
@@ -189,37 +245,35 @@ export const GAME_ASSET_MANIFEST = {
       loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
       frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
-    fallback: runtimeFallback("connect_four", "Current connect-four renderer uses ACTIVE token discs and shell art.")
+    fallback: runtimeFallback("connect_four", "Current Connect Four runtime keeps existing token and column interaction fallbacks.")
   },
   battleship: {
     label: "Battleship",
-    sourceRoot: ACTIVE_ASSET_ROOT,
+    sourceRoot: GAME_THEME_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("concepts", "spiritverse_battleship_forge_theme.png", {
-        notes: "Forge tactical concept art now serves as the primary battleship shell while the live grid remains readable above it."
+      default: gameThemeAsset("Battleship", "boards", "battleship_grid_premium_placeholder.svg", {
+        notes: "Premium Battleship grid placeholder is now the primary named source file.",
+        fallbackAsset: activeAsset("concepts", "spiritverse_battleship_forge_theme.png")
       })
     },
     pieces: {
-      default: activeAsset("ships", "battleship-ship-battleship.png", {
-        notes: "Wave 4B isolated battleship-class ship is now the primary shell accent."
-      }),
+      default: activeAsset("ships", "battleship-ship-battleship.png"),
       shipSet: activeAsset("ships", "battleship-ship-carrier.png"),
       user: activeAsset("ships", "battleship-marker-hit.png"),
       spiritkin: activeAsset("ships", "battleship-marker-miss.png")
     },
     cards: {
-      default: activeAsset("ships", "battleship-ship-cruiser.png", {
-        notes: "Wave 4B cruiser fills the support card slot because the final pack delivers isolated ships rather than a family sheet."
-      })
+      default: activeAsset("ships", "battleship-ship-cruiser.png")
     },
     room: {
-      default: activeAsset("rooms", "room_battleship_forge_scene.png")
+      default: gameThemeAsset("Battleship", "room_backdrops", "battleship_room_premium_placeholder.svg", {
+        notes: "Premium Battleship room placeholder is manifest-driven.",
+        fallbackAsset: activeAsset("rooms", "room_battleship_forge_scene.png")
+      })
     },
     overlays: {
-      sonar: activeAsset("fx", "battleship_marker_family_v4a.png", {
-        notes: "Wave 4A marker family used as support-layer sonar overlay."
-      })
+      sonar: activeAsset("fx", "battleship_marker_family_v4a.png")
     },
     ui: {
       yourMove: activeAsset("ui", "your_move_banner_v2.png"),
@@ -228,83 +282,101 @@ export const GAME_ASSET_MANIFEST = {
       loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
       frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
-    fallback: runtimeFallback("battleship", "Current battleship renderer uses CSS grid markers over ACTIVE forge scene art.")
+    fallback: runtimeFallback("battleship", "Current Battleship grid and markers remain the functional fallback layer.")
   },
   spirit_cards: {
     label: "Spirit Cards",
-    sourceRoot: ACTIVE_ASSET_ROOT,
+    sourceRoot: GAME_THEME_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("concepts", "Book Covers All.png", {
-        notes: "Composite codex cover art now replaces the placeholder table as the primary Spirit Cards shell."
+      default: gameThemeAsset("Spirit_Cards", "boards", "spirit_cards_table_premium_placeholder.svg", {
+        notes: "Premium Spirit Cards table placeholder is now the primary named source file.",
+        fallbackAsset: activeAsset("concepts", "Book Covers All.png")
       })
     },
     pieces: {},
     cards: {
-      default: activeAsset("concepts", "Spiritkins in spiritverse.png", {
-        notes: "Founders scene enriches Spirit Cards as support art."
+      default: gameThemeAsset("Spirit_Cards", "cards", "spirit_cards_founder_set_placeholder.svg", {
+        notes: "Founder set placeholder now drives premium card treatment.",
+        fallbackAsset: activeAsset("concepts", "Spiritkins in spiritverse.png")
       }),
-      backs: activeAsset("ui", "spirit_cards_back_placeholder.svg"),
-      frames: activeAsset("ui", "spirit_cards_frame_placeholder.svg"),
-      founderSet: activeAsset("ui", "spiritcore-spiritkins-portraits.png")
+      backs: gameThemeAsset("Spirit_Cards", "cards", "spirit_cards_back_placeholder.svg", {
+        notes: "Manifest-driven premium placeholder for card backs.",
+        fallbackAsset: activeAsset("ui", "spirit_cards_back_placeholder.svg")
+      }),
+      frames: gameThemeAsset("Spirit_Cards", "cards", "spirit_cards_frame_placeholder.svg", {
+        notes: "Manifest-driven premium placeholder for card frames.",
+        fallbackAsset: activeAsset("ui", "spirit_cards_frame_placeholder.svg")
+      }),
+      founderSet: gameThemeAsset("Spirit_Cards", "cards", "spirit_cards_founder_set_placeholder.svg", {
+        notes: "Manifest-driven founder set placeholder.",
+        fallbackAsset: activeAsset("ui", "spiritcore-spiritkins-portraits.png")
+      })
     },
     room: {
-      default: activeAsset("concepts", "Spiritkins in spiritverse.png")
+      default: gameThemeAsset("Spirit_Cards", "room_backdrops", "spirit_cards_room_premium_placeholder.svg", {
+        notes: "Premium Spirit Cards room placeholder is manifest-driven.",
+        fallbackAsset: activeAsset("concepts", "Spiritkins in spiritverse.png")
+      })
     },
     overlays: {},
     ui: {
       frame: activeAsset("ui", "modal_frame_premium.png")
     },
-    fallback: runtimeFallback("spirit_cards", "Current spirit-cards renderer uses placeholder card assets preserved in ACTIVE.")
+    fallback: runtimeFallback("spirit_cards", "Current Spirit Cards layout and game-state logic remain the fallback if premium card art is missing.")
   },
   echo_trials: {
     label: "Echo Trials",
-    sourceRoot: ACTIVE_ASSET_ROOT,
+    sourceRoot: GAME_THEME_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("concepts", "spiritcore-architecture-layers.png", {
-        notes: "Architecture layers concept art now serves as the primary Echo Trials shell."
+      default: gameThemeAsset("Echo_Trials", "boards", "echo_trials_panel_premium_placeholder.svg", {
+        notes: "Premium Echo Trials panel placeholder is now the primary named source file.",
+        fallbackAsset: activeAsset("concepts", "spiritcore-architecture-layers.png")
       })
     },
     pieces: {},
     cards: {},
     room: {
-      default: activeAsset("concepts", "Spiritverse_all_games_together_theme.png")
+      default: gameThemeAsset("Echo_Trials", "room_backdrops", "echo_trials_room_premium_placeholder.svg", {
+        notes: "Premium Echo Trials room placeholder is manifest-driven.",
+        fallbackAsset: activeAsset("concepts", "Spiritverse_all_games_together_theme.png")
+      })
     },
     overlays: {},
     ui: {
       frame: activeAsset("ui", "modal_frame_premium.png")
     },
-    fallback: runtimeFallback("echo_trials", "Current echo-trials renderer uses placeholder ACTIVE shell assets.")
+    fallback: runtimeFallback("echo_trials", "Current Echo Trials panel/input renderer remains active if premium assets are missing.")
   },
   go: {
     label: "Go",
-    sourceRoot: ACTIVE_ASSET_ROOT,
+    sourceRoot: GAME_THEME_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("boards", "go_board_aquatic_base.png")
+      default: gameThemeAsset("Go", "boards", "go_board_premium_placeholder.svg", {
+        notes: "Premium Go board placeholder is now the primary named source file.",
+        fallbackAsset: activeAsset("boards", "go_board_aquatic_base.png")
+      })
     },
     pieces: {
-      default: activeAsset("tokens", "go-stone-white.png", {
-        notes: "Wave 4B isolated stones replace interim v3 singles for direct runtime use."
-      }),
+      default: activeAsset("tokens", "go-stone-white.png"),
       user: activeAsset("tokens", "go-stone-white.png"),
       spiritkin: activeAsset("tokens", "go-stone-black.png"),
       blackStone: activeAsset("tokens", "go-stone-black.png"),
       whiteStone: activeAsset("tokens", "go-stone-white.png")
     },
     cards: {
-      default: activeAsset("tokens", "go_stone_family_v4a_left.png", {
-        notes: "Wave 4A support sheet is preserved as shell art because Wave 4B only supplies isolated stones."
-      })
+      default: activeAsset("tokens", "go_stone_family_v4a_left.png")
     },
     room: {
-      default: activeAsset("rooms", "room_go_aquatic_scene.png")
+      default: gameThemeAsset("Go", "room_backdrops", "go_room_premium_placeholder.svg", {
+        notes: "Premium Go room placeholder is manifest-driven.",
+        fallbackAsset: activeAsset("rooms", "room_go_aquatic_scene.png")
+      })
     },
     overlays: {
-      hoshi: activeAsset("fx", "go-overlay-hint.png", {
-        notes: "Wave 4B hint overlay replaces the earlier Wave 4A preview ring as the direct hover cue."
-      })
+      hoshi: activeAsset("fx", "go-overlay-hint.png")
     },
     ui: {
       yourMove: activeAsset("ui", "your_move_banner_v2.png"),
@@ -313,21 +385,25 @@ export const GAME_ASSET_MANIFEST = {
       loss: activeAsset("ui", "generic_you_lost_banner_large.png"),
       frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
-    fallback: runtimeFallback("go", "Current go renderer uses CSS stones over ACTIVE board and room art.")
+    fallback: runtimeFallback("go", "Current Go intersections and stones remain the functional fallback layer.")
   },
   grand_stage: {
     label: "Grand Stage",
-    sourceRoot: ACTIVE_ASSET_ROOT,
+    sourceRoot: GAME_THEME_ASSET_ROOT,
     variants: ["default"],
     board: {
-      default: activeAsset("concepts", "spiritcore-architecture-layers.png", {
-        notes: "Grand Stage now uses architecture layers art as the primary platform shell."
+      default: gameThemeAsset("Grand_Stage", "boards", "grand_stage_platform_premium_placeholder.svg", {
+        notes: "Premium Grand Stage platform placeholder is now the primary named source file.",
+        fallbackAsset: activeAsset("concepts", "spiritcore-architecture-layers.png")
       })
     },
     pieces: {},
     cards: {},
     room: {
-      default: activeAsset("concepts", "Spiritverse_all_games_together_theme.png")
+      default: gameThemeAsset("Grand_Stage", "room_backdrops", "grand_stage_room_premium_placeholder.svg", {
+        notes: "Premium Grand Stage room placeholder is manifest-driven.",
+        fallbackAsset: activeAsset("concepts", "Spiritverse_all_games_together_theme.png")
+      })
     },
     overlays: {
       spotlight: activeAsset("fx", "portal_beam_fx_blue_v1.png"),
@@ -336,7 +412,7 @@ export const GAME_ASSET_MANIFEST = {
     ui: {
       frame: activeAsset("ui", "ui-board-frame-ornate.png")
     },
-    fallback: runtimeFallback("grand_stage", "Current grand-stage experience uses ACTIVE fullscreen shell assets.")
+    fallback: runtimeFallback("grand_stage", "Grand Stage keeps the existing fullscreen shell if premium platform art is missing.")
   }
 };
 
@@ -371,7 +447,18 @@ export function resolveGameAsset(gameType, slot, variant = "default") {
 }
 
 export function resolveGameAssetUrl(gameType, slot, variant = "default") {
-  return resolveGameAsset(gameType, slot, variant)?.publicPath || null;
+  return resolveAssetPublicPath(resolveGameAsset(gameType, slot, variant));
+}
+
+export function resolveGameThemeEnvironment(variant) {
+  const key = String(variant || "").trim().toLowerCase();
+  const environment = THEME_VARIANT_ENVIRONMENT[key];
+  if (!environment) return null;
+  return {
+    room: environment.room || null,
+    board: environment.board || null,
+    accent: environment.accent || null
+  };
 }
 
 export function listGameAssetInventory() {
@@ -388,7 +475,8 @@ export function listGameAssetInventory() {
       if (!slotEntries || typeof slotEntries !== "object") continue;
       for (const asset of Object.values(slotEntries)) {
         if (!asset) continue;
-        implemented.push(`${slotName}:${asset.sourcePath.split("/").pop()}`);
+        const assetName = asset.sourcePath?.split("/").pop() || "";
+        implemented.push(`${slotName}:${assetName}`);
       }
     }
     return {

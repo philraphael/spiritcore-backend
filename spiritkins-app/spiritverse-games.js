@@ -1,5 +1,5 @@
 import { getGameTheme } from "./data/gameThemes.js";
-import { getGameAssetPackage, resolveGameAsset } from "./data/gameAssetManifest.js";
+import { getGameAssetPackage, resolveGameAsset, resolveGameThemeEnvironment } from "./data/gameAssetManifest.js";
 
 /**
  * Spiritverse Games Engine — Visual Interactive Boards (GRAND STAGE EDITION)
@@ -73,31 +73,13 @@ function cssUrlValue(url) {
   return `url("${String(url).replace(/"/g, '\\"')}")`;
 }
 
-function activeRuntimeAsset(category, filename) {
-  return `/app/assets/${encodeURIComponent(String(category || "").replace(/\\/g, "/"))}/${encodeURIComponent(String(filename || "").replace(/\\/g, "/"))}`;
+function assetPublicPath(asset) {
+  return asset?.publicPath || asset?.fallbackAsset?.publicPath || "";
 }
 
-const CHESS_PIECE_IMAGES = {
-  wP: activeRuntimeAsset("pieces", "chess-piece-pawn-white.png"),
-  wR: activeRuntimeAsset("pieces", "chess-piece-rook-white.png"),
-  wN: activeRuntimeAsset("pieces", "chess-piece-knight-white.png"),
-  wB: activeRuntimeAsset("pieces", "chess-piece-bishop-white.png"),
-  wQ: activeRuntimeAsset("pieces", "chess-piece-queen-white.png"),
-  wK: activeRuntimeAsset("pieces", "chess-piece-king-white.png"),
-  bP: activeRuntimeAsset("pieces", "chess-piece-pawn-black.png"),
-  bR: activeRuntimeAsset("pieces", "chess-piece-rook-black.png"),
-  bN: activeRuntimeAsset("pieces", "chess-piece-knight-black.png"),
-  bB: activeRuntimeAsset("pieces", "chess-piece-bishop-black.png"),
-  bQ: activeRuntimeAsset("pieces", "chess-piece-queen-black.png"),
-  bK: activeRuntimeAsset("pieces", "chess-piece-king-black.png"),
-};
-
-const CHECKERS_PIECE_IMAGES = {
-  white: activeRuntimeAsset("pieces", "checkers-piece-white.png"),
-  black: activeRuntimeAsset("pieces", "checkers-piece-black.png"),
-  whiteKing: activeRuntimeAsset("pieces", "checkers-piece-white-king.png"),
-  blackKing: activeRuntimeAsset("pieces", "checkers-piece-black-king.png"),
-};
+function resolveRuntimeAssetUrl(type, slot, variant = "default") {
+  return assetPublicPath(resolveGameAsset(type, slot, variant));
+}
 
 function buildRuntimePieceImage(src, alt, cls = "") {
   if (!src) return "";
@@ -115,6 +97,14 @@ function themeVarsToStyle(theme, assetUrls = {}) {
     "--game-token-spirit": cssUrlValue(assetUrls.tokenSpiritUrl),
     "--game-token-accent": cssUrlValue(assetUrls.tokenAccentUrl),
     "--game-overlay-fx": cssUrlValue(assetUrls.overlayUrl),
+    "--game-overlay-selected": cssUrlValue(assetUrls.overlaySelectedUrl),
+    "--game-overlay-valid": cssUrlValue(assetUrls.overlayValidUrl),
+    "--game-overlay-capture": cssUrlValue(assetUrls.overlayCaptureUrl),
+    "--game-overlay-hover": cssUrlValue(assetUrls.overlayHoverUrl),
+    "--game-overlay-win": cssUrlValue(assetUrls.overlayWinUrl),
+    "--game-card-back": cssUrlValue(assetUrls.cardBackUrl),
+    "--game-card-frame": cssUrlValue(assetUrls.cardFrameUrl),
+    "--game-card-founder": cssUrlValue(assetUrls.cardFounderUrl),
     "--game-modal-frame": cssUrlValue(assetUrls.frameUrl),
     "--game-ui-frame": cssUrlValue(assetUrls.frameUrl)
   };
@@ -128,7 +118,7 @@ function resolveThemeAssetPackage(type, theme) {
 }
 
 function resolveRuntimeTokenUrl(type, variant = "user") {
-  return resolveGameAsset(type, "pieces", variant)?.publicPath || "";
+  return assetPublicPath(resolveGameAsset(type, "pieces", variant));
 }
 
 function findConnectFourWinningLine(board = []) {
@@ -151,41 +141,13 @@ function findConnectFourWinningLine(board = []) {
 }
 
 function resolveThemeEnvironmentOverrides(theme) {
-  const variant = String(theme?.boardVariant || "default").toLowerCase();
-  const runtime = (category, filename) => filename ? activeRuntimeAsset(category, filename) : "";
-  const overrides = {
-    crown: {
-      roomUrl: runtime("ui", "spiritcore-media-hero.png"),
-      boardUrl: "",
-      accentUrl: runtime("ui", "welcome_open.png")
-    },
-    archive: {
-      roomUrl: runtime("concepts", "Elaria.png"),
-      boardUrl: "",
-      accentUrl: runtime("concepts", "Elaria.png")
-    },
-    veil: {
-      roomUrl: runtime("rooms", "room_chess_lyra_celestial_scene.png"),
-      boardUrl: runtime("concepts", "spiritverse_chess_lyra_theme.png"),
-      accentUrl: runtime("ui", "lyra_close.png")
-    },
-    ember: {
-      roomUrl: runtime("rooms", "room_battleship_forge_scene.png"),
-      boardUrl: runtime("concepts", "spiritverse_battleship_forge_theme.png"),
-      accentUrl: runtime("ui", "kairo_close.png")
-    },
-    astral: {
-      roomUrl: runtime("rooms", "room_connect4_waterfall_scene.png"),
-      boardUrl: runtime("concepts", "spiritverse_connect_four_waterfall_theme.png"),
-      accentUrl: runtime("ui", "raien_close.png")
-    },
-    abyssal: {
-      roomUrl: runtime("rooms", "room_go_aquatic_scene.png"),
-      boardUrl: runtime("concepts", "spiritverse_go_aquatic_theme.png"),
-      accentUrl: runtime("concepts", "thalassar.png")
-    }
+  const environment = resolveGameThemeEnvironment(theme?.boardVariant);
+  if (!environment) return {};
+  return {
+    roomUrl: environment.room?.publicPath || "",
+    boardUrl: environment.board?.publicPath || "",
+    accentUrl: environment.accent?.publicPath || ""
   };
-  return overrides[variant] || {};
 }
 
 function buildAssetDataAttributes(type, theme) {
@@ -197,8 +159,8 @@ function buildAssetDataAttributes(type, theme) {
   const fallbackAsset = assets.fallback || null;
   const attrs = [
     ["data-asset-root", assets.sourceRoot],
-    ["data-asset-board", environment.boardUrl || boardAsset?.publicPath || boardAsset?.sourcePath || ""],
-    ["data-asset-room", environment.roomUrl || roomAsset?.publicPath || roomAsset?.sourcePath || ""],
+    ["data-asset-board", environment.boardUrl || assetPublicPath(boardAsset) || boardAsset?.sourcePath || ""],
+    ["data-asset-room", environment.roomUrl || assetPublicPath(roomAsset) || roomAsset?.sourcePath || ""],
     ["data-asset-fallback", fallbackAsset?.fallbackKey || fallbackAsset?.renderer || ""]
   ];
   return attrs
@@ -232,19 +194,38 @@ function withThemeFrame(content, type, theme, extraClass = "") {
     resolveGameAsset(type, "overlays", "hoshi") ||
     resolveGameAsset(type, "overlays", "sonar") ||
     resolveGameAsset(type, "overlays", "frame");
+  const overlaySelectedAsset = resolveGameAsset(type, "overlays", "selected");
+  const overlayValidAsset = resolveGameAsset(type, "overlays", "validMove");
+  const overlayCaptureAsset = resolveGameAsset(type, "overlays", "capture");
+  const overlayHoverAsset =
+    resolveGameAsset(type, "overlays", "dropTrail") ||
+    resolveGameAsset(type, "overlays", "selection") ||
+    resolveGameAsset(type, "overlays", "hoshi");
+  const overlayWinAsset = resolveGameAsset(type, "overlays", "winLine");
   const frameAsset = resolveGameAsset(type, "ui", "frame");
+  const cardBackAsset = resolveGameAsset(type, "cards", "backs");
+  const cardFrameAsset = resolveGameAsset(type, "cards", "frames");
+  const cardFounderAsset = resolveGameAsset(type, "cards", "founderSet");
   return `
     <div class="${classes.join(" ")}" data-game-theme="${type}" data-associated-spiritkin="${theme.associatedSpiritkin}" data-theme="${escapeAttribute(theme.boardVariant || "default")}" data-theme-variant="${escapeAttribute(theme.boardVariant || "default")}" ${assetAttrs} style="${themeVarsToStyle(theme, {
-      boardUrl: boardAsset?.publicPath,
-      roomUrl: roomAsset?.publicPath,
-      cardUrl: cardAsset?.publicPath,
-      accentUrl: accentAsset?.publicPath,
-      tokenUserUrl: tokenUserAsset?.publicPath,
-      tokenSpiritUrl: tokenSpiritAsset?.publicPath,
-      tokenAccentUrl: tokenAccentAsset?.publicPath,
-      overlayUrl: overlayAsset?.publicPath,
-      frameUrl: frameAsset?.publicPath
-    })}; --game-room-art: ${cssUrlValue(environment.roomUrl || roomAsset?.publicPath)}; --game-board-art: ${cssUrlValue(environment.boardUrl || boardAsset?.publicPath)}; --game-accent-art: ${cssUrlValue(environment.accentUrl || accentAsset?.publicPath)};">
+      boardUrl: assetPublicPath(boardAsset),
+      roomUrl: assetPublicPath(roomAsset),
+      cardUrl: assetPublicPath(cardAsset),
+      accentUrl: assetPublicPath(accentAsset),
+      tokenUserUrl: assetPublicPath(tokenUserAsset),
+      tokenSpiritUrl: assetPublicPath(tokenSpiritAsset),
+      tokenAccentUrl: assetPublicPath(tokenAccentAsset),
+      overlayUrl: assetPublicPath(overlayAsset),
+      overlaySelectedUrl: assetPublicPath(overlaySelectedAsset),
+      overlayValidUrl: assetPublicPath(overlayValidAsset),
+      overlayCaptureUrl: assetPublicPath(overlayCaptureAsset),
+      overlayHoverUrl: assetPublicPath(overlayHoverAsset),
+      overlayWinUrl: assetPublicPath(overlayWinAsset),
+      cardBackUrl: assetPublicPath(cardBackAsset),
+      cardFrameUrl: assetPublicPath(cardFrameAsset),
+      cardFounderUrl: assetPublicPath(cardFounderAsset),
+      frameUrl: assetPublicPath(frameAsset)
+    })}; --game-room-art: ${cssUrlValue(environment.roomUrl || assetPublicPath(roomAsset))}; --game-board-art: ${cssUrlValue(environment.boardUrl || assetPublicPath(boardAsset))}; --game-accent-art: ${cssUrlValue(environment.accentUrl || assetPublicPath(accentAsset))};">
       <div class="sv-theme-atlas">
         <div class="sv-theme-atlas-copy">
           <span class="sv-theme-atlas-kicker">${escapeAttribute(theme.domainLabel || `${theme.associatedSpiritkin} Domain`)}</span>
@@ -332,14 +313,14 @@ const GrandStage = {
     const boardAsset = resolveGameAsset(gameType, "board");
     const roomAsset = resolveGameAsset(gameType, "room");
     const fallbackAsset = assetPackage?.fallback || null;
-    if (environment.boardUrl || boardAsset?.publicPath || boardAsset?.sourcePath) overlay.dataset.assetBoard = environment.boardUrl || boardAsset?.publicPath || boardAsset.sourcePath;
-    if (environment.roomUrl || roomAsset?.publicPath || roomAsset?.sourcePath) overlay.dataset.assetRoom = environment.roomUrl || roomAsset?.publicPath || roomAsset.sourcePath;
+    if (environment.boardUrl || assetPublicPath(boardAsset) || boardAsset?.sourcePath) overlay.dataset.assetBoard = environment.boardUrl || assetPublicPath(boardAsset) || boardAsset.sourcePath;
+    if (environment.roomUrl || assetPublicPath(roomAsset) || roomAsset?.sourcePath) overlay.dataset.assetRoom = environment.roomUrl || assetPublicPath(roomAsset) || roomAsset.sourcePath;
     if (fallbackAsset?.fallbackKey || fallbackAsset?.renderer) overlay.dataset.assetFallback = fallbackAsset?.fallbackKey || fallbackAsset?.renderer;
     for (const [key, value] of Object.entries(theme.cssVars || {})) {
       overlay.style.setProperty(key, value);
     }
-    overlay.style.setProperty("--game-board-art", cssUrlValue(environment.boardUrl || boardAsset?.publicPath));
-    overlay.style.setProperty("--game-room-art", cssUrlValue(environment.roomUrl || roomAsset?.publicPath));
+    overlay.style.setProperty("--game-board-art", cssUrlValue(environment.boardUrl || assetPublicPath(boardAsset)));
+    overlay.style.setProperty("--game-room-art", cssUrlValue(environment.roomUrl || assetPublicPath(roomAsset)));
     overlay.style.setProperty("--game-accent-art", cssUrlValue(environment.accentUrl || ""));
     
     overlay.innerHTML = `
@@ -545,11 +526,11 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
       if (isLastMove) cellClass += ' chess-last-move';
 
       const pieceKey = piece ? `${piece.color}${piece.type}` : null;
-      const pieceImage = pieceKey ? CHESS_PIECE_IMAGES[pieceKey] || "" : "";
+      const pieceSvg = pieceKey ? (CHESS_PIECE_THEMES[themeId]?.[pieceKey] || CHESS_PIECES[pieceKey] || "") : "";
 
       html += `<div class="${cellClass}" data-sq="${sq}" ${isInteractive ? 'data-action="chess-square-click"' : ''}>`;
       if (isValidMove && !piece) html += `<div class="chess-move-dot"></div>`;
-      if (pieceImage) html += `<div class="chess-piece ${piece.color === 'w' ? 'piece-white' : 'piece-black'}" data-sq="${sq}">${buildRuntimePieceImage(pieceImage, `${piece.color === "w" ? "White" : "Black"} chess ${piece.type}`, "chess-piece-image")}</div>`;
+      if (pieceSvg) html += `<div class="chess-piece ${piece.color === 'w' ? 'piece-white' : 'piece-black'}" data-sq="${sq}">${pieceSvg}</div>`;
       if (isValidMove && piece) html += `<div class="chess-capture-ring"></div>`;
       html += `</div>`;
     }
@@ -609,6 +590,10 @@ function renderChessBoard(container, fen, selectedSquare, validMoves, lastMove, 
 // ============================================================
 function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, lastMove, onSquareClick, isExpanded = false, theme = resolveGameTheme("checkers"), isInteractive = true) {
   const board = boardArray || Array(32).fill(null);
+  const userPieceUrl = resolveRuntimeAssetUrl("checkers", "pieces", "user");
+  const spiritPieceUrl = resolveRuntimeAssetUrl("checkers", "pieces", "spiritkin");
+  const userKingUrl = resolveRuntimeAssetUrl("checkers", "pieces", "userKing") || userPieceUrl;
+  const spiritKingUrl = resolveRuntimeAssetUrl("checkers", "pieces", "spiritkinKing") || spiritPieceUrl;
   
   let html = '';
   if (!isExpanded) {
@@ -646,7 +631,10 @@ function renderCheckersBoard(container, boardArray, selectedPiece, validMoves, l
       if (piece) {
         const isKing = piece.includes('king');
         const colorClass = piece.includes('white') ? 'piece-user' : 'piece-spiritkin';
-        html += `<div class="checkers-piece ${colorClass} ${isKing ? 'piece-king' : ''}"></div>`;
+        const pieceUrl = piece.includes("white")
+          ? (isKing ? userKingUrl : userPieceUrl)
+          : (isKing ? spiritKingUrl : spiritPieceUrl);
+        html += `<div class="checkers-piece ${colorClass} ${isKing ? 'piece-king' : ''}">${buildRuntimePieceImage(pieceUrl, `${piece} checkers piece`, "checkers-piece-image")}</div>`;
       }
       if (isValid && !piece) html += `<div class="checkers-move-dot"></div>`;
       html += `</div>`;
@@ -693,7 +681,7 @@ function renderGoBoard(container, boardArray, lastMove, onSquareClick, isExpande
   const board = boardArray || Array(size * size).fill(null);
   const goUserStone = resolveRuntimeTokenUrl("go", "user");
   const goSpiritStone = resolveRuntimeTokenUrl("go", "spiritkin");
-  const goHintOverlay = resolveGameAsset("go", "overlays", "hoshi")?.publicPath || "";
+  const goHintOverlay = assetPublicPath(resolveGameAsset("go", "overlays", "hoshi"));
 
   let html = '';
   if (!isExpanded) {
