@@ -24,7 +24,7 @@ const GAME_REGISTRY = {
     name: "Spirit-Cards",
     type: "tcg",
     description: "A Spiritverse trading card game. Shape the realm with your hand.",
-    instructions: "Play cards to gain Realm Points or challenge the Spiritkin's board.",
+    instructions: "First to 15 realm points wins. Draw to refill your hand, then play a card you can afford with your current mana.",
     createData: () => {
       const deck = generateCardDeck();
       const spiritkinDeck = generateCardDeck();
@@ -46,7 +46,7 @@ const GAME_REGISTRY = {
     name: "Echo Trials",
     type: "echoes",
     description: "A challenge where your Spiritkin poses riddles from the deep Echoes of the Spiritverse.",
-    instructions: "Answer the riddle posed by your Spiritkin.",
+    instructions: "Read the riddle, type one answer, and submit it. Each wrong answer uses one of your three attempts.",
     createData: () => {
       const riddles = [
         { question: "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?", answer: "echo" },

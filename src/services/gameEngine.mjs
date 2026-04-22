@@ -192,18 +192,18 @@ export const createGameEngine = ({ bus, world, registry, orchestrator }) => {
 
 function getGameCommentaryFlavor(gameType) {
   if (gameType === "chess") return {
-    opening: "Set your opening cleanly.",
-    reply: "I see the position. Let me answer the pressure.",
-    win: "The position closed my way.",
-    draw: "The board froze into balance.",
-    forfeit: "We can leave the position here for now."
+    opening: "Bring your first white piece forward cleanly. I want to see your opening shape.",
+    reply: "I see the files, diagonals, and king pressure forming. Let me answer the position.",
+    win: "The king ran out of breathing room.",
+    draw: "The position sealed itself into balance.",
+    forfeit: "We can leave this position set and return to it later."
   };
   if (gameType === "checkers") return {
-    opening: "Show me your first diagonal.",
-    reply: "I see the jump lanes. Let me answer them.",
-    win: "The diagonals finished in my favor.",
-    draw: "The diagonals held level.",
-    forfeit: "We can leave the lane here for now."
+    opening: "Show me your first diagonal and make it count.",
+    reply: "I can see the jump lanes and king paths opening. Let me answer them.",
+    win: "The diagonal pressure finally broke my way.",
+    draw: "The lanes held level and neither side could break through.",
+    forfeit: "We can leave the lane quiet here for now."
   };
   if (gameType === "go") return {
     opening: "Place the first stone with intent.",
@@ -213,38 +213,38 @@ function getGameCommentaryFlavor(gameType) {
     forfeit: "We can leave the star-map quiet for now."
   };
   if (gameType === "spirit_cards") return {
-    opening: "Shape your first card line carefully.",
-    reply: "I see the realm you are building. Let me answer it.",
-    win: "The stronger realm held for me.",
-    draw: "The realm stayed balanced.",
-    forfeit: "We can set the cards down here for now."
+    opening: "Open with a card line that actually changes the realm.",
+    reply: "I can see your hand pressure, your mana line, and the field you are building. Let me answer the realm.",
+    win: "My field held the stronger realm in the end.",
+    draw: "The realm stayed level and refused a clean break.",
+    forfeit: "We can set the deck down here for now."
   };
   if (gameType === "echo_trials") return {
-    opening: "Listen to the riddle before you rush it.",
-    reply: "I felt where your answer reached. Let me answer the trial.",
-    win: "The trial held its answer from you this time.",
-    draw: "The trial settled without yielding.",
-    forfeit: "We can let the riddle rest for now."
+    opening: "Listen to the riddle before you commit to an answer.",
+    reply: "I can feel where your answer touched the clue. Let me answer the trial.",
+    win: "The trial kept its answer hidden from you this time.",
+    draw: "The trial settled without revealing a clean answer.",
+    forfeit: "We can let the riddle rest here for now."
   };
   if (gameType === "tictactoe") return {
-    opening: "Claim your first square cleanly.",
-    reply: "I see the line you're building. Let me answer it.",
-    win: "The grid closed my way.",
-    draw: "The grid filled evenly.",
+    opening: "Claim your first square cleanly and start shaping the line.",
+    reply: "I see the line and fork pressure you are setting. Let me answer the grid.",
+    win: "The grid closed in my favor.",
+    draw: "The grid filled without giving either line away.",
     forfeit: "We can leave the grid here for now."
   };
   if (gameType === "connect_four") return {
-    opening: "Choose your first column carefully.",
-    reply: "I see the stack you're building. Let me answer it.",
-    win: "The line fell my way in the end.",
-    draw: "The columns filled without a break.",
-    forfeit: "We can leave the columns here for now."
+    opening: "Choose your first column carefully and start shaping the stack.",
+    reply: "I can see the vertical pressure and diagonal traps building. Let me answer the column.",
+    win: "The falling line broke my way in the end.",
+    draw: "The columns filled without opening a four.",
+    forfeit: "We can leave the columns standing here for now."
   };
   if (gameType === "battleship") return {
-    opening: "Take your first shot with intent.",
-    reply: "I see your search pattern. Let me answer it.",
-    win: "The search favored me in the end.",
-    draw: "The deep held its silence.",
+    opening: "Take your first shot with intent and start reading the grid.",
+    reply: "I see the search pattern you are laying across the water. Let me answer it.",
+    win: "The search tide turned my way in the end.",
+    draw: "The deep held its silence for both of us.",
     forfeit: "We can let the water go still for now."
   };
   return {

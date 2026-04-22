@@ -1086,6 +1086,24 @@ export const SpiritverseGames = {
     const spiritkinHand = gameData.spiritkinHand || [];
     const realmPoints = gameData.realmPoints || { user: 0, spiritkin: 0 };
     const isUsersTurn = gameData.status !== 'ended' && gameData.turn === 'user';
+    const affordableHand = hand.filter((card) => Number(card?.cost || 0) <= Number(mana || 0));
+    const targetScore = 15;
+    const userRemaining = Math.max(0, targetScore - Number(realmPoints.user || 0));
+    const spiritkinRemaining = Math.max(0, targetScore - Number(realmPoints.spiritkin || 0));
+    const boardLeader = Number(realmPoints.user || 0) === Number(realmPoints.spiritkin || 0)
+      ? "The score is even."
+      : Number(realmPoints.user || 0) > Number(realmPoints.spiritkin || 0)
+        ? `You are ahead by ${Number(realmPoints.user || 0) - Number(realmPoints.spiritkin || 0)} realm point${Number(realmPoints.user || 0) - Number(realmPoints.spiritkin || 0) === 1 ? "" : "s"}.`
+        : `Spiritkin is ahead by ${Number(realmPoints.spiritkin || 0) - Number(realmPoints.user || 0)} realm point${Number(realmPoints.spiritkin || 0) - Number(realmPoints.user || 0) === 1 ? "" : "s"}.`;
+    const nextActionCopy = !isUsersTurn
+      ? "Waiting for the Spiritkin reply. Your hand unlocks when the realm settles."
+      : !hand.length
+        ? "Your hand is empty. Draw first, then start building your field."
+        : !affordableHand.length
+          ? `Nothing in hand fits ${mana}/5 mana. Draw for a new option or wait for a better line.`
+          : affordableHand.length === 1
+            ? `Play ${affordableHand[0].name} now or draw first.`
+            : "Play any affordable card or draw first.";
     const userBoard = board.filter((entry) => entry?.owner === "user");
     const spiritkinBoard = board.filter((entry) => entry?.owner === "spiritkin");
     const root = resolveTarget(container);
@@ -1129,10 +1147,14 @@ export const SpiritverseGames = {
           </div>
           <div class="spirit-cards-boardline">
             <div class="game-help-card">
-              <div class="game-help-card-label">Board Presence</div>
-              <p>${board.length ? `${board.length} card${board.length === 1 ? '' : 's'} are in play. Reach 15 realm points first.` : 'No cards are in play yet. Draw or play a card to begin shaping the realm.'}</p>
+              <div class="game-help-card-label">Objective</div>
+              <p>Reach ${targetScore} realm points first. You need ${userRemaining} more. Spiritkin needs ${spiritkinRemaining} more.</p>
             </div>
-            <button class="echo-submit-btn spirit-cards-draw-btn" data-action="cards-draw" ${!isUsersTurn ? 'disabled' : ''}>Draw a Card</button>
+            <div class="game-help-card">
+              <div class="game-help-card-label">Right Now</div>
+              <p>${nextActionCopy}</p>
+            </div>
+            <button class="echo-submit-btn spirit-cards-draw-btn" data-action="cards-draw" ${!isUsersTurn ? 'disabled' : ''}>Draw card</button>
           </div>
         </div>
 
@@ -1166,18 +1188,23 @@ export const SpiritverseGames = {
         <div class="player-hand">
           <div class="spirit-cards-zone-label">Your Hand</div>
           <div class="spirit-cards-grid">
-            ${hand.length ? hand.map((card, i) => `
-              <button class="spirit-card-tile spirit-card-player" data-action="cards-play-card" data-card-idx="${i}" ${!isUsersTurn ? 'disabled' : ''}>
+            ${hand.length ? hand.map((card, i) => {
+              const canAfford = Number(card?.cost || 0) <= Number(mana || 0);
+              const disabled = !isUsersTurn || !canAfford;
+              return `
+              <button class="spirit-card-tile spirit-card-player ${canAfford ? 'is-playable' : 'is-locked'}" data-action="cards-play-card" data-card-idx="${i}" ${disabled ? 'disabled' : ''}>
                 <div class="spirit-card-glyph">${spiritCardGlyph(card)}</div>
                 <div class="spirit-card-name">${card.name}</div>
                 <div class="spirit-card-meta">Cost ${card.cost} • Power ${card.power}</div>
                 <div class="spirit-card-meta">${card.type}</div>
+                <div class="spirit-card-state">${canAfford ? 'Playable now' : `Needs ${card.cost} mana`}</div>
               </button>
-            `).join('') : `<div class="spirit-cards-hint">${isUsersTurn ? 'Your hand is empty. Draw a card to continue.' : 'Waiting for the Spiritkin to answer the board.'}</div>`}
+            `;
+            }).join('') : `<div class="spirit-cards-hint">${isUsersTurn ? 'Your hand is empty. Draw a card to continue.' : 'Waiting for the Spiritkin to answer the realm.'}</div>`}
           </div>
         </div>
         
-        <div class="spirit-cards-hint">${isUsersTurn ? 'Tap a card to play it. Use Draw if you need more options in hand.' : 'The Spiritkin is resolving the board. Your next hand opens when the turn returns.'}</div>
+        <div class="spirit-cards-hint">${board.length ? `${board.length} card${board.length === 1 ? '' : 's'} are in play. ${boardLeader}` : 'No cards are in play yet. Draw or play a card to begin shaping the realm.'}</div>
       </div>
     `;
     
@@ -1198,6 +1225,7 @@ export const SpiritverseGames = {
     const riddle = gameData.riddle || "A riddle awaits...";
     const attempts = gameData.attempts || 0;
     const maxAttempts = gameData.maxAttempts || 3;
+    const attemptsLeft = Math.max(0, Number(maxAttempts || 0) - Number(attempts || 0));
     const isUsersTurn = gameData.status !== 'ended' && gameData.turn === 'user';
     const root = resolveTarget(container);
     if (!root) return;
@@ -1205,19 +1233,31 @@ export const SpiritverseGames = {
     const html = `
       <div class="echo-trials-container ${isExpanded ? 'echo-trials-grand' : ''}">
         <div class="riddle-box">
-          <div class="echo-riddle-label">🔔 Echo's Riddle</div>
+          <div class="echo-riddle-label">Echo Trial</div>
           <div class="echo-riddle-text">${riddle}</div>
-          
+          <div class="echo-trial-status-grid">
+            <div class="echo-trial-status-card">
+              <div class="echo-trial-status-label">Objective</div>
+              <strong>Solve the riddle before all ${maxAttempts} attempts are spent.</strong>
+              <p>One answer per turn. Wrong answers consume an attempt.</p>
+            </div>
+            <div class="echo-trial-status-card">
+              <div class="echo-trial-status-label">Right Now</div>
+              <strong>${isUsersTurn ? 'Offer your best answer.' : 'Wait for the trial reply.'}</strong>
+              <p>${isUsersTurn ? `${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} remain.` : 'Input unlocks again as soon as the Spiritkin finishes responding.'}</p>
+            </div>
+          </div>
+
           <div class="echo-attempt-pips">
             ${Array.from({length: maxAttempts}).map((_, i) => `
               <div class="echo-attempt-pip ${i < attempts ? 'used' : 'available'}"></div>
             `).join('')}
           </div>
-          <div class="echo-attempt-copy">Attempts: ${attempts}/${maxAttempts}</div>
+          <div class="echo-attempt-copy">${attempts}/${maxAttempts} used. ${attemptsLeft} remaining.${gameData.lastMove ? ` Last answer: "${escapeAttribute(gameData.lastMove)}".` : ''}</div>
           
           <div class="echo-answer-row">
-            <input type="text" class="echo-answer-input" data-action="echo-input-change" value="${escapeAttribute(this.echoAnswer || '')}" placeholder="${isUsersTurn ? 'Your answer...' : 'Waiting for the next trial turn...'}" ${!isUsersTurn ? 'disabled' : ''} />
-            <button class="echo-submit-btn" data-action="echo-submit-direct" ${!isUsersTurn ? 'disabled' : ''}>Submit</button>
+            <input type="text" class="echo-answer-input" data-action="echo-input-change" value="${escapeAttribute(this.echoAnswer || '')}" placeholder="${isUsersTurn ? 'Type the answer the riddle wants...' : 'Waiting for the next trial turn...'}" ${!isUsersTurn ? 'disabled' : ''} />
+            <button class="echo-submit-btn" data-action="echo-submit-direct" ${!isUsersTurn ? 'disabled' : ''}>Offer answer</button>
           </div>
         </div>
       </div>

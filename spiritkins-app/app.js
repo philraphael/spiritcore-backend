@@ -5763,7 +5763,7 @@ async function executeGameMove(move, options = {}) {
     state.gameInput = "";
     state.gameFeedback = {
       phase: "sending",
-      text: `Move placed. ${state.selectedSpiritkin?.name || "Spiritkin"} is reading the board...`,
+      text: buildGameMoveSendingText(previousGame?.type || state.activeGame?.type, move, state.selectedSpiritkin?.name),
       move: String(move),
     };
     setAuthoritativeTurnPhase("processing", {
@@ -5821,26 +5821,10 @@ async function executeGameMove(move, options = {}) {
         buildGameOutcomeReaction(state.selectedSpiritkin.name, state.activeGame) ||
         (state.activeGame?.status === "active" ? buildPresenceTabNarration("games", state.selectedSpiritkin, getBondStateForSpiritkin(state.selectedSpiritkin.name).currentBond, null, null) : "");
       state.gameSpiritkinMessage = resolvedGameReply || null;
-      state.gameFeedback = state.activeGame?.status === "ended"
-        ? {
-            phase: "complete",
-            text: state.activeGame?.result?.label || "The board has settled.",
-            move: latestHistory?.move || null,
-          }
-        : latestHistory?.player === "spiritkin"
-          ? {
-              phase: "reply",
-              text: `${state.selectedSpiritkin?.name || "Spiritkin"} answered the board.`,
-              move: latestHistory.move || null,
-            }
-          : {
-              phase: "ready",
-              text: "Move accepted. The board is ready for you.",
-              move: null,
-            };
+      state.gameFeedback = buildGameResolvedFeedback(state.activeGame, state.selectedSpiritkin?.name, latestHistory);
       state.statusText = state.activeGame?.status === "ended"
         ? (state.activeGame?.result?.label || "Game complete.")
-        : (addUserMessage ? "Move accepted." : "");
+        : (addUserMessage ? (state.gameFeedback?.text || "Move accepted.") : "");
       state.statusError = false;
 
       if (SpiritverseGames && SpiritverseGames.reset) {
@@ -6002,9 +5986,7 @@ async function startGameSession(gameType) {
     state.gameInput = "";
     state.gameFeedback = {
       phase: "ready",
-      text: state.activeGame?.turn === "user"
-        ? "Board ready. Your first move is live."
-        : `${state.selectedSpiritkin.name} is opening the game.`,
+      text: buildGameTurnState(state.activeGame, state.selectedSpiritkin.name).detail,
       move: null,
     };
     state.statusText = "Game started.";
@@ -6068,15 +6050,259 @@ function buildGameOutcomeSummary(game, spiritkinName) {
   const result = game?.result || null;
   if (!result) return null;
   if (result.isDraw) {
-    return { headline: "Draw", detail: result.label || "The game ended in balance." };
+    return {
+      headline: "Draw",
+      detail: result.label || "The game settled into balance."
+    };
   }
   if (result.winner === "user") {
-    return { headline: "You Won", detail: result.label || `You finished ${game?.name || "the game"} cleanly.` };
+    return {
+      headline: "You Won",
+      detail: result.label || `You finished ${game?.name || "the game"} cleanly.`
+    };
   }
   if (result.winner === "spiritkin") {
-    return { headline: `${spiritkinName} Won`, detail: result.label || `${spiritkinName} finished the game cleanly.` };
+    return {
+      headline: `${spiritkinName} Won`,
+      detail: result.label || `${spiritkinName} finished the game cleanly.`
+    };
   }
   return { headline: "Game Complete", detail: result.label || "The game is complete." };
+}
+
+function pluralizeGameWord(count, singular, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function buildGameActionPrompt(game, spiritkinName) {
+  if (!game) return "Open a game to see the next action.";
+  const type = game.type;
+  const data = game.data || {};
+  if (type === "chess") {
+    return "Select a white piece, then choose one of the highlighted destination squares.";
+  }
+  if (type === "checkers") {
+    return "Select a white piece, then choose a highlighted dark square to move or jump.";
+  }
+  if (type === "go") {
+    return "Star-Mapping is still a preview surface. Choose one of the live games for a full match.";
+  }
+  if (type === "spirit_cards") {
+    const mana = Number(data.mana || 0);
+    const hand = Array.isArray(data.hand) ? data.hand : [];
+    const affordable = hand.filter((card) => Number(card?.cost || 0) <= mana);
+    if (!hand.length) {
+      return "Your hand is empty. Use Draw to reopen your options, then play toward 15 realm points.";
+    }
+    if (!affordable.length) {
+      return `No card in hand fits your ${mana}/5 mana. Draw for a new option and keep the race to 15 realm points alive.`;
+    }
+    return affordable.length === 1
+      ? `You can play ${affordable[0].name} now or draw first. Reach 15 realm points before ${spiritkinName}.`
+      : `Play any affordable card from your hand or draw first. Reach 15 realm points before ${spiritkinName}.`;
+  }
+  if (type === "echo_trials") {
+    const maxAttempts = Number(data.maxAttempts || 3);
+    const attempts = Number(data.attempts || 0);
+    const remaining = Math.max(0, maxAttempts - attempts);
+    return `Read the riddle, type one answer, and submit it. ${pluralizeGameWord(remaining, "attempt")} remain.`;
+  }
+  if (type === "tictactoe") {
+    return "Tap any open square and start building a line of three.";
+  }
+  if (type === "connect_four") {
+    return "Drop into one open column and keep building toward four in a row.";
+  }
+  if (type === "battleship") {
+    return "Tap one unmarked cell on the search grid to fire your next shot.";
+  }
+  return "Use the visible board controls to make your next move.";
+}
+
+function buildGameWaitingPrompt(game, spiritkinName) {
+  if (!game) return `${spiritkinName} is still resolving the last game state.`;
+  if (game.type === "chess") {
+    return `${spiritkinName} is reading the position. The board unlocks when the reply lands.`;
+  }
+  if (game.type === "checkers") {
+    return `${spiritkinName} is reading the jump lanes. The board unlocks when the reply lands.`;
+  }
+  if (game.type === "spirit_cards") {
+    return `${spiritkinName} is resolving the realm. Your hand unlocks after the reply lands.`;
+  }
+  if (game.type === "echo_trials") {
+    return `${spiritkinName} is weighing your answer. Input unlocks when the trial reply arrives.`;
+  }
+  if (game.type === "tictactoe") {
+    return `${spiritkinName} is placing the answering mark. The grid unlocks after that move resolves.`;
+  }
+  if (game.type === "connect_four") {
+    return `${spiritkinName} is choosing the next column. The board unlocks after that drop resolves.`;
+  }
+  if (game.type === "battleship") {
+    return `${spiritkinName} is tracing the next search pattern. The grid unlocks after the reply lands.`;
+  }
+  return `${spiritkinName} is taking the next turn. Controls unlock when the move resolves.`;
+}
+
+function buildGameTurnState(game, spiritkinName) {
+  const resolvedSpiritkin = spiritkinName || state.selectedSpiritkin?.name || "Spiritkin";
+  if (!game) {
+    return {
+      className: "turn-finished",
+      title: "No active game",
+      detail: "Start a game to open the board."
+    };
+  }
+  if (game.status === "ended") {
+    if (game.result?.isDraw) {
+      return {
+        className: "turn-finished",
+        title: "Game finished",
+        detail: "This round ended in a draw. Replay it or choose another game."
+      };
+    }
+    return {
+      className: "turn-finished",
+      title: game.result?.winner === "user" ? "You finished the game" : `${resolvedSpiritkin} finished the game`,
+      detail: "Review the outcome below, then replay it or move to another game."
+    };
+  }
+  if (state.gameLoading) {
+    return {
+      className: "turn-spiritkin",
+      title: `${resolvedSpiritkin} is responding`,
+      detail: "Controls stay locked until the current move finishes resolving."
+    };
+  }
+  if (game.turn === "user") {
+    return {
+      className: "turn-user",
+      title: "Your turn",
+      detail: buildGameActionPrompt(game, resolvedSpiritkin)
+    };
+  }
+  return {
+    className: "turn-spiritkin",
+    title: `${resolvedSpiritkin}'s turn`,
+    detail: buildGameWaitingPrompt(game, resolvedSpiritkin)
+  };
+}
+
+function buildGameMoveSendingText(gameType, move, spiritkinName) {
+  const resolvedSpiritkin = spiritkinName || state.selectedSpiritkin?.name || "Spiritkin";
+  if (gameType === "chess") return `Move sent. ${resolvedSpiritkin} is reading the position.`;
+  if (gameType === "checkers") return `Move sent. ${resolvedSpiritkin} is reading the diagonals.`;
+  if (gameType === "spirit_cards") {
+    return String(move) === "draw"
+      ? `Draw committed. ${resolvedSpiritkin} is reading the next hand.`
+      : `Card committed. ${resolvedSpiritkin} is answering the realm.`;
+  }
+  if (gameType === "echo_trials") return `Answer sent. ${resolvedSpiritkin} is weighing the clue.`;
+  if (gameType === "tictactoe") return `Mark placed. ${resolvedSpiritkin} is answering the grid.`;
+  if (gameType === "connect_four") return `Drop committed. ${resolvedSpiritkin} is reading the columns.`;
+  if (gameType === "battleship") return `Shot committed. ${resolvedSpiritkin} is tracing the search pattern.`;
+  return `Move placed. ${resolvedSpiritkin} is reading the board.`;
+}
+
+function buildGameResolvedFeedback(game, spiritkinName, latestHistory) {
+  const resolvedSpiritkin = spiritkinName || state.selectedSpiritkin?.name || "Spiritkin";
+  if (!game) {
+    return {
+      phase: "ready",
+      text: "The board is ready.",
+      move: null
+    };
+  }
+  if (game.status === "ended") {
+    return {
+      phase: "complete",
+      text: game.result?.label || "The game is complete.",
+      move: latestHistory?.move || null
+    };
+  }
+  if (latestHistory?.player === "spiritkin") {
+    if (game.type === "chess") {
+      return { phase: "reply", text: `${resolvedSpiritkin} answered the position. Your move again.`, move: latestHistory.move || null };
+    }
+    if (game.type === "checkers") {
+      return { phase: "reply", text: `${resolvedSpiritkin} answered the diagonals. Your move again.`, move: latestHistory.move || null };
+    }
+    if (game.type === "spirit_cards") {
+      const points = game.data?.realmPoints || {};
+      return {
+        phase: "reply",
+        text: `${resolvedSpiritkin} answered the realm. Score is ${Number(points.user || 0)} to ${Number(points.spiritkin || 0)}. Your hand is live again.`,
+        move: latestHistory.move || null
+      };
+    }
+    if (game.type === "tictactoe") {
+      return { phase: "reply", text: `${resolvedSpiritkin} placed the answering mark. Find your next line.`, move: latestHistory.move || null };
+    }
+    if (game.type === "connect_four") {
+      return { phase: "reply", text: `${resolvedSpiritkin} answered the column. Your next drop is live.`, move: latestHistory.move || null };
+    }
+    if (game.type === "battleship") {
+      return { phase: "reply", text: `${resolvedSpiritkin} answered the search pattern. Fire your next shot when ready.`, move: latestHistory.move || null };
+    }
+  }
+  if (game.type === "echo_trials") {
+    const maxAttempts = Number(game.data?.maxAttempts || 3);
+    const attempts = Number(game.data?.attempts || 0);
+    const remaining = Math.max(0, maxAttempts - attempts);
+    return {
+      phase: "ready",
+      text: `That was not the answer yet. Read the reply, then try again. ${pluralizeGameWord(remaining, "attempt")} remain.`,
+      move: null
+    };
+  }
+  if (game.type === "spirit_cards") {
+    const points = game.data?.realmPoints || {};
+    return {
+      phase: "ready",
+      text: `Your turn. Realm points are ${Number(points.user || 0)} to ${Number(points.spiritkin || 0)}. ${buildGameActionPrompt(game, resolvedSpiritkin)}`,
+      move: null
+    };
+  }
+  return {
+    phase: "ready",
+    text: buildGameActionPrompt(game, resolvedSpiritkin),
+    move: null
+  };
+}
+
+function setGamePanelFeedback(text, phase = "ready", move = null) {
+  state.gameFeedback = {
+    phase,
+    text,
+    move
+  };
+  state.statusText = text;
+  state.statusError = phase === "error";
+  render();
+}
+
+function getGameActionBlockReason(expectedType) {
+  const game = state.activeGame;
+  const spiritkinName = state.selectedSpiritkin?.name || "Spiritkin";
+  if (!game || game.type !== expectedType) return "";
+  if (state.gameLoading) {
+    return `${spiritkinName} is still resolving the current turn. Controls unlock when the reply lands.`;
+  }
+  if (game.status !== "active") {
+    return "This round is finished. Play again or choose another game.";
+  }
+  if (game.turn !== "user") {
+    return buildGameWaitingPrompt(game, spiritkinName);
+  }
+  return "";
+}
+
+function ensureGameActionAvailable(expectedType) {
+  const reason = getGameActionBlockReason(expectedType);
+  if (!reason) return true;
+  setGamePanelFeedback(reason);
+  return false;
 }
 
 function cssAssetUrl(url) {
@@ -8111,15 +8337,19 @@ function buildChatView() {
                   ${(() => {
                     const help = getGameHelpContent(state.activeGame.type, state.gameInstructions);
                     const tutorialIntro = buildGameTutorialIntro(spiritkin.name, state.activeGame.type, help);
+                    const turnState = buildGameTurnState(state.activeGame, spiritkin.name);
+                    const helpButtonLabel = state.gameHelpOpen
+                      ? "Hide help"
+                      : (state.gameHelpSeen?.[state.activeGame.type] ? "Reopen help" : "Show help");
                     return `
                       <div class="game-help-panel ${state.gameHelpOpen ? 'open' : ''}">
                         <div class="game-help-header">
                           <div>
-                            <div class="game-help-label">How To Play</div>
+                            <div class="game-help-label">Tutorial & Help</div>
                             <div class="game-help-title">${esc(state.activeGame.name || state.activeGame.type)}</div>
                           </div>
                           <button class="btn btn-ghost btn-xs" data-action="${state.gameHelpOpen ? 'dismiss-game-help' : 'toggle-game-help'}">
-                            ${state.gameHelpOpen ? 'Hide help' : 'Show help'}
+                            ${helpButtonLabel}
                           </button>
                         </div>
                         ${state.gameHelpOpen ? `
@@ -8145,6 +8375,10 @@ function buildChatView() {
                             <div class="game-help-card">
                               <div class="game-help-card-label">Watch For Feedback</div>
                               <p>${esc(help.feedback)}</p>
+                            </div>
+                            <div class="game-help-card">
+                              <div class="game-help-card-label">Right Now</div>
+                              <p>${esc(turnState.detail)}</p>
                             </div>
                             <div class="game-help-card">
                               <div class="game-help-card-label">Win Condition</div>
@@ -8196,18 +8430,16 @@ function buildChatView() {
                       : `<button class="btn btn-ghost btn-xs game-end-btn" data-action="clear-finished-game">Close</button>`}
                   </div>
 
-                  <div class="game-turn-badge ${state.activeGame.status === 'ended' ? 'turn-finished' : state.activeGame.turn === 'user' ? 'turn-user' : 'turn-spiritkin'}" style="${buildGameChromeStyle(state.activeGame.type, {
+                  <div class="game-turn-badge ${buildGameTurnState(state.activeGame, spiritkin.name).className}" style="${buildGameChromeStyle(state.activeGame.type, {
                     bannerKey: getGameBannerKey(state.activeGame, 'turn', state.gameFeedback, state.gameSpiritkinMessage)
                   })}">
-                    ${state.activeGame.status === 'ended'
-                      ? (state.activeGame.result?.isDraw
-                        ? 'Finished in a draw'
-                        : state.activeGame.result?.winner === 'user'
-                          ? 'You finished the game'
-                          : `${esc(spiritkin.name)} finished the game`)
-                      : state.activeGame.turn === 'user'
-                        ? 'Your turn'
-                        : `${esc(spiritkin.name)} is thinking...`}
+                    ${(() => {
+                      const turnState = buildGameTurnState(state.activeGame, spiritkin.name);
+                      return `
+                        <div class="game-turn-title">${esc(turnState.title)}</div>
+                        <div class="game-turn-detail">${esc(turnState.detail)}</div>
+                      `;
+                    })()}
                   </div>
 
                   ${gameFeedback ? `
@@ -9319,15 +9551,22 @@ async function onClick(event) {
       const inputEl = document.querySelector("[data-action='game-input-change']");
       move = (state.gameInput?.trim()) || (inputEl?.value?.trim());
     }
-    if (!move) return;
+    if (!move) {
+      setGamePanelFeedback(
+        state.activeGame?.type === "echo_trials"
+          ? "Enter an answer before submitting the trial."
+          : "Choose a move on the board or enter one before submitting."
+      );
+      return;
+    }
     await submitGameMove(move);
     return;
   }
 
   // ---- VISUAL GAME BOARD ACTIONS ----
   if (action === "chess-square-click") {
-    if (!state.activeGame || state.activeGame.type !== 'chess' || state.activeGame.status !== 'active' || state.gameLoading) return;
-    if (state.activeGame.turn !== 'user') return;
+    if (!state.activeGame || state.activeGame.type !== 'chess') return;
+    if (!ensureGameActionAvailable('chess')) return;
     const sq = element.dataset.sq;
     if (!sq || !SpiritverseGames) return;
     SpiritverseGames.handleChessSquareClick(
@@ -9340,8 +9579,8 @@ async function onClick(event) {
   }
 
   if (action === "checkers-square-click") {
-    if (!state.activeGame || state.activeGame.type !== 'checkers' || state.activeGame.status !== 'active' || state.gameLoading) return;
-    if (state.activeGame.turn !== 'user') return;
+    if (!state.activeGame || state.activeGame.type !== 'checkers') return;
+    if (!ensureGameActionAvailable('checkers')) return;
     const sq = element.dataset.sq;
     if (sq === undefined || sq === null || sq === '' || !SpiritverseGames) return;
     SpiritverseGames.handleCheckersSquareClick(
@@ -9355,8 +9594,8 @@ async function onClick(event) {
   }
 
   if (action === "go-square-click") {
-    if (!state.activeGame || state.activeGame.type !== 'go' || state.activeGame.status !== 'active' || state.gameLoading) return;
-    if (state.activeGame.turn !== 'user') return;
+    if (!state.activeGame || state.activeGame.type !== 'go') return;
+    if (!ensureGameActionAvailable('go')) return;
     const idx = element.dataset.idx;
     if (idx === undefined || idx === null || idx === '' || !SpiritverseGames) return;
     const size = 13;
@@ -9369,8 +9608,8 @@ async function onClick(event) {
   }
 
   if (action === "ttt-cell-click") {
-    if (!state.activeGame || state.activeGame.type !== 'tictactoe' || state.activeGame.status !== 'active' || state.gameLoading) return;
-    if (state.activeGame.turn !== 'user') return;
+    if (!state.activeGame || state.activeGame.type !== 'tictactoe') return;
+    if (!ensureGameActionAvailable('tictactoe')) return;
     const idx = element.dataset.idx;
     if (idx === undefined || idx === null || idx === '') return;
     submitGameMove(String(idx));
@@ -9378,8 +9617,8 @@ async function onClick(event) {
   }
 
   if (action === "connect4-column-click") {
-    if (!state.activeGame || state.activeGame.type !== 'connect_four' || state.activeGame.status !== 'active' || state.gameLoading) return;
-    if (state.activeGame.turn !== 'user') return;
+    if (!state.activeGame || state.activeGame.type !== 'connect_four') return;
+    if (!ensureGameActionAvailable('connect_four')) return;
     const col = element.dataset.col;
     if (col === undefined || col === null || col === '') return;
     submitGameMove(String(col));
@@ -9387,8 +9626,8 @@ async function onClick(event) {
   }
 
   if (action === "battleship-cell-click") {
-    if (!state.activeGame || state.activeGame.type !== 'battleship' || state.activeGame.status !== 'active' || state.gameLoading) return;
-    if (state.activeGame.turn !== 'user') return;
+    if (!state.activeGame || state.activeGame.type !== 'battleship') return;
+    if (!ensureGameActionAvailable('battleship')) return;
     const idx = element.dataset.idx;
     if (idx === undefined || idx === null || idx === '') return;
     submitGameMove(String(idx));
@@ -9396,18 +9635,26 @@ async function onClick(event) {
   }
 
   if (action === "cards-play-card") {
-    if (!state.activeGame || state.activeGame.type !== 'spirit_cards' || state.gameLoading) return;
-    if (state.activeGame.turn !== 'user') return;
+    if (!state.activeGame || state.activeGame.type !== 'spirit_cards') return;
+    if (!ensureGameActionAvailable('spirit_cards')) return;
     const cardIdx = element.dataset.cardIdx;
     const hand = state.activeGame.data?.hand || [];
     const card = hand[parseInt(cardIdx)];
-    if (!card) return;
+    if (!card) {
+      setGamePanelFeedback("That card is no longer available in your hand.");
+      return;
+    }
+    if (Number(card.cost || 0) > Number(state.activeGame.data?.mana || 0)) {
+      setGamePanelFeedback(`You need ${card.cost} mana to play ${card.name}. Draw or choose another card.`);
+      return;
+    }
     submitGameMove(`play:${card.name}`);
     return;
   }
 
   if (action === "cards-draw") {
-    if (!state.activeGame || state.activeGame.type !== 'spirit_cards' || state.gameLoading) return;
+    if (!state.activeGame || state.activeGame.type !== 'spirit_cards') return;
+    if (!ensureGameActionAvailable('spirit_cards')) return;
     submitGameMove('draw');
     return;
   }

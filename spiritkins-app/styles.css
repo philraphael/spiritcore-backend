@@ -5692,15 +5692,26 @@ button:disabled {
 
 /* Turn badge */
 .game-turn-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 14px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 14px;
   border-radius: 20px;
-  font-size: 0.78rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.game-turn-title {
+  font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.game-turn-detail {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .game-turn-badge.turn-user {
@@ -5713,6 +5724,12 @@ button:disabled {
   background: rgba(242, 219, 160, 0.12);
   border: 1px solid rgba(242, 219, 160, 0.3);
   color: var(--gold);
+}
+
+.game-turn-badge.turn-finished {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text);
 }
 
 /* Spiritkin commentary bubble */
