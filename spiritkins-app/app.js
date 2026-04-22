@@ -3129,6 +3129,9 @@ function installGlobalInteractionDiagnostics() {
   };
 
   window.addEventListener("error", (event) => {
+    state.statusText = "A runtime error interrupted the last action. Refresh once. If it continues, use Report issue and include the room, step, and build marker.";
+    state.statusError = true;
+    try { render(); } catch (_) {}
     console.error("window.onerror", {
       message: event.message,
       filename: event.filename,
@@ -3139,6 +3142,9 @@ function installGlobalInteractionDiagnostics() {
   });
 
   window.addEventListener("unhandledrejection", (event) => {
+    state.statusText = "An interaction failed before it could finish. Refresh once, then retry. If it repeats, report the exact step and visible build marker.";
+    state.statusError = true;
+    try { render(); } catch (_) {}
     console.error("unhandledrejection", {
       reason: event.reason?.stack || event.reason?.message || String(event.reason),
     });
@@ -6419,13 +6425,19 @@ function render() {
     }
   } catch (error) {
     console.error("[Spiritverse Render Failure]", error);
+    const buildMarker = document.querySelector('meta[name="spiritverse-build"]')?.content || "unknown-build";
     root.innerHTML = `
       <section class="entry-screen" style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;">
         <div class="panel-card" style="max-width:560px;text-align:left;">
           <div class="panel-label">Boot Failure</div>
           <h2 style="margin-top:8px;">Spiritverse could not render.</h2>
           <p>The client hit a render-time failure before the app surface became interactive.</p>
-          <p style="opacity:0.78;">Open the browser console for the exact error trace.</p>
+          <p style="opacity:0.78;">Refresh once. If the problem continues, capture this build marker and the exact step that failed.</p>
+          <div style="margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,0.04);font-size:0.9rem;line-height:1.5;">
+            Build: ${esc(buildMarker)}<br />
+            Failure type: render-time client failure<br />
+            Recovery: reload once, then report the failing room, click path, and this marker if it repeats.
+          </div>
         </div>
       </section>
     `;
@@ -6819,9 +6831,10 @@ async function submitIssueReport() {
 
     state.issueReportStatus = {
       kind: "success",
-      text: data.captured
+      text: data.message || (data.captured
         ? "Thanks. Your beta report was logged for review."
-        : "Thanks. We noted that, but it did not need a repair queue entry right now.",
+        : "Thanks. We noted that, but it did not need a repair queue entry right now."),
+      detail: [data.recovery?.user_message, ...(data.recovery?.diagnostics || [])].filter(Boolean).join(" "),
     };
     state.issueReportText = "";
     state.issueReportContextNote = "";
@@ -6830,6 +6843,7 @@ async function submitIssueReport() {
     state.issueReportStatus = {
       kind: "error",
       text: error.message || "Could not send your report right now.",
+      detail: "Refresh once, then retry. If it keeps failing, capture whether the problem happened during boot, render, or a specific interaction.",
     };
   } finally {
     state.issueReportSubmitting = false;
@@ -6925,7 +6939,10 @@ function buildIssueReporter() {
     <div class="issue-reporter ${state.issueReporterOpen ? "open" : ""}">
       ${status ? `
         <div class="issue-status issue-status-${esc(status.kind)}" data-focus-anchor="issue-status">
-          <span>${esc(status.text)}</span>
+          <div>
+            <div>${esc(status.text)}</div>
+            ${status.detail ? `<div class="issue-status-detail">${esc(status.detail)}</div>` : ""}
+          </div>
           <button class="issue-status-close" data-action="dismiss-issue-status" aria-label="Dismiss issue status">×</button>
         </div>
       ` : ""}
@@ -6941,7 +6958,7 @@ function buildIssueReporter() {
             </div>
             <button class="btn btn-ghost btn-sm" data-action="toggle-issue-reporter">Close</button>
           </div>
-          <p class="issue-reporter-copy">Short and direct is enough. We automatically include your current Spiritverse context.</p>
+          <p class="issue-reporter-copy">Short and direct is enough. We automatically include your current Spiritverse context. Current cap: 3 reports per user per UTC day.</p>
           <div class="issue-reporter-context">${esc(contextSummary)}</div>
           <textarea
             class="issue-reporter-textarea"
@@ -9918,6 +9935,7 @@ function initializeSpiritverseApp() {
   } catch (error) {
     console.error("[Spiritverse Boot Failure]", error);
     const root = document.getElementById("root");
+    const buildMarker = document.querySelector('meta[name="spiritverse-build"]')?.content || "unknown-build";
     if (root) {
       root.innerHTML = `
         <section class="entry-screen" style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;">
@@ -9925,7 +9943,12 @@ function initializeSpiritverseApp() {
             <div class="panel-label">Boot Failure</div>
             <h2 style="margin-top:8px;">Spiritverse could not finish loading.</h2>
             <p>A startup error stopped the client before the interface became interactive.</p>
-            <p style="opacity:0.78;">Open the browser console for the exact boot trace.</p>
+            <p style="opacity:0.78;">Refresh once. If startup still fails, capture this build marker and the boot failure text for production review.</p>
+            <div style="margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,0.04);font-size:0.9rem;line-height:1.5;">
+              Build: ${esc(buildMarker)}<br />
+              Failure type: startup boot failure<br />
+              Recovery: reload once, then report the visible failure text and this marker if it repeats.
+            </div>
           </div>
         </section>
       `;

@@ -7762,6 +7762,13 @@ button[data-action="begin-quest"]:active,
   border-radius: 18px;
 }
 
+.issue-status-detail {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: rgba(244, 239, 227, 0.72);
+}
+
 .issue-status-success {
   border-color: rgba(111, 208, 227, 0.28);
 }

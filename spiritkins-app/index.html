@@ -64,8 +64,8 @@
         <div style="font-size:0.74rem;letter-spacing:0.14em;text-transform:uppercase;color:#f2dba0;margin-bottom:8px;">Spiritverse Boot</div>
         <h1>Spiritverse could not finish loading.</h1>
         <p>The app shell loaded, but the client boot sequence failed before the interface became interactive.</p>
-        <p>Refresh once. If this continues, the console now includes the boot error for diagnosis.</p>
-        <div id="sv-boot-fallback-detail" class="sv-boot-fallback-detail">Waiting for boot diagnostics…</div>
+        <p>Refresh once. If this continues, capture the build marker below and the boot diagnostics text for production review.</p>
+        <div id="sv-boot-fallback-detail" class="sv-boot-fallback-detail">Waiting for boot diagnostics...</div>
       </div>
     </div>
     <script>
@@ -73,12 +73,14 @@
         const root = document.getElementById("root");
         const fallback = document.getElementById("sv-boot-fallback");
         const detail = document.getElementById("sv-boot-fallback-detail");
+        const buildMeta = document.querySelector('meta[name="spiritverse-build"]');
         let bootReady = false;
 
         function showFallback(reason) {
           if (bootReady) return;
           fallback.classList.add("visible");
-          detail.textContent = reason || "Unknown boot failure.";
+          const buildMarker = buildMeta && buildMeta.content ? buildMeta.content : "unknown-build";
+          detail.textContent = `Build: ${buildMarker} | ${reason || "Unknown boot failure."}`;
         }
 
         window.__svMarkBootReady = function () {

@@ -511,6 +511,8 @@ function renderRepairTab() {
   const emerging = handoff.newly_emerging_issues || [];
   const areas = handoff.repeat_complaints_by_system_area || [];
   const packets = handoff.repair_packets || [];
+  const reviewSummary = handoff.review_summary || digest.review_summary || {};
+  const priorityQueue = handoff.priority_queue || [];
 
   return `
     <div class="cc-tab-content">
@@ -529,6 +531,33 @@ function renderRepairTab() {
             <div class="cc-stat-box"><span class="cc-stat-val">${(digest.grouped_recurring_issues || []).length}</span><span class="cc-stat-label">Recurring Clusters</span></div>
             <div class="cc-stat-box"><span class="cc-stat-val">${Object.keys(digest.top_bug_themes || {}).length}</span><span class="cc-stat-label">Bug Areas</span></div>
           </div>
+          <div class="cc-review-summary">
+            <div class="cc-review-callout">
+              <strong>${escapeHtml(reviewSummary.owner_action || "Review priority packets first, then validate reproduction in production before preparing a manual repair brief.")}</strong>
+            </div>
+            <div class="cc-review-pills">
+              <span class="cc-governance-pill">Urgent ${reviewSummary.urgent_packets ?? reviewSummary.urgent_clusters ?? 0}</span>
+              <span class="cc-governance-pill">High ${reviewSummary.high_priority_packets ?? reviewSummary.high_priority_clusters ?? 0}</span>
+              <span class="cc-governance-pill">Watch ${reviewSummary.watch_packets ?? reviewSummary.watch_clusters ?? 0}</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="cc-card" style="grid-column: span 2;">
+          <h3>Priority Review Queue</h3>
+          <div class="cc-issue-list">
+            ${priorityQueue.length ? priorityQueue.map((item) => `
+              <div class="cc-issue-item">
+                <div class="cc-issue-top">
+                  <strong>${escapeHtml(item.affected_system || item.probable_area || "general_app")}</strong>
+                  <span class="cc-priority cc-priority-${escapeHtml(item.priority_label || "routine")}">${escapeHtml(item.priority_label || "routine")}</span>
+                </div>
+                <div class="cc-issue-summary">${escapeHtml(item.summary)}</div>
+                <div class="cc-issue-meta">${escapeHtml(item.probable_area || "general_app")} / ${item.related_reports || 0} related reports / confidence ${Number(item.confidence || 0).toFixed(2)}</div>
+                <div class="cc-issue-meta">${escapeHtml(item.recommended_next_action || "")}</div>
+              </div>
+            `).join("") : '<p class="cc-empty">No priority queue items are available.</p>'}
+          </div>
         </section>
 
         <section class="cc-card">
@@ -536,9 +565,9 @@ function renderRepairTab() {
           <div class="cc-issue-list">
             ${recurring.length ? recurring.map((item) => `
               <div class="cc-issue-item">
-                <div class="cc-issue-top"><strong>${escapeHtml(item.probable_area)}</strong><span class="cc-severity ${escapeHtml(item.severity)}">${escapeHtml(item.severity)}</span></div>
+                <div class="cc-issue-top"><strong>${escapeHtml(item.affected_system || item.probable_area)}</strong><span class="cc-severity ${escapeHtml(item.severity)}">${escapeHtml(item.severity)}</span></div>
                 <div class="cc-issue-summary">${escapeHtml(item.summary)}</div>
-                <div class="cc-issue-meta">${item.related_reports} related reports / confidence ${Number(item.confidence || 0).toFixed(2)}</div>
+                <div class="cc-issue-meta">${escapeHtml(item.probable_area || "general_app")} / ${item.related_reports} related reports / confidence ${Number(item.confidence || 0).toFixed(2)}</div>
               </div>
             `).join("") : '<p class="cc-empty">No recurring bugs queued.</p>'}
           </div>
@@ -549,9 +578,9 @@ function renderRepairTab() {
           <div class="cc-issue-list">
             ${severe.length ? severe.map((item) => `
               <div class="cc-issue-item">
-                <div class="cc-issue-top"><strong>${escapeHtml(item.feature_context?.probable_area || "general_app")}</strong><span class="cc-severity ${escapeHtml(item.severity)}">${escapeHtml(item.severity)}</span></div>
+                <div class="cc-issue-top"><strong>${escapeHtml(item.affected_system || item.feature_context?.affected_system || item.feature_context?.probable_area || "general_app")}</strong><span class="cc-severity ${escapeHtml(item.severity)}">${escapeHtml(item.severity)}</span></div>
                 <div class="cc-issue-summary">${escapeHtml(item.summary)}</div>
-                <div class="cc-issue-meta">${item.recent_related_reports?.length || 0} linked reports</div>
+                <div class="cc-issue-meta">${escapeHtml(item.feature_context?.probable_area || "general_app")} / ${item.recent_related_reports?.length || 0} linked reports</div>
               </div>
             `).join("") : '<p class="cc-empty">No high-severity issues detected.</p>'}
           </div>
@@ -562,7 +591,7 @@ function renderRepairTab() {
           <div class="cc-issue-list">
             ${emerging.length ? emerging.map((item) => `
               <div class="cc-issue-item">
-                <div class="cc-issue-top"><strong>${escapeHtml(item.feature_context?.probable_area || "general_app")}</strong><span class="cc-confidence">confidence ${Number(item.confidence || 0).toFixed(2)}</span></div>
+                <div class="cc-issue-top"><strong>${escapeHtml(item.affected_system || item.feature_context?.affected_system || item.feature_context?.probable_area || "general_app")}</strong><span class="cc-confidence">confidence ${Number(item.confidence || 0).toFixed(2)}</span></div>
                 <div class="cc-issue-summary">${escapeHtml(item.summary)}</div>
               </div>
             `).join("") : '<p class="cc-empty">No emerging issues yet.</p>'}
@@ -575,7 +604,7 @@ function renderRepairTab() {
             ${areas.length ? areas.map((item) => `
               <div class="cc-issue-item">
                 <div class="cc-issue-top"><strong>${escapeHtml(item.probable_area)}</strong><span class="cc-confidence">${item.complaints} complaints</span></div>
-                <div class="cc-issue-meta">${item.clusters} active cluster${item.clusters === 1 ? "" : "s"}</div>
+                <div class="cc-issue-meta">${item.clusters} active cluster${item.clusters === 1 ? "" : "s"} / priority ${escapeHtml(item.highest_priority || "routine")}</div>
               </div>
             `).join("") : '<p class="cc-empty">No system-area repeats yet.</p>'}
           </div>
@@ -586,10 +615,10 @@ function renderRepairTab() {
           <div class="cc-issue-list">
             ${state.recentIssueReports.length ? state.recentIssueReports.slice(0, 10).map((report) => `
               <div class="cc-issue-item">
-                <div class="cc-issue-top"><strong>${escapeHtml(report.context?.current_feature || report.repair_summary?.probable_area || "general_app")}</strong><span class="cc-severity ${escapeHtml(report.severity || "low")}">${escapeHtml(report.severity || "low")}</span></div>
+                <div class="cc-issue-top"><strong>${escapeHtml(report.repair_summary?.affected_system || report.context?.current_feature || report.repair_summary?.probable_area || "general_app")}</strong><span class="cc-severity ${escapeHtml(report.severity || "low")}">${escapeHtml(report.severity || "low")}</span></div>
                 <div class="cc-issue-summary">${escapeHtml(report.repair_summary?.owner_digest_line || report.summary || "Report received.")}</div>
                 <div class="cc-issue-meta">
-                  ${escapeHtml(report.classification || "unknown")} / ${escapeHtml(report.status || "logged")} / ${escapeHtml(new Date(report.created_at).toLocaleString())}
+                  ${escapeHtml(report.repair_summary?.probable_area || report.context?.current_feature || "general_app")} / ${escapeHtml(report.classification || "unknown")} / ${escapeHtml(report.status || "logged")} / ${escapeHtml(new Date(report.created_at).toLocaleString())}
                   ${report.conversation_id ? ` / <button class="btn btn-ghost btn-sm" onclick="viewTranscript('${report.conversation_id}')">Open transcript</button>` : ""}
                 </div>
               </div>
@@ -602,16 +631,31 @@ function renderRepairTab() {
           <div class="cc-packet-list">
             ${packets.length ? packets.map((packet) => `
               <article class="cc-packet-card">
-                <div class="cc-issue-top"><strong>${escapeHtml(packet.feature_context?.probable_area || "general_app")}</strong><span class="cc-severity ${escapeHtml(packet.severity)}">${escapeHtml(packet.severity)}</span></div>
+                <div class="cc-issue-top">
+                  <strong>${escapeHtml(packet.affected_system || packet.feature_context?.affected_system || packet.feature_context?.probable_area || "general_app")}</strong>
+                  <div class="cc-packet-badges">
+                    <span class="cc-priority cc-priority-${escapeHtml(packet.priority_label || "routine")}">${escapeHtml(packet.priority_label || "routine")}</span>
+                    <span class="cc-severity ${escapeHtml(packet.severity)}">${escapeHtml(packet.severity)}</span>
+                  </div>
+                </div>
                 <h4>${escapeHtml(packet.summary)}</h4>
+                <div class="cc-issue-meta">${escapeHtml(packet.feature_context?.probable_area || "general_app")} / confidence ${Number(packet.confidence || 0).toFixed(2)} / ${escapeHtml(packet.owner_review_summary || "")}</div>
                 <div class="cc-packet-grid">
                   <div>
                     <div class="cc-packet-label">Reproduction hints</div>
                     <ul class="cc-packet-listing">${(packet.reproduction_hints || []).map((hint) => `<li>${escapeHtml(hint)}</li>`).join("")}</ul>
                   </div>
                   <div>
-                    <div class="cc-packet-label">Recent related reports</div>
-                    <ul class="cc-packet-listing">${(packet.recent_related_reports || []).map((report) => `<li>${escapeHtml(report.summary)}</li>`).join("")}</ul>
+                    <div class="cc-packet-label">Grouped related issues</div>
+                    <ul class="cc-packet-listing">${(packet.grouped_related_issues || []).map((report) => `<li>${escapeHtml(report.summary)}</li>`).join("")}</ul>
+                  </div>
+                  <div>
+                    <div class="cc-packet-label">Production diagnostics</div>
+                    <ul class="cc-packet-listing">${(packet.diagnostics || []).map((hint) => `<li>${escapeHtml(hint)}</li>`).join("")}</ul>
+                  </div>
+                  <div>
+                    <div class="cc-packet-label">User recovery guidance</div>
+                    <ul class="cc-packet-listing">${(packet.user_recovery_guidance || []).map((hint) => `<li>${escapeHtml(hint)}</li>`).join("")}</ul>
                   </div>
                 </div>
                 <div class="cc-issue-meta">${escapeHtml(packet.recommended_next_action || "")}</div>

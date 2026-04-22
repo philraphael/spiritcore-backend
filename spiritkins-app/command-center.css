@@ -306,6 +306,27 @@ body {
   font-size: 0.88rem;
 }
 
+.cc-review-summary {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.cc-review-callout {
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  line-height: 1.5;
+}
+
+.cc-review-pills,
+.cc-packet-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
 .cc-governance-pill,
 .cc-severity,
 .cc-confidence {
@@ -370,6 +391,41 @@ body {
 
 .cc-severity.low,
 .cc-confidence {
+  color: var(--cc-text-primary);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.cc-priority {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.32rem 0.72rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cc-priority-urgent {
+  color: #fff;
+  background: rgba(255, 82, 82, 0.22);
+  border: 1px solid rgba(255, 82, 82, 0.38);
+}
+
+.cc-priority-high {
+  color: #fff;
+  background: rgba(255, 215, 64, 0.18);
+  border: 1px solid rgba(255, 215, 64, 0.28);
+}
+
+.cc-priority-watch {
+  color: var(--cc-text-primary);
+  background: rgba(124, 77, 255, 0.16);
+  border: 1px solid rgba(124, 77, 255, 0.3);
+}
+
+.cc-priority-routine {
   color: var(--cc-text-primary);
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.08);

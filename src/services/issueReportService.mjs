@@ -31,6 +31,27 @@ function uniqueStrings(values, limit = 6) {
   return [...new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean))].slice(0, limit);
 }
 
+const SEVERITY_SCORE = {
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+const RISK_SCORE = {
+  repair_candidate: 3,
+  review_needed: 2,
+  adaptive_only: 1,
+  informational: 0,
+};
+
+const CLUSTER_STOP_WORDS = new Set([
+  "the", "and", "that", "this", "with", "from", "into", "when", "then", "have", "keeps",
+  "keep", "after", "before", "while", "there", "they", "them", "does", "doesnt", "dont",
+  "not", "working", "right", "just", "like", "feel", "game", "games", "voice", "spiritkin",
+  "spiritcore", "report", "issue", "please", "would", "could", "should", "still", "again",
+  "once", "your", "about", "because", "around", "general", "user", "beta",
+]);
+
 function sanitizeContext(context = {}) {
   if (!context || typeof context !== "object") return {};
   return {
@@ -55,6 +76,100 @@ function inferThemeSignature(lower = "", probableArea = "general_app") {
   if (/\bslow|load|loading|stuck|freeze|crash|broken|error|fail\b/.test(lower)) return `${probableArea}:stability`;
   if (/\badd|feature|wish\b/.test(lower)) return `${probableArea}:feature_request`;
   return `${probableArea}:${summarizeText(lower.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim(), 48) || "general"}`;
+}
+
+function normalizeClusterTokens(text = "", limit = 6) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token && token.length > 2 && !CLUSTER_STOP_WORDS.has(token))
+    .slice(0, limit);
+}
+
+function inferAffectedSystem(probableArea = "general_app", reportText = "") {
+  const lower = String(reportText || "").toLowerCase();
+  if (probableArea === "voice_audio" || /\b(mic|microphone|voice|speech|audio)\b/.test(lower)) return "voice_runtime";
+  if (probableArea === "games" || /\b(game|board|move|turn|piece|tile)\b/.test(lower)) return "game_runtime";
+  if (/\b(boot|startup|load|loading|crash|render|screen|blank)\b/.test(lower)) return "app_shell";
+  if (probableArea === "adaptive_behavior") return "adaptive_behavior";
+  if (probableArea === "content_voice") return "content_fidelity";
+  return probableArea || "general_app";
+}
+
+function buildRecurringKey({ reportText, classification, probableArea, context = {} }) {
+  const normalizedContext = sanitizeContext(context);
+  const lower = String(reportText || "").toLowerCase();
+  const signature = inferThemeSignature(lower, probableArea);
+  const tokens = normalizeClusterTokens(reportText, 5).join("_") || "general";
+  return [
+    classification?.kind || "unknown",
+    probableArea || "general_app",
+    normalizedContext.related_spiritkin || "global",
+    signature,
+    tokens,
+  ].join(":");
+}
+
+function buildInitialReproductionHints({ probableArea = "general_app", reportText = "", context = {} }) {
+  const normalizedContext = sanitizeContext(context);
+  const lower = String(reportText || "").toLowerCase();
+  const lines = [`Open the ${probableArea} surface and repeat the user path that triggered the report.`];
+
+  if (normalizedContext.source_context) lines.push(`Start from source context: ${normalizedContext.source_context}.`);
+  if (normalizedContext.related_spiritkin) lines.push(`Use Spiritkin context: ${normalizedContext.related_spiritkin}.`);
+  if (normalizedContext.conversation_id) lines.push("Check the linked conversation state before reproducing the issue.");
+  if (/\bboot|startup|load|loading|blank screen\b/.test(lower)) lines.push("Reproduce from a cold page load and watch the first render lifecycle.");
+  if (/\brender|screen|layout|button|click|tap|panel\b/.test(lower)) lines.push("Confirm the UI renders, then verify the failing interaction after first paint.");
+  if (/\bmic|microphone|voice|speech|audio\b/.test(lower)) lines.push("Exercise the microphone path and confirm state transitions through listen, process, and response.");
+  if (/\bgame|board|move|turn|piece|tile\b/.test(lower)) lines.push("Start a fresh game and confirm board render plus first interaction alignment.");
+
+  return uniqueStrings(lines, 6);
+}
+
+function buildRecoveryGuidance({ probableArea = "general_app", classification = {}, reportText = "" }) {
+  const lower = String(reportText || "").toLowerCase();
+  const lines = [
+    "Refresh once before retrying the same action.",
+    "If the issue repeats, send the visible build marker and the room or feature you were using.",
+  ];
+
+  if (classification.route === "repair_queue") lines.unshift("If the action is blocked, stop retrying loops and capture the exact failing step for review.");
+  if (probableArea === "voice_audio" || /\bmic|microphone|voice|speech|audio\b/.test(lower)) lines.push("If voice is affected, pause speaking, let the state settle, then retry one clean turn.");
+  if (probableArea === "games" || /\b(game|board|move|turn)\b/.test(lower)) lines.push("If gameplay is affected, avoid rapid repeated clicks and retry from a fresh board state.");
+  if (/\b(boot|load|render|screen|blank)\b/.test(lower)) lines.push("If the interface does not recover after refresh, capture the boot or render failure text from the screen.");
+
+  return uniqueStrings(lines, 5);
+}
+
+function buildDiagnosticsChecklist({ probableArea = "general_app", reportText = "", classification = {}, context = {} }) {
+  const normalizedContext = sanitizeContext(context);
+  const lower = String(reportText || "").toLowerCase();
+  const checks = [];
+
+  if (/\b(boot|startup|load|loading|blank)\b/.test(lower)) checks.push("Verify boot fallback visibility and capture the build marker shown with the failure.");
+  if (/\b(render|screen|layout|button|click|tap|panel)\b/.test(lower)) checks.push("Confirm a visible render surface exists before the failing interaction.");
+  if (probableArea === "voice_audio" || /\b(mic|microphone|voice|speech|audio)\b/.test(lower)) checks.push("Inspect voice state transitions and confirm the microphone does not stall between user and Spiritkin turns.");
+  if (probableArea === "games" || /\b(game|board|move|turn)\b/.test(lower)) checks.push("Verify board render, click alignment, and state updates on the first user action.");
+  if (classification.route === "repair_queue") checks.push("Review clustered reports first before drafting any manual repair brief.");
+  if (normalizedContext.current_feature) checks.push(`Validate the production path in feature context: ${normalizedContext.current_feature}.`);
+
+  return uniqueStrings(checks, 6);
+}
+
+function computePriorityScore({ severity = "low", confidence = 0, groupSize = 1, riskTier = "informational" }) {
+  return ((SEVERITY_SCORE[severity] || 1) * 30)
+    + ((RISK_SCORE[riskTier] || 0) * 10)
+    + (Math.min(groupSize, 6) * 6)
+    + Math.round(clamp01(confidence, 0) * 20);
+}
+
+function priorityLabelFromScore(score = 0) {
+  if (score >= 110) return "urgent";
+  if (score >= 80) return "high";
+  if (score >= 50) return "watch";
+  return "routine";
 }
 
 function buildIssueClassification(text, context = {}) {
@@ -228,20 +343,40 @@ function buildRepairSummary({ reportText, classification, context = {} }) {
           ? `Feature request: ${summarizeText(reportText, 120)}`
           : `Low-signal report: ${summarizeText(reportText, 120)}`;
 
-  const recurringKey = [
-    classification.kind,
+  const clearSummary = summarizeText(reportText, 180);
+  const affectedSystem = inferAffectedSystem(probableArea, reportText);
+  const reproductionHints = buildInitialReproductionHints({ probableArea, reportText, context: normalizedContext });
+  const recoveryGuidance = buildRecoveryGuidance({ probableArea, classification, reportText });
+  const diagnostics = buildDiagnosticsChecklist({ probableArea, reportText, classification, context: normalizedContext });
+  const recurringKey = buildRecurringKey({
+    reportText,
+    classification,
     probableArea,
-    normalizedContext.related_spiritkin || "global",
-    inferThemeSignature(lower, probableArea),
-  ].join(":");
+    context: normalizedContext,
+  });
+  const priorityScore = computePriorityScore({
+    severity: classification.severity,
+    confidence: classification.confidence,
+    groupSize: 1,
+    riskTier: classification.risk_tier,
+  });
 
   return {
     probable_area: probableArea,
+    affected_system: affectedSystem,
+    issue_family: classification.kind,
+    theme_signature: inferThemeSignature(lower, probableArea),
     severity: classification.severity,
+    confidence: classification.confidence,
     risk_tier: classification.risk_tier,
     suggested_route: classification.route,
+    clear_summary: clearSummary,
     actionable_summary: summarizeText(reportText, 220),
     owner_digest_line: ownerDigestLine,
+    owner_review_brief: `${affectedSystem} / ${classification.severity} / ${classification.route}`,
+    reproduction_hints: reproductionHints,
+    recovery_guidance: recoveryGuidance,
+    diagnostics,
     suggested_next_action:
       classification.route === "repair_queue" ? "review for sandbox repair planning" :
       classification.route === "adaptive_behavior" ? "review adaptation/correction behavior" :
@@ -249,6 +384,8 @@ function buildRepairSummary({ reportText, classification, context = {} }) {
       classification.route === "ignore" ? "ignore for now" :
       "review for roadmap triage",
     recurring_key: recurringKey,
+    priority_score: priorityScore,
+    priority_label: priorityLabelFromScore(priorityScore),
     governance: {
       autonomous_patch_allowed: false,
       autonomous_deploy_allowed: false,
@@ -267,6 +404,9 @@ function normalizeStoredRecord(record = {}) {
     severity: summary.severity || record.severity || "low",
     risk_tier: summary.risk_tier || "informational",
     suggested_route: summary.suggested_route || record.route || "ignore",
+    affected_system: summary.affected_system || inferAffectedSystem(summary.probable_area || "general_app", record.report_text || ""),
+    priority_score: Number(summary.priority_score || 0),
+    priority_label: summary.priority_label || "routine",
     context: summary.context || {},
     grouped_key: summary.recurring_key || null,
   };
@@ -274,22 +414,42 @@ function normalizeStoredRecord(record = {}) {
 
 function summarizeGroup(group = []) {
   const first = group[0] || {};
+  const averageConfidence = clamp01(
+    group.reduce((sum, item) => sum + Number(item.confidence || 0), 0) / Math.max(group.length, 1),
+    clamp01(first.confidence, 0.5)
+  );
+  const priorityScore = computePriorityScore({
+    severity: first.severity || "low",
+    confidence: averageConfidence,
+    groupSize: group.length,
+    riskTier: first.risk_tier || "informational",
+  });
   return {
     grouped_key: first.grouped_key || null,
     classification: first.classification || "unknown",
     probable_area: first.repair_summary?.probable_area || first.context?.current_feature || "general_app",
+    affected_system: first.repair_summary?.affected_system || first.affected_system || "general_app",
     count: group.length,
     latest_created_at: group[0]?.created_at || null,
     top_summary: first.repair_summary?.owner_digest_line || first.summary || summarizeText(first.report_text, 120),
     severity: first.severity || "low",
     risk_tier: first.risk_tier || "informational",
+    confidence: averageConfidence,
+    priority_score: priorityScore,
+    priority_label: priorityLabelFromScore(priorityScore),
   };
 }
 
 function clusterIssueReports(reports = []) {
   return Object.values(
     (reports || []).reduce((acc, report) => {
-      const key = report.grouped_key || `${report.classification}:${report.context?.current_feature || "general_app"}`;
+      const probableArea = report.repair_summary?.probable_area || report.context?.current_feature || "general_app";
+      const key = report.grouped_key || [
+        report.classification || "unknown",
+        probableArea,
+        report.repair_summary?.affected_system || report.affected_system || "general_app",
+        report.repair_summary?.theme_signature || inferThemeSignature(String(report.raw_report || report.report_text || "").toLowerCase(), probableArea),
+      ].join(":");
       if (!acc[key]) acc[key] = [];
       acc[key].push(report);
       return acc;
@@ -297,9 +457,18 @@ function clusterIssueReports(reports = []) {
   )
     .map((group) => group.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || ""))))
     .sort((a, b) => {
-      const severityScore = { high: 3, medium: 2, low: 1 };
-      const scoreA = (a.length * 10) + (severityScore[a[0]?.severity] || 0);
-      const scoreB = (b.length * 10) + (severityScore[b[0]?.severity] || 0);
+      const scoreA = computePriorityScore({
+        severity: a[0]?.severity || "low",
+        confidence: a[0]?.confidence || 0,
+        groupSize: a.length,
+        riskTier: a[0]?.risk_tier || "informational",
+      });
+      const scoreB = computePriorityScore({
+        severity: b[0]?.severity || "low",
+        confidence: b[0]?.confidence || 0,
+        groupSize: b.length,
+        riskTier: b[0]?.risk_tier || "informational",
+      });
       return scoreB - scoreA;
     });
 }
@@ -329,23 +498,44 @@ function buildRepairPacket(group = []) {
   const primary = group[0];
   if (!primary) return null;
 
+  const averageConfidence = clamp01(
+    group.reduce((sum, item) => sum + Number(item.confidence || 0), 0) / Math.max(group.length, 1),
+    clamp01(primary.confidence, 0.5)
+  );
+  const priorityScore = computePriorityScore({
+    severity: primary.severity || "low",
+    confidence: averageConfidence,
+    groupSize: group.length,
+    riskTier: primary.risk_tier || "informational",
+  });
+  const featureContext = {
+    probable_area: primary.repair_summary?.probable_area || primary.context?.current_feature || "general_app",
+    affected_system: primary.repair_summary?.affected_system || primary.affected_system || "general_app",
+    current_feature: primary.context?.current_feature || null,
+    source_context: primary.context?.source_context || null,
+    related_spiritkin: primary.context?.related_spiritkin || null,
+  };
+
   return {
     issue_id: primary.id,
     cluster_key: primary.grouped_key || null,
     summary: primary.repair_summary?.owner_digest_line || primary.summary || summarizeText(primary.raw_report, 140),
+    clear_summary: primary.repair_summary?.clear_summary || primary.summary || summarizeText(primary.raw_report, 180),
     category: primary.classification || "bug",
     severity: primary.severity || "low",
-    confidence: clamp01(
-      group.reduce((sum, item) => sum + Number(item.confidence || 0), 0) / Math.max(group.length, 1),
-      clamp01(primary.confidence, 0.5)
-    ),
+    confidence: averageConfidence,
+    priority_score: priorityScore,
+    priority_label: priorityLabelFromScore(priorityScore),
     reproduction_hints: buildReproductionHints(group, primary),
-    feature_context: {
-      probable_area: primary.repair_summary?.probable_area || primary.context?.current_feature || "general_app",
-      current_feature: primary.context?.current_feature || null,
-      source_context: primary.context?.source_context || null,
-      related_spiritkin: primary.context?.related_spiritkin || null,
-    },
+    feature_context: featureContext,
+    affected_system: featureContext.affected_system,
+    grouped_related_issues: group.slice(0, 5).map((report) => ({
+      id: report.id,
+      created_at: report.created_at,
+      severity: report.severity,
+      summary: report.repair_summary?.clear_summary || report.repair_summary?.owner_digest_line || report.summary || summarizeText(report.raw_report, 120),
+      current_feature: report.context?.current_feature || null,
+    })),
     recent_related_reports: group.slice(0, 5).map((report) => ({
       id: report.id,
       created_at: report.created_at,
@@ -354,6 +544,18 @@ function buildRepairPacket(group = []) {
       severity: report.severity,
       route: report.route,
     })),
+    diagnostics: primary.repair_summary?.diagnostics || buildDiagnosticsChecklist({
+      probableArea: featureContext.probable_area,
+      reportText: primary.raw_report,
+      classification: primary,
+      context: primary.context,
+    }),
+    user_recovery_guidance: primary.repair_summary?.recovery_guidance || buildRecoveryGuidance({
+      probableArea: featureContext.probable_area,
+      classification: primary,
+      reportText: primary.raw_report,
+    }),
+    owner_review_summary: primary.repair_summary?.owner_review_brief || `${featureContext.affected_system} / ${primary.severity || "low"} / ${primary.route || "review"}`,
     recommended_next_action:
       primary.route === "repair_queue"
         ? "Owner review, then convert into a Codex sandbox repair brief if confirmed."
@@ -497,6 +699,8 @@ export function createIssueReportService({ supabase, logger = console }) {
         risk_tier: record.repair_summary?.risk_tier || classification.risk_tier,
         route: record.route,
         suggested_route: record.repair_summary?.suggested_route || classification.route,
+        affected_system: record.repair_summary?.affected_system || "general_app",
+        priority_label: record.repair_summary?.priority_label || "routine",
         confidence: record.confidence,
         status: record.status,
         created_at: record.created_at,
@@ -552,6 +756,20 @@ export function createIssueReportService({ supabase, logger = console }) {
       })
       .slice(0, 10)
       .map(summarizeGroup);
+    const reviewSummary = {
+      urgent_clusters: groupedRecurringIssues.filter((item) => item.priority_label === "urgent").length,
+      high_priority_clusters: groupedRecurringIssues.filter((item) => item.priority_label === "high").length,
+      watch_clusters: groupedRecurringIssues.filter((item) => item.priority_label === "watch").length,
+      top_review_targets: groupedRecurringIssues.slice(0, 5).map((item) => ({
+        grouped_key: item.grouped_key,
+        probable_area: item.probable_area,
+        affected_system: item.affected_system,
+        summary: item.top_summary,
+        severity: item.severity,
+        count: item.count,
+        priority_label: item.priority_label,
+      })),
+    };
 
     return {
       generated_at: nowIso(),
@@ -566,6 +784,7 @@ export function createIssueReportService({ supabase, logger = console }) {
         by_status: countsByStatus,
       },
       grouped_recurring_issues: groupedRecurringIssues,
+      review_summary: reviewSummary,
       latest_reported_issues: reports.slice(0, 12).map((report) => ({
         id: report.id,
         classification: report.classification,
@@ -573,6 +792,8 @@ export function createIssueReportService({ supabase, logger = console }) {
         risk_tier: report.risk_tier,
         route: report.route,
         summary: report.repair_summary?.owner_digest_line || report.summary,
+        affected_system: report.repair_summary?.affected_system || report.affected_system || "general_app",
+        priority_label: report.priority_label || report.repair_summary?.priority_label || "routine",
         created_at: report.created_at,
       })),
       top_bug_themes: reports
@@ -593,6 +814,8 @@ export function createIssueReportService({ supabase, logger = console }) {
           route: report.route,
           status: report.status,
           summary: report.repair_summary?.owner_digest_line || report.summary,
+          affected_system: report.repair_summary?.affected_system || report.affected_system || "general_app",
+          priority_label: report.priority_label || report.repair_summary?.priority_label || "routine",
           created_at: report.created_at,
         })),
       preference_correction_trends: reports
@@ -613,6 +836,8 @@ export function createIssueReportService({ supabase, logger = console }) {
           status: report.status,
           owner_digest_line: report.repair_summary?.owner_digest_line || summarizeText(report.report_text, 120),
           probable_area: report.repair_summary?.probable_area || "general_app",
+          affected_system: report.repair_summary?.affected_system || report.affected_system || "general_app",
+          priority_label: report.priority_label || report.repair_summary?.priority_label || "routine",
           created_at: report.created_at,
         })),
       corrections: reports
@@ -634,6 +859,8 @@ export function createIssueReportService({ supabase, logger = console }) {
         status: report.status,
         confidence: report.confidence,
         summary: report.repair_summary?.owner_digest_line || summarizeText(report.report_text, 120),
+        affected_system: report.repair_summary?.affected_system || report.affected_system || "general_app",
+        priority_label: report.priority_label || report.repair_summary?.priority_label || "routine",
         created_at: report.created_at,
       })),
     };
@@ -655,10 +882,14 @@ export function createIssueReportService({ supabase, logger = console }) {
       cluster_key: packet.cluster_key,
       issue_id: packet.issue_id,
       summary: packet.summary,
+      clear_summary: packet.clear_summary,
       severity: packet.severity,
       confidence: packet.confidence,
       probable_area: packet.feature_context?.probable_area || "general_app",
+      affected_system: packet.affected_system || packet.feature_context?.affected_system || "general_app",
       related_reports: packet.recent_related_reports.length,
+      priority_label: packet.priority_label,
+      priority_score: packet.priority_score,
       recommended_next_action: packet.recommended_next_action,
     }));
     const severityScore = { high: 3, medium: 2, low: 1 };
@@ -674,11 +905,31 @@ export function createIssueReportService({ supabase, logger = console }) {
       .slice(0, 10);
     const systemAreas = packets.reduce((acc, packet) => {
       const key = packet.feature_context?.probable_area || "general_app";
-      if (!acc[key]) acc[key] = { probable_area: key, complaints: 0, clusters: 0 };
+      if (!acc[key]) acc[key] = { probable_area: key, complaints: 0, clusters: 0, highest_priority: "routine" };
       acc[key].clusters += 1;
       acc[key].complaints += packet.recent_related_reports.length;
+      if ((packet.priority_score || 0) >= 80) {
+        acc[key].highest_priority = packet.priority_label || acc[key].highest_priority;
+      }
       return acc;
     }, {});
+    const priorityQueue = [...packets]
+      .sort((a, b) => Number(b.priority_score || 0) - Number(a.priority_score || 0))
+      .slice(0, 12)
+      .map((packet) => ({
+        issue_id: packet.issue_id,
+        cluster_key: packet.cluster_key,
+        summary: packet.summary,
+        clear_summary: packet.clear_summary,
+        severity: packet.severity,
+        confidence: packet.confidence,
+        probable_area: packet.feature_context?.probable_area || "general_app",
+        affected_system: packet.affected_system || packet.feature_context?.affected_system || "general_app",
+        priority_label: packet.priority_label,
+        priority_score: packet.priority_score,
+        related_reports: packet.recent_related_reports?.length || 0,
+        recommended_next_action: packet.recommended_next_action,
+      }));
 
     return {
       generated_at: nowIso(),
@@ -692,6 +943,14 @@ export function createIssueReportService({ supabase, logger = console }) {
       highest_severity_issues: highestSeverityIssues,
       newly_emerging_issues: newestIssues,
       repeat_complaints_by_system_area: Object.values(systemAreas).sort((a, b) => b.complaints - a.complaints),
+      review_summary: {
+        urgent_packets: packets.filter((packet) => packet.priority_label === "urgent").length,
+        high_priority_packets: packets.filter((packet) => packet.priority_label === "high").length,
+        watch_packets: packets.filter((packet) => packet.priority_label === "watch").length,
+        production_verification_required: true,
+        owner_action: "Review packets in priority order, validate reproduction in production, then prepare a manual repair brief.",
+      },
+      priority_queue: priorityQueue,
       repair_packets: packets,
     };
   }
