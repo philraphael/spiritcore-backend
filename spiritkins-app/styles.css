@@ -1239,6 +1239,20 @@ button:disabled {
   pointer-events: none;
 }
 
+.portrait-frame.is-listening::after,
+.spiritkin-media-panel.is-listening::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--portrait-color, var(--realm-accent)) 42%, rgba(255,255,255,0.14));
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 0 18px color-mix(in srgb, var(--portrait-color, var(--realm-accent)) 24%, transparent);
+  animation: spiritkinListeningPulse 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
 @keyframes spiritkinPresenceFloat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
@@ -1252,6 +1266,11 @@ button:disabled {
 @keyframes spiritkinSpeakingAura {
   0%, 100% { opacity: 0.58; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.02); }
+}
+
+@keyframes spiritkinListeningPulse {
+  0%, 100% { opacity: 0.42; transform: scale(1); }
+  50% { opacity: 0.88; transform: scale(1.012); }
 }
 
 .selection-placeholder {
@@ -1830,6 +1849,11 @@ button:disabled {
   box-shadow: 0 18px 42px rgba(0,0,0,0.2), 0 0 26px color-mix(in srgb, var(--realm-accent-soft) 52%, transparent);
 }
 
+.companion-presence-dock.is-listening {
+  border-color: color-mix(in srgb, var(--realm-accent) 30%, transparent);
+  box-shadow: 0 18px 42px rgba(0,0,0,0.19), 0 0 20px color-mix(in srgb, var(--realm-accent-soft) 34%, transparent);
+}
+
 .companion-presence-dock.is-attentive {
   border-color: color-mix(in srgb, var(--realm-accent) 28%, transparent);
   box-shadow: 0 18px 40px rgba(0,0,0,0.18), 0 0 18px color-mix(in srgb, var(--realm-accent-soft) 34%, transparent);
@@ -1889,6 +1913,10 @@ button:disabled {
 
 .companion-presence-dock.is-speaking .companion-presence-label::before {
   animation: spiritkinPresencePulse 1.15s ease-in-out infinite;
+}
+
+.companion-presence-dock.is-listening .companion-presence-label::before {
+  animation: spiritkinListeningPulse 1.8s ease-in-out infinite;
 }
 
 .companion-presence-dock.is-attentive .companion-presence-label::before {
@@ -8628,5 +8656,52 @@ button[data-action="begin-quest"]:active,
 
   .presence-tab-content[data-presence-surface="games"] .board-grand {
     max-width: 100%;
+  }
+}
+
+.bonded-support-rail .companion-presence-dock.variant-bonded-home {
+  grid-template-columns: minmax(188px, 236px) minmax(0, 1fr);
+  gap: 22px;
+  padding: 22px;
+  margin-top: 0;
+}
+
+.bonded-support-rail .companion-presence-dock.variant-bonded-home .spiritkin-media-panel.bonded {
+  width: 100%;
+  max-width: 236px;
+  min-height: 192px;
+  margin-bottom: 0;
+}
+
+.bonded-support-rail .companion-presence-dock.variant-bonded-home .companion-dock-portrait {
+  width: min(188px, 100%);
+  max-width: 188px;
+}
+
+.bonded-support-rail .companion-presence-dock.variant-bonded-home .companion-presence-copy strong {
+  font-size: 1.18rem;
+}
+
+@media (max-width: 1180px) {
+  .bonded-support-rail .companion-presence-dock.variant-bonded-home {
+    grid-template-columns: minmax(156px, 196px) minmax(0, 1fr);
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .bonded-support-rail .companion-presence-dock.variant-bonded-home .spiritkin-media-panel.bonded {
+    max-width: 196px;
+    min-height: 168px;
+  }
+
+  .bonded-support-rail .companion-presence-dock.variant-bonded-home .companion-dock-portrait {
+    width: min(160px, 100%);
+    max-width: 160px;
+  }
+}
+
+@media (max-width: 760px) {
+  .bonded-support-rail .companion-presence-dock.variant-bonded-home {
+    grid-template-columns: 1fr;
   }
 }

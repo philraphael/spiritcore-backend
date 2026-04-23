@@ -1,5 +1,6 @@
 import { nowIso } from "../utils/time.mjs";
 import { toUuid } from "../utils/id.mjs";
+import { buildSpiritCoreAmbientFoundation } from "./spiritCoreAmbientService.mjs";
 
 function clamp01(value, fallback = 0) {
   const parsed = Number(value);
@@ -33,6 +34,41 @@ function normalizeAdaptiveProfile(raw = {}) {
     repetitionSensitivity: clamp01(raw?.repetitionSensitivity, 0.25),
     respectPreference: clamp01(raw?.respectPreference, 0.5),
     spiritualityPreference: clamp01(raw?.spiritualityPreference, 0.25),
+    styleModel: raw?.styleModel && typeof raw.styleModel === "object"
+      ? {
+          formality: clamp01(raw.styleModel.formality, 0.48),
+          casualness: clamp01(raw.styleModel.casualness, 0.34),
+          emotionalHeaviness: clamp01(raw.styleModel.emotionalHeaviness, 0.3),
+          directness: clamp01(raw.styleModel.directness, 0.46),
+          verbosity: clamp01(raw.styleModel.verbosity, 0.44),
+          playfulness: clamp01(raw.styleModel.playfulness, 0.32),
+        }
+      : {
+          formality: 0.48,
+          casualness: 0.34,
+          emotionalHeaviness: 0.3,
+          directness: 0.46,
+          verbosity: 0.44,
+          playfulness: 0.32,
+        },
+    styleMemory: raw?.styleMemory && typeof raw.styleMemory === "object"
+      ? {
+          prefersConciseReplies: Boolean(raw.styleMemory.prefersConciseReplies),
+          prefersPlayfulTone: Boolean(raw.styleMemory.prefersPlayfulTone),
+          prefersWarmth: raw.styleMemory.prefersWarmth === false ? false : true,
+          prefersStructuredClarity: Boolean(raw.styleMemory.prefersStructuredClarity),
+          usesCasualLanguage: Boolean(raw.styleMemory.usesCasualLanguage),
+          prefersDirectness: Boolean(raw.styleMemory.prefersDirectness),
+        }
+      : {
+          prefersConciseReplies: false,
+          prefersPlayfulTone: false,
+          prefersWarmth: true,
+          prefersStructuredClarity: false,
+          usesCasualLanguage: false,
+          prefersDirectness: false,
+        },
+    preferenceSummary: Array.isArray(raw?.preferenceSummary) ? raw.preferenceSummary.filter(Boolean).slice(-8) : [],
     correctionFlags: raw?.correctionFlags && typeof raw.correctionFlags === "object"
       ? {
           avoidRepetition: Boolean(raw.correctionFlags.avoidRepetition),
@@ -458,6 +494,23 @@ function mergeStoredAdaptiveProfile(stored = {}, generated = {}) {
     repetitionSensitivity: Number(Math.max(base.repetitionSensitivity, incoming.repetitionSensitivity).toFixed(3)),
     respectPreference: Number(Math.max(base.respectPreference, incoming.respectPreference).toFixed(3)),
     spiritualityPreference: Number(Math.max(base.spiritualityPreference, incoming.spiritualityPreference).toFixed(3)),
+    styleModel: {
+      formality: Number(average([base.styleModel.formality, incoming.styleModel.formality], base.styleModel.formality).toFixed(3)),
+      casualness: Number(average([base.styleModel.casualness, incoming.styleModel.casualness], base.styleModel.casualness).toFixed(3)),
+      emotionalHeaviness: Number(average([base.styleModel.emotionalHeaviness, incoming.styleModel.emotionalHeaviness], base.styleModel.emotionalHeaviness).toFixed(3)),
+      directness: Number(average([base.styleModel.directness, incoming.styleModel.directness], base.styleModel.directness).toFixed(3)),
+      verbosity: Number(average([base.styleModel.verbosity, incoming.styleModel.verbosity], base.styleModel.verbosity).toFixed(3)),
+      playfulness: Number(average([base.styleModel.playfulness, incoming.styleModel.playfulness], base.styleModel.playfulness).toFixed(3)),
+    },
+    styleMemory: {
+      prefersConciseReplies: base.styleMemory.prefersConciseReplies || incoming.styleMemory.prefersConciseReplies,
+      prefersPlayfulTone: base.styleMemory.prefersPlayfulTone || incoming.styleMemory.prefersPlayfulTone,
+      prefersWarmth: base.styleMemory.prefersWarmth || incoming.styleMemory.prefersWarmth,
+      prefersStructuredClarity: base.styleMemory.prefersStructuredClarity || incoming.styleMemory.prefersStructuredClarity,
+      usesCasualLanguage: base.styleMemory.usesCasualLanguage || incoming.styleMemory.usesCasualLanguage,
+      prefersDirectness: base.styleMemory.prefersDirectness || incoming.styleMemory.prefersDirectness,
+    },
+    preferenceSummary: [...new Set([...(base.preferenceSummary || []), ...(incoming.preferenceSummary || [])])].slice(-8),
     correctionFlags: {
       avoidRepetition: base.correctionFlags.avoidRepetition || incoming.correctionFlags.avoidRepetition,
       avoidNarration: base.correctionFlags.avoidNarration || incoming.correctionFlags.avoidNarration,
@@ -482,6 +535,23 @@ function buildStructuredMemoryAdaptiveProfile(structured = {}) {
     repetitionSensitivity: correctionContent.some((entry) => entry.includes("repeat")) ? 0.72 : 0.25,
     respectPreference: content.some((entry) => entry.includes("respectful") || entry.includes("cleaner")) ? 0.74 : 0.5,
     spiritualityPreference: content.some((entry) => entry.includes("spiritual") || entry.includes("faith")) ? 0.78 : 0.25,
+    styleModel: {
+      formality: content.some((entry) => entry.includes("formal") || entry.includes("professional")) ? 0.74 : 0.48,
+      casualness: content.some((entry) => entry.includes("casual") || entry.includes("slang")) ? 0.7 : 0.34,
+      emotionalHeaviness: content.some((entry) => entry.includes("deep") || entry.includes("heavy")) ? 0.68 : 0.3,
+      directness: content.some((entry) => entry.includes("direct") || entry.includes("clear")) ? 0.72 : 0.46,
+      verbosity: content.some((entry) => entry.includes("concise") || entry.includes("brief")) ? 0.26 : 0.44,
+      playfulness: content.some((entry) => entry.includes("playful")) ? 0.62 : 0.32,
+    },
+    styleMemory: {
+      prefersConciseReplies: content.some((entry) => entry.includes("concise") || entry.includes("brief")),
+      prefersPlayfulTone: content.some((entry) => entry.includes("playful")),
+      prefersWarmth: content.some((entry) => entry.includes("warm") || entry.includes("kind")),
+      prefersStructuredClarity: content.some((entry) => entry.includes("structured") || entry.includes("clear")),
+      usesCasualLanguage: content.some((entry) => entry.includes("casual") || entry.includes("slang")),
+      prefersDirectness: content.some((entry) => entry.includes("direct")),
+    },
+    preferenceSummary: preferences.map((entry) => entry?.content).filter(Boolean).slice(-6),
     recentCorrections: corrections.map((entry) => entry?.content).filter(Boolean).slice(-6),
     correctionFlags: {
       avoidRepetition: correctionContent.some((entry) => entry.includes("repeat")),
@@ -593,6 +663,13 @@ export function createSpiritCoreAdaptiveService({ supabase, structuredMemoryServ
       surfacePriority,
       userModel,
     });
+    const ambientFoundation = buildSpiritCoreAmbientFoundation({
+      spiritkinIdentity,
+      worldState,
+      signals,
+      surfacePriority,
+      userModel,
+    });
 
     return {
       userModel,
@@ -604,6 +681,7 @@ export function createSpiritCoreAdaptiveService({ supabase, structuredMemoryServ
       surfacePriority,
       returnPackage,
       worldHooks,
+      ambientFoundation,
       structuredMemorySummary: structured?.brief || "",
       version: 1,
     };
@@ -631,6 +709,10 @@ export function createSpiritCoreAdaptiveService({ supabase, structuredMemoryServ
         },
         spiritcore_return_state: {
           ...(envelope.returnPackage || {}),
+          updatedAt: nowIso(),
+        },
+        spiritcore_ambient_foundation: {
+          ...(envelope.ambientFoundation || {}),
           updatedAt: nowIso(),
         },
       },

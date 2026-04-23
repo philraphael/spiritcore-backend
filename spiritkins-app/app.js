@@ -1779,7 +1779,17 @@ function getSpiritkinVisualState(name) {
   const speechTurn = normalizeTurnPhaseValue(state.sessionModel?.speechState?.turnPhase || "idle");
   const isGameFocused = state.activePresenceTab === "games" && !!state.activeGame;
   const recentUserTurn = !!_lastUserSubmission.at && (Date.now() - _lastUserSubmission.at) < 45000;
-  const attentive = !!(state.loadingReply || state.voiceListening || recentUserTurn || speechTurn === "user_turn" || speechTurn === "processing");
+  const attentive = !!(state.loadingReply || state.voiceListening || recentUserTurn || speechTurn === "user_input" || speechTurn === "processing");
+  if (state.voiceListening) {
+    return {
+      state: "listening",
+      mediaState: "listening",
+      phase: "listening",
+      emotionTone,
+      statusLabel: `${name} listening`,
+      statusDetail: "Mic capture is active and the Spiritkin is holding space for your next words."
+    };
+  }
   if (speaking && emotionalState) {
     return {
       state: "speaking",
@@ -1880,6 +1890,8 @@ function buildPortrait(name, cls, size) {
   const classSignature = `${cls || ""} ${size || ""}`.trim();
   const eagerPortrait = /portrait-card|portrait-focus|portrait-hero/.test(classSignature);
   const speakingCls = isSpiritkinSpeechActive(name) ? "is-speaking" : "";
+  const visualState = getSpiritkinVisualState(name);
+  const listeningCls = visualState.state === "listening" ? "is-listening" : "";
   const portraitFailed = isSpiritkinMediaFailed(name, "portrait", portraitPath);
   const videoLayer = buildSpiritkinVideoLayer(name, classSignature);
   const videoEnabledCls = videoLayer ? "has-video" : "";
@@ -1900,7 +1912,7 @@ function buildPortrait(name, cls, size) {
     `
     : portraitSvg(name);
   return `
-    <div class="portrait-frame ${portraitPath ? "has-remote-image" : ""} ${portraitFailed ? "portrait-fallback-only" : ""} ${videoEnabledCls} ${speakingCls} ${esc(cls)} ${esc(size)}">
+    <div class="portrait-frame ${portraitPath ? "has-remote-image" : ""} ${portraitFailed ? "portrait-fallback-only" : ""} ${videoEnabledCls} ${speakingCls} ${listeningCls} ${esc(cls)} ${esc(size)}">
       <div class="portrait-backdrop"></div>
       <div class="portrait-art">${portraitContent}${videoLayer}</div>
     </div>
@@ -2045,11 +2057,12 @@ function buildSpiritkinMediaPanel(name, surface = "focus") {
   const primarySrc = isSpiritkinMediaFailed(name, surface, resolvedPrimarySrc) ? "" : resolvedPrimarySrc;
   const speakingCls = isSpiritkinSpeechActive(name) ? "is-speaking" : "";
   const visualState = getSpiritkinVisualState(name);
+  const listeningCls = visualState.state === "listening" ? "is-listening" : "";
   return buildCompositeVisualFrame(
     primarySrc,
     fallbackPortrait,
     `${name} visual panel`,
-    `spiritkin-media-panel ${surface} ${speakingCls} is-${esc(visualState.state)}`,
+    `spiritkin-media-panel ${surface} ${speakingCls} ${listeningCls} is-${esc(visualState.state)}`,
     surface !== "card",
     {
       fallbackMode: "errorOnly",
@@ -2075,15 +2088,17 @@ function buildSpiritkinCanonPanel(name, cls = "profile-canon-art") {
   );
 }
 
-function buildCompanionPresenceDock(spiritkin) {
+function buildCompanionPresenceDock(spiritkin, options = {}) {
   if (!spiritkin?.ui) return "";
   const meta = spiritkin.ui;
   const visualState = getSpiritkinVisualState(spiritkin.name);
   const roomMeta = getRoomDisplayMeta(state.activePresenceTab, spiritkin);
+  const variant = options?.variant === "bonded-home" ? "bonded-home" : "rail";
+  const mediaSurface = variant === "bonded-home" ? "bonded" : "card";
   return `
-    <div class="companion-presence-dock ${esc(meta.cls)} is-${esc(visualState.state)} ${visualState.state === "speaking" ? "is-speaking" : ""}" data-presence-state="${esc(visualState.state)}">
+    <div class="companion-presence-dock variant-${esc(variant)} ${esc(meta.cls)} is-${esc(visualState.state)} ${visualState.state === "speaking" ? "is-speaking" : ""}" data-presence-state="${esc(visualState.state)}">
       <div class="companion-presence-visual">
-        ${buildSpiritkinMediaPanel(spiritkin.name, "card")}
+        ${buildSpiritkinMediaPanel(spiritkin.name, mediaSurface)}
         ${buildPortrait(spiritkin.name, `companion-dock-portrait ${meta.cls}`, "portrait-mini")}
       </div>
       <div class="companion-presence-copy">
@@ -2102,7 +2117,7 @@ function getAtmosphereSpiritkin() {
 
 function createDefaultAdaptiveProfile() {
   return {
-    version: 1,
+    version: 2,
     toneStyle: "grounded",
     intensity: 0.45,
     playfulness: 0.32,
@@ -2110,6 +2125,23 @@ function createDefaultAdaptiveProfile() {
     repetitionSensitivity: 0.25,
     respectPreference: 0.5,
     spiritualityPreference: 0.25,
+    styleModel: {
+      formality: 0.48,
+      casualness: 0.34,
+      emotionalHeaviness: 0.3,
+      directness: 0.46,
+      verbosity: 0.44,
+      playfulness: 0.32
+    },
+    styleMemory: {
+      prefersConciseReplies: false,
+      prefersPlayfulTone: false,
+      prefersWarmth: true,
+      prefersStructuredClarity: false,
+      usesCasualLanguage: false,
+      prefersDirectness: false
+    },
+    preferenceSummary: [],
     correctionFlags: {
       avoidRepetition: false,
       avoidNarration: false,
@@ -2320,6 +2352,8 @@ function normalizeAdaptiveProfile(raw) {
   const base = createDefaultAdaptiveProfile();
   const source = raw && typeof raw === "object" ? raw : {};
   const flags = source.correctionFlags && typeof source.correctionFlags === "object" ? source.correctionFlags : {};
+  const styleModel = source.styleModel && typeof source.styleModel === "object" ? source.styleModel : {};
+  const styleMemory = source.styleMemory && typeof source.styleMemory === "object" ? source.styleMemory : {};
   return {
     ...base,
     toneStyle: typeof source.toneStyle === "string" && source.toneStyle.trim() ? source.toneStyle.trim() : base.toneStyle,
@@ -2329,6 +2363,23 @@ function normalizeAdaptiveProfile(raw) {
     repetitionSensitivity: clamp01(source.repetitionSensitivity, base.repetitionSensitivity),
     respectPreference: clamp01(source.respectPreference, base.respectPreference),
     spiritualityPreference: clamp01(source.spiritualityPreference, base.spiritualityPreference),
+    styleModel: {
+      formality: clamp01(styleModel.formality, base.styleModel.formality),
+      casualness: clamp01(styleModel.casualness, base.styleModel.casualness),
+      emotionalHeaviness: clamp01(styleModel.emotionalHeaviness, base.styleModel.emotionalHeaviness),
+      directness: clamp01(styleModel.directness, base.styleModel.directness),
+      verbosity: clamp01(styleModel.verbosity, base.styleModel.verbosity),
+      playfulness: clamp01(styleModel.playfulness, base.styleModel.playfulness)
+    },
+    styleMemory: {
+      prefersConciseReplies: Boolean(styleMemory.prefersConciseReplies),
+      prefersPlayfulTone: Boolean(styleMemory.prefersPlayfulTone),
+      prefersWarmth: styleMemory.prefersWarmth === false ? false : true,
+      prefersStructuredClarity: Boolean(styleMemory.prefersStructuredClarity),
+      usesCasualLanguage: Boolean(styleMemory.usesCasualLanguage),
+      prefersDirectness: Boolean(styleMemory.prefersDirectness)
+    },
+    preferenceSummary: normalizePhraseList(source.preferenceSummary, 8),
     correctionFlags: {
       avoidRepetition: Boolean(flags.avoidRepetition),
       avoidNarration: Boolean(flags.avoidNarration),
@@ -2371,6 +2422,8 @@ function extractOpeningSignature(text) {
 }
 
 function inferToneStyleFromProfile(profile) {
+  if ((profile.styleModel?.formality || 0) > 0.72) return "formal";
+  if ((profile.styleModel?.casualness || 0) > 0.68) return "casual";
   if ((profile.spiritualityPreference || 0) > 0.7 || (profile.respectPreference || 0) > 0.7) return "reverent";
   if ((profile.playfulness || 0) > 0.64 && (profile.competitiveness || 0) > 0.56) return "playful-competitive";
   if ((profile.playfulness || 0) > 0.62) return "playful";
@@ -2392,6 +2445,14 @@ function updateAdaptiveProfileFromUserText(text) {
   const spiritualHit = /\b(god|lord|jesus|faith|prayer|pray|blessed|spiritual|church|scripture|sacred|holy|religious)\b/.test(lower);
   const highIntensityHit = /\b(now|seriously|really|straight up|for real|urgent|immediately)\b/.test(lower) || /!{2,}/.test(input);
   const lowIntensityHit = /\b(softly|gently|easy|slow down|not too much|quietly)\b/.test(lower);
+  const conciseHit = /\b(be concise|keep it concise|short answer|be brief|briefly|shorter|less words|keep it short)\b/.test(lower);
+  const structuredHit = /\b(step by step|structured|clear structure|organize it|bullet points|numbered|clearer|cleanly)\b/.test(lower);
+  const warmHit = /\b(warm|gentle|kind|comfort|softer|tender)\b/.test(lower);
+  const directHit = /\b(be direct|straight answer|just tell me|don't sugarcoat|dont sugarcoat|clear answer|straight up)\b/.test(lower);
+  const casualHit = /\b(lol|lmao|bruh|nah|yeah|yep|kinda|sorta|fr|ngl|bro|dude)\b/.test(lower);
+  const formalHit = /\b(formal|professional|proper|polished|measured|respectful)\b/.test(lower);
+  const heavyHit = /\b(heavy|deep|serious|raw|intense|weighty)\b/.test(lower);
+  const lightHit = /\b(lighten up|lighter|keep it light|easygoing|not too deep)\b/.test(lower);
   const repetitionHit = /\b(repeat|repeating|repetitive|same phrase|same thing|keep saying|again and again)\b/.test(lower);
   const narratorHit = /\b(stop narrating|don't narrate|less narrator|not like a narrator|don't describe the interface|don't sound like a system)\b/.test(lower);
   const profanityBoundaryHit = /\b(don't cuss|dont cuss|no profanity|don't swear|dont swear|keep it clean)\b/.test(lower);
@@ -2406,6 +2467,31 @@ function updateAdaptiveProfileFromUserText(text) {
   }
   if (highIntensityHit) profile.intensity = clamp01(profile.intensity + 0.1, profile.intensity);
   if (lowIntensityHit) profile.intensity = clamp01(profile.intensity - 0.12, profile.intensity);
+  if (conciseHit) {
+    profile.styleModel.verbosity = clamp01(profile.styleModel.verbosity - 0.16, profile.styleModel.verbosity);
+    profile.styleMemory.prefersConciseReplies = true;
+  }
+  if (structuredHit) {
+    profile.styleMemory.prefersStructuredClarity = true;
+    profile.styleModel.directness = clamp01(profile.styleModel.directness + 0.08, profile.styleModel.directness);
+  }
+  if (warmHit) profile.styleMemory.prefersWarmth = true;
+  if (directHit) {
+    profile.styleMemory.prefersDirectness = true;
+    profile.styleModel.directness = clamp01(profile.styleModel.directness + 0.14, profile.styleModel.directness);
+    profile.styleModel.formality = clamp01(profile.styleModel.formality - 0.04, profile.styleModel.formality);
+  }
+  if (casualHit) {
+    profile.styleMemory.usesCasualLanguage = true;
+    profile.styleModel.casualness = clamp01(profile.styleModel.casualness + 0.16, profile.styleModel.casualness);
+    profile.styleModel.formality = clamp01(profile.styleModel.formality - 0.08, profile.styleModel.formality);
+  }
+  if (formalHit) {
+    profile.styleModel.formality = clamp01(profile.styleModel.formality + 0.14, profile.styleModel.formality);
+    profile.styleModel.casualness = clamp01(profile.styleModel.casualness - 0.08, profile.styleModel.casualness);
+  }
+  if (heavyHit) profile.styleModel.emotionalHeaviness = clamp01(profile.styleModel.emotionalHeaviness + 0.14, profile.styleModel.emotionalHeaviness);
+  if (lightHit) profile.styleModel.emotionalHeaviness = clamp01(profile.styleModel.emotionalHeaviness - 0.14, profile.styleModel.emotionalHeaviness);
   if (repetitionHit) {
     profile.repetitionSensitivity = clamp01(profile.repetitionSensitivity + 0.22, profile.repetitionSensitivity);
     profile.correctionFlags.avoidRepetition = true;
@@ -2436,6 +2522,16 @@ function updateAdaptiveProfileFromUserText(text) {
     profile.recentCorrections = [...profile.recentCorrections, `Avoid phrase: ${explicitPhrase}`].slice(-6);
   }
 
+  profile.styleModel.playfulness = clamp01((profile.styleModel.playfulness * 0.6) + (profile.playfulness * 0.4), profile.styleModel.playfulness);
+  profile.styleMemory.prefersPlayfulTone = profile.playfulness > 0.62 || profile.styleModel.playfulness > 0.58;
+  profile.preferenceSummary = mergeUniqueStrings(profile.preferenceSummary, [
+    profile.styleMemory.prefersConciseReplies ? "Prefers concise replies" : "",
+    profile.styleMemory.prefersPlayfulTone ? "Responds well to playful tone" : "",
+    profile.styleMemory.prefersWarmth ? "Responds well to warmth" : "",
+    profile.styleMemory.prefersStructuredClarity ? "Responds well to structured clarity" : "",
+    profile.styleMemory.usesCasualLanguage ? "Uses casual language" : "",
+    profile.styleMemory.prefersDirectness ? "Prefers direct answers" : ""
+  ].filter(Boolean), 8);
   profile.toneStyle = inferToneStyleFromProfile(profile);
   state.adaptiveProfile = profile;
   persistAdaptiveProfile();
@@ -2454,6 +2550,12 @@ function observeAssistantStyle(text) {
   });
   if (opener) profile.recentAssistantOpeners = mergeUniqueStrings(profile.recentAssistantOpeners, [opener], 6);
   if (repeatedPhrases.length) profile.recentAssistantPhrases = mergeUniqueStrings(profile.recentAssistantPhrases, repeatedPhrases, 10);
+  const sentenceCount = output.split(/(?<=[.!?])\s+/).filter(Boolean).length;
+  if (sentenceCount <= 2) {
+    profile.styleModel.verbosity = clamp01(profile.styleModel.verbosity - 0.02, profile.styleModel.verbosity);
+  } else if (sentenceCount >= 5) {
+    profile.styleModel.verbosity = clamp01(profile.styleModel.verbosity + 0.02, profile.styleModel.verbosity);
+  }
   state.adaptiveProfile = profile;
   persistAdaptiveProfile();
   updateSpiritkinEvolution(state.primarySpiritkin?.name || state.selectedSpiritkin?.name, { assistantText: output });
@@ -5251,6 +5353,9 @@ function buildAdaptiveRequestContext() {
       repetitionSensitivity: profile.repetitionSensitivity,
       respectPreference: profile.respectPreference,
       spiritualityPreference: profile.spiritualityPreference,
+      styleModel: profile.styleModel,
+      styleMemory: profile.styleMemory,
+      preferenceSummary: profile.preferenceSummary.slice(-6),
       correctionFlags: profile.correctionFlags,
       dislikedPhrases: profile.dislikedPhrases.slice(-6),
       blockedOpeners: profile.blockedOpeners.slice(-4),
@@ -8074,6 +8179,7 @@ function buildBondedHomeView() {
           </div>
 
           <aside class="bonded-support-rail">
+            ${buildCompanionPresenceDock(spiritkin, { variant: "bonded-home" })}
             ${buildSpiritCoreGuidanceCard("bonded-home-guidance")}
             ${buildRetentionHomeStrip()}
             ${buildTemporalWorldStrip()}

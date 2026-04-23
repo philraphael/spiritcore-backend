@@ -278,6 +278,23 @@ function buildAdaptiveLayer(ctx) {
   parts.push(`Repetition sensitivity: ${numberOrDefault(adaptive.repetitionSensitivity, 0.25).toFixed(2)}`);
   parts.push(`Respect preference: ${numberOrDefault(adaptive.respectPreference, 0.5).toFixed(2)}`);
   parts.push(`Spiritual / reverent preference: ${numberOrDefault(adaptive.spiritualityPreference, 0.25).toFixed(2)}`);
+  if (adaptive.styleModel && typeof adaptive.styleModel === "object") {
+    parts.push(`Formality: ${numberOrDefault(adaptive.styleModel.formality, 0.48).toFixed(2)}`);
+    parts.push(`Casual / slang comfort: ${numberOrDefault(adaptive.styleModel.casualness, 0.34).toFixed(2)}`);
+    parts.push(`Emotional heaviness tolerance: ${numberOrDefault(adaptive.styleModel.emotionalHeaviness, 0.3).toFixed(2)}`);
+    parts.push(`Directness preference: ${numberOrDefault(adaptive.styleModel.directness, 0.46).toFixed(2)}`);
+    parts.push(`Verbosity preference: ${numberOrDefault(adaptive.styleModel.verbosity, 0.44).toFixed(2)}`);
+  }
+  if (adaptive.styleMemory && typeof adaptive.styleMemory === "object") {
+    const enabledPrefs = Object.entries(adaptive.styleMemory)
+      .filter(([, value]) => value)
+      .map(([key]) => key);
+    if (enabledPrefs.length) parts.push(`Style memory: ${enabledPrefs.join(", ")}`);
+  }
+  const preferenceSummary = Array.isArray(adaptive.preferenceSummary) ? adaptive.preferenceSummary.filter(Boolean).slice(-6) : [];
+  if (preferenceSummary.length) {
+    parts.push(`Preference summary: ${preferenceSummary.map((item) => sanitizeText(item)).join(" | ")}`);
+  }
 
   const flags = adaptive.correctionFlags ?? {};
   const enabledFlags = Object.entries(flags)
@@ -324,8 +341,22 @@ function buildAdaptiveLayer(ctx) {
   parts.push("Adapt style with restraint. Modulate cadence, sharpness, playfulness, and reverence. Do not become a mirror clone of the user.");
   parts.push("Keep this Spiritkin distinct. Identity outranks adaptation. Adaptation only shapes delivery, not canon role or worldview.");
   parts.push("If the user wants less repetition, vary openings, pivots, and reassurance language before repeating any stock phrase.");
+  parts.push("Never infer race, ethnicity, gender identity, disability, religion, or any protected trait from style. Adapt only to conversational behavior and explicit user preference.");
 
   return parts.join("\n");
+}
+
+function buildAmbientFoundationLayer(ctx) {
+  const ambient = ctx?.context?.spiritCoreAmbientFoundation ?? null;
+  if (!ambient || typeof ambient !== "object") return null;
+  return [
+    "AMBIENT FOUNDATION",
+    `Environment scene: ${sanitizeText(ambient.environmentScene || "bonded-presence")}`,
+    `Hospitality mode: ${sanitizeText(ambient.hospitalityMode || "bonded-presence")}`,
+    `World mood: ${sanitizeText(ambient.worldMood || "steady")}`,
+    ambient?.sceneState?.reduceClutter ? "Favor uncluttered presentation cues in descriptive language." : "",
+    "This is descriptive groundwork only. Do not imply real-world device control or environmental action unless explicitly enabled in a future system."
+  ].filter(Boolean).join("\n");
 }
 
 function buildEvolutionLayer(ctx) {
@@ -496,6 +527,7 @@ function buildContextBlock(ctx, memoryLayer) {
   const spiritCoreSignalsLayer = buildSpiritCoreSignalsLayer(ctx);
   const spiritCoreGuidanceLayer = buildSpiritCoreGuidanceLayer(ctx);
   const spiritCoreWorldHooksLayer = buildSpiritCoreWorldHooksLayer(ctx);
+  const ambientFoundationLayer = buildAmbientFoundationLayer(ctx);
   const hierarchicalMemoryLayer = buildHierarchicalMemoryLayer(ctx);
   const spiritMemoryBriefLayer = buildSpiritMemoryBriefLayer(ctx);
 
@@ -531,6 +563,7 @@ function buildContextBlock(ctx, memoryLayer) {
     spiritCoreSignalsLayer,
     spiritCoreGuidanceLayer,
     spiritCoreWorldHooksLayer,
+    ambientFoundationLayer,
     "MEMORY / CONTEXT",
     [
       sceneName ? `Current scene: ${sceneName}` : "Current scene: default",

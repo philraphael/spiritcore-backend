@@ -20,6 +20,7 @@ function createSpiritkinVideoSet(name) {
       speaking: [
         buildVideoUrl(name, "speaking", "speaking_01.mp4"),
       ],
+      listening: [],
       attentive: [],
       reflective: [],
       gameFocused: [],
@@ -37,6 +38,7 @@ function createSpiritkinVideoSet(name) {
       special: []
     },
     aliases: {
+      listening: ["listening", "attentive", "idle"],
       attentive: ["attentive", "idle"],
       reflective: ["reflective", "calm", "idle"],
       gameFocused: ["gameFocused", "idle"],
@@ -68,6 +70,7 @@ function getStateEntries(set, normalizedState) {
   if (!set || !normalizedState) return [];
   if (normalizedState === "idle") return cloneStateList(set.states?.idle);
   if (normalizedState === "speaking") return cloneStateList(set.states?.speaking);
+  if (normalizedState === "listening") return cloneStateList(set.states?.listening);
   if (normalizedState === "attentive") return cloneStateList(set.states?.attentive);
   if (normalizedState === "reflective") return cloneStateList(set.states?.reflective);
   if (normalizedState === "game-focused" || normalizedState === "gamefocused") {
@@ -90,6 +93,7 @@ export function getSpiritkinVideoSet(spiritkin) {
     states: {
       idle: cloneStateList(set.states?.idle),
       speaking: cloneStateList(set.states?.speaking),
+      listening: cloneStateList(set.states?.listening),
       attentive: cloneStateList(set.states?.attentive),
       reflective: cloneStateList(set.states?.reflective),
       gameFocused: cloneStateList(set.states?.gameFocused),
@@ -101,6 +105,7 @@ export function getSpiritkinVideoSet(spiritkin) {
       special: cloneStateList(set.states?.special),
     },
     aliases: {
+      listening: [...(set.aliases?.listening || ["listening", "attentive", "idle"])],
       attentive: [...(set.aliases?.attentive || ["attentive", "idle"])],
       reflective: [...(set.aliases?.reflective || ["reflective", "calm", "idle"])],
       gameFocused: [...(set.aliases?.gameFocused || ["gameFocused", "idle"])],
@@ -114,6 +119,7 @@ export function getSpiritkinVideoCandidates(spiritkin, state) {
   if (!set) return [];
   const normalizedState = normalizeStateKey(state);
   const aliasMap = {
+    listening: set.aliases?.listening || ["listening", "attentive", "idle"],
     attentive: set.aliases?.attentive || ["attentive", "idle"],
     reflective: set.aliases?.reflective || ["reflective", "calm", "idle"],
     "game-focused": set.aliases?.gameFocused || ["gameFocused", "idle"],

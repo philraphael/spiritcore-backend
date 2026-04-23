@@ -381,6 +381,8 @@ export function createResponseEngine() {
     const blockedOpeners = Array.isArray(adaptive.blockedOpeners) ? adaptive.blockedOpeners.filter(Boolean) : [];
     const recentAssistantOpeners = Array.isArray(adaptive.recentAssistantOpeners) ? adaptive.recentAssistantOpeners.filter(Boolean) : [];
     const recentAssistantPhrases = Array.isArray(adaptive.recentAssistantPhrases) ? adaptive.recentAssistantPhrases.filter(Boolean) : [];
+    const styleModel = adaptive.styleModel && typeof adaptive.styleModel === "object" ? adaptive.styleModel : {};
+    const styleMemory = adaptive.styleMemory && typeof adaptive.styleMemory === "object" ? adaptive.styleMemory : {};
     const flags = adaptive.correctionFlags ?? {};
 
     const sentences = output
@@ -428,6 +430,32 @@ export function createResponseEngine() {
         .replace(/\bdon't be mad if you lose\b/gi, "stay with me here")
         .replace(/\bdon't glare at me\b/gi, "easy")
         .replace(/\btoo late\b/gi, "you saw it happen");
+    }
+
+    if ((numberOrDefault(styleModel.verbosity, 0.44) < 0.34 || styleMemory.prefersConciseReplies) && sentences.length > 2) {
+      output = sentences.slice(0, 2).join(" ").trim();
+    }
+
+    if (numberOrDefault(styleModel.directness, 0.46) > 0.68 || styleMemory.prefersDirectness) {
+      output = output
+        .replace(/\bI think\b/gi, "")
+        .replace(/\bmaybe\b/gi, "")
+        .replace(/\bperhaps\b/gi, "")
+        .replace(/\bit sounds like\b/gi, "it is reading as")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    if (numberOrDefault(styleModel.emotionalHeaviness, 0.3) < 0.24) {
+      output = output.replace(/!{2,}/g, "!").replace(/\bdevastating\b/gi, "hard");
+    }
+
+    if (numberOrDefault(styleModel.formality, 0.48) > 0.7 && /\b(?:yeah|nah|kinda|sorta)\b/i.test(output)) {
+      output = output
+        .replace(/\byeah\b/gi, "yes")
+        .replace(/\bnah\b/gi, "no")
+        .replace(/\bkinda\b/gi, "somewhat")
+        .replace(/\bsorta\b/gi, "somewhat");
     }
 
     return trimFillerLead(output.replace(/\s+/g, " ").trim());

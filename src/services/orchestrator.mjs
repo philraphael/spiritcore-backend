@@ -279,6 +279,7 @@ export const createOrchestrator = ({
       spiritCoreSurfacePriority: spiritCoreEnvelope?.surfacePriority || null,
       spiritCoreReturnPackage: spiritCoreEnvelope?.returnPackage || null,
       spiritCoreWorldHooks: spiritCoreEnvelope?.worldHooks || null,
+      spiritCoreAmbientFoundation: spiritCoreEnvelope?.ambientFoundation || null,
     };
 
     const rawAdapterResult = await withTimeout(
