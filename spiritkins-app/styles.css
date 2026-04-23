@@ -4608,10 +4608,12 @@ button:disabled {
 .presence-stage .spiritkin-media-panel.profile {
   min-height: clamp(360px, 42vw, 640px);
   margin-bottom: 0;
+  width: min(100%, 760px);
 }
 
 .presence-stage .portrait-hero {
-  width: min(220px, 32%);
+  width: min(360px, 54%);
+  max-width: 360px;
 }
 
 .presence-summary {
@@ -4635,6 +4637,7 @@ button:disabled {
 
 .companion-presence-visual .spiritkin-media-panel.card {
   min-height: 148px;
+  min-width: min(100%, 188px);
 }
 
 .companion-dock-portrait {
@@ -8878,6 +8881,34 @@ button[data-action="begin-quest"]:active,
   opacity: 1;
 }
 
+/* Live correction: prevent bonded media columns from collapsing into slivers. */
+.selection-focus.pending,
+.selection-focus.bonded {
+  grid-template-columns: minmax(280px, 1.08fr) minmax(320px, 0.92fr);
+}
+
+.selection-focus-stage {
+  min-width: 280px;
+}
+
+.selection-focus.pending .spiritkin-media-panel.focus,
+.selection-focus.bonded .spiritkin-media-panel.bonded {
+  min-width: 280px;
+}
+
+@media (max-width: 1180px) {
+  .selection-focus.pending,
+  .selection-focus.bonded {
+    grid-template-columns: 1fr;
+  }
+
+  .selection-focus-stage,
+  .selection-focus.pending .spiritkin-media-panel.focus,
+  .selection-focus.bonded .spiritkin-media-panel.bonded {
+    min-width: 0;
+  }
+}
+
 .presence-tab-content[data-presence-surface="games"] .sv-theme-shell {
   background:
     linear-gradient(180deg, rgba(6, 12, 22, 0.74), rgba(6, 12, 22, 0.42)),
@@ -9026,7 +9057,7 @@ button[data-action="begin-quest"]:active,
 .chat-rail-section {
   position: sticky;
   top: 0;
-  z-index: var(--z-game-panel);
+  z-index: var(--z-content-panel);
   padding-bottom: 4px;
 }
 

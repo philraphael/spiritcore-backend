@@ -3564,7 +3564,8 @@ function syncMountedMedia({ attemptPlay = false } = {}) {
   const media = getMediaToggleState(state.mediaMuted);
   document.querySelectorAll(".video-player-element").forEach((video) => {
     const isGatePreview = video.dataset.entryVideo === "gate" && isIdleSpiritGatePreviewActive();
-    const effectiveMuted = isGatePreview && !attemptPlay ? true : state.mediaMuted;
+    const isForcedMutedAutoplay = video.dataset.forceMutedAutoplay === "1" && !attemptPlay;
+    const effectiveMuted = (isGatePreview && !attemptPlay) || isForcedMutedAutoplay ? true : state.mediaMuted;
     video.muted = effectiveMuted;
     video.defaultMuted = effectiveMuted;
     video.volume = effectiveMuted ? 0 : 1;
@@ -3649,8 +3650,9 @@ function syncSelectionTrailers() {
       });
     }
 
-    video.defaultMuted = !!state.mediaMuted;
-    video.muted = !!state.mediaMuted;
+    const forceMutedAutoplay = video.dataset.forceMutedAutoplay === "1";
+    video.defaultMuted = forceMutedAutoplay || !!state.mediaMuted;
+    video.muted = forceMutedAutoplay || !!state.mediaMuted;
     video.playsInline = true;
 
     const attemptPlayback = (label, forceMuted = state.mediaMuted) => {
@@ -3694,7 +3696,7 @@ function syncSelectionTrailers() {
       return;
     }
 
-    attemptPlayback("initial", state.mediaMuted).catch((error) => {
+    attemptPlayback("initial", forceMutedAutoplay || state.mediaMuted).catch((error) => {
       if (!state.mediaMuted) {
         attemptPlayback("muted-retry", true).catch((retryError) => {
           markSelectionTrailerFailure(owner, {
@@ -3963,6 +3965,17 @@ function syncEntryCinematics() {
 
 function getActiveVoice() {
   return state.selectedSpiritkin?.ui?.voice || state.primarySpiritkin?.ui?.voice || "nova";
+}
+
+function getActiveVoiceProfile() {
+  const profile = state.selectedSpiritkin?.voiceProfile || state.primarySpiritkin?.voiceProfile || null;
+  return profile && typeof profile === "object" ? profile : null;
+}
+
+function getSafeSpeechPlaybackRate() {
+  const rawSpeed = Number(getActiveVoiceProfile()?.speed);
+  if (!Number.isFinite(rawSpeed)) return 0.96;
+  return Math.max(0.84, Math.min(1.04, rawSpeed));
 }
 
 function createLocalAssistantMessage(content, overrides = {}) {
@@ -7989,8 +8002,8 @@ function buildSpiritkinSelectionOverlay(spiritkin) {
               </div>
               <div class="video-player-container spiritkin-intro spiritkin-intro-video selection-fullscreen-video">
                 <div class="video-player-wrapper spiritkin-intro spiritkin-intro-video selection-fullscreen-video">
-                  <video class="video-player-element" data-trailer-kind="intro" data-trailer-owner="${esc(spiritkin.name)}" autoplay ${state.mediaMuted ? "muted" : ""} playsinline preload="metadata" loop poster="${esc(stillSrc || getSpiritkinPortraitPath(spiritkin.name) || "")}">
-                    <source src="${trailerPath}" type="video/mp4">
+                  <video class="video-player-element" data-trailer-kind="intro" data-trailer-owner="${esc(spiritkin.name)}" data-force-muted-autoplay="1" autoplay muted playsinline preload="metadata" loop poster="${esc(stillSrc || getSpiritkinPortraitPath(spiritkin.name) || "")}">
+                    <source src="${esc(trailerPath)}" type="video/mp4">
                     Your browser does not support the video tag.
                   </video>
                   <div class="video-player-overlay"></div>
@@ -9505,6 +9518,17 @@ async function onClick(event) {
     const spiritkinName = element.dataset.name || state.selectionOverlaySpiritkin?.name || null;
     const candidate = state.spiritkins.find((item) => item.name === spiritkinName) || state.selectionOverlaySpiritkin;
     if (candidate) {
+      if (state.primarySpiritkin && state.primarySpiritkin.name !== candidate.name) {
+        state.rebondSpiritkin = candidate;
+        state.selectedSpiritkin = state.primarySpiritkin;
+        state.selectionOverlaySpiritkin = null;
+        state.statusText = `${getSpiritkinDisplayName(candidate)} is previewed. Confirm rebonding only if you want to switch companions.`;
+        state.statusError = false;
+        persistSession();
+        render();
+        revealCurrentFocus({ selector: ".bond-modal-card, .selection-view" });
+        return;
+      }
       state.pendingBondSpiritkin = candidate;
       state.selectedSpiritkin = candidate;
       state.selectionOverlaySpiritkin = null;
@@ -9558,8 +9582,13 @@ async function onClick(event) {
   if (action === "request-rebond") {
     const candidate = state.spiritkins.find((spiritkin) => spiritkin.name === element.dataset.name) ?? null;
     if (candidate) {
-      state.rebondSpiritkin = candidate;
+      clearSelectionTrailerFailure(candidate?.name);
+      state.selectionOverlaySpiritkin = candidate;
+      state.rebondSpiritkin = null;
+      state.statusText = `${getSpiritkinDisplayName(candidate)} is in view. Preview the reveal before confirming any rebond.`;
+      state.statusError = false;
       render();
+      revealCurrentFocus({ selector: ".selection-overlay-shell, [data-focus-anchor='selection-overlay']" });
     }
     return;
   }
@@ -10638,6 +10667,8 @@ async function playAudio(buffer, options = {}) {
     const audio = new Audio();
     audio.src = url;
     audio.volume = 1.0;
+    audio.playbackRate = getSafeSpeechPlaybackRate();
+    audio.preservesPitch = true;
     audio.onended = () => {
       const userVoiceSessionActive = shouldKeepVoiceLoopActive();
       if (_activeAudioRequestId !== requestId) {
