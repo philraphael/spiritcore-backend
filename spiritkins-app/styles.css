@@ -8328,6 +8328,7 @@ button[data-action="begin-quest"]:active,
   grid-template-columns: minmax(0, 1.14fr) minmax(360px, 0.86fr);
   gap: 28px;
   align-items: start;
+  isolation: isolate;
 }
 
 .chat-layout.game-focus-mode .world-shell-body {
@@ -8341,6 +8342,7 @@ button[data-action="begin-quest"]:active,
   max-height: none;
   min-height: 920px;
   padding: 28px;
+  overflow: visible;
   border-left: none;
   border-top: 2px solid color-mix(in srgb, var(--realm-accent) 30%, transparent);
   border-radius: 30px;
@@ -8361,6 +8363,16 @@ button[data-action="begin-quest"]:active,
 .presence-panel,
 .chat-stage {
   min-width: 0;
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+}
+
+.world-shell-header,
+.presence-tab-content {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
 }
 
 .chat-stage {
@@ -8369,17 +8381,20 @@ button[data-action="begin-quest"]:active,
   max-height: calc(100vh - 28px);
   min-height: 920px;
   overflow: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: 28px 18px 28px 24px;
   border-radius: 30px;
   box-shadow: 0 26px 66px rgba(0, 0, 0, 0.24);
 }
 
 .chat-layout.game-focus-mode .chat-stage {
-  opacity: 0.62;
-  transform: scale(0.985);
+  opacity: 1;
+  transform: none;
 }
 
 .chat-rail-section {
+  display: grid;
   gap: 16px;
   align-content: start;
   min-width: 0;
@@ -8433,17 +8448,23 @@ button[data-action="begin-quest"]:active,
 }
 
 .presence-tab-content[data-presence-surface="games"] .active-game-panel {
+  min-width: 0;
   gap: 24px;
 }
 
 .presence-tab-content[data-presence-surface="games"] .sv-theme-shell {
+  min-width: 0;
   gap: 20px;
   padding: 24px;
+  overflow: hidden;
 }
 
 .presence-tab-content[data-presence-surface="games"] .game-board-container {
+  width: 100%;
+  max-width: 100%;
   min-height: clamp(520px, 56vw, 920px);
   padding: 24px 20px;
+  overflow: auto;
 }
 
 .presence-tab-content[data-presence-surface="games"] .board-grand {
