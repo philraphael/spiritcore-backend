@@ -26,6 +26,14 @@
   --realm-glow-c: rgba(246, 164, 92, 0.1);
   --realm-panel: rgba(8, 23, 35, 0.8);
   --realm-stage: rgba(6, 20, 31, 0.88);
+  --z-world-base: 0;
+  --z-room-surface: 10;
+  --z-content-panel: 20;
+  --z-game-panel: 35;
+  --z-modal: 70;
+  --z-active-overlay: 120;
+  --z-game-fullscreen: 130;
+  --z-game-toast: 140;
 }
 
 *,
@@ -139,12 +147,12 @@ button:disabled {
   animation-duration: 22s;
 }
 
-.sv-orbit.realm-elaria {
+.sv-orbit.realm-solis {
   opacity: 0.7;
   animation-duration: 18s;
 }
 
-.sv-orbit.realm-thalassar {
+.sv-orbit.realm-neris {
   opacity: 0.7;
   animation-duration: 24s;
 }
@@ -194,7 +202,7 @@ button:disabled {
   --kairo-gold: rgba(242, 219, 160, 0.85);
 }
 
-.realm-elaria {
+.realm-solis {
   --realm-accent: rgba(240, 177, 90, 0.96);
   --realm-accent-soft: rgba(240, 177, 90, 0.16);
   --realm-glow-a: rgba(255, 221, 163, 0.24);
@@ -204,7 +212,7 @@ button:disabled {
   --realm-stage: rgba(20, 11, 8, 0.94);
 }
 
-.realm-thalassar {
+.realm-neris {
   --realm-accent: rgba(111, 208, 227, 0.94);
   --realm-accent-soft: rgba(111, 208, 227, 0.16);
   --realm-glow-a: rgba(111, 208, 227, 0.2);
@@ -235,11 +243,11 @@ button:disabled {
   background: linear-gradient(135deg, rgba(78,205,196,0.34), rgba(26,42,74,0.3));
 }
 
-.app-shell.realm-elaria .topbar-logo {
+.app-shell.realm-solis .topbar-logo {
   background: linear-gradient(135deg, rgba(240,177,90,0.34), rgba(255,221,163,0.22));
 }
 
-.app-shell.realm-thalassar .topbar-logo {
+.app-shell.realm-neris .topbar-logo {
   background: linear-gradient(135deg, rgba(111,208,227,0.3), rgba(16,57,84,0.32));
 }
 
@@ -836,8 +844,8 @@ button:disabled {
 .entry-spirit.lyra,
 .entry-spirit.raien,
 .entry-spirit.kairo,
-.entry-spirit.elaria,
-.entry-spirit.thalassar {
+.entry-spirit.solis,
+.entry-spirit.neris {
   background:
     linear-gradient(135deg, rgba(255,255,255,0.04), transparent 75%),
     color-mix(in srgb, var(--realm-panel) 65%, rgba(255,255,255,0.03));
@@ -857,8 +865,8 @@ button:disabled {
 .portrait-frame.lyra { --portrait-color: rgba(232,180,216,0.8); }
 .portrait-frame.raien { --portrait-color: rgba(245,166,35,0.82); }
 .portrait-frame.kairo { --portrait-color: rgba(78,205,196,0.78); }
-.portrait-frame.elaria { --portrait-color: rgba(240,177,90,0.8); }
-.portrait-frame.thalassar { --portrait-color: rgba(111,208,227,0.78); }
+.portrait-frame.solis { --portrait-color: rgba(240,177,90,0.8); }
+.portrait-frame.neris { --portrait-color: rgba(111,208,227,0.78); }
 .portrait-frame.generic { --portrait-color: rgba(184,166,255,0.7); }
 
 .portrait-frame::after {
@@ -1405,16 +1413,16 @@ button:disabled {
 .sk-card.lyra,
 .sk-card.raien,
 .sk-card.kairo,
-.sk-card.elaria,
-.sk-card.thalassar {
+.sk-card.solis,
+.sk-card.neris {
   position: relative;
 }
 
 .sk-card.lyra::before,
 .sk-card.raien::before,
 .sk-card.kairo::before,
-.sk-card.elaria::before,
-.sk-card.thalassar::before {
+.sk-card.solis::before,
+.sk-card.neris::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -3055,8 +3063,8 @@ button:disabled {
 .realm-lyra .resonance-depth { border-color: rgba(232,150,200,0.15); background: rgba(232,150,200,0.04); }
 .realm-raien .resonance-depth { border-color: rgba(245,166,35,0.15); background: rgba(245,166,35,0.04); }
 .realm-kairo .resonance-depth { border-color: rgba(78,205,196,0.15); background: rgba(78,205,196,0.04); }
-.realm-elaria .resonance-depth { border-color: rgba(240,177,90,0.16); background: rgba(240,177,90,0.05); }
-.realm-thalassar .resonance-depth { border-color: rgba(111,208,227,0.16); background: rgba(111,208,227,0.05); }
+.realm-solis .resonance-depth { border-color: rgba(240,177,90,0.16); background: rgba(240,177,90,0.05); }
+.realm-neris .resonance-depth { border-color: rgba(111,208,227,0.16); background: rgba(111,208,227,0.05); }
 
 
 /* MONETIZATION: Tier Modal */
@@ -8704,4 +8712,175 @@ button[data-action="begin-quest"]:active,
   .bonded-support-rail .companion-presence-dock.variant-bonded-home {
     grid-template-columns: 1fr;
   }
+}
+
+/* ============================================================
+   FRONTEND FINISHING PASS B: VISUAL + LAYER AUTHORITY
+   ============================================================ */
+
+.sv-bg,
+.sv-noise,
+.sv-orbit {
+  z-index: var(--z-world-base);
+}
+
+.app-shell {
+  z-index: var(--z-room-surface);
+  isolation: isolate;
+}
+
+.topbar,
+.world-shell-header {
+  position: relative;
+  z-index: var(--z-content-panel);
+}
+
+.world-shell-body,
+.presence-panel,
+.presence-tab-content,
+.chat-stage,
+.panel-card {
+  position: relative;
+  z-index: var(--z-content-panel);
+  isolation: isolate;
+}
+
+.presence-tab-content[data-presence-surface="games"],
+.presence-tab-content[data-presence-surface="games"] .games-view,
+.presence-tab-content[data-presence-surface="games"] .active-game-panel,
+.presence-tab-content[data-presence-surface="games"] .sv-theme-shell {
+  position: relative;
+  z-index: var(--z-game-panel);
+  isolation: isolate;
+}
+
+.chat-layout.game-focus-mode .presence-panel,
+.chat-layout.game-focus-mode .active-game-panel {
+  z-index: var(--z-game-panel);
+}
+
+.chat-layout.game-focus-mode .chat-stage {
+  z-index: var(--z-content-panel);
+}
+
+.modal-scrim,
+.realm-travel-overlay,
+.tier-modal-scrim {
+  z-index: var(--z-modal);
+}
+
+.crown-gate-overlay,
+.selection-overlay,
+.survey-overlay {
+  z-index: var(--z-active-overlay);
+}
+
+.game-fullscreen-overlay {
+  z-index: var(--z-game-fullscreen);
+}
+
+.game-action-toast {
+  z-index: var(--z-game-toast);
+}
+
+.sv-bg,
+.sv-noise,
+.sv-orbit,
+.chat-stage::before,
+.sk-card::before,
+.selection-overlay-backdrop,
+.video-player-overlay,
+.game-fullscreen-overlay::before,
+.sv-theme-shell::before,
+.sv-theme-shell::after {
+  pointer-events: none;
+}
+
+.presence-chip.solis { box-shadow: inset 0 0 0 1px rgba(240,177,90,0.22); color: rgba(240,177,90,0.92); }
+.presence-chip.neris { box-shadow: inset 0 0 0 1px rgba(111,208,227,0.22); color: rgba(111,208,227,0.92); }
+
+.spiritkin-media-panel,
+.spiritkin-media-panel .composite-visual-frame,
+.companion-presence-visual .spiritkin-media-panel.card,
+.selection-overlay-still-art,
+.selection-overlay-still-art .composite-visual-frame {
+  overflow: hidden;
+}
+
+.spiritkin-media-panel .composite-visual-frame {
+  width: 100%;
+  min-height: clamp(180px, 24vw, 320px);
+  aspect-ratio: 16 / 10;
+}
+
+.spiritkin-media-panel.card .composite-visual-frame,
+.companion-presence-visual .spiritkin-media-panel.card .composite-visual-frame {
+  min-height: clamp(118px, 14vw, 170px);
+  aspect-ratio: 4 / 3;
+}
+
+.spiritkin-media-panel.profile .composite-visual-frame,
+.spiritkin-media-panel.focus .composite-visual-frame {
+  min-height: clamp(220px, 28vw, 390px);
+}
+
+.composite-visual-image,
+.spiritkin-media-panel .composite-visual-primary,
+.spiritkin-media-panel .composite-visual-fallback,
+.portrait-frame .portrait-image,
+.portrait-frame .spiritkin-video-element,
+.video-player-element {
+  width: 100%;
+  height: 100%;
+}
+
+.spiritkin-media-panel .composite-visual-primary,
+.spiritkin-media-panel .composite-visual-fallback,
+.portrait-frame.portrait-hero .portrait-image,
+.portrait-frame.portrait-focus .portrait-image,
+.portrait-frame.portrait-mini .portrait-image,
+.portrait-frame.portrait-hero .spiritkin-video-element,
+.portrait-frame.portrait-focus .spiritkin-video-element,
+.portrait-frame.portrait-mini .spiritkin-video-element {
+  object-fit: contain;
+  object-position: center center;
+}
+
+.portrait-frame {
+  aspect-ratio: 4 / 5;
+}
+
+.portrait-mini {
+  max-width: 118px;
+}
+
+.portrait-card,
+.portrait-focus,
+.portrait-hero {
+  max-height: none;
+}
+
+.chat-layout.game-focus-mode .active-game-panel {
+  background:
+    linear-gradient(180deg, rgba(6, 12, 22, 0.82), rgba(6, 12, 22, 0.48)),
+    color-mix(in srgb, var(--realm-stage) 88%, rgba(255,255,255,0.03));
+}
+
+.chat-layout.game-focus-mode .chat-stage,
+.chat-layout.game-focus-mode .chat-stage .thread-wrap,
+.chat-layout.game-focus-mode .chat-stage .composer-shell,
+.chat-layout.game-focus-mode .chat-stage .starter-prompts,
+.chat-layout.game-focus-mode .chat-stage .voice-guidance,
+.chat-layout.game-focus-mode .chat-stage .spiritcore-guidance-card,
+.chat-layout.game-focus-mode .chat-stage .auto-open-mic-banner,
+.chat-layout.game-focus-mode .chat-stage .chat-warning,
+.chat-layout.game-focus-mode .chat-stage .chat-error {
+  opacity: 1;
+}
+
+.presence-tab-content[data-presence-surface="games"] .sv-theme-shell {
+  background:
+    linear-gradient(180deg, rgba(6, 12, 22, 0.74), rgba(6, 12, 22, 0.42)),
+    var(--game-room-art, none) center / cover no-repeat,
+    color-mix(in srgb, var(--realm-stage) 82%, rgba(255,255,255,0.02));
 }

@@ -184,36 +184,36 @@ const COMPOSITE_VISUAL_ASSETS = {
       card: activeAssetUrl("ui", "kairo_close.png")
     },
     Elaria: {
-      focus: activeAssetUrl("concepts", "Elaria.png"),
-      profile: activeAssetUrl("concepts", "Elaria.png"),
-      card: activeAssetUrl("concepts", "Elaria Left Thalassar right.png")
+      focus: activeAssetUrl("concepts", "Solis.png"),
+      profile: activeAssetUrl("concepts", "Solis.png"),
+      card: activeAssetUrl("concepts", "Solis Neris pair.png")
     },
     Thalassar: {
-      focus: activeAssetUrl("concepts", "thalassar.png"),
-      profile: activeAssetUrl("concepts", "thalassar.png"),
-      card: activeAssetUrl("concepts", "Elaria Left Thalassar right.png")
+      focus: activeAssetUrl("concepts", "Neris.png"),
+      profile: activeAssetUrl("concepts", "Neris.png"),
+      card: activeAssetUrl("concepts", "Solis Neris pair.png")
     }
   }
 };
 
 const AUTHORITATIVE_FOUNDER_MEDIA = {
   Elaria: {
-    founderCard: activeAssetUrl("concepts", "Elaria.png"),
-    focus: activeAssetUrl("concepts", "Elaria.png"),
-    profile: activeAssetUrl("concepts", "Elaria.png"),
-    bonded: activeAssetUrl("concepts", "Elaria.png"),
-    fallbackCard: activeAssetUrl("concepts", "Elaria Left Thalassar right.png"),
-    portrait: activeAssetUrl("concepts", "Elaria.png"),
-    canonSupplement: activeAssetUrl("concepts", "Elaria Left Thalassar right.png")
+    founderCard: activeAssetUrl("concepts", "Solis.png"),
+    focus: activeAssetUrl("concepts", "Solis.png"),
+    profile: activeAssetUrl("concepts", "Solis.png"),
+    bonded: activeAssetUrl("concepts", "Solis.png"),
+    fallbackCard: activeAssetUrl("concepts", "Solis Neris pair.png"),
+    portrait: activeAssetUrl("concepts", "Solis.png"),
+    canonSupplement: activeAssetUrl("concepts", "Solis Neris pair.png")
   },
   Thalassar: {
-    founderCard: activeAssetUrl("concepts", "thalassar.png"),
-    focus: activeAssetUrl("concepts", "thalassar.png"),
-    profile: activeAssetUrl("concepts", "thalassar.png"),
-    bonded: activeAssetUrl("concepts", "thalassar.png"),
-    fallbackCard: activeAssetUrl("concepts", "Elaria Left Thalassar right.png"),
-    portrait: activeAssetUrl("concepts", "thalassar.png"),
-    canonSupplement: activeAssetUrl("concepts", "Elaria Left Thalassar right.png")
+    founderCard: activeAssetUrl("concepts", "Neris.png"),
+    focus: activeAssetUrl("concepts", "Neris.png"),
+    profile: activeAssetUrl("concepts", "Neris.png"),
+    bonded: activeAssetUrl("concepts", "Neris.png"),
+    fallbackCard: activeAssetUrl("concepts", "Solis Neris pair.png"),
+    portrait: activeAssetUrl("concepts", "Neris.png"),
+    canonSupplement: activeAssetUrl("concepts", "Solis Neris pair.png")
   }
 };
 
@@ -603,7 +603,7 @@ const SK_META = {
     ]
   },
   Elaria: {
-    cls: "elaria",
+    cls: "solis",
     symbol: "Archive",
     mood: "Luminous authority",
     strap: "A dawnscript sovereign for truth, remembrance, and rightful permission.",
@@ -625,7 +625,7 @@ const SK_META = {
     ]
   },
   Thalassar: {
-    cls: "thalassar",
+    cls: "neris",
     symbol: "Tide",
     mood: "Deep tide",
     strap: "A tidal sovereign for depth, sacred feeling, and what waits below the surface.",
@@ -9195,13 +9195,13 @@ function buildChatView() {
                 <p class="realm-desc">Kairo realm of teal starlight and shifting constellations.</p>
                 <button class="realm-visit-btn" data-action="noop">Visit Kairo's Realm</button>
               </div>
-              <div class="realm-card-travel realm-elaria">
+              <div class="realm-card-travel realm-solis">
                 <div class="realm-icon">✶</div>
                 <div class="realm-name">The Ember Archive</div>
                 <p class="realm-desc">Solis realm of dawnscript glass, ember law, and sovereign truth brought into rightful form.</p>
                 <button class="realm-visit-btn" data-action="noop">Visit Solis's Realm</button>
               </div>
-              <div class="realm-card-travel realm-thalassar">
+              <div class="realm-card-travel realm-neris">
                 <div class="realm-icon">◌</div>
                 <div class="realm-name">The Abyssal Chorus</div>
                 <p class="realm-desc">Neris realm of bioluminescent tide, undertow memory, and deep feeling that rises in time.</p>

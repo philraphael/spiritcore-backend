@@ -57,8 +57,8 @@ const THEME_VARIANT_ENVIRONMENT = {
     accent: activeAsset("ui", "welcome_open.png")
   },
   archive: {
-    room: activeAsset("concepts", "Elaria.png"),
-    accent: activeAsset("concepts", "Elaria.png")
+    room: activeAsset("concepts", "Solis.png"),
+    accent: activeAsset("concepts", "Solis.png")
   },
   veil: {
     room: activeAsset("rooms", "room_chess_lyra_celestial_scene.png"),
@@ -78,7 +78,7 @@ const THEME_VARIANT_ENVIRONMENT = {
   abyssal: {
     room: activeAsset("rooms", "room_go_aquatic_scene.png"),
     board: activeAsset("concepts", "spiritverse_go_aquatic_theme.png"),
-    accent: activeAsset("concepts", "thalassar.png")
+    accent: activeAsset("concepts", "Neris.png")
   }
 };
 

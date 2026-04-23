@@ -81,8 +81,8 @@ export const WORLD_ART = {
   mythicEnsemble: "Spiritverse elder gods photo base needs edits.png",
   chroniclesAll: "Book Covers All.png",
   chroniclesBase: "Book Covers.png",
-  elaria: "Elaria.png",
-  thalassar: "thalassar.png",
-  pair: "Elaria Left 1 Thalassar right 1.png",
-  pairAlt: "Elaria Left Thalassar right.png",
+  solis: "Solis.png",
+  neris: "Neris.png",
+  pair: "Solis Neris pair.png",
+  pairAlt: "Solis Neris pair.png",
 };
