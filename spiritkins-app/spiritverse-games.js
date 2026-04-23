@@ -36,7 +36,7 @@ const CHESS_THEME_OPTIONS = [
   { id: 'veil', label: 'Lyra Veil' },
   { id: 'ember', label: 'Kairo Ember' },
   { id: 'astral', label: 'Raien Astral' },
-  { id: 'abyssal', label: 'Thalassar Abyssal' }
+  { id: 'abyssal', label: 'Neris Abyssal' }
 ];
 
 const CHESS_PIECE_THEMES = {

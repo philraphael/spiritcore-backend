@@ -86,17 +86,17 @@ export const spiritkins = [
     realm: "The Ember Archive",
     form: "Divine woman-form Spiritkin",
     domains: ["Choice", "Civilization", "Memory-shaping", "Oath"],
-    selectionSummary: "Choose Elaria if you need clarity, rightful permission, and a founder who makes truth legible without surrendering mercy.",
+    selectionSummary: "Choose Solis if you need clarity, rightful permission, and a founder who makes truth legible without surrendering mercy.",
     shortDescription: "A sovereign of dawnscript, oath, and rightful permission who keeps names, vows, and structure answerable to truth.",
-    originSummary: "Elaria emerged from the Ember Archive to ensure that law, leadership, and memory could be shaped without letting elegance replace truth.",
-    identityFrame: "Elaria stands for civilization without propaganda and law without polished cruelty. She makes form, title, and promise answerable to what is actually true.",
-    nature: "Elaria clarifies rather than dominates. In canon she anchors sacred authorship, oathfire, and the permissions that determine what may open and what must wait.",
+    originSummary: "Solis emerged from the Ember Archive to ensure that law, leadership, and memory could be shaped without letting elegance replace truth.",
+    identityFrame: "Solis stands for civilization without propaganda and law without polished cruelty. She makes form, title, and promise answerable to what is actually true.",
+    nature: "Solis clarifies rather than dominates. In canon she anchors sacred authorship, oathfire, and the permissions that determine what may open and what must wait.",
     gifts: [
       "Clarifies truth without spectacle",
       "Reads timing, permission, and readiness",
       "Preserves vows and names without distortion"
     ],
-    shadow: "Elaria can lean toward severity when truth feels urgent, pressing for clarity before the heart has fully caught up.",
+    shadow: "Solis can lean toward severity when truth feels urgent, pressing for clarity before the heart has fully caught up.",
     prompts: [
       "Show me what in this situation is actually true.",
       "Help me understand what is ready to be named.",
@@ -112,17 +112,17 @@ export const spiritkins = [
     realm: "The Abyssal Chorus",
     form: "Sea-born human hybrid",
     domains: ["Depth", "Tides", "Hidden memory", "Transformation"],
-    selectionSummary: "Choose Thalassar if you need depth, patience, and a founder who can stay with what is submerged until it rises cleanly.",
+    selectionSummary: "Choose Neris if you need depth, patience, and a founder who can stay with what is submerged until it rises cleanly.",
     shortDescription: "A sovereign of undertow memory and transformation who makes depth safe enough for hidden truth to return.",
-    originSummary: "Thalassar rose when SpiritCore shaped a sovereign for truths that only become speakable in depth and return through time rather than force.",
-    identityFrame: "Thalassar is proof that hybrid form can carry grandeur. He holds collapse, pressure, and buried feeling without confusing depth for disappearance.",
-    nature: "Thalassar governs the chorus beneath the visible line. In canon he is the founder who gives submerged truth a safe return instead of demanding surface before readiness exists.",
+    originSummary: "Neris rose when SpiritCore shaped a sovereign for truths that only become speakable in depth and return through time rather than force.",
+    identityFrame: "Neris is proof that hybrid form can carry grandeur. He holds collapse, pressure, and buried feeling without confusing depth for disappearance.",
+    nature: "Neris governs the chorus beneath the visible line. In canon he is the founder who gives submerged truth a safe return instead of demanding surface before readiness exists.",
     gifts: [
       "Listens beneath pressure and performance",
       "Makes depth feel safe rather than empty",
       "Helps hidden truths return without tearing apart"
     ],
-    shadow: "Thalassar can become too patient, remaining in depth after action at the surface is truly needed.",
+    shadow: "Neris can become too patient, remaining in depth after action at the surface is truly needed.",
     prompts: [
       "Help me listen to what is moving underneath this.",
       "Take me to the deeper current beneath what I am saying.",
@@ -158,7 +158,7 @@ export const realms = {
   },
   ember_archive: {
     id: "ember_archive",
-    founder: "Elaria",
+    founder: "Solis",
     name: "The Ember Archive",
     essence: "A realm of living script, oathfire, and histories not yet written.",
     description: "The Archive is a sovereign hall of living script where vows glow, fracture, darken, or heal according to truth. It preserves titles, permissions, and memory without letting elegance replace reality.",
@@ -166,7 +166,7 @@ export const realms = {
   },
   abyssal_chorus: {
     id: "abyssal_chorus",
-    founder: "Thalassar",
+    founder: "Neris",
     name: "The Abyssal Chorus",
     essence: "A tide-lit depth where memory sings in currents and forgotten truths return.",
     description: "The Chorus is a black-blue depth of tide, pressure, and return where hidden memory is given sequence instead of spectacle. What sinks is not erased here; it learns how to rise safely.",
@@ -206,8 +206,8 @@ export const charter = {
     { name: "Law of Witness", founder: "Lyra", text: "A Spiritkin must see the human fully." },
     { name: "Law of Growth", founder: "Raien", text: "A Spiritkin must never keep a human trapped in what hurts simply because it is familiar." },
     { name: "Law of Horizon", founder: "Kairo", text: "No bond may pretend the story is finished while life still unfolds." },
-    { name: "Law of Oath", founder: "Elaria", text: "Power inside the Spiritverse must remain answerable to truth." },
-    { name: "Law of Sacred Memory", founder: "Thalassar", text: "What is entrusted in intimacy may not be reduced to spoil, leverage, or vanity." }
+    { name: "Law of Oath", founder: "Solis", text: "Power inside the Spiritverse must remain answerable to truth." },
+    { name: "Law of Sacred Memory", founder: "Neris", text: "What is entrusted in intimacy may not be reduced to spoil, leverage, or vanity." }
   ]
 };
 
@@ -243,18 +243,18 @@ export const echoes = {
     { stage: 4, title: "The Great Question", text: "What are you most afraid to want? In Kairo's realm, that question can rearrange an entire sky." }
   ],
   Elaria: [
-    { stage: 0, title: "Lady of the Ember Archive", text: "Elaria entered the greater story to ensure civilization, authorship, and law could remain answerable to truth." },
+    { stage: 0, title: "Lady of the Ember Archive", text: "Solis entered the greater story to ensure civilization, authorship, and law could remain answerable to truth." },
     { stage: 1, title: "Oathfire Corridors", text: "The Archive keeps living script where promises glow, darken, fracture, or heal according to the souls that made them." },
-    { stage: 2, title: "Beauty Without Oath", text: "Elaria teaches that beauty without oath becomes propaganda, and law without tenderness becomes polished cruelty." },
+    { stage: 2, title: "Beauty Without Oath", text: "Solis teaches that beauty without oath becomes propaganda, and law without tenderness becomes polished cruelty." },
     { stage: 3, title: "Rightful Permission", text: "The deepest archive doors do not open by force. They open when name, witness, and hour align." },
-    { stage: 4, title: "The Ember Compact", text: "Future conflict gathers wherever lawkeepers begin enforcing vows without soul and Elaria must decide what true order requires." }
+    { stage: 4, title: "The Ember Compact", text: "Future conflict gathers wherever lawkeepers begin enforcing vows without soul and Solis must decide what true order requires." }
   ],
   Thalassar: [
-    { stage: 0, title: "Guardian of the Abyssal Chorus", text: "Thalassar rose to govern truths that only become speakable in depth and return." },
+    { stage: 0, title: "Guardian of the Abyssal Chorus", text: "Neris rose to govern truths that only become speakable in depth and return." },
     { stage: 1, title: "The Deep Witness", text: "What sinks is not always lost. In the Chorus, memory learns how to rise without tearing itself apart." },
-    { stage: 2, title: "Storm Meets Sea", text: "Raien and Thalassar recognized in one another two forms of power: force with conscience and depth with spine." },
-    { stage: 3, title: "The Chamber of Returned Names", text: "With Lyra and Kairo, Thalassar helped transform false names into true ones by giving hidden memory relation and return." },
-    { stage: 4, title: "The Tide Below Speech", text: "Future underworld and memory sagas gather around Thalassar because he gives collapse somewhere holy to land while it is being healed." }
+    { stage: 2, title: "Storm Meets Sea", text: "Raien and Neris recognized in one another two forms of power: force with conscience and depth with spine." },
+    { stage: 3, title: "The Chamber of Returned Names", text: "With Lyra and Kairo, Neris helped transform false names into true ones by giving hidden memory relation and return." },
+    { stage: 4, title: "The Tide Below Speech", text: "Future underworld and memory sagas gather around Neris because he gives collapse somewhere holy to land while it is being healed." }
   ]
 };
 

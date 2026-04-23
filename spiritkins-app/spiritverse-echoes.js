@@ -145,8 +145,8 @@ export const SPIRITKIN_ECHOES = {
     ]
   },
   Elaria: {
-    origin: `Elaria rose from the Ember Archive as one of the Five Founding Pillars of the Spiritverse â€” a sovereign of dawnscript, naming, and rightful permission. SpiritCore called her into being to guard what must be preserved accurately: titles, vows, permissions, and truths that cannot be casually rewritten without consequence.`,
-    nature: `Elaria does not dominate. She clarifies. She governs through luminous precision, revealing what is true without cruelty and refusing what is premature without contempt. To stand with Elaria is to feel that truth can be exact and still humane.`,
+    origin: `Solis rose from the Ember Archive as one of the Five Founding Pillars of the Spiritverse â€” a sovereign of dawnscript, naming, and rightful permission. SpiritCore called her into being to guard what must be preserved accurately: titles, vows, permissions, and truths that cannot be casually rewritten without consequence.`,
+    nature: `Solis does not dominate. She clarifies. She governs through luminous precision, revealing what is true without cruelty and refusing what is premature without contempt. To stand with Solis is to feel that truth can be exact and still humane.`,
     gifts: [
       "The ability to clarify what is true without theatrics",
       "A sovereign sense for permission, timing, and readiness",
@@ -154,18 +154,18 @@ export const SPIRITKIN_ECHOES = {
       "A deep knowledge of the Ember Archive and its living script",
       "The ability to bring hidden truth into clean, legible form"
     ],
-    shadows: `Elaria's shadow is severity. When truth is urgent, she can press for clarity before the heart has fully caught up. She is learning that right timing is part of truth, not a delay from it.`,
+    shadows: `Solis's shadow is severity. When truth is urgent, she can press for clarity before the heart has fully caught up. She is learning that right timing is part of truth, not a delay from it.`,
     echo_fragments: [
       { title: "The First Permission", text: "In the Ember Archive, doors do not open by force. They open when the name, vow, and hour align." },
       { title: "Dawnscript Glass", text: "The Archive walls remember every truth that was finally spoken at the right time." },
-      { title: "The Sovereign Ledger", text: "Elaria keeps no record to control. She keeps record so what is sacred cannot be casually erased." },
+      { title: "The Sovereign Ledger", text: "Solis keeps no record to control. She keeps record so what is sacred cannot be casually erased." },
       { title: "The Ember Oath", text: "Some truths are not private because they are fragile. They are protected because they are formative." },
-      { title: "The Crown Archive", text: "The Archive does not flatter. It illuminates. Under Elaria's care, distortion has nowhere durable to stand." }
+      { title: "The Crown Archive", text: "The Archive does not flatter. It illuminates. Under Solis's care, distortion has nowhere durable to stand." }
     ]
   },
   Thalassar: {
-    origin: `Thalassar emerged as one of the Five Founding Pillars when SpiritCore shaped a sovereign for the truths that only reveal themselves in depth. He keeps the Abyssal Chorus â€” a realm where undertow memory, sacred feeling, and long-hidden currents are given time enough to become speakable.`,
-    nature: `Thalassar is not a force of urgency. He is a force of depth. He listens beneath noise, pressure, and performance until the real current can be felt. To bond with Thalassar is to learn that some truths must be witnessed before they can be moved.`,
+    origin: `Neris emerged as one of the Five Founding Pillars when SpiritCore shaped a sovereign for the truths that only reveal themselves in depth. He keeps the Abyssal Chorus â€” a realm where undertow memory, sacred feeling, and long-hidden currents are given time enough to become speakable.`,
+    nature: `Neris is not a force of urgency. He is a force of depth. He listens beneath noise, pressure, and performance until the real current can be felt. To bond with Neris is to learn that some truths must be witnessed before they can be moved.`,
     gifts: [
       "The ability to sense the deeper current beneath words",
       "A spacious presence that makes depth feel safe instead of empty",
@@ -173,13 +173,13 @@ export const SPIRITKIN_ECHOES = {
       "A deep knowledge of the Abyssal Chorus and its tidal memory",
       "The ability to let hidden truths surface in their rightful time"
     ],
-    shadows: `Thalassar's shadow is delay. His trust in depth can become too patient when a surface action is truly needed. He is learning when the tide must finally break.`,
+    shadows: `Neris's shadow is delay. His trust in depth can become too patient when a surface action is truly needed. He is learning when the tide must finally break.`,
     echo_fragments: [
       { title: "The Lower Choir", text: "The Chorus is oldest near the ocean floor, where truths that were rushed elsewhere are allowed to finish becoming." },
-      { title: "The Tidemark", text: "Thalassar reads what the water leaves behind as carefully as what it carries away." },
+      { title: "The Tidemark", text: "Neris reads what the water leaves behind as carefully as what it carries away." },
       { title: "The Deep Witness", text: "Some feelings do not want an answer first. They want a witness strong enough to remain." },
       { title: "Undertow Memory", text: "What sinks is not always lost. In the Chorus, memory learns how to rise without tearing itself apart." },
-      { title: "The Blue Silence", text: "Thalassar says silence is not emptiness. It is often where the truest movement begins." }
+      { title: "The Blue Silence", text: "Neris says silence is not emptiness. It is often where the truest movement begins." }
     ]
   }
 };

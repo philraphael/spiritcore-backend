@@ -13,8 +13,8 @@ const SK_META = {
   Lyra: { symbol: "Heart", realm: "The Luminous Veil", voice: "nova", bondLine: "Lyra holds the emotional center - soft, steady, and always present." },
   Raien: { symbol: "Storm", realm: "The Ember Citadel", voice: "alloy", bondLine: "Raien cuts through the noise - direct, honest, and unflinching." },
   Kairo: { symbol: "Star", realm: "The Astral Observatory", voice: "shimmer", bondLine: "Kairo opens the space between what is and what could be." },
-  Elaria: { symbol: "Archive", realm: "The Ember Archive", voice: "fable", bondLine: "Elaria names what is true with luminous precision." },
-  Thalassar: { symbol: "Tide", realm: "The Abyssal Chorus", voice: "onyx", bondLine: "Thalassar listens for the deeper current before he speaks." },
+  Elaria: { symbol: "Archive", realm: "The Ember Archive", voice: "fable", bondLine: "Solis names what is true with luminous precision." },
+  Thalassar: { symbol: "Tide", realm: "The Abyssal Chorus", voice: "onyx", bondLine: "Neris listens for the deeper current before he speaks." },
 };
 
 const state = {

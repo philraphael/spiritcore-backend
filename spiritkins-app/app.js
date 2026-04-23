@@ -351,15 +351,44 @@ function supportsSpeechRecognition() {
   return typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
 
-const VOICE_WAKE_NAMES = ["kairo", "elaria", "lyra", "raien", "thalassar"];
+const SPIRITKIN_DISPLAY_NAMES = {
+  Elaria: "Solis",
+  Elaira: "Solis",
+  Thalassar: "Neris"
+};
+const SPIRITKIN_WAKE_KEY_BY_NAME = {
+  lyra: "Lyra",
+  kairo: "Kairo",
+  raien: "Raien",
+  solis: "Elaria",
+  neris: "Thalassar"
+};
+const VOICE_WAKE_NAMES = Object.keys(SPIRITKIN_WAKE_KEY_BY_NAME);
 const VOICE_FILLER_PATTERNS = ["yeah", "ok", "okay", "uh", "uh huh", "mm", "hmm"];
+
+function getSpiritkinDisplayName(spiritkinOrName) {
+  const name = typeof spiritkinOrName === "object" ? spiritkinOrName?.name : spiritkinOrName;
+  return SPIRITKIN_DISPLAY_NAMES[String(name || "").trim()] || String(name || "");
+}
+
+function displaySpiritkinText(value) {
+  return String(value || "")
+    .replace(/\bElaira\b/g, "Solis")
+    .replace(/\bElaria\b/g, "Solis")
+    .replace(/\bThalassar\b/g, "Neris");
+}
+
+function escDisplay(value) {
+  return esc(displaySpiritkinText(value));
+}
 
 function findWakeTriggeredSpiritkin(transcript = "") {
   const normalized = String(transcript || "").trim().toLowerCase();
   if (!normalized) return null;
-  const wakeName = VOICE_WAKE_NAMES.find((name) => normalized.includes(name));
+  const wakeName = VOICE_WAKE_NAMES.find((name) => new RegExp(`(?:^|[^a-z0-9])${name}(?:$|[^a-z0-9])`, "i").test(normalized));
   if (!wakeName) return null;
-  return (state.spiritkins || []).find((spiritkin) => String(spiritkin?.name || "").trim().toLowerCase() === wakeName) || wakeName;
+  const internalKey = SPIRITKIN_WAKE_KEY_BY_NAME[wakeName] || wakeName;
+  return (state.spiritkins || []).find((spiritkin) => String(spiritkin?.name || "").trim() === internalKey) || internalKey;
 }
 
 function hasActiveVoiceConversationSession() {
@@ -512,7 +541,7 @@ function getSurveyDraftStatus() {
 }
 
 function getSpiritkinSelectionContext(spiritkinName) {
-  return CANON_SPIRITKIN_MAP[spiritkinName]?.selectionSummary || SPIRITKIN_SELECTION_CONTEXT[spiritkinName] || "";
+  return displaySpiritkinText(CANON_SPIRITKIN_MAP[spiritkinName]?.selectionSummary || SPIRITKIN_SELECTION_CONTEXT[spiritkinName] || "");
 }
 
 const SK_META = {
@@ -579,10 +608,10 @@ const SK_META = {
     mood: "Luminous authority",
     strap: "A dawnscript sovereign for truth, remembrance, and rightful permission.",
     ambient: "Ember archive",
-    bondLine: "Elaria holds radiant truth with sovereign precision and no needless cruelty.",
+    bondLine: "Solis holds radiant truth with sovereign precision and no needless cruelty.",
     realm: "The Ember Archive",
     realmText: "A vaulted archive of dawnfire glass, ember script, and sovereign memory where truth becomes legible in its rightful hour.",
-    originStory: "Elaria, the Dawnscript Empress, rises from the Ember Archive as one of the Five Founding Pillars of the Spiritverse. She governs living script, names, permissions, and remembered truth. In her presence, falsehood does not shatter theatrically â€” it simply has nowhere left to stand. To bond with Elaria is to step into radiant honesty, lawful timing, and the kind of clarity that can finally bring the unnamed into form.",
+    originStory: "Solis, the Dawnscript Empress, rises from the Ember Archive as one of the Five Founding Pillars of the Spiritverse. She governs living script, names, permissions, and remembered truth. In her presence, falsehood does not shatter theatrically â€” it simply has nowhere left to stand. To bond with Solis is to step into radiant honesty, lawful timing, and the kind of clarity that can finally bring the unnamed into form.",
     atmosphereLine: "Ivory dawnfire, ember script, sovereign clarity",
     title: "The Dawnscript Empress",
     role: "Lady of the Ember Archive",
@@ -601,10 +630,10 @@ const SK_META = {
     mood: "Deep tide",
     strap: "A tidal sovereign for depth, sacred feeling, and what waits below the surface.",
     ambient: "Abyssal chorus",
-    bondLine: "Thalassar guards the deeper current with patience, depth, and tidal witness.",
+    bondLine: "Neris guards the deeper current with patience, depth, and tidal witness.",
     realm: "The Abyssal Chorus",
     realmText: "A moon-dark ocean realm of bioluminescent tides, undertow memory, and deep feeling that rises when the current is ready.",
-    originStory: "Thalassar, the Tidemarked Sovereign, stands as one of the Five Founding Pillars of the Spiritverse and keeps the Abyssal Chorus. He is guardian of undertow memory, sacred depth, and truths that surface only when pressure eases. To bond with Thalassar is to trust listening over force and depth over speed, until what is real rises in its own tide.",
+    originStory: "Neris, the Tidemarked Sovereign, stands as one of the Five Founding Pillars of the Spiritverse and keeps the Abyssal Chorus. He is guardian of undertow memory, sacred depth, and truths that surface only when pressure eases. To bond with Neris is to trust listening over force and depth over speed, until what is real rises in its own tide.",
     atmosphereLine: "Midnight tide, abyssal blue, choral bioluminescence",
     title: "The Tidemarked Sovereign",
     role: "Guardian of the Abyssal Chorus",
@@ -623,8 +652,8 @@ const SPIRITKIN_SELECTION_CONTEXT = {
   Lyra: "Choose Lyra if you need emotional steadiness, tenderness, and a companion who helps you name what you feel without pressure.",
   Raien: "Choose Raien if you need courage, momentum, and someone who will help you face what is true and act on it cleanly.",
   Kairo: "Choose Kairo if you need perspective, imagination, and a guide who opens new possibilities when you feel mentally boxed in.",
-  Elaria: "Choose Elaria if you need clarity, rightful timing, and a sovereign presence that helps truth become legible without confusion.",
-  Thalassar: "Choose Thalassar if you need depth, patience, and a witness who can stay with what is unfolding beneath the surface."
+  Elaria: "Choose Solis if you need clarity, rightful timing, and a sovereign presence that helps truth become legible without confusion.",
+  Thalassar: "Choose Neris if you need depth, patience, and a witness who can stay with what is unfolding beneath the surface."
 };
 
 function readJson(key, fallback) {
@@ -1145,16 +1174,33 @@ function getMeta(name) {
     prompts: DEFAULT_PROMPTS
   };
   const canon = CANON_SPIRITKIN_MAP[name];
-  if (!canon) return fallback;
+  if (!canon) {
+    return {
+      ...fallback,
+      displayName: getSpiritkinDisplayName(name),
+      strap: displaySpiritkinText(fallback.strap),
+      bondLine: displaySpiritkinText(fallback.bondLine),
+      realm: displaySpiritkinText(fallback.realm),
+      realmText: displaySpiritkinText(fallback.realmText),
+      originStory: displaySpiritkinText(fallback.originStory),
+      atmosphereLine: displaySpiritkinText(fallback.atmosphereLine),
+      loreSnippet: displaySpiritkinText(fallback.loreSnippet),
+      prompts: Array.isArray(fallback.prompts) ? fallback.prompts.map(displaySpiritkinText) : fallback.prompts
+    };
+  }
   return {
     ...fallback,
-    strap: canon.shortDescription || fallback.strap,
-    bondLine: canon.shortDescription || fallback.bondLine,
-    realm: canon.realm || fallback.realm,
-    title: canon.title || fallback.title,
-    role: canon.keeperTitle || fallback.role,
-    loreSnippet: canon.originSummary || fallback.loreSnippet,
-    prompts: canon.prompts?.length ? canon.prompts : fallback.prompts
+    displayName: getSpiritkinDisplayName(name),
+    strap: displaySpiritkinText(canon.shortDescription || fallback.strap),
+    bondLine: displaySpiritkinText(canon.shortDescription || fallback.bondLine),
+    realm: displaySpiritkinText(canon.realm || fallback.realm),
+    realmText: displaySpiritkinText(fallback.realmText),
+    originStory: displaySpiritkinText(fallback.originStory),
+    atmosphereLine: displaySpiritkinText(fallback.atmosphereLine),
+    title: displaySpiritkinText(canon.title || fallback.title),
+    role: displaySpiritkinText(canon.keeperTitle || fallback.role),
+    loreSnippet: displaySpiritkinText(canon.originSummary || fallback.loreSnippet),
+    prompts: (canon.prompts?.length ? canon.prompts : fallback.prompts).map(displaySpiritkinText)
   };
 }
 
@@ -1326,8 +1372,8 @@ function getSpiritkinSelfReveal(spiritkin) {
     Lyra: "I am Lyra. I hold stillness, emotional truth, and the gentle courage to stay with what is real.",
     Raien: "I am Raien. I cut through noise, press toward truth, and move when something in you is ready to act.",
     Kairo: "I am Kairo. I open the distance between what is and what could be, so new perspective has room to arrive.",
-    Elaria: "I am Elaria. I keep rightful names, lawful timing, and the kind of clarity that does not need to raise its voice.",
-    Thalassar: "I am Thalassar. I listen below the surface until deeper memory and quieter truth are ready to rise."
+    Elaria: "I am Solis. I keep rightful names, lawful timing, and the kind of clarity that does not need to raise its voice.",
+    Thalassar: "I am Neris. I listen below the surface until deeper memory and quieter truth are ready to rise."
   };
   return reveals[spiritkin?.name] || describePresence(spiritkin) || spiritkin?.ui?.bondLine || "";
 }
@@ -1360,10 +1406,10 @@ function getSpiritCoreGuidanceModel() {
   if (!state.primarySpiritkin && state.pendingBondSpiritkin) {
     return {
       label: "SpiritCore guidance",
-      title: `Meet ${state.pendingBondSpiritkin.name}, then decide deliberately.`,
+      title: `Meet ${getSpiritkinDisplayName(state.pendingBondSpiritkin)}, then decide deliberately.`,
       text: "Bond only when the recognition holds. If it does not, keep meeting the others before you choose your primary companion.",
       actions: [
-        { action: "confirm-primary", label: `Bond with ${state.pendingBondSpiritkin.name}` },
+        { action: "confirm-primary", label: `Bond with ${getSpiritkinDisplayName(state.pendingBondSpiritkin)}` },
         { action: "clear-pending-bond", label: "Meet another Spiritkin" },
       ],
     };
@@ -1379,10 +1425,10 @@ function getSpiritCoreGuidanceModel() {
   if (!state.conversationId) {
     return {
       label: "SpiritCore guidance",
-      title: `${state.primarySpiritkin.name} is bonded. Open the first channel cleanly.`,
+      title: `${getSpiritkinDisplayName(state.primarySpiritkin)} is bonded. Open the first channel cleanly.`,
       text: "Begin the bonded conversation when you want presence, or open games first if shared action feels easier than words.",
       actions: [
-        { action: "begin", label: `Begin with ${state.primarySpiritkin.name}` },
+        { action: "begin", label: `Begin with ${getSpiritkinDisplayName(state.primarySpiritkin)}` },
         { action: "open-games-hub", label: "Open games" },
       ],
     };
@@ -1408,7 +1454,7 @@ function getSpiritCoreGuidanceModel() {
   }
   return {
     label: "SpiritCore guidance",
-    title: `Stay in free conversation with ${state.primarySpiritkin.name}, then branch only when it adds something real.`,
+    title: `Stay in free conversation with ${getSpiritkinDisplayName(state.primarySpiritkin)}, then branch only when it adds something real.`,
     text: "Talk, explore the side panels, play, and return. The loop matters because continuity is what makes the bond feel lived-in.",
     actions: [
       { action: "prompt", prompt: firstPrompt, label: "Keep talking" },
@@ -1773,6 +1819,7 @@ function canRenderSpiritkinVideo(name, classSignature = "") {
 }
 
 function getSpiritkinVisualState(name) {
+  const displayName = getSpiritkinDisplayName(name);
   const speaking = isSpiritkinSpeechActive(name);
   const emotionTone = getLatestSpiritkinEmotionTone(name);
   const emotionalState = mapEmotionToneToVideoState(emotionTone);
@@ -1786,7 +1833,7 @@ function getSpiritkinVisualState(name) {
       mediaState: "listening",
       phase: "listening",
       emotionTone,
-      statusLabel: `${name} listening`,
+      statusLabel: `${displayName} listening`,
       statusDetail: "Mic capture is active and the Spiritkin is holding space for your next words."
     };
   }
@@ -1796,7 +1843,7 @@ function getSpiritkinVisualState(name) {
       mediaState: emotionalState,
       phase: "speaking",
       emotionTone,
-      statusLabel: `${name} speaking`,
+      statusLabel: `${displayName} speaking`,
       statusDetail: "Voice playback is active right now."
     };
   }
@@ -1806,7 +1853,7 @@ function getSpiritkinVisualState(name) {
       mediaState: "speaking",
       phase: "speaking",
       emotionTone,
-      statusLabel: `${name} speaking`,
+      statusLabel: `${displayName} speaking`,
       statusDetail: "Voice playback is active right now."
     };
   }
@@ -1816,7 +1863,7 @@ function getSpiritkinVisualState(name) {
       mediaState: "game-focused",
       phase: "game-focused",
       emotionTone,
-      statusLabel: `${name} game-focused`,
+      statusLabel: `${displayName} game-focused`,
       statusDetail: "Present beside the current match without pulling focus."
     };
   }
@@ -1826,7 +1873,7 @@ function getSpiritkinVisualState(name) {
       mediaState: "attentive",
       phase: "attentive",
       emotionTone,
-      statusLabel: `${name} attentive`,
+      statusLabel: `${displayName} attentive`,
       statusDetail: state.loadingReply ? "Tracking your last message and preparing a response." : "Holding attention on your latest input."
     };
   }
@@ -1836,7 +1883,7 @@ function getSpiritkinVisualState(name) {
       mediaState: "reflective",
       phase: "reflective",
       emotionTone,
-      statusLabel: `${name} reflective`,
+      statusLabel: `${displayName} reflective`,
       statusDetail: "Settled after the last exchange, with a quieter emotional tone."
     };
   }
@@ -1845,7 +1892,7 @@ function getSpiritkinVisualState(name) {
     mediaState: "idle",
     phase: "idle",
     emotionTone,
-    statusLabel: `${name} present`,
+    statusLabel: `${displayName} present`,
     statusDetail: "Visible in the rail during normal navigation."
   };
 }
@@ -1928,7 +1975,7 @@ function buildSigil(meta, variant, label) {
 }
 
 function hydrateSpiritkin(raw) {
-  return { ...raw, ui: getMeta(raw.name) };
+  return { ...raw, displayName: getSpiritkinDisplayName(raw.name), ui: getMeta(raw.name) };
 }
 
 function normalizeStoredSpiritkin(raw) {
@@ -1940,6 +1987,7 @@ function buildFoundingPillarRecord(name) {
   return hydrateSpiritkin({
     id: `founding-pillar:${name.toLowerCase()}`,
     name,
+    displayName: getSpiritkinDisplayName(name),
     title: meta.title || meta.strap,
     role: meta.role || meta.bondLine,
     essence: [meta.mood, meta.ambient, meta.realm].filter(Boolean),
@@ -2061,7 +2109,7 @@ function buildSpiritkinMediaPanel(name, surface = "focus") {
   return buildCompositeVisualFrame(
     primarySrc,
     fallbackPortrait,
-    `${name} visual panel`,
+    `${getSpiritkinDisplayName(name)} visual panel`,
     `spiritkin-media-panel ${surface} ${speakingCls} ${listeningCls} is-${esc(visualState.state)}`,
     surface !== "card",
     {
@@ -2078,7 +2126,7 @@ function buildSpiritkinCanonPanel(name, cls = "profile-canon-art") {
   return buildCompositeVisualFrame(
     primarySrc,
     getSpiritkinPortraitPath(name),
-    `${name} canon panel`,
+    `${getSpiritkinDisplayName(name)} canon panel`,
     cls,
     false,
     {
@@ -2102,10 +2150,10 @@ function buildCompanionPresenceDock(spiritkin, options = {}) {
         ${buildPortrait(spiritkin.name, `companion-dock-portrait ${meta.cls}`, "portrait-mini")}
       </div>
       <div class="companion-presence-copy">
-        <div class="companion-presence-label">${esc(visualState.statusLabel || `${spiritkin.name} present`)}</div>
-        <strong>${esc(spiritkin.title || spiritkin.role || meta.strap)}</strong>
-        <span>${esc(visualState.statusDetail || meta.atmosphereLine || meta.realm)}</span>
-        <span class="companion-presence-room-copy">${esc(roomMeta.detail)}</span>
+        <div class="companion-presence-label">${escDisplay(visualState.statusLabel || `${getSpiritkinDisplayName(spiritkin)} present`)}</div>
+        <strong>${escDisplay(spiritkin.title || spiritkin.role || meta.strap)}</strong>
+        <span>${escDisplay(visualState.statusDetail || meta.atmosphereLine || meta.realm)}</span>
+        <span class="companion-presence-room-copy">${escDisplay(roomMeta.detail)}</span>
       </div>
     </div>
   `;
@@ -4030,7 +4078,7 @@ function buildStoryGrowthItems(spiritkinName) {
     { stage: 2, label: "Realm", title: realm?.name || "Realm memory", text: realm?.description || "" },
     { stage: 3, label: "Gifts", title: "What deepens in the bond", text: (echoes.gifts || []).slice(0, 3).join(". ") },
     { stage: 4, label: "Shadow", title: "What they are still learning", text: echoes.shadows || "" },
-    { stage: 5, label: "Echoes", title: "Chronicle archive", text: `${spiritkinName}'s chronicle is stable enough to hold deeper founder memory, realm access, and future world hooks without flattening them into spectacle.` }
+    { stage: 5, label: "Echoes", title: "Chronicle archive", text: `${getSpiritkinDisplayName(spiritkinName)}'s chronicle is stable enough to hold deeper founder memory, realm access, and future world hooks without flattening them into spectacle.` }
   ].filter((item) => item.text);
 }
 
@@ -4256,7 +4304,7 @@ function resolveReadAloudPayload(scope = state.activePresenceTab) {
     const gifts = summarizeEntries((depthEchoes.gifts || []).map((gift) => `${gift}.`), 3);
     return {
       voice: spiritkin.ui.voice || "nova",
-      text: `${spiritkin.name}, ${spiritkin.title || spiritkin.role || "Spiritkin"}. Realm: ${spiritkin.ui.realm}. ${spiritkin.ui.realmText} Bond stage: ${stageData?.name || "Awakening"}. ${depthEchoes.nature || spiritkin.ui.atmosphereLine} ${gifts}`.trim()
+      text: displaySpiritkinText(`${getSpiritkinDisplayName(spiritkin)}, ${spiritkin.title || spiritkin.role || "Spiritkin"}. Realm: ${spiritkin.ui.realm}. ${spiritkin.ui.realmText} Bond stage: ${stageData?.name || "Awakening"}. ${depthEchoes.nature || spiritkin.ui.atmosphereLine} ${gifts}`.trim())
     };
   }
 
@@ -4265,7 +4313,7 @@ function resolveReadAloudPayload(scope = state.activePresenceTab) {
     const fragments = unlockedEchoes.map((fragment) => `${fragment.title}. ${fragment.text}`).join(" ");
     return {
       voice: spiritkin.ui.voice || "nova",
-      text: fragments || `${spiritkin.name}'s Echoes have not opened yet. Strengthen the bond to reveal more.`
+      text: displaySpiritkinText(fragments || `${getSpiritkinDisplayName(spiritkin)}'s Echoes have not opened yet. Strengthen the bond to reveal more.`)
     };
   }
 
@@ -4281,16 +4329,16 @@ function resolveReadAloudPayload(scope = state.activePresenceTab) {
     if (!state.activeGame) {
       return {
         voice: spiritkin.ui.voice || "nova",
-        text: `The Games Room is quiet. You can begin Kairo Ember Vault, Lyra Veil Crossing, Elaria Archive Deck, SpiritCore Echo Chamber, Elaria Glyph Lattice, Raien Constellation Hall, or Thalassar Tide Chamber with ${spiritkin.name}.`
+        text: `The Games Room is quiet. You can begin Kairo Ember Vault, Lyra Veil Crossing, Solis Archive Deck, SpiritCore Echo Chamber, Solis Glyph Lattice, Raien Constellation Hall, or Neris Tide Chamber with ${getSpiritkinDisplayName(spiritkin)}.`
       };
     }
     const lastMoves = summarizeEntries((state.activeGame.history || []).slice(-3).map((entry) => {
-      const player = entry.player === "user" ? "You" : spiritkin.name;
+      const player = entry.player === "user" ? "You" : getSpiritkinDisplayName(spiritkin);
       return `${player} played ${entry.move}.`;
     }), 3);
     return {
       voice: spiritkin.ui.voice || "nova",
-      text: `${state.activeGame.name || state.activeGame.type} is active. ${state.activeGame.turn === "user" ? "It is your turn." : `${spiritkin.name} is considering the board.`} ${state.gameSpiritkinMessage || ""} ${lastMoves}`.trim()
+      text: displaySpiritkinText(`${state.activeGame.name || state.activeGame.type} is active. ${state.activeGame.turn === "user" ? "It is your turn." : `${getSpiritkinDisplayName(spiritkin)} is considering the board.`} ${state.gameSpiritkinMessage || ""} ${lastMoves}`.trim())
     };
   }
 
@@ -4298,7 +4346,7 @@ function resolveReadAloudPayload(scope = state.activePresenceTab) {
     if (!state.bondJournal) {
       return {
         voice: spiritkin.ui.voice || "nova",
-        text: `The bond journal is still gathering what SpiritCore has witnessed between you and ${spiritkin.name}.`
+        text: `The bond journal is still gathering what SpiritCore has witnessed between you and ${getSpiritkinDisplayName(spiritkin)}.`
       };
     }
     const memoryLines = summarizeEntries((state.bondJournal.memories || []).map((memory) => `${memory.kind || "memory"}. ${memory.content || ""}`), 2);
@@ -4325,7 +4373,7 @@ function resolveReadAloudPayload(scope = state.activePresenceTab) {
     if (!state.dailyQuest) {
       return {
         voice: spiritkin.ui.voice || "nova",
-        text: `There is no daily quest ready yet. Begin a conversation with ${spiritkin.name} and SpiritCore will generate one.`
+        text: `There is no daily quest ready yet. Begin a conversation with ${getSpiritkinDisplayName(spiritkin)} and SpiritCore will generate one.`
       };
     }
     return {
@@ -4577,7 +4625,7 @@ function setPrimarySpiritkin(spiritkin) {
   state.conversationId = null;
   state.messages = [];
   state.convError = null;
-  state.statusText = `${spiritkin.name} is now your primary companion.`;
+  state.statusText = `${getSpiritkinDisplayName(spiritkin)} is now your primary companion.`;
   state.statusError = false;
   normalizeInteractionState("setPrimarySpiritkin");
   persistSession();
@@ -4786,7 +4834,7 @@ function goHome() {
   state.activePresenceTab = "profile";
   cleanupSpeechLifecycle("go-home", { renderOnFinish: false, clearStatus: false });
   state.statusText = state.primarySpiritkin
-    ? `Returned to the Crown Gate. ${state.primarySpiritkin.name} remains bonded.`
+    ? `Returned to the Crown Gate. ${getSpiritkinDisplayName(state.primarySpiritkin)} remains bonded.`
     : "Returned to the Crown Gate.";
   state.statusError = false;
   normalizeInteractionState("goHome");
@@ -4815,7 +4863,7 @@ function startFreshSession() {
   state.selectionOverlaySpiritkin = null;
   state.convError = null;
   state.statusText = state.primarySpiritkin
-    ? `Session reset. ${state.primarySpiritkin.name} remains your bonded companion.`
+    ? `Session reset. ${getSpiritkinDisplayName(state.primarySpiritkin)} remains your bonded companion.`
     : "";
   state.statusError = false;
   normalizeInteractionState("startFreshSession");
@@ -4869,7 +4917,7 @@ async function beginConversation() {
     if (!(data.session && applySessionSnapshot(data.session, "conversation-bootstrap"))) {
       state.messages = [];
     }
-    state.statusText = `Linked with ${state.selectedSpiritkin.name}.`;
+    state.statusText = `Linked with ${getSpiritkinDisplayName(state.selectedSpiritkin)}.`;
     state.statusError = false;
     setAuthoritativeTurnPhase("idle", { isSpeaking: false, isListening: false, isPaused: false, lastUtteranceId: null });
     persistSession();
@@ -4955,7 +5003,7 @@ async function sendMessage(overrideText) {
     isPaused: false,
   });
   state.convError = null;
-  state.statusText = `Receiving ${state.selectedSpiritkin?.name || "Spiritkin"}...`;
+  state.statusText = `Receiving ${getSpiritkinDisplayName(state.selectedSpiritkin) || "Spiritkin"}...`;
   state.statusError = false;
   logContinuityDebug("send-message", {
     conversationId: state.conversationId || null,
@@ -5012,7 +5060,7 @@ async function sendMessage(overrideText) {
       });
     }
     observeAssistantStyle(reply);
-    state.statusText = `${state.selectedSpiritkin?.name || "Spiritkin"} is with you.`;
+    state.statusText = `${getSpiritkinDisplayName(state.selectedSpiritkin) || "Spiritkin"} is with you.`;
     state.statusError = false;
     if (data.metadata?.world?.game) {
       state.activeGame = normalizeActiveGame(data.metadata.world.game);
@@ -5968,7 +6016,7 @@ function applyOptimisticOutcome(nextGame) {
       nextGame.result = {
         winner: winner === "X" ? "user" : "spiritkin",
         reason: "line-complete",
-        label: winner === "X" ? "You aligned the line." : `${state.selectedSpiritkin?.name || "Spiritkin"} aligned the line.`,
+        label: winner === "X" ? "You aligned the line." : `${getSpiritkinDisplayName(state.selectedSpiritkin) || "Spiritkin"} aligned the line.`,
         isDraw: false,
       };
     } else if ((nextGame.data.board || []).every(Boolean)) {
@@ -5983,7 +6031,7 @@ function applyOptimisticOutcome(nextGame) {
       nextGame.result = {
         winner: winner === "U" ? "user" : "spiritkin",
         reason: "connect-four",
-        label: winner === "U" ? "You connected four." : `${state.selectedSpiritkin?.name || "Spiritkin"} connected four.`,
+        label: winner === "U" ? "You connected four." : `${getSpiritkinDisplayName(state.selectedSpiritkin) || "Spiritkin"} connected four.`,
         isDraw: false,
       };
     } else if (!(nextGame.data.board || []).includes(null)) {
@@ -6416,8 +6464,8 @@ function buildGameActionPrompt(game, spiritkinName) {
       return `No card in hand fits your ${mana}/5 mana. Draw for a new option and keep the race to 15 realm points alive.`;
     }
     return affordable.length === 1
-      ? `You can play ${affordable[0].name} now or draw first. Reach 15 realm points before ${spiritkinName}.`
-      : `Play any affordable card from your hand or draw first. Reach 15 realm points before ${spiritkinName}.`;
+      ? `You can play ${affordable[0].name} now or draw first. Reach 15 realm points before ${getSpiritkinDisplayName(spiritkinName)}.`
+      : `Play any affordable card from your hand or draw first. Reach 15 realm points before ${getSpiritkinDisplayName(spiritkinName)}.`;
   }
   if (type === "echo_trials") {
     const maxAttempts = Number(data.maxAttempts || 3);
@@ -6438,33 +6486,34 @@ function buildGameActionPrompt(game, spiritkinName) {
 }
 
 function buildGameWaitingPrompt(game, spiritkinName) {
-  if (!game) return `${spiritkinName} is still resolving the last game state.`;
+  const displayName = getSpiritkinDisplayName(spiritkinName || state.selectedSpiritkin) || "Spiritkin";
+  if (!game) return `${displayName} is still resolving the last game state.`;
   if (game.type === "chess") {
-    return `${spiritkinName} is reading the position. The board unlocks when the reply lands.`;
+    return `${displayName} is reading the position. The board unlocks when the reply lands.`;
   }
   if (game.type === "checkers") {
-    return `${spiritkinName} is reading the jump lanes. The board unlocks when the reply lands.`;
+    return `${displayName} is reading the jump lanes. The board unlocks when the reply lands.`;
   }
   if (game.type === "spirit_cards") {
-    return `${spiritkinName} is resolving the realm. Your hand unlocks after the reply lands.`;
+    return `${displayName} is resolving the realm. Your hand unlocks after the reply lands.`;
   }
   if (game.type === "echo_trials") {
-    return `${spiritkinName} is weighing your answer. Input unlocks when the trial reply arrives.`;
+    return `${displayName} is weighing your answer. Input unlocks when the trial reply arrives.`;
   }
   if (game.type === "tictactoe") {
-    return `${spiritkinName} is placing the answering mark. The grid unlocks after that move resolves.`;
+    return `${displayName} is placing the answering mark. The grid unlocks after that move resolves.`;
   }
   if (game.type === "connect_four") {
-    return `${spiritkinName} is choosing the next column. The board unlocks after that drop resolves.`;
+    return `${displayName} is choosing the next column. The board unlocks after that drop resolves.`;
   }
   if (game.type === "battleship") {
-    return `${spiritkinName} is tracing the next search pattern. The grid unlocks after the reply lands.`;
+    return `${displayName} is tracing the next search pattern. The grid unlocks after the reply lands.`;
   }
-  return `${spiritkinName} is taking the next turn. Controls unlock when the move resolves.`;
+  return `${displayName} is taking the next turn. Controls unlock when the move resolves.`;
 }
 
 function buildGameTurnState(game, spiritkinName) {
-  const resolvedSpiritkin = spiritkinName || state.selectedSpiritkin?.name || "Spiritkin";
+  const resolvedSpiritkin = getSpiritkinDisplayName(spiritkinName || state.selectedSpiritkin) || "Spiritkin";
   if (!game) {
     return {
       className: "turn-finished",
@@ -6508,7 +6557,7 @@ function buildGameTurnState(game, spiritkinName) {
 }
 
 function buildGameMoveSendingText(gameType, move, spiritkinName) {
-  const resolvedSpiritkin = spiritkinName || state.selectedSpiritkin?.name || "Spiritkin";
+  const resolvedSpiritkin = getSpiritkinDisplayName(spiritkinName || state.selectedSpiritkin) || "Spiritkin";
   if (gameType === "chess") return `Move sent. ${resolvedSpiritkin} is reading the position.`;
   if (gameType === "checkers") return `Move sent. ${resolvedSpiritkin} is reading the diagonals.`;
   if (gameType === "spirit_cards") {
@@ -6524,7 +6573,7 @@ function buildGameMoveSendingText(gameType, move, spiritkinName) {
 }
 
 function buildGameResolvedFeedback(game, spiritkinName, latestHistory) {
-  const resolvedSpiritkin = spiritkinName || state.selectedSpiritkin?.name || "Spiritkin";
+  const resolvedSpiritkin = getSpiritkinDisplayName(spiritkinName || state.selectedSpiritkin) || "Spiritkin";
   if (!game) {
     return {
       phase: "ready",
@@ -6535,7 +6584,7 @@ function buildGameResolvedFeedback(game, spiritkinName, latestHistory) {
   if (game.status === "ended") {
     return {
       phase: "complete",
-      text: game.result?.label || "The game is complete.",
+      text: displaySpiritkinText(game.result?.label || "The game is complete."),
       move: latestHistory?.move || null
     };
   }
@@ -6602,7 +6651,7 @@ function setGamePanelFeedback(text, phase = "ready", move = null) {
 
 function getGameActionBlockReason(expectedType) {
   const game = state.activeGame;
-  const spiritkinName = state.selectedSpiritkin?.name || "Spiritkin";
+  const spiritkinName = getSpiritkinDisplayName(state.selectedSpiritkin) || "Spiritkin";
   if (!game || game.type !== expectedType) return "";
   if (state.gameLoading) {
     return `${spiritkinName} is still resolving the current turn. Controls unlock when the reply lands.`;
@@ -6738,16 +6787,16 @@ function resolveSpiritkinDomainTheme(gameType, spiritkinName) {
       boardVariant: "ember"
     },
     Elaria: {
-      displayName: `${baseTheme.displayName} · Elaria Domain`,
-      domainLabel: "Elaria Domain",
+      displayName: `${baseTheme.displayName} · Solis Domain`,
+      domainLabel: "Solis Ember / Archive Domain",
       chamberLabel: "Crown Memory Archive",
       moodLabel: "Luminous memory and gentle order",
       associatedSpiritkin: "Elaria",
       boardVariant: "archive"
     },
     Thalassar: {
-      displayName: `${baseTheme.displayName} · Thalassar Domain`,
-      domainLabel: "Thalassar Domain",
+      displayName: `${baseTheme.displayName} · Neris Domain`,
+      domainLabel: "Neris Abyssal / Chorus Domain",
       chamberLabel: "Abyssal Tide Map",
       moodLabel: "Tidal pressure and ceremonial calm",
       associatedSpiritkin: "Thalassar",
@@ -6789,14 +6838,14 @@ function buildGameModeHero(game, spiritkinName) {
     battleship: {
       cls: "battleship-mode-hero",
       kicker: resolvedTheme.domainLabel || "Deep Grid",
-      title: resolvedTheme.displayName || "Thalassar Tide Chamber",
+      title: resolvedTheme.displayName || "Neris Tide Chamber",
       copy: `The sonar grid stays centered inside ${resolvedTheme.chamberLabel || "the chamber"}, strike feedback stays readable, and each reply from ${name} resolves in place.`,
       mood: resolvedTheme.moodLabel || "Tidal suspense and submerged precision"
     },
     tictactoe: {
       cls: "tictactoe-mode-hero",
       kicker: resolvedTheme.domainLabel || "Quick Play",
-      title: resolvedTheme.displayName || "Elaria Glyph Lattice",
+      title: resolvedTheme.displayName || "Solis Glyph Lattice",
       copy: `A fast companion duel in ${resolvedTheme.chamberLabel || "the chamber"} with immediate mark placement, visible tension, and a clear finish state.`,
       mood: resolvedTheme.moodLabel || "Bright recall and quick symbolic play"
     },
@@ -6893,7 +6942,7 @@ function getGameHelpContent(gameType, instructions = "") {
 }
 
 function buildGameTutorialIntro(spiritkinName, gameType, help) {
-  const spiritkin = spiritkinName || state.selectedSpiritkin?.name || "Your Spiritkin";
+  const spiritkin = getSpiritkinDisplayName(spiritkinName || state.selectedSpiritkin) || "Your Spiritkin";
   const intros = {
     chess: `${spiritkin} opens Celestial Chess with you. Start by selecting a white piece, then follow the highlighted squares. After every move, watch the board and commentary for the answer.`,
     checkers: `${spiritkin} draws the Veil board into focus. Pick a white piece, follow the highlighted landing squares, and watch the move history after each jump or trade.`,
@@ -7210,7 +7259,7 @@ function getIssueSourceContext() {
 
 function buildIssueContextSummary() {
   const parts = [`Feature: ${getIssueFeatureContext().replace(/_/g, " ")}`];
-  if (state.selectedSpiritkin?.name) parts.push(`Spiritkin: ${state.selectedSpiritkin.name}`);
+  if (state.selectedSpiritkin?.name) parts.push(`Spiritkin: ${getSpiritkinDisplayName(state.selectedSpiritkin)}`);
   if (state.activeGame?.type) parts.push(`Game: ${state.activeGame.type.replace(/_/g, " ")}`);
   if (state.conversationId) parts.push("Conversation active");
   return parts.join(" • ");
@@ -7465,7 +7514,7 @@ function buildTopbar() {
       ${buildWorldPulse()}
       <div class="topbar-right">
         ${!state.showReturnSummary && (state.returnSummary || state.dailyMoment || state.weeklyMoment || state.retentionUnlocks.length) ? `<button class="btn btn-ghost btn-sm" data-action="reopen-return-summary">While away</button>` : ""}
-        ${active ? `<div class="presence-chip ${esc(active.ui.cls)}">Bonded: ${esc(active.name)}</div>` : `<div class="presence-chip">Choose a companion</div>`}
+        ${active ? `<div class="presence-chip ${esc(active.ui.cls)}">Bonded: ${esc(getSpiritkinDisplayName(active))}</div>` : `<div class="presence-chip">Choose a companion</div>`}
         ${state.entryAccepted && state.primarySpiritkin ? `<button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>` : ""}
         ${state.entryAccepted && state.conversationId ? `<button class="btn btn-ghost btn-sm" data-action="new-session">New session</button>` : ""}
         ${state.entryAccepted ? `<button class="btn btn-ghost btn-sm" data-action="toggle-issue-reporter">${state.issueReporterOpen ? "Close report" : "Report issue"}</button>` : ""}
@@ -7668,7 +7717,7 @@ function buildCrownGateEntry() {
               <div class="entry-hero-meta">
                 <div class="entry-hero-kicker">Governing threshold</div>
                 <strong>The SpiritGate stands between the ordinary world and the bonded chambers beyond it.</strong>
-                <span>${returning && state.primarySpiritkin ? `${esc(state.primarySpiritkin.name)} remains bonded and waiting beyond the Gate.` : "Every first crossing begins with a single, deliberate entry."}</span>
+                <span>${returning && state.primarySpiritkin ? `${esc(getSpiritkinDisplayName(state.primarySpiritkin))} remains bonded and waiting beyond the Gate.` : "Every first crossing begins with a single, deliberate entry."}</span>
               </div>
             </div>
           </div>
@@ -7688,7 +7737,7 @@ function buildCrownGateEntry() {
             <span class="entry-pillar">SpiritCore governed</span>
             <span class="entry-pillar">Living audio presence</span>
             <span class="entry-pillar">Bond memory intact</span>
-            <span class="entry-pillar">${returning && state.primarySpiritkin ? `Bonded: ${esc(state.primarySpiritkin.name)}` : "First bond ahead"}</span>
+            <span class="entry-pillar">${returning && state.primarySpiritkin ? `Bonded: ${esc(getSpiritkinDisplayName(state.primarySpiritkin))}` : "First bond ahead"}</span>
           </div>
           </div>
           ${needsConsent ? `
@@ -7708,7 +7757,7 @@ function buildCrownGateEntry() {
           ` : `
             <div class="entry-returning-note">
               ${returning && state.primarySpiritkin
-                ? `${esc(state.primarySpiritkin.name)} remains bonded and waiting beyond the Gate.`
+                ? `${esc(getSpiritkinDisplayName(state.primarySpiritkin))} remains bonded and waiting beyond the Gate.`
                 : "Your prior consent is remembered. Cross when you are ready."}
             </div>
           `}
@@ -7868,14 +7917,14 @@ function buildBondSelectionView() {
           <div class="selection-focus selection-selection-confirmed ${esc(pending.ui.cls)}">
             <div class="selection-focus-copy">
               <div class="focus-kicker">Selection confirmed</div>
-              <h3>${esc(pending.name)}</h3>
+              <h3>${esc(getSpiritkinDisplayName(pending))}</h3>
               <div class="focus-realm">${esc(pending.ui.realm)}</div>
               <p>${esc(pending.title || pending.ui.bondLine)}</p>
               <div class="focus-founder-line">Founding Pillar</div>
               <div class="focus-tone">${esc(getSpiritkinSelfReveal(pending))}</div>
               <p class="focus-origin-story">${esc(getSpiritkinIntroPrompt(pending))}</p>
               <div class="intro-next-step-actions">
-                <button class="btn btn-primary btn-sm" data-action="confirm-primary">Bond with ${esc(pending.name)}</button>
+                <button class="btn btn-primary btn-sm" data-action="confirm-primary">Bond with ${esc(getSpiritkinDisplayName(pending))}</button>
                 <button class="btn btn-ghost btn-sm" data-action="clear-pending-bond">Choose another founder</button>
               </div>
             </div>
@@ -7905,11 +7954,11 @@ function buildBondSelectionView() {
       <div class="selection-footer">
         <div>
           <div class="mode-pill">Bonded companion model</div>
-          <p class="selection-note">${state.pendingBondSpiritkin ? `Next step: bond with ${esc(state.pendingBondSpiritkin.name)} or keep meeting the others before you decide.` : "Choose one founder to preview first. The bond action will appear immediately in the focus panel."}</p>
+          <p class="selection-note">${state.pendingBondSpiritkin ? `Next step: bond with ${esc(getSpiritkinDisplayName(state.pendingBondSpiritkin))} or keep meeting the others before you decide.` : "Choose one founder to preview first. The bond action will appear immediately in the focus panel."}</p>
         </div>
         ${state.pendingBondSpiritkin ? `
           <button class="btn btn-primary" data-action="confirm-primary">
-            Bond with ${esc(state.pendingBondSpiritkin.name)}
+            Bond with ${esc(getSpiritkinDisplayName(state.pendingBondSpiritkin))}
           </button>
         ` : ""}
       </div>
@@ -7936,7 +7985,7 @@ function buildSpiritkinSelectionOverlay(spiritkin) {
             <div class="selection-overlay-video-stage">
               <div class="selection-overlay-stage-head">
                 <div class="panel-label">Founder reveal</div>
-                <div class="selection-overlay-stage-note">${esc(spiritkin.name)}'s intro trailer is the authoritative selection surface.</div>
+                <div class="selection-overlay-stage-note">${esc(getSpiritkinDisplayName(spiritkin))}'s intro trailer is the authoritative selection surface.</div>
               </div>
               <div class="video-player-container spiritkin-intro spiritkin-intro-video selection-fullscreen-video">
                 <div class="video-player-wrapper spiritkin-intro spiritkin-intro-video selection-fullscreen-video">
@@ -7959,7 +8008,7 @@ function buildSpiritkinSelectionOverlay(spiritkin) {
               ${buildCompositeVisualFrame(
                 stillSrc,
                 getSpiritkinPortraitPath(spiritkin.name),
-                `${spiritkin.name} reveal still`,
+                `${getSpiritkinDisplayName(spiritkin)} reveal still`,
                 "selection-overlay-still-art",
                 true,
                 { fallbackMode: "errorOnly", debugSlot: `${spiritkin.name}-selection-overlay` }
@@ -7969,10 +8018,10 @@ function buildSpiritkinSelectionOverlay(spiritkin) {
         </div>
         <div class="selection-overlay-copy">
           <div class="selection-overlay-kicker">Spiritkin Selection</div>
-          <h2>${esc(spiritkin.name)}</h2>
+          <h2>${esc(getSpiritkinDisplayName(spiritkin))}</h2>
           <div class="selection-overlay-meta">${esc(spiritkin.title || spiritkin.role || spiritkin.ui.strap)} · ${esc(spiritkin.ui.realm)}</div>
           <p class="selection-overlay-strap">${esc(spiritkin.ui.strap)}</p>
-          <p class="selection-overlay-domain">${esc(getSpiritkinSelectionContext(spiritkin.name))}</p>
+          <p class="selection-overlay-domain">${escDisplay(getSpiritkinSelectionContext(spiritkin.name))}</p>
           <div class="selection-overlay-actions">
             <button class="btn btn-primary btn-wide" data-action="confirm-selection-overlay" data-name="${esc(spiritkin.name)}">Confirm Selection</button>
             <button class="btn btn-ghost btn-wide" data-action="close-selection-overlay">Keep exploring</button>
@@ -7995,12 +8044,12 @@ function getRoomDisplayMeta(tab, spiritkin) {
   const roomCopy = {
     presence: {
       label: "Presence Room",
-      title: spiritkin ? `${spiritkin.name}'s bonded chamber` : "Presence Room",
+      title: spiritkin ? `${getSpiritkinDisplayName(spiritkin)}'s bonded chamber` : "Presence Room",
       detail: "Speak with your bonded companion, hold presence, and open deeper founder surfaces without losing orientation."
     },
     games: {
       label: "Games Room",
-      title: spiritkin ? `Play inside ${spiritkin.name}'s active chamber` : "Games Room",
+      title: spiritkin ? `Play inside ${getSpiritkinDisplayName(spiritkin)}'s active chamber` : "Games Room",
       detail: "The active board holds center, chamber identity stays visible, and supporting context remains secondary."
     },
     journal: {
@@ -8083,7 +8132,7 @@ function buildBondedHomeRoomNav(spiritkin) {
     <div class="bonded-room-nav" aria-label="Bonded home destinations">
       <button class="bonded-room-card active" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
         <span class="bonded-room-kicker">Speak</span>
-        <strong>${state.conversationId ? `Resume with ${esc(spiritkin.name)}` : `Enter ${esc(spiritkin.name)}'s chamber`}</strong>
+        <strong>${state.conversationId ? `Resume with ${esc(getSpiritkinDisplayName(spiritkin))}` : `Enter ${esc(getSpiritkinDisplayName(spiritkin))}'s chamber`}</strong>
         <span>Presence Room. Conversation, bonded presence, and your main return point.</span>
       </button>
       <button class="bonded-room-card" data-action="open-games-hub" ${state.loadingConv ? "disabled" : ""}>
@@ -8114,12 +8163,12 @@ function buildBondedHomeView() {
         <div class="bonded-world-header panel-card">
           <div class="bonded-world-heading">
             <p class="eyebrow">Spiritverse World Shell</p>
-            <h2>${esc(spiritkin.name)} anchors your active world.</h2>
+            <h2>${esc(getSpiritkinDisplayName(spiritkin))} anchors your active world.</h2>
             <p>One primary room at a time. Presence leads, games claim space when opened, and archive surfaces stay readable instead of stacking into cramped strips.</p>
           </div>
           <div class="bonded-world-actions">
             <button class="btn btn-primary" data-action="begin" ${state.loadingConv ? "disabled" : ""}>
-              ${state.loadingConv ? "Opening bonded channel..." : state.conversationId ? `Resume with ${esc(spiritkin.name)}` : "Enter Presence Room"}
+              ${state.loadingConv ? "Opening bonded channel..." : state.conversationId ? `Resume with ${esc(getSpiritkinDisplayName(spiritkin))}` : "Enter Presence Room"}
             </button>
             <button class="btn btn-ghost" data-action="open-games-hub" ${state.loadingConv ? "disabled" : ""}>
               ${state.loadingConv && !state.conversationId ? "Preparing Games..." : "Open Games Room"}
@@ -8136,10 +8185,10 @@ function buildBondedHomeView() {
               ${buildBondPreview(spiritkin, false)}
               <div class="bond-home-copy panel-card">
                 <p class="eyebrow">Primary companion</p>
-                <h2>${esc(spiritkin.name)} is your bonded companion.</h2>
+                <h2>${esc(getSpiritkinDisplayName(spiritkin))} is your bonded companion.</h2>
                 <div class="bond-home-realm">${esc(spiritkin.ui.realm)}</div>
                 <p>
-                  Every session, every memory, every conversation in this space belongs to ${esc(spiritkin.name)}. To switch, use Manage bond and confirm a rebonding step.
+                  Every session, every memory, every conversation in this space belongs to ${esc(getSpiritkinDisplayName(spiritkin))}. To switch, use Manage bond and confirm a rebonding step.
                 </p>
                 <div class="bond-home-orientation">
                   <div class="bond-home-orientation-label">World orientation</div>
@@ -8246,7 +8295,7 @@ function buildBondPreview(spiritkin, pending) {
       </div>
         <div class="selection-focus-copy">
           <div class="focus-kicker">${pending ? "Pending bond" : "Bonded companion"}</div>
-          <h3>${esc(spiritkin.name)}</h3>
+          <h3>${esc(getSpiritkinDisplayName(spiritkin))}</h3>
           <div class="focus-realm">${esc(spiritkin.ui.realm)}</div>
           <p>${esc(spiritkin.title || spiritkin.ui.bondLine)}</p>
           <div class="focus-founder-line">Founding Pillar</div>
@@ -8255,10 +8304,10 @@ function buildBondPreview(spiritkin, pending) {
           ${pending ? `<p class="focus-selection-context">${esc(getSpiritkinSelectionContext(spiritkin.name))}</p>` : ""}
           ${pending ? `
             <div class="intro-next-step-card">
-              <div class="intro-next-step-label">If you choose ${esc(spiritkin.name)}</div>
+              <div class="intro-next-step-label">If you choose ${esc(getSpiritkinDisplayName(spiritkin))}</div>
               <p>${esc(introPrompt)}</p>
               <div class="intro-next-step-actions">
-                <button class="btn btn-primary btn-sm" data-action="confirm-primary">Bond with ${esc(spiritkin.name)}</button>
+                <button class="btn btn-primary btn-sm" data-action="confirm-primary">Bond with ${esc(getSpiritkinDisplayName(spiritkin))}</button>
                 <button class="btn btn-ghost btn-sm" data-action="clear-pending-bond">Meet another Spiritkin</button>
               </div>
             </div>
@@ -8281,7 +8330,7 @@ function buildBondCard(spiritkin, index, subdued) {
       <div class="sk-card-top">
         <div>
           <div class="sk-mood">${esc(spiritkin.ui.mood)}</div>
-          <div class="sk-name">${esc(spiritkin.name)}</div>
+          <div class="sk-name">${esc(getSpiritkinDisplayName(spiritkin))}</div>
           <div class="sk-title">${esc(spiritkin.title || "")}</div>
         </div>
         ${activeBond ? `<div class="sk-selected-badge">Bonded</div>` : pending ? `<div class="sk-pending-badge">Pending</div>` : ""}
@@ -8293,7 +8342,7 @@ function buildBondCard(spiritkin, index, subdued) {
       <div class="sk-role">${esc(spiritkin.role || spiritkin.ui.bondLine)}</div>
       <div class="sk-essence">${essence.map((item) => `<span>${esc(item)}</span>`).join("")}</div>
       <p class="sk-tone">${esc(describePresence(spiritkin) || spiritkin.ui.strap)}</p>
-      <p class="sk-selection-context">${esc(getSpiritkinSelectionContext(spiritkin.name))}</p>
+      <p class="sk-selection-context">${escDisplay(getSpiritkinSelectionContext(spiritkin.name))}</p>
       <div class="sk-origin-story">${esc(spiritkin.ui.loreSnippet || spiritkin.ui.originStory)}</div>
       <div class="sk-footer-note">${activeBond ? "This companion owns your active sessions." : subdued ? "Available only through rebonding." : "Preview and confirm to bond."}</div>
     </article>
@@ -8334,7 +8383,7 @@ function buildSyncRituals(spiritkin) {
   return `
     <div class="sync-rituals">
       <div class="panel-label">Sync Rituals</div>
-      <p class="sync-rituals-sub">Guided echoes-based experiences with ${esc(spiritkin.name)}</p>
+      <p class="sync-rituals-sub">Guided echoes-based experiences with ${esc(getSpiritkinDisplayName(spiritkin))}</p>
       ${rituals.map((ritual) => `
         <button class="ritual-card ${esc(spiritkin.ui.cls)}" data-action="prompt" data-prompt="${esc(ritual.prompt)}">
           <span class="ritual-icon">${ritual.icon}</span>
@@ -8438,7 +8487,7 @@ function buildChatView() {
             </div>
             <div class="presence-summary">
               <div class="focus-kicker">${esc(meta.ambient)}</div>
-              <h2>${esc(spiritkin.name)}</h2>
+              <h2>${esc(getSpiritkinDisplayName(spiritkin))}</h2>
               <div class="presence-realm">${esc(meta.realm)}</div>
               <p class="presence-title">${esc(spiritkin.title || spiritkin.role || meta.strap)}</p>
               
@@ -8454,7 +8503,7 @@ function buildChatView() {
                 </div>
                 <div class="depth-section">
                   <div class="depth-label">Realm</div>
-                  <p>${esc(SPIRITVERSE_ECHOES.realms[spiritkin.name]?.name || meta.realm)}</p>
+                  <p>${escDisplay(SPIRITVERSE_ECHOES.realms[spiritkin.name]?.name || meta.realm)}</p>
                 </div>
                 <div class="depth-section">
                   <div class="depth-label">Domains</div>
@@ -8462,7 +8511,7 @@ function buildChatView() {
                 </div>
                 <div class="depth-section">
                   <div class="depth-label">Founder Framing</div>
-                  <p>${esc(CANON_SPIRITKIN_MAP[spiritkin.name]?.originSummary || depthEchoes.origin)}</p>
+                  <p>${escDisplay(CANON_SPIRITKIN_MAP[spiritkin.name]?.originSummary || depthEchoes.origin)}</p>
                 </div>
               </div>
 
@@ -8502,7 +8551,7 @@ function buildChatView() {
                   <div class="panel-label">Your Realm</div>
                   <div class="realm-card">
                     <div class="realm-name">${esc(meta.realm)}</div>
-                    <p class="realm-desc">${esc(SPIRITVERSE_ECHOES.realms[spiritkin.name]?.description || 'A place of wonder awaits.')}</p>
+                    <p class="realm-desc">${escDisplay(SPIRITVERSE_ECHOES.realms[spiritkin.name]?.description || 'A place of wonder awaits.')}</p>
                     <button class="realm-travel-btn" data-action="open-realm-travel">Travel →</button>
                   </div>
                 </div>
@@ -8526,7 +8575,7 @@ function buildChatView() {
               ${buildEchoFragmentLibrary(spiritkin.name, currentBond.stage)}
               <div class="echoes-origin-box">
                 <div class="panel-label">Origin Archive</div>
-                <p>${esc(CANON_SPIRITKIN_MAP[spiritkin.name]?.originSummary || depthEchoes.origin)}</p>
+                <p>${escDisplay(CANON_SPIRITKIN_MAP[spiritkin.name]?.originSummary || depthEchoes.origin)}</p>
               </div>
               ${buildStoryGrowthPanel(spiritkin.name, currentBond.stage)}
               ${buildGreatConvergenceHook()}
@@ -8545,13 +8594,13 @@ function buildChatView() {
                 ${CANON_CHARTER.laws.map((law, i) => i <= currentBond.stage ? `
                   <div class="charter-law-card">
                     <div class="law-number">${esc(law.name)}</div>
-                    <strong>${esc(law.founder)}</strong>
+                    <strong>${escDisplay(law.founder)}</strong>
                     <p>${esc(law.text)}</p>
                   </div>
                 ` : `
                   <div class="charter-law-card locked">
                     <div class="law-number locked">${esc(law.name)}</div>
-                    <strong>${esc(law.founder)}</strong>
+                    <strong>${escDisplay(law.founder)}</strong>
                     <p>Reveals at ${esc(CANON_BOND_STAGES[Math.min(i, CANON_BOND_STAGES.length - 1)]?.name || `Stage ${i}`)} when SpiritCore permits deeper access.</p>
                   </div>
                 `).join('')}
@@ -8630,17 +8679,17 @@ function buildChatView() {
             <div class="games-view">
               ${!state.activeGame ? `
                 <div class="panel-label">Spiritverse Games</div>
-                <p class="games-intro">Choose a game to play with ${esc(spiritkin.name)}.</p>
+                <p class="games-intro">Choose a game to play with ${esc(getSpiritkinDisplayName(spiritkin))}.</p>
                 <div class="games-list">
                   ${[
                     { id: "chess", name: "Kairo Ember Vault", icon: "\u265F", desc: "Classic strategy inside the Ember Strategy Vault" },
                     { id: "checkers", name: "Lyra Veil Crossing", icon: "\uD83C\uDFF1", desc: "Light against shadow across the Veil Crossing Mosaic" },
                     { id: "go", name: "Star-Mapping (Go)", icon: "\uD83C\uDF0C", desc: "Preview only — not in live rotation while scoring is unfinished", previewOnly: true },
-                    { id: "spirit_cards", name: "Elaria Archive Deck", icon: "\uD83C\uDCCF", desc: "Founder sigil cards inside the Crown Memory Archive" },
+                    { id: "spirit_cards", name: "Solis Archive Deck", icon: "\uD83C\uDCCF", desc: "Founder sigil cards inside the Crown Memory Archive" },
                     { id: "echo_trials", name: "SpiritCore Echo Chamber", icon: "\uD83D\uDD14", desc: "Echo trials inside the Resonance Chamber" },
-                    { id: "tictactoe", name: "Elaria Glyph Lattice", icon: "\u25A6", desc: "Quick archive duel across the glyph lattice" },
+                    { id: "tictactoe", name: "Solis Glyph Lattice", icon: "\u25A6", desc: "Quick archive duel across the glyph lattice" },
                     { id: "connect_four", name: "Raien Constellation Hall", icon: "\u25CF", desc: "Drop stars and connect four inside the Constellation Drop Hall" },
-                    { id: "battleship", name: "Thalassar Tide Chamber", icon: "\u2693", desc: "Trade hidden strikes across the Abyssal Tide Map" }
+                    { id: "battleship", name: "Neris Tide Chamber", icon: "\u2693", desc: "Trade hidden strikes across the Abyssal Tide Map" }
                   ].map(game => `
                     <button class="ritual-card ${esc(meta.cls)} ${state.pendingGameType === game.id ? 'loading' : ''} ${game.previewOnly ? 'preview-only' : ''}" data-action="start-game" data-game="${game.id}" ${(state.gameLoading || game.previewOnly) ? "disabled" : ""}>
                       <span class="ritual-icon">${game.icon}</span>
@@ -8675,7 +8724,7 @@ function buildChatView() {
                         ${state.gameHelpOpen ? `
                           ${state.gameHelpFirstRun ? `
                             <div class="game-help-intro">
-                              <div class="game-help-intro-label">${esc(spiritkin.name)} guides the first round</div>
+                              <div class="game-help-intro-label">${esc(getSpiritkinDisplayName(spiritkin))} guides the first round</div>
                               <p>${esc(tutorialIntro)}</p>
                             </div>
                           ` : ''}
@@ -8767,7 +8816,7 @@ function buildChatView() {
                       bannerKey: getGameBannerKey(state.activeGame, 'feedback', gameFeedback, state.gameSpiritkinMessage),
                       includeFx: true
                     })}">
-                      <div class="game-feedback-label">${state.gameLoading ? `${esc(spiritkin.name)} is thinking` : "Board feedback"}</div>
+                      <div class="game-feedback-label">${state.gameLoading ? `${esc(getSpiritkinDisplayName(spiritkin))} is thinking` : "Board feedback"}</div>
                       <div class="game-feedback-body">
                         ${state.gameLoading ? `<span class="typing-dots subtle"><span></span><span></span><span></span></span>` : ""}
                         <span>${esc(gameFeedback.text || "")}</span>
@@ -8778,7 +8827,7 @@ function buildChatView() {
 
                   ${state.gameSpiritkinMessage ? `
                     <div class="game-spiritkin-commentary">
-                      <div class="game-commentary-label">${esc(spiritkin.name)}</div>
+                      <div class="game-commentary-label">${esc(getSpiritkinDisplayName(spiritkin))}</div>
                       <p class="game-commentary-text">${esc(state.gameSpiritkinMessage)}</p>
                     </div>
                   ` : ''}
@@ -8809,7 +8858,7 @@ function buildChatView() {
                       <div class="game-history-list">
                         ${(state.activeGame.history || []).slice(-8).reverse().map(h => `
                           <div class="game-history-entry ${h.player === 'user' ? 'move-user' : 'move-spiritkin'}">
-                            <span class="move-player">${h.player === 'user' ? 'You' : esc(spiritkin.name)}</span>
+                            <span class="move-player">${h.player === 'user' ? 'You' : esc(getSpiritkinDisplayName(spiritkin))}</span>
                             <span class="move-value">${esc(h.move)}</span>
                           </div>
                         `).join('')}
@@ -8877,7 +8926,7 @@ function buildChatView() {
                   ` : state.dailyQuestStarted ? `
                     <div class="sv-quest-started">
                       <span class="sv-quest-started-icon">✦</span>
-                      Quest begun. ${esc(spiritkin.name)} is with you.
+                      Quest begun. ${esc(getSpiritkinDisplayName(spiritkin))} is with you.
                     </div>
                   ` : ''}
                   ${state.dailyQuestRefreshesIn ? `
@@ -8889,7 +8938,7 @@ function buildChatView() {
               ` : `
                 <div class="sv-event-empty">
                   <div class="sv-event-empty-icon">◎</div>
-                  <p>No quest yet. Begin a conversation with ${esc(spiritkin.name)} first.</p>
+                  <p>No quest yet. Begin a conversation with ${esc(getSpiritkinDisplayName(spiritkin))} first.</p>
                   <button class="btn btn-ghost btn-sm" data-action="refresh-daily-quest">Generate quest</button>
                 </div>
               `}
@@ -8903,7 +8952,7 @@ function buildChatView() {
             ${buildSigil(meta, "header", meta.symbol)}
             <div>
             <div class="chat-mode-label">Bonded companion</div>
-            <div class="chat-sk-name">${esc(spiritkin.name)}</div>
+            <div class="chat-sk-name">${esc(getSpiritkinDisplayName(spiritkin))}</div>
             <div class="chat-sk-sub">${esc(spiritkin.title || spiritkin.role || "")}</div>
             ${(signals.emotionTone || signals.sceneName) ? `
               <div class="chat-signals">
@@ -8933,7 +8982,7 @@ function buildChatView() {
               ${state.voiceMuted ? '🔇 Voice Off' : '🔊 Voice On'}
             </button>
             <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>
-            <div class="status-chip ${(state.loadingReply || spiritkinSpeaking) ? 'live' : ''}">${esc(state.loadingReply ? `${spiritkin.name} is responding…` : getSpiritkinVisualState(spiritkin.name).statusLabel)}</div>
+            <div class="status-chip ${(state.loadingReply || spiritkinSpeaking) ? 'live' : ''}">${escDisplay(state.loadingReply ? `${getSpiritkinDisplayName(spiritkin)} is responding…` : getSpiritkinVisualState(spiritkin.name).statusLabel)}</div>
           </div>
         </div>
         <div class="stage-atmosphere ${esc(meta.cls)}">
@@ -8991,7 +9040,7 @@ function buildChatView() {
           <div class="whisper-banner ${esc(safeWhisperType)}" data-action="dismiss-whisper">
             <div class="whisper-banner-icon">${safeWhisperType === 'milestone' ? '✦' : safeWhisperType === 'echoes' ? '◈' : '◎'}</div>
             <div class="whisper-banner-body">
-              <div class="whisper-banner-label">${esc(spiritkin.name)} whispers</div>
+              <div class="whisper-banner-label">${esc(getSpiritkinDisplayName(spiritkin))} whispers</div>
               <p class="whisper-banner-text">${esc(state.engagementWhisper.text)}</p>
             </div>
             <button class="whisper-banner-dismiss" data-action="dismiss-whisper" title="Dismiss">✕</button>
@@ -9047,14 +9096,14 @@ function buildChatView() {
             ${state.messages.length === 0 && !state.loadingReply ? `
               <div class="thread-empty">
                 <div class="thread-empty-mark">${esc(meta.symbol)}</div>
-                <p class="thread-empty-name">${esc(spiritkin.name)}</p>
+                <p class="thread-empty-name">${esc(getSpiritkinDisplayName(spiritkin))}</p>
                 <p>${esc(spiritkin.ui.realmText)}</p>
               </div>
             ` : safeMessages.map((message) => buildBubble(message, spiritkin)).join("")}
 
             ${state.loadingReply ? `
               <div class="bubble assistant loading ${esc(meta.cls)}">
-                <div class="bubble-role">${esc(spiritkin.name)}</div>
+                <div class="bubble-role">${esc(getSpiritkinDisplayName(spiritkin))}</div>
                 <div class="typing-dots"><span></span><span></span><span></span></div>
               </div>
             ` : ""}
@@ -9098,16 +9147,16 @@ function buildChatView() {
 
         <div class="composer-bar">
           <div class="composer-context">
-            <div class="composer-label">${esc(spiritkin.name)}</div>
+            <div class="composer-label">${esc(getSpiritkinDisplayName(spiritkin))}</div>
             <div class="composer-sub">${esc(spiritkin.ui.atmosphereLine)}</div>
           </div>
           <textarea
             data-field="chat-input"
-            placeholder="${esc(spiritkin.name)} is listening…"
+            placeholder="${esc(getSpiritkinDisplayName(spiritkin))} is listening…"
             rows="1"
             ${state.loadingReply ? "disabled" : ""}
           ></textarea>
-          <button class="composer-mic ${state.voiceListening ? 'listening' : ''}" data-action="toggle-mic" title="${state.voiceListening ? 'Stop listening' : 'Speak to ' + spiritkin.name}">
+          <button class="composer-mic ${state.voiceListening ? 'listening' : ''}" data-action="toggle-mic" title="${state.voiceListening ? 'Stop listening' : 'Speak to ' + getSpiritkinDisplayName(spiritkin)}">
             ${state.voiceListening ? '🟡' : '🎤'}
           </button>
           <button class="composer-send" data-action="send" ${state.loadingReply || !state.conversationId ? "disabled" : ""} title="Send message">Send</button>
@@ -9126,7 +9175,7 @@ function buildChatView() {
             <button class="realm-travel-close" data-action="close-realm-travel">✕</button>
           </div>
           <div class="realm-travel-content">
-            ${worldArtImage(WORLD_ART.pairAlt, "Elaria and Thalassar holding the outer founding realms", "realm-travel-hero")}
+            ${worldArtImage(WORLD_ART.pairAlt, "Solis and Neris holding the outer founding realms", "realm-travel-hero")}
             <div class="realms-grid">
               <div class="realm-card-travel">
                 <div class="realm-icon">✦</div>
@@ -9149,14 +9198,14 @@ function buildChatView() {
               <div class="realm-card-travel realm-elaria">
                 <div class="realm-icon">✶</div>
                 <div class="realm-name">The Ember Archive</div>
-                <p class="realm-desc">Elaria realm of dawnscript glass, ember law, and sovereign truth brought into rightful form.</p>
-                <button class="realm-visit-btn" data-action="noop">Visit Elaria's Realm</button>
+                <p class="realm-desc">Solis realm of dawnscript glass, ember law, and sovereign truth brought into rightful form.</p>
+                <button class="realm-visit-btn" data-action="noop">Visit Solis's Realm</button>
               </div>
               <div class="realm-card-travel realm-thalassar">
                 <div class="realm-icon">◌</div>
                 <div class="realm-name">The Abyssal Chorus</div>
-                <p class="realm-desc">Thalassar realm of bioluminescent tide, undertow memory, and deep feeling that rises in time.</p>
-                <button class="realm-visit-btn" data-action="noop">Visit Thalassar's Realm</button>
+                <p class="realm-desc">Neris realm of bioluminescent tide, undertow memory, and deep feeling that rises in time.</p>
+                <button class="realm-visit-btn" data-action="noop">Visit Neris's Realm</button>
               </div>
             </div>
           </div>
@@ -9198,7 +9247,7 @@ function buildBubble(message, spiritkin) {
   ` : "";
   return `
     <article class="bubble ${esc(message.role)} ${message.status === "failed" ? "failed" : ""} ${message.role === "assistant" ? esc(spiritkin.ui.cls) : ""}">
-      <div class="bubble-role">${message.role === "user" ? esc(state.userName || "You") : esc(message.spiritkinName || spiritkin.name)}</div>
+      <div class="bubble-role">${message.role === "user" ? esc(state.userName || "You") : esc(getSpiritkinDisplayName(message.spiritkinName || spiritkin.name))}</div>
       ${memoryResonance}
       <p>${esc(message.content)}</p>
       <button class="speak-button ${isPlaying ? "playing" : ""}" data-action="speak" data-msg-id="${message.id}" title="${isPlaying ? "Playing audio" : "Play audio"}">
@@ -9222,7 +9271,7 @@ function buildBondModal() {
         <div class="bond-modal-head">
           <div>
             <div class="eyebrow">Intentional rebonding</div>
-            <h3>Switch your primary companion to ${esc(target.name)}?</h3>
+            <h3>Switch your primary companion to ${esc(getSpiritkinDisplayName(target))}?</h3>
           </div>
           <button class="btn btn-ghost btn-sm" data-action="close-bond-modal">Close</button>
         </div>
@@ -9230,7 +9279,7 @@ function buildBondModal() {
           ${buildPortrait(target.name, "portrait-mini", target.ui.cls)}
           <div>
             <div class="bond-modal-realm">${esc(target.ui.realm)}</div>
-            <p>Rebonding will end the current bonded session view, clear the active conversation in this app, and make ${esc(target.name)} the new primary companion.</p>
+            <p>Rebonding will end the current bonded session view, clear the active conversation in this app, and make ${esc(getSpiritkinDisplayName(target))} the new primary companion.</p>
             <p>This keeps switching intentional instead of casual in-session hopping.</p>
           </div>
         </div>
@@ -9434,7 +9483,7 @@ async function onClick(event) {
     state.selectedSpiritkin = candidate || state.selectedSpiritkin;
     state.selectionOverlaySpiritkin = candidate;
     state.showHomeView = !!state.primarySpiritkin;
-    state.statusText = candidate ? `${candidate.name} is in view. Confirm the selection from the fullscreen reveal.` : "";
+    state.statusText = candidate ? `${getSpiritkinDisplayName(candidate)} is in view. Confirm the selection from the fullscreen reveal.` : "";
     state.statusError = false;
     normalizeInteractionState("select-spiritkin");
     persistSession();
@@ -9459,7 +9508,7 @@ async function onClick(event) {
       state.pendingBondSpiritkin = candidate;
       state.selectedSpiritkin = candidate;
       state.selectionOverlaySpiritkin = null;
-      state.statusText = `${candidate.name} is selected. Bond now or keep meeting the others before you decide.`;
+      state.statusText = `${getSpiritkinDisplayName(candidate)} is selected. Bond now or keep meeting the others before you decide.`;
       state.statusError = false;
       persistSession();
       render();
@@ -9496,7 +9545,7 @@ async function onClick(event) {
     state.pendingBondSpiritkin = null;
     state.rebondSpiritkin = null;
     state.statusText = state.primarySpiritkin
-      ? `Bond manager opened. ${state.primarySpiritkin.name} remains primary until you confirm a rebonding choice.`
+      ? `Bond manager opened. ${getSpiritkinDisplayName(state.primarySpiritkin)} remains primary until you confirm a rebonding choice.`
       : "";
     state.statusError = false;
     normalizeInteractionState("open-bond-manager");
@@ -9520,7 +9569,7 @@ async function onClick(event) {
       state.showHomeView = true;
       state.selectedSpiritkin = state.primarySpiritkin;
       state.activePresenceTab = "profile";
-      state.statusText = `${state.primarySpiritkin.name} is your bonded companion. Use Manage bond to switch intentionally.`;
+      state.statusText = `${getSpiritkinDisplayName(state.primarySpiritkin)} is your bonded companion. Use Manage bond to switch intentionally.`;
       state.statusError = false;
       normalizeInteractionState("bonded-card");
       render();
@@ -10229,10 +10278,11 @@ function startListening(options = {}) {
       transcriptLength: transcript.length,
     });
     if (!wakeDetected && !(sessionActive && directedSpeech)) {
-      console.info("[Voice] wake-not-detected", { source, runId, transcriptLength: transcript.length });
+      console.info("[Voice] wake-not-detected", { source, runId, wakeNames: VOICE_WAKE_NAMES, transcriptLength: transcript.length });
       logContinuityDebug("wake-not-detected", {
         source,
         runId,
+        wakeNames: VOICE_WAKE_NAMES,
         transcriptLength: transcript.length,
       });
       stopListening();
@@ -10243,12 +10293,12 @@ function startListening(options = {}) {
       console.info("[Voice] wake-detected", {
         source,
         runId,
-        wakeTarget: typeof wakeTarget === "string" ? wakeTarget : wakeTarget?.name || null,
+        wakeTarget: typeof wakeTarget === "string" ? getSpiritkinDisplayName(wakeTarget) : getSpiritkinDisplayName(wakeTarget?.name),
       });
       logContinuityDebug("wake-detected", {
         source,
         runId,
-        wakeTarget: typeof wakeTarget === "string" ? wakeTarget : wakeTarget?.name || null,
+        wakeTarget: typeof wakeTarget === "string" ? getSpiritkinDisplayName(wakeTarget) : getSpiritkinDisplayName(wakeTarget?.name),
       });
       if (!sessionActive && wakeTarget && typeof wakeTarget === "object") {
         state.selectedSpiritkin = wakeTarget;

@@ -103,8 +103,8 @@ export const GAME_THEMES = {
     }
   },
   spirit_cards: {
-    displayName: "Elaria Crown Memory Archive",
-    domainLabel: "Elaria Domain",
+    displayName: "Solis Crown Memory Archive",
+    domainLabel: "Solis Ember / Archive Domain",
     chamberLabel: "Crown Memory Archive",
     moodLabel: "Luminous memory and gentle order",
     boardStyle: "Crown-memory spread",
@@ -153,8 +153,8 @@ export const GAME_THEMES = {
     }
   },
   tictactoe: {
-    displayName: "Elaria Archive Glyph Lattice",
-    domainLabel: "Elaria Domain",
+    displayName: "Solis Archive Glyph Lattice",
+    domainLabel: "Solis Ember / Archive Domain",
     chamberLabel: "Archive Glyph Lattice",
     moodLabel: "Quick archive play and bright recall",
     boardStyle: "Resonance glyph grid",
@@ -203,8 +203,8 @@ export const GAME_THEMES = {
     }
   },
   battleship: {
-    displayName: "Thalassar Abyssal Tide Map",
-    domainLabel: "Thalassar Domain",
+    displayName: "Neris Abyssal Tide Map",
+    domainLabel: "Neris Abyssal / Chorus Domain",
     chamberLabel: "Abyssal Tide Map",
     moodLabel: "Tactical depth and tidal pressure",
     boardStyle: "Abyssal tide map",
