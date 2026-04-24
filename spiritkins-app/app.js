@@ -71,8 +71,10 @@ function createSpiritverseGamesFallback() {
     available: false,
     echoAnswer: "",
     reset() {},
-    render(targetId) {
-      const target = typeof document !== "undefined" ? document.getElementById(targetId) : null;
+    render(targetRef) {
+      const target = typeof document === "undefined"
+        ? null
+        : (typeof targetRef === "string" ? document.getElementById(targetRef) : targetRef);
       if (target) {
         target.innerHTML = `
           <div class="panel-card" style="padding:20px;text-align:left;">
@@ -3583,6 +3585,13 @@ async function transitionPresenceSurface(tab, options = {}) {
   const { announce = true } = options;
   const runId = ++_surfaceTransitionRunId;
   const previousTab = state.activePresenceTab;
+  if (tab === "games" && tab !== previousTab) {
+    console.info("[Games] tab activated", {
+      fromTab: previousTab || null,
+      toTab: tab,
+      activeGame: state.activeGame?.type || null
+    });
+  }
   state.pendingPresenceTab = tab;
   if (tab !== previousTab) {
     state.statusText = `Opening ${tab.replace("_", " ")}...`;
@@ -4436,7 +4445,7 @@ function syncEntryCinematics() {
 function mountActiveGameBoard(runId, attempt = 0) {
   if (runId !== _gameBoardMountRunId) return;
   if (!state.activeGame || !SpiritverseGames || state.activePresenceTab !== "games") return;
-  console.info("[Games] mount-scheduled", {
+  console.info("[Games] mount attempt", {
     runId,
     attempt,
     tab: state.activePresenceTab,
@@ -4444,10 +4453,13 @@ function mountActiveGameBoard(runId, attempt = 0) {
   });
   const container = document.getElementById("spiritverse-game-board");
   const boardStage = document.querySelector(".presence-tab-content[data-presence-surface='games'] .game-board-container");
+  const containerRect = container?.getBoundingClientRect?.() || { width: 0, height: 0 };
+  const boardStageRect = boardStage?.getBoundingClientRect?.() || { width: 0, height: 0 };
   const canMount = !!container && !!boardStage
     && container.offsetParent !== null
     && boardStage.offsetParent !== null
-    && ((container.clientWidth || 0) > 0 || (boardStage.clientWidth || 0) > 0);
+    && ((container.clientWidth || 0) > 0 || (boardStage.clientWidth || 0) > 0 || (containerRect.width || 0) > 0 || (boardStageRect.width || 0) > 0)
+    && ((container.clientHeight || 0) > 0 || (boardStage.clientHeight || 0) > 0 || (containerRect.height || 0) > 0 || (boardStageRect.height || 0) > 0);
   if (!canMount) {
     console.info("[Games] mount-container-missing", {
       runId,
@@ -4456,11 +4468,13 @@ function mountActiveGameBoard(runId, attempt = 0) {
       hasBoardStage: !!boardStage,
       containerWidth: container?.clientWidth || 0,
       boardStageWidth: boardStage?.clientWidth || 0,
+      containerHeight: container?.clientHeight || 0,
+      boardStageHeight: boardStage?.clientHeight || 0,
       tab: state.activePresenceTab,
       gameType: state.activeGame?.type || null
     });
-    if (attempt < 1 && typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-      window.requestAnimationFrame(() => mountActiveGameBoard(runId, attempt + 1));
+    if (attempt < 1 && typeof window !== "undefined") {
+      window.setTimeout(() => mountActiveGameBoard(runId, attempt + 1), 120);
     }
     return;
   }
@@ -4469,6 +4483,8 @@ function mountActiveGameBoard(runId, attempt = 0) {
     attempt,
     containerWidth: container.clientWidth || 0,
     boardStageWidth: boardStage.clientWidth || 0,
+    containerHeight: container.clientHeight || 0,
+    boardStageHeight: boardStage.clientHeight || 0,
     tab: state.activePresenceTab,
     gameType: state.activeGame?.type || null
   });
@@ -4482,6 +4498,12 @@ function mountActiveGameBoard(runId, attempt = 0) {
       (move) => submitGameMove(move),
       resolveSpiritkinDomainTheme(state.activeGame?.type, spiritkin?.name)
     );
+    console.info("[Games] render success", {
+      runId,
+      attempt,
+      gameType: state.activeGame?.type || null,
+      available: SpiritverseGames?.available !== false
+    });
   } catch (error) {
     console.error("[Games] render-failed", {
       runId,
@@ -4497,6 +4519,11 @@ function scheduleActiveGameBoardMount() {
   _gameBoardMountRunId += 1;
   const runId = _gameBoardMountRunId;
   if (!state.activeGame || !SpiritverseGames || state.activePresenceTab !== "games") return;
+  console.info("[Games] mount-scheduled", {
+    runId,
+    tab: state.activePresenceTab,
+    gameType: state.activeGame?.type || null
+  });
   if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
     window.requestAnimationFrame(() => mountActiveGameBoard(runId, 0));
     return;
@@ -6961,6 +6988,11 @@ async function startGameSession(gameType) {
       return false;
     }
     state.pendingGameType = gameType;
+    console.info("[Games] game selected", {
+      gameType,
+      activeTab: state.activePresenceTab,
+      hasConversation: !!state.conversationId
+    });
     state.activePresenceTab = "games";
     state.showHomeView = false;
     normalizeInteractionState("startGameSession:prepare");

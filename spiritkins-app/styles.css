@@ -8987,6 +8987,9 @@ button[data-action="begin-quest"]:active,
   max-width: 100%;
   min-height: clamp(520px, 56vw, 920px);
   padding: 24px 20px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
   overflow: auto;
 }
 
@@ -10120,6 +10123,12 @@ button[data-action="begin-quest"]:active,
 .world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] #spiritverse-game-board {
   width: 100%;
   max-width: 100%;
+}
+
+.presence-tab-content[data-presence-surface="games"] #spiritverse-game-board {
+  min-height: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 .selection-overlay-stage,

@@ -999,7 +999,22 @@ export const SpiritverseGames = {
     });
     // Render to main container
     const el = typeof container === 'string' ? document.getElementById(container) : container;
-    if (el) renderFn(el, false);
+    if (!el) {
+      console.error("[Games] render-failed", {
+        type,
+        reason: "container-missing",
+        containerType: typeof container === "string" ? "id" : "element",
+        containerId: typeof container === "string" ? container : (container?.id || null)
+      });
+      return;
+    }
+    renderFn(el, false);
+    console.info("[Games] render success", {
+      type,
+      containerId: el.id || null,
+      status: safeGame.status,
+      turn: safeGame.turn
+    });
     // Update Grand Stage if open
     if (GrandStage.isOpen && GrandStage.gameType === type) {
       GrandStage.update(renderFn, gameCommentary, history);
