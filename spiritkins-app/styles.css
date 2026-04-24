@@ -9183,6 +9183,33 @@ button[data-action="begin-quest"]:active,
   color: rgba(255,255,255,0.94);
 }
 
+.wake-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.045);
+  color: rgba(255,255,255,0.82);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wake-status-chip.listening,
+.wake-status-chip.detected,
+.settings-status-line.listening,
+.settings-status-line.detected {
+  border-color: color-mix(in srgb, var(--realm-accent) 38%, rgba(255,255,255,0.1));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--realm-accent-soft) 22%, transparent);
+}
+
+.wake-status-chip.paused,
+.settings-status-line.paused {
+  color: rgba(255,231,177,0.92);
+}
+
 .wake-mode-card {
   display: grid;
   gap: 10px;
@@ -9243,6 +9270,82 @@ button[data-action="begin-quest"]:active,
 .wake-mode-card.disabled,
 .wake-mode-card.unsupported {
   opacity: 0.82;
+}
+
+.settings-modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(3, 8, 16, 0.62);
+  backdrop-filter: blur(12px);
+}
+
+.settings-modal-card {
+  width: min(680px, calc(100vw - 28px));
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 26px;
+  border: 1px solid color-mix(in srgb, var(--realm-accent) 18%, rgba(255,255,255,0.08));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018)),
+    color-mix(in srgb, var(--realm-panel) 78%, rgba(4,8,16,0.92));
+  box-shadow: 0 28px 80px rgba(0,0,0,0.34);
+}
+
+.settings-modal-head,
+.settings-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-modal-head h3 {
+  margin: 2px 0 0;
+}
+
+.settings-modal-close {
+  border: 0;
+  background: transparent;
+  color: rgba(255,255,255,0.82);
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.settings-modal-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.settings-row strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.settings-row p,
+.settings-status-copy,
+.settings-note {
+  margin: 0;
+  color: rgba(255,255,255,0.72);
+  line-height: 1.5;
+}
+
+.settings-status-line {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.86);
+  font-size: 0.82rem;
 }
 
 @media (min-width: 1281px) {
@@ -9347,6 +9450,8 @@ button[data-action="begin-quest"]:active,
   .topbar-right,
   .chat-header-right,
   .presence-panel-actions,
+  .settings-modal-head,
+  .settings-row,
   .wake-mode-head,
   .wake-mode-foot {
     align-items: stretch;
@@ -9417,5 +9522,11 @@ button[data-action="begin-quest"]:active,
 
   .composer-bar {
     grid-template-columns: 1fr auto auto;
+  }
+
+  .settings-modal-card {
+    width: min(100vw - 20px, 680px);
+    padding: 18px;
+    border-radius: 22px;
   }
 }

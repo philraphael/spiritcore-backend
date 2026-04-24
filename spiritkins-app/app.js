@@ -253,6 +253,8 @@ function worldArtImage(filename, alt, cls = "", eager = false) {
 let _AUDIO_CONTEXT = null;
 let _currentAudio = null;
 let _voiceLoopTimer = null;
+let _speechHoldTimer = null;
+let _wakeResumeTimer = null;
 let _audioPlaying = false;
 let _recognition = null;
 let _recognitionRunId = 0;
@@ -268,6 +270,10 @@ let _activeSpeechRequestId = 0;
 let _activeAudioRequestId = 0;
 let _pressedInteractiveEl = null;
 let _lastSpeechFingerprint = { key: "", at: 0 };
+let _pendingVoiceTurn = null;
+
+const LONG_FORM_SILENCE_GRACE_MS = 1400;
+const WAKE_MODE_SILENCE_GRACE_MS = 1650;
 
 function claimSpeechRequest() {
   _activeSpeechRequestId = ++_nextSpeechRequestId;
@@ -277,6 +283,20 @@ function claimSpeechRequest() {
 function invalidateSpeechRequests() {
   _activeSpeechRequestId = ++_nextSpeechRequestId;
   _activeAudioRequestId = 0;
+}
+
+function clearSpeechHoldTimer() {
+  if (_speechHoldTimer) {
+    clearTimeout(_speechHoldTimer);
+    _speechHoldTimer = null;
+  }
+}
+
+function clearWakeResumeTimer() {
+  if (_wakeResumeTimer) {
+    clearTimeout(_wakeResumeTimer);
+    _wakeResumeTimer = null;
+  }
 }
 
 function isSpeechRequestActive(requestId) {
@@ -2744,7 +2764,10 @@ const state = {
   voiceMode: localStorage.getItem("sk_voice_mode") === "1", // Always-on mic mode
   wakeModeEnabled: localStorage.getItem(WAKE_MODE_KEY) === "1",
   wakeDetected: false,
+  wakePaused: false,
+  wakePauseReason: "",
   wakeModeStatus: "",
+  settingsOpen: false,
   voiceGuidanceDismissed: localStorage.getItem(VOICE_GUIDANCE_KEY) === "1",
   voiceTranscriptPreview: "",
   voicePermissionBlocked: false,
@@ -7015,6 +7038,7 @@ function render() {
   const root = document.getElementById("root");
   if (!root) return;
   try {
+    syncWakeModeSessionDefault();
     normalizeInteractionState("render");
     enforceEntryVoiceSilence();
     root.innerHTML = buildApp();
@@ -7022,6 +7046,7 @@ function render() {
     syncSelectionTrailers();
     syncEntryCinematics();
     if (state.voiceMode) maybeAutoOpenGameMic();
+    if (shouldAutoResumeWakeMode()) scheduleWakeResume("render");
     if (typeof window.__svMarkBootReady === "function") {
       window.__svMarkBootReady();
     }
@@ -7124,9 +7149,71 @@ function getWakeModeStatus(spiritkin = getActiveWakeSpiritkin()) {
   const wakeName = getWakeNameForSpiritkin(spiritkin);
   if (state.voiceMuted) return { cls: "disabled", label: "Voice muted", detail: `Unmute voice to listen for "${wakeName}".` };
   if (!state.wakeModeEnabled) return { cls: "off", label: "Off", detail: `Foreground only. Listens for "${wakeName}" while this app is open.` };
+  if (state.wakePaused) return { cls: "paused", label: "Wake paused", detail: state.wakePauseReason || `Wake mode paused while "${wakeName}" was out of view.` };
   if (state.wakeDetected) return { cls: "detected", label: "Wake detected", detail: `${getSpiritkinDisplayName(spiritkin)} heard "${wakeName}". Ask your question.` };
   if (state.voiceListening) return { cls: "listening", label: "Listening", detail: `Foreground wake mode is listening for "${wakeName}".` };
   return { cls: "standby", label: "Ready", detail: `Wake mode is on for "${wakeName}". Tap resume if the browser pauses it.` };
+}
+
+function syncWakeModeSessionDefault() {
+  if (typeof window === "undefined") return;
+  if (localStorage.getItem(WAKE_MODE_KEY) !== null) return;
+  if (!state.entryAccepted || !state.primarySpiritkin || !supportsSpeechRecognition()) return;
+  state.wakeModeEnabled = true;
+  localStorage.setItem(WAKE_MODE_KEY, "1");
+}
+
+function shouldAutoResumeWakeMode() {
+  return !!(
+    state.wakeModeEnabled &&
+    !state.voiceMuted &&
+    !state.loadingReply &&
+    !_audioPlaying &&
+    !_recognition &&
+    canUseVoiceInteraction() &&
+    typeof document !== "undefined" &&
+    document.visibilityState === "visible"
+  );
+}
+
+function markWakePaused(reason = "Wake paused while the app was not visible.") {
+  state.wakePaused = true;
+  state.wakeDetected = false;
+  state.wakePauseReason = reason;
+}
+
+function scheduleWakeResume(reason = "resume") {
+  clearWakeResumeTimer();
+  if (!shouldAutoResumeWakeMode()) return;
+  _wakeResumeTimer = setTimeout(() => {
+    if (!shouldAutoResumeWakeMode()) return;
+    state.wakePaused = false;
+    state.wakePauseReason = "";
+    startListening({ source: `wake-mode-${reason}` });
+  }, 320);
+}
+
+function createPendingVoiceTurn(source = "manual") {
+  return {
+    source,
+    finalSegments: [],
+    interimSegments: [],
+    wakeDetected: false,
+    wakeName: "",
+    sessionActive: false,
+    segmentCount: 0,
+    lastPreview: "",
+    finalTranscript: "",
+  };
+}
+
+function getPendingVoiceTranscript(turn = _pendingVoiceTurn) {
+  if (!turn) return "";
+  return [turn.finalTranscript, ...(turn.interimSegments || [])]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function enforceEntryVoiceSilence() {
@@ -7158,8 +7245,130 @@ function clearVoiceLoopTimer() {
 
 function clearVoiceTurnCapture() {
   clearVoiceLoopTimer();
+  clearSpeechHoldTimer();
+  _pendingVoiceTurn = null;
   setVoiceTurnRuntimeState({ awaitingUserTurn: false, captureAfterAudio: false });
   logContinuityDebug("voice-turn-capture-cleared", {});
+}
+
+function scheduleVoiceTurnFinalize(options = {}) {
+  const { source = "manual", force = false, reason = "silence-grace" } = options;
+  clearSpeechHoldTimer();
+  if (force) {
+    finalizePendingVoiceTurn({ source, reason, force: true });
+    return;
+  }
+  const delay = shouldUseWakeMode(source) ? WAKE_MODE_SILENCE_GRACE_MS : LONG_FORM_SILENCE_GRACE_MS;
+  _speechHoldTimer = setTimeout(() => {
+    finalizePendingVoiceTurn({ source, reason, force: false });
+  }, delay);
+}
+
+function finalizePendingVoiceTurn(options = {}) {
+  const { source = "manual", reason = "silence-grace", force = false } = options;
+  clearSpeechHoldTimer();
+  const turn = _pendingVoiceTurn;
+  if (!turn) return false;
+  const rawTranscript = getPendingVoiceTranscript(turn);
+  const sessionActive = hasActiveVoiceConversationSession();
+  const activeWakeSpiritkin = getActiveWakeSpiritkin();
+  const activeWakeName = getWakeNameForSpiritkin(activeWakeSpiritkin);
+  const wakeDetected = turn.wakeDetected || !!findWakeTriggeredSpiritkin(rawTranscript, { activeOnly: true });
+  const anyWakeTarget = findWakeTriggeredSpiritkin(rawTranscript, { activeOnly: false });
+  const wrongWakeDetected = !!anyWakeTarget && !wakeDetected;
+  const directedSpeech = isDirectedSpeech(rawTranscript);
+  const wakeModeRun = shouldUseWakeMode(source);
+
+  console.info("[Voice] transcript-finalized", {
+    source,
+    reason,
+    force,
+    transcriptLength: rawTranscript.length,
+    segmentCount: turn.segmentCount,
+    preview: rawTranscript.slice(0, 180),
+    wakeDetected,
+    wrongWakeDetected,
+    wakeName: activeWakeName,
+  });
+  logContinuityDebug("transcript-finalized", {
+    source,
+    reason,
+    force,
+    transcriptLength: rawTranscript.length,
+    segmentCount: turn.segmentCount,
+    preview: rawTranscript.slice(0, 180),
+    wakeDetected,
+    wrongWakeDetected,
+    wakeName: activeWakeName,
+  });
+
+  if (!rawTranscript) {
+    _pendingVoiceTurn = null;
+    return false;
+  }
+
+  if (wrongWakeDetected || (!wakeDetected && !(sessionActive && directedSpeech))) {
+    if (wakeModeRun) {
+      state.wakeDetected = false;
+      state.input = "";
+      state.voiceTranscriptPreview = "";
+      state.statusText = wrongWakeDetected
+        ? `Wake mode ignored a different Spiritkin name. Listening for "${activeWakeName}".`
+        : activeWakeName
+          ? `Wake mode ignored speech until "${activeWakeName}" is heard.`
+          : "Wake mode needs an active Spiritkin wake name.";
+      state.statusError = false;
+      _pendingVoiceTurn = null;
+      render();
+      return false;
+    }
+    _pendingVoiceTurn = null;
+    stopListening();
+    setVoiceWaitingStatus(wrongWakeDetected
+      ? `Ignored a different Spiritkin wake name. Stay with "${activeWakeName}" for this active session.`
+      : "Voice input ignored until a Spiritkin is named or a live session is active.");
+    return false;
+  }
+
+  const wakeCleanedTranscript = wakeDetected ? stripWakeNameFromTranscript(rawTranscript, activeWakeName) : rawTranscript;
+  if (wakeModeRun && wakeDetected && !wakeCleanedTranscript) {
+    state.input = "";
+    state.voiceTranscriptPreview = "";
+    state.statusText = `${getSpiritkinDisplayName(activeWakeSpiritkin)} is awake. Ask your question now.`;
+    state.statusError = false;
+    _pendingVoiceTurn = createPendingVoiceTurn(source);
+    render();
+    return false;
+  }
+
+  const submissionText = wakeModeRun && wakeCleanedTranscript ? wakeCleanedTranscript : rawTranscript;
+  const now = Date.now();
+  if (_lastVoiceSubmission.text === submissionText && (now - _lastVoiceSubmission.at) < 1500) return false;
+  _lastVoiceSubmission = { text: submissionText, at: now };
+  if (isDuplicateUserSubmission(submissionText)) {
+    _pendingVoiceTurn = null;
+    stopListening();
+    setVoiceWaitingStatus();
+    return false;
+  }
+
+  _pendingVoiceTurn = null;
+  stopListening();
+  state.input = submissionText;
+  state.voiceTranscriptPreview = submissionText;
+  state.statusText = wakeModeRun && wakeDetected
+    ? `Wake detected. Captured: "${submissionText}"`
+    : `Captured: "${submissionText}"`;
+  state.statusError = false;
+  render();
+  if (!sessionActive && wakeDetected && !state.conversationId && state.selectedSpiritkin) {
+    beginConversation().then(() => {
+      if (state.conversationId) sendMessage(submissionText);
+    });
+    return true;
+  }
+  sendMessage(submissionText);
+  return true;
 }
 
 function stopCurrentAudioPlayback() {
@@ -7207,6 +7416,9 @@ function cleanupSpeechLifecycle(reason = "unspecified", options = {}) {
   _scheduledAutoSpeechMessageId = null;
   invalidateSpeechRequests();
   clearVoiceLoopTimer();
+  clearSpeechHoldTimer();
+  clearWakeResumeTimer();
+  _pendingVoiceTurn = null;
 
   if (_recognition) {
     _recognitionStopRequested = true;
@@ -7523,6 +7735,7 @@ function buildApp() {
       ${!inEntryFlow && state.showReturnSummary ? buildRetentionPanel() : ""}
       ${state.surveyOpen ? buildSurveyModal() : ""}
       ${state.tierModalOpen ? buildTierModal() : ""}
+      ${state.settingsOpen ? buildSettingsModal() : ""}
       ${state.showCrownGateHome || !state.entryAccepted ? buildCrownGateEntry() : (state.spiritverseTrailerActive ? buildSpiritverseArrival() : (state.spiritCoreWelcoming ? buildSpiritCoreWelcome() : buildMain()))}
       ${!inEntryFlow ? buildIssueReporter() : ""}
       ${buildBondModal()}
@@ -7563,6 +7776,7 @@ function buildWorldPulse() {
 
 function buildTopbar() {
   const active = state.primarySpiritkin;
+  const wakeStatus = active ? getWakeModeStatus(active) : null;
   return `
     <header class="topbar" data-focus-anchor="topbar">
       <button class="topbar-brand topbar-home" data-action="go-home" title="Return to the Spiritverse home">
@@ -7576,7 +7790,9 @@ function buildTopbar() {
       <div class="topbar-right">
         ${!state.showReturnSummary && (state.returnSummary || state.dailyMoment || state.weeklyMoment || state.retentionUnlocks.length) ? `<button class="btn btn-ghost btn-sm" data-action="reopen-return-summary">While away</button>` : ""}
         ${active ? `<div class="presence-chip ${esc(active.ui.cls)}">Bonded: ${esc(getSpiritkinDisplayName(active))}</div>` : `<div class="presence-chip">Choose a companion</div>`}
+        ${wakeStatus && active ? `<div class="wake-status-chip ${esc(wakeStatus.cls)}" title="${esc(wakeStatus.detail)}">Wake ${esc(wakeStatus.label)}</div>` : ""}
         ${state.entryAccepted && state.primarySpiritkin ? `<button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>` : ""}
+        ${state.entryAccepted ? `<button class="btn btn-ghost btn-sm" data-action="open-settings">Settings</button>` : ""}
         ${state.entryAccepted && state.conversationId ? `<button class="btn btn-ghost btn-sm" data-action="new-session">New session</button>` : ""}
         ${state.entryAccepted ? `<button class="btn btn-ghost btn-sm" data-action="toggle-issue-reporter">${state.issueReporterOpen ? "Close report" : "Report issue"}</button>` : ""}
         ${state.entryAccepted && state.userName ? `<span class="topbar-user">${esc(state.userName)}</span>` : ""}
@@ -7929,6 +8145,54 @@ function buildSpiritCoreWelcome() {
         `}
       </div>
     </section>
+  `;
+}
+
+function buildSettingsModal() {
+  const active = getActiveWakeSpiritkin();
+  const wakeStatus = getWakeModeStatus(active);
+  const wakeName = getWakeNameForSpiritkin(active);
+  return `
+    <div class="settings-modal-scrim" data-action="close-settings">
+      <div class="settings-modal-card" role="dialog" aria-modal="true" aria-label="Voice and wake settings">
+        <div class="settings-modal-head">
+          <div>
+            <div class="panel-label">Settings</div>
+            <h3>Voice and wake</h3>
+          </div>
+          <button class="settings-modal-close" data-action="close-settings" aria-label="Close settings">×</button>
+        </div>
+        <div class="settings-modal-section">
+          <div class="settings-row">
+            <div>
+              <strong>Foreground wake mode</strong>
+              <p>Listens only while this app is open and the browser allows microphone capture.</p>
+            </div>
+            <button class="wake-mode-switch ${state.wakeModeEnabled ? "enabled" : ""}" data-action="toggle-wake-mode" aria-pressed="${state.wakeModeEnabled ? "true" : "false"}">
+              ${state.wakeModeEnabled ? "On" : "Off"}
+            </button>
+          </div>
+          <div class="settings-status-line ${esc(wakeStatus.cls)}">Status: ${esc(wakeStatus.label)}${wakeName ? ` · Wake word: ${esc(wakeName)}` : ""}</div>
+          <div class="settings-status-copy">${esc(wakeStatus.detail)}</div>
+        </div>
+        <div class="settings-modal-section">
+          <div class="settings-row">
+            <div>
+              <strong>Microphone privacy</strong>
+              <p>Voice stays foreground-only in the web app. Leaving the tab can pause wake mode.</p>
+            </div>
+            <button class="btn btn-ghost btn-sm mute-toggle" data-action="toggle-mute" title="${state.voiceMuted ? "Unmute voice" : "Mute voice"}">
+              ${state.voiceMuted ? "Voice Off" : "Voice On"}
+            </button>
+          </div>
+        </div>
+        <div class="settings-modal-section">
+          <div class="settings-note">
+            True background wake mode still requires a native mobile wrapper or equivalent background-capable runtime.
+          </div>
+        </div>
+      </div>
+    </div>
   `;
 }
 
@@ -8505,7 +8769,6 @@ function buildChatView() {
   const spiritkinSpeaking = isSpiritkinSpeechActive(spiritkin.name);
   const roomMeta = getRoomDisplayMeta(state.activePresenceTab, spiritkin);
   const wakeMode = getWakeModeStatus(spiritkin);
-  const wakeName = getWakeNameForSpiritkin(spiritkin);
 
   // Echoes & Charter Logic
   const { currentBond, stageData } = getBondStateForSpiritkin(spiritkin.name);
@@ -9044,11 +9307,9 @@ function buildChatView() {
             <button class="btn btn-ghost btn-sm mute-toggle" data-action="toggle-mute" title="${state.voiceMuted ? 'Unmute voice' : 'Mute voice'}">
               ${state.voiceMuted ? '🔇 Voice Off' : '🔊 Voice On'}
             </button>
-            <button class="btn btn-ghost btn-sm wake-toggle ${state.wakeModeEnabled ? "active" : ""}" data-action="toggle-wake-mode" title="Foreground wake mode for ${esc(getSpiritkinDisplayName(spiritkin))}">
-              ${state.wakeModeEnabled ? "Wake On" : "Wake Off"}
-            </button>
             <div class="presence-chip ${esc(meta.cls)}">${esc(meta.symbol)}</div>
             <div class="status-chip ${(state.loadingReply || spiritkinSpeaking) ? 'live' : ''}">${escDisplay(state.loadingReply ? `${getSpiritkinDisplayName(spiritkin)} is responding…` : getSpiritkinVisualState(spiritkin.name).statusLabel)}</div>
+            ${state.wakeModeEnabled ? `<div class="wake-status-chip ${esc(wakeMode.cls)}">${esc(wakeMode.label)}</div>` : ""}
           </div>
         </div>
         <div class="stage-atmosphere ${esc(meta.cls)}">
@@ -9200,23 +9461,6 @@ function buildChatView() {
               : "This browser does not expose live speech recognition here. Voice input works best in current Chrome-class browsers."}</p>
           </div>
         ` : ""}
-
-        <div class="wake-mode-card ${esc(wakeMode.cls)}">
-          <div class="wake-mode-head">
-            <div>
-              <div class="wake-mode-label">Foreground wake mode</div>
-              <div class="wake-mode-title">${esc(wakeMode.label)}</div>
-            </div>
-            <button class="wake-mode-switch ${state.wakeModeEnabled ? "enabled" : ""}" data-action="toggle-wake-mode" aria-pressed="${state.wakeModeEnabled ? "true" : "false"}">
-              ${state.wakeModeEnabled ? "On" : "Off"}
-            </button>
-          </div>
-          <p>${esc(wakeMode.detail)}</p>
-          <div class="wake-mode-foot">
-            <span>Active wake word: <strong>${esc(wakeName || "none")}</strong></span>
-            <span>${state.wakeModeEnabled ? "App-open only" : "User controlled"}</span>
-          </div>
-        </div>
 
         ${showVoicePreview ? `
           <div class="voice-live-chip ${state.voiceListening ? "listening" : "captured"}">
@@ -9897,7 +10141,7 @@ async function onClick(event) {
   if (action === "toggle-mic") {
     dismissVoiceGuidance();
     if (state.voiceListening) {
-      stopListening();
+      stopListening({ finalizePending: true, reason: "manual-stop" });
     } else {
       startListening({ source: "manual-toggle" });
     }
@@ -10294,6 +10538,16 @@ async function onClick(event) {
     render();
     return;
   }
+  if (action === "open-settings") {
+    state.settingsOpen = true;
+    render();
+    return;
+  }
+  if (action === "close-settings") {
+    state.settingsOpen = false;
+    render();
+    return;
+  }
 
   if (action === "bond-generated-spiritkin") {
     if (state.generatedSpiritkin) {
@@ -10338,7 +10592,11 @@ function startListening(options = {}) {
   }
 
   clearVoiceLoopTimer();
+  clearSpeechHoldTimer();
+  _pendingVoiceTurn = createPendingVoiceTurn(source);
   state.voicePermissionBlocked = false;
+  state.wakePaused = false;
+  state.wakePauseReason = "";
   state.voiceTranscriptPreview = "";
   state.statusText = source === "manual-toggle" || source === "auto-turn"
     ? "Requesting microphone access..."
@@ -10389,133 +10647,68 @@ function startListening(options = {}) {
 
   recognition.onresult = (event) => {
     if (!isActiveRun()) return;
-    const result = event.results?.[event.resultIndex];
-    const transcript = String(result?.[0]?.transcript || "").trim();
-    const preview = Array.from(event.results || [])
-      .slice(event.resultIndex)
+    const allResults = Array.from(event.results || []);
+    const finalSegments = allResults
+      .filter((entry) => entry?.isFinal)
       .map((entry) => String(entry?.[0]?.transcript || "").trim())
-      .filter(Boolean)
-      .join(" ")
-      .trim();
-    state.voiceTranscriptPreview = preview || transcript;
-    if (!result?.isFinal) {
-      render();
-      return;
-    }
-    state.input = transcript;
-    state.voiceTranscriptPreview = transcript;
-    render();
-    if (!transcript) return;
-    const sessionActive = hasActiveVoiceConversationSession();
-    const wakeModeRun = shouldUseWakeMode(source);
+      .filter(Boolean);
+    const interimSegments = allResults
+      .filter((entry) => !entry?.isFinal)
+      .map((entry) => String(entry?.[0]?.transcript || "").trim())
+      .filter(Boolean);
+    const finalTranscript = finalSegments.join(" ").replace(/\s+/g, " ").trim();
+    const previewTranscript = [finalTranscript, ...interimSegments].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
     const activeWakeSpiritkin = getActiveWakeSpiritkin();
     const activeWakeName = getWakeNameForSpiritkin(activeWakeSpiritkin);
-    const wakeTarget = findWakeTriggeredSpiritkin(transcript, { activeOnly: true });
+    const wakeTarget = findWakeTriggeredSpiritkin(previewTranscript || finalTranscript, { activeOnly: true });
     const wakeDetected = !!wakeTarget;
-    const directedSpeech = isDirectedSpeech(transcript);
+    const directedSpeech = isDirectedSpeech(previewTranscript || finalTranscript);
+
+    _pendingVoiceTurn = {
+      ...(_pendingVoiceTurn || createPendingVoiceTurn(source)),
+      source,
+      finalSegments,
+      interimSegments,
+      finalTranscript,
+      lastPreview: previewTranscript,
+      segmentCount: finalSegments.length + interimSegments.length,
+      wakeDetected,
+      wakeName: activeWakeName,
+      sessionActive: hasActiveVoiceConversationSession(),
+    };
+
+    state.voiceTranscriptPreview = previewTranscript;
+    state.input = previewTranscript;
+
     console.info(`[Voice] ${directedSpeech ? "directed-speech-true" : "directed-speech-false"}`, {
       source,
       runId,
-      transcriptLength: transcript.length,
+      transcriptLength: (previewTranscript || finalTranscript).length,
+      segmentCount: _pendingVoiceTurn.segmentCount,
     });
     logContinuityDebug(directedSpeech ? "directed-speech-true" : "directed-speech-false", {
       source,
       runId,
-      transcriptLength: transcript.length,
+      transcriptLength: (previewTranscript || finalTranscript).length,
+      segmentCount: _pendingVoiceTurn.segmentCount,
     });
-    if (!wakeDetected && !(sessionActive && directedSpeech)) {
-      console.info("[Voice] wake-not-detected", {
-        source,
-        runId,
-        wakeNames: activeWakeName ? [activeWakeName] : VOICE_WAKE_NAMES,
-        activeSpiritkin: getSpiritkinDisplayName(activeWakeSpiritkin),
-        transcriptLength: transcript.length
-      });
-      logContinuityDebug("wake-not-detected", {
-        source,
-        runId,
-        wakeNames: activeWakeName ? [activeWakeName] : VOICE_WAKE_NAMES,
-        activeSpiritkin: getSpiritkinDisplayName(activeWakeSpiritkin),
-        transcriptLength: transcript.length,
-      });
-      if (wakeModeRun) {
-        state.wakeDetected = false;
-        state.input = "";
-        state.voiceTranscriptPreview = "";
-        state.statusText = activeWakeName
-          ? `Wake mode ignored speech until "${activeWakeName}" is heard.`
-          : "Wake mode needs an active Spiritkin wake name.";
-        state.statusError = false;
-        render();
-        return;
-      }
-      stopListening();
-      setVoiceWaitingStatus("Voice input ignored until a Spiritkin is named or a live session is active.");
-      return;
-    }
+
     if (wakeDetected) {
-      console.info("[Voice] wake-detected", {
-        source,
-        runId,
-        wakeTarget: typeof wakeTarget === "string" ? getSpiritkinDisplayName(wakeTarget) : getSpiritkinDisplayName(wakeTarget?.name),
-      });
-      logContinuityDebug("wake-detected", {
-        source,
-        runId,
-        wakeTarget: typeof wakeTarget === "string" ? getSpiritkinDisplayName(wakeTarget) : getSpiritkinDisplayName(wakeTarget?.name),
-      });
       state.wakeDetected = true;
-      if (!sessionActive && wakeTarget && typeof wakeTarget === "object") {
+      if (!_pendingVoiceTurn.sessionActive && wakeTarget && typeof wakeTarget === "object") {
         state.selectedSpiritkin = wakeTarget;
       }
-    } else if (sessionActive && directedSpeech) {
-      console.info("[Voice] session-active-bypass", { source, runId });
-      logContinuityDebug("session-active-bypass", { source, runId });
     }
-    setVoiceTurnRuntimeState({ awaitingUserTurn: false, captureAfterAudio: false });
-    setAuthoritativeTurnPhase("processing", {
-      isSpeaking: false,
-      isListening: false,
-      isPaused: false,
-    });
-    logContinuityDebug("listening-transcript", {
-      source,
-      runId,
-      transcriptLength: transcript.length,
-    });
-    const wakeCleanedTranscript = wakeDetected ? stripWakeNameFromTranscript(transcript, activeWakeName) : transcript;
-    if (wakeModeRun && wakeDetected && !wakeCleanedTranscript) {
-      state.input = "";
-      state.voiceTranscriptPreview = "";
-      state.statusText = `${getSpiritkinDisplayName(activeWakeSpiritkin)} is awake. Ask your question now.`;
+
+    if (previewTranscript) {
+      state.statusText = shouldUseWakeMode(source) && activeWakeName
+        ? `Listening for your full turn after "${activeWakeName}"...`
+        : "Listening... hold your thought for a beat.";
       state.statusError = false;
-      render();
-      return;
+      scheduleVoiceTurnFinalize({ source, reason: "silence-grace" });
     }
-    const submissionText = wakeModeRun && wakeCleanedTranscript ? wakeCleanedTranscript : transcript;
-    state.input = submissionText;
-    const now = Date.now();
-    if (_lastVoiceSubmission.text === submissionText && (now - _lastVoiceSubmission.at) < 1500) return;
-    _lastVoiceSubmission = { text: submissionText, at: now };
-    if (isDuplicateUserSubmission(submissionText)) {
-      stopListening();
-      setVoiceWaitingStatus();
-      return;
-    }
-    stopListening();
-    state.voiceTranscriptPreview = submissionText;
-    state.statusText = wakeModeRun && wakeDetected
-      ? `Wake detected. Captured: "${submissionText}"`
-      : `Captured: "${submissionText}"`;
-    state.statusError = false;
+
     render();
-    if (!sessionActive && wakeDetected && !state.conversationId && state.selectedSpiritkin) {
-      beginConversation().then(() => {
-        if (state.conversationId) sendMessage(submissionText);
-      });
-      return;
-    }
-    sendMessage(submissionText);
   };
 
   recognition.onerror = (event) => {
@@ -10550,6 +10743,8 @@ function startListening(options = {}) {
       : `Voice error: ${event.error}. Tap the mic to try again.`;
     state.statusError = true;
     state.voiceTranscriptPreview = "";
+    clearSpeechHoldTimer();
+    _pendingVoiceTurn = null;
     _recognition = null;
     const stopRequested = _recognitionStopRequested;
     _recognitionStopRequested = false;
@@ -10589,6 +10784,10 @@ function startListening(options = {}) {
     }
     _recognition = null;
     state.voiceListening = false;
+    if (_pendingVoiceTurn && getPendingVoiceTranscript(_pendingVoiceTurn)) {
+      finalizePendingVoiceTurn({ source, reason: "recognition-ended", force: true });
+      return;
+    }
     state.voiceTranscriptPreview = "";
     setAuthoritativeTurnPhase("complete", {
       isSpeaking: false,
@@ -10607,11 +10806,7 @@ function startListening(options = {}) {
       if (state.wakeModeEnabled && !state.voiceMuted && canUseVoiceInteraction()) {
         state.wakeDetected = false;
         setVoiceWaitingStatus(`Wake mode is ready for "${getWakeNameForSpiritkin(getActiveWakeSpiritkin())}".`);
-        _voiceLoopTimer = setTimeout(() => {
-          if (!_recognition && state.wakeModeEnabled && !state.voiceMuted && canUseVoiceInteraction()) {
-            startListening({ source: "wake-mode-resume" });
-          }
-        }, 450);
+        scheduleWakeResume("resume");
       } else {
         setVoiceWaitingStatus();
       }
@@ -10631,7 +10826,12 @@ function startListening(options = {}) {
   }
 }
 
-function stopListening() {
+function stopListening(options = {}) {
+  const { finalizePending = false, reason = "stop-listening" } = options;
+  if (finalizePending) {
+    const finalized = finalizePendingVoiceTurn({ source: "manual-toggle", reason, force: true });
+    if (finalized) return;
+  }
   logContinuityDebug("listening-stop-requested", {
     hasRecognition: !!_recognition,
     voiceListening: !!state.voiceListening,
@@ -10647,9 +10847,12 @@ function restoreVoiceContinuityState() {
   const canResumeHint = !!((state.voiceMode || state.wakeModeEnabled) && !state.voiceMuted && state.selectedSpiritkin && state.conversationId);
   state.pendingVoiceResume = false;
   if (canResumeHint) {
-    state.statusText = state.wakeModeEnabled
-      ? "Foreground wake mode paused when the app left view. Tap Wake On to resume."
-      : "Voice session paused during transition. Tap the mic or type to continue.";
+    if (state.wakeModeEnabled) {
+      markWakePaused("Wake paused while the app was out of view. Return to the tab to resume foreground listening.");
+      state.statusText = "Wake paused. Return to the tab to resume foreground listening.";
+    } else {
+      state.statusText = "Voice session paused during transition. Tap the mic or type to continue.";
+    }
     state.statusError = false;
   }
   persistSession();
@@ -10670,13 +10873,43 @@ function installSpeechLifecycleGuards() {
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState !== "hidden") return;
-    const preserveResumeHint = !!((state.voiceMode || state.wakeModeEnabled) && !state.voiceMuted && state.selectedSpiritkin && state.conversationId);
-    if (preserveResumeHint) {
-      state.pendingVoiceResume = true;
-      persistSession();
+    if (document.visibilityState === "hidden") {
+      const preserveResumeHint = !!((state.voiceMode || state.wakeModeEnabled) && !state.voiceMuted && state.selectedSpiritkin && state.conversationId);
+      if (preserveResumeHint) {
+        if (state.wakeModeEnabled) {
+          markWakePaused("Wake paused because the tab is no longer visible.");
+        }
+        state.pendingVoiceResume = true;
+        persistSession();
+      }
+      cleanupSpeechLifecycle("visibility-hidden", { renderOnFinish: false, clearStatus: false, preserveResumeHint });
+      return;
     }
-    cleanupSpeechLifecycle("visibility-hidden", { renderOnFinish: false, clearStatus: false, preserveResumeHint });
+    if (state.wakeModeEnabled) {
+      state.statusText = state.wakePaused
+        ? "Wake paused while hidden. Resuming foreground listening..."
+        : `Wake ready for "${getWakeNameForSpiritkin(getActiveWakeSpiritkin())}".`;
+      state.statusError = false;
+      render();
+      scheduleWakeResume("return");
+    }
+  });
+
+  window.addEventListener("blur", () => {
+    if (!state.wakeModeEnabled || document.visibilityState === "hidden") return;
+    markWakePaused("Wake paused while the browser window is out of focus.");
+    cleanupSpeechLifecycle("window-blur", { renderOnFinish: false, clearStatus: false, preserveResumeHint: true });
+    render();
+  });
+
+  window.addEventListener("focus", () => {
+    if (!state.wakeModeEnabled) return;
+    state.statusText = state.wakePaused
+      ? "Wake paused while unfocused. Resuming foreground listening..."
+      : `Wake ready for "${getWakeNameForSpiritkin(getActiveWakeSpiritkin())}".`;
+    state.statusError = false;
+    render();
+    scheduleWakeResume("focus");
   });
 }
 
