@@ -114,6 +114,7 @@ let spiritGateArrivalPlaybackSafetyTimer = null;
 let spiritGateActiveAttemptId = 0;
 let spiritGateTransitionRevealTimer = null;
 let spiritGateTransitionRouteTimer = null;
+let bondFeedbackTimer = null;
 const selectionTrailerFailures = new Set();
 const VOICE_GUIDANCE_KEY = "sk_voice_guidance_dismissed";
 const WAKE_MODE_KEY = "sk_foreground_wake_mode";
@@ -2812,6 +2813,8 @@ const state = {
   ratings: readJson(RATINGS_KEY, {}),
   statusText: "",
   statusError: false,
+  bondFeedbackKind: "",
+  bondFeedbackSpiritkin: "",
   mediaMuted: localStorage.getItem(MEDIA_MUTED_KEY) !== "0",
   voiceMuted: localStorage.getItem("sk_voice_muted") === "1",
   voiceListening: false,
@@ -4887,6 +4890,30 @@ function setPrimarySpiritkin(spiritkin) {
   state.statusError = false;
   normalizeInteractionState("setPrimarySpiritkin");
   persistSession();
+}
+
+function triggerBondFeedback(kind, spiritkinName, message, options = {}) {
+  const { error = false, duration = 2200 } = options;
+  state.bondFeedbackKind = kind || "";
+  state.bondFeedbackSpiritkin = spiritkinName || "";
+  if (message) state.statusText = message;
+  state.statusError = !!error;
+  if (bondFeedbackTimer) {
+    window.clearTimeout(bondFeedbackTimer);
+    bondFeedbackTimer = null;
+  }
+  if (duration > 0) {
+    const expectedKind = state.bondFeedbackKind;
+    const expectedSpiritkin = state.bondFeedbackSpiritkin;
+    bondFeedbackTimer = window.setTimeout(() => {
+      if (state.bondFeedbackKind === expectedKind && state.bondFeedbackSpiritkin === expectedSpiritkin) {
+        state.bondFeedbackKind = "";
+        state.bondFeedbackSpiritkin = "";
+        render();
+      }
+      bondFeedbackTimer = null;
+    }, duration);
+  }
 }
 
 function openCrownGate() {
@@ -7997,6 +8024,9 @@ function buildWorldPulse() {
 function buildTopbar() {
   const active = state.primarySpiritkin;
   const wakeStatus = active ? getWakeModeStatus(active) : null;
+  const bondedFeedbackClass = active && state.bondFeedbackKind === "confirmed" && state.bondFeedbackSpiritkin === active.name
+    ? "is-bond-updated"
+    : "";
   return `
     <header class="topbar" data-focus-anchor="topbar">
       <button class="topbar-brand topbar-home" data-action="go-home" title="Return to the Spiritverse home">
@@ -8009,7 +8039,7 @@ function buildTopbar() {
       ${buildWorldPulse()}
       <div class="topbar-right">
         ${!state.showReturnSummary && (state.returnSummary || state.dailyMoment || state.weeklyMoment || state.retentionUnlocks.length) ? `<button class="btn btn-ghost btn-sm" data-action="reopen-return-summary">While away</button>` : ""}
-        ${active ? `<div class="presence-chip ${esc(active.ui.cls)}">Bonded: ${esc(getSpiritkinDisplayName(active))}</div>` : `<div class="presence-chip">Choose a companion</div>`}
+        ${active ? `<div class="presence-chip ${esc(active.ui.cls)} ${bondedFeedbackClass}">Bonded: ${esc(getSpiritkinDisplayName(active))}</div>` : `<div class="presence-chip">Choose a companion</div>`}
         ${wakeStatus && active ? `<div class="wake-status-chip ${esc(wakeStatus.cls)}" title="${esc(wakeStatus.detail)}">Wake ${esc(wakeStatus.label)}</div>` : ""}
         ${state.entryAccepted && state.primarySpiritkin ? `<button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>` : ""}
         ${state.entryAccepted ? `<button class="btn btn-ghost btn-sm" data-action="open-settings">Settings</button>` : ""}
@@ -8728,13 +8758,14 @@ function buildBondedHomeView() {
           <div class="bonded-room-stage">
             <div class="selection-hero bonded-hero">
               ${buildBondPreview(spiritkin, false)}
-              <div class="bond-home-copy panel-card">
+              <div class="bond-home-copy panel-card ${state.bondFeedbackKind === "confirmed" && state.bondFeedbackSpiritkin === spiritkin.name ? "is-bond-updated" : ""}">
                 <p class="eyebrow">Primary companion</p>
                 <h2>${esc(getSpiritkinDisplayName(spiritkin))} is your bonded companion.</h2>
                 <div class="bond-home-realm">${esc(spiritkin.ui.realm)}</div>
                 <p>
                   Every session, every memory, every conversation in this space belongs to ${esc(getSpiritkinDisplayName(spiritkin))}. To switch, use Manage bond and confirm a rebonding step.
                 </p>
+                ${state.bondFeedbackKind === "confirmed" && state.bondFeedbackSpiritkin === spiritkin.name ? `<div class="bond-feedback-banner">Bond updated. ${esc(getSpiritkinDisplayName(spiritkin))} now anchors your world.</div>` : ""}
                 <div class="bond-home-orientation">
                   <div class="bond-home-orientation-label">World orientation</div>
                   <p>Use Presence for conversation, Games for shared action, Journal for preserved bond memory, and Events for live realm movement and quests.</p>
@@ -8831,8 +8862,9 @@ function buildBondPreview(spiritkin, pending) {
   const primaryMediaSurface = pending ? "focus" : "bonded";
   const selfReveal = getSpiritkinSelfReveal(spiritkin);
   const introPrompt = getSpiritkinIntroPrompt(spiritkin);
+  const feedbackClass = state.bondFeedbackSpiritkin === spiritkin.name ? `bond-feedback-${esc(state.bondFeedbackKind || "")}` : "";
   return `
-    <div class="selection-focus ${esc(spiritkin.ui.cls)} ${pending ? "pending" : "bonded"}">
+    <div class="selection-focus ${esc(spiritkin.ui.cls)} ${pending ? "pending" : "bonded"} ${feedbackClass}">
       <div class="selection-focus-stage has-still">
         ${buildSpiritkinMediaPanel(spiritkin.name, primaryMediaSurface)}
         ${buildSigil(spiritkin.ui, "focus", spiritkin.ui.symbol)}
@@ -8868,17 +8900,19 @@ function buildBondPreview(spiritkin, pending) {
 function buildBondCard(spiritkin, index, subdued) {
   const activeBond = state.primarySpiritkin?.name === spiritkin.name;
   const pending = state.pendingBondSpiritkin?.name === spiritkin.name;
+  const selected = state.selectedSpiritkin?.name === spiritkin.name;
+  const rebondTarget = state.rebondSpiritkin?.name === spiritkin.name;
   const essence = Array.isArray(spiritkin.essence) ? spiritkin.essence.slice(0, 3) : [];
   const action = activeBond ? "bonded-card" : subdued ? "request-rebond" : "preview-primary";
   return `
-    <article class="sk-card ${esc(spiritkin.ui.cls)} ${activeBond ? "bonded" : ""} ${pending ? "pending" : ""} ${subdued ? "subdued" : ""}" data-action="${action}" data-index="${index}" data-name="${esc(spiritkin.name)}">
+    <article class="sk-card ${esc(spiritkin.ui.cls)} ${activeBond ? "bonded" : ""} ${pending ? "pending" : ""} ${selected ? "selected" : ""} ${rebondTarget ? "rebond-target" : ""} ${subdued ? "subdued" : ""}" data-action="${action}" data-index="${index}" data-name="${esc(spiritkin.name)}">
       <div class="sk-card-top">
         <div>
           <div class="sk-mood">${esc(spiritkin.ui.mood)}</div>
           <div class="sk-name">${esc(getSpiritkinDisplayName(spiritkin))}</div>
           <div class="sk-title">${esc(spiritkin.title || "")}</div>
         </div>
-        ${activeBond ? `<div class="sk-selected-badge">Bonded</div>` : pending ? `<div class="sk-pending-badge">Pending</div>` : ""}
+        ${activeBond ? `<div class="sk-selected-badge">Bonded</div>` : pending ? `<div class="sk-pending-badge">Selected</div>` : rebondTarget ? `<div class="sk-pending-badge">Ready to switch</div>` : selected ? `<div class="sk-pending-badge">In view</div>` : ""}
       </div>
       <div class="sk-founder-badge">Founding Pillar</div>
       ${buildSpiritkinMediaPanel(spiritkin.name, "card")}
@@ -8889,7 +8923,7 @@ function buildBondCard(spiritkin, index, subdued) {
       <p class="sk-tone">${esc(describePresence(spiritkin) || spiritkin.ui.strap)}</p>
       <p class="sk-selection-context">${escDisplay(getSpiritkinSelectionContext(spiritkin.name))}</p>
       <div class="sk-origin-story">${esc(spiritkin.ui.loreSnippet || spiritkin.ui.originStory)}</div>
-      <div class="sk-footer-note">${activeBond ? "This companion owns your active sessions." : subdued ? "Available only through rebonding." : "Preview and confirm to bond."}</div>
+      <div class="sk-footer-note">${activeBond ? "This companion owns your active sessions." : rebondTarget ? "Confirmation is armed. Confirm rebonding to switch immediately." : subdued ? "Available only through rebonding." : selected ? "Selection is live. Confirm to continue." : "Preview and confirm to bond."}</div>
     </article>
   `;
 }
@@ -9711,7 +9745,7 @@ function buildChatView() {
           <button class="composer-send" data-action="send" ${state.loadingReply || !state.conversationId ? "disabled" : ""} title="Send message">Send</button>
         </div>
 
-        ${state.statusText ? `<div class="status-bar ${state.statusError ? "error" : ""}">${esc(state.statusText)}</div>` : ""}
+        ${state.statusText ? `<div class="status-bar ${state.statusError ? "error" : ""} ${state.bondFeedbackKind ? `bond-feedback-${esc(state.bondFeedbackKind)}` : ""}">${esc(state.statusText)}</div>` : ""}
       </aside>
       ` : ""}
       </div>
@@ -10032,8 +10066,9 @@ async function onClick(event) {
     state.selectedSpiritkin = candidate || state.selectedSpiritkin;
     state.selectionOverlaySpiritkin = candidate;
     state.showHomeView = !!state.primarySpiritkin;
-    state.statusText = candidate ? `${getSpiritkinDisplayName(candidate)} is in view. Confirm the selection from the fullscreen reveal.` : "";
-    state.statusError = false;
+    if (candidate) {
+      triggerBondFeedback("selected", candidate.name, `${getSpiritkinDisplayName(candidate)} is in view. Confirm the selection from the fullscreen reveal.`, { duration: 1800 });
+    }
     normalizeInteractionState("select-spiritkin");
     persistSession();
     render();
@@ -10062,8 +10097,7 @@ async function onClick(event) {
         state.showHomeView = true;
         state.activePresenceTab = "profile";
         state.currentTab = "profile";
-        state.statusText = `${getSpiritkinDisplayName(candidate)} is ready. Confirm rebonding to make them your active companion.`;
-        state.statusError = false;
+        triggerBondFeedback("armed", candidate.name, `${getSpiritkinDisplayName(candidate)} is ready. Confirm rebonding to make them your active companion.`, { duration: 2600 });
         persistSession();
         render();
         revealCurrentFocus({ selector: ".bond-modal, [data-focus-anchor='bond-modal'], .selection-view" });
@@ -10072,8 +10106,7 @@ async function onClick(event) {
       state.pendingBondSpiritkin = candidate;
       state.selectedSpiritkin = candidate;
       state.selectionOverlaySpiritkin = null;
-      state.statusText = `${getSpiritkinDisplayName(candidate)} is selected. Bond now or keep meeting the others before you decide.`;
-      state.statusError = false;
+      triggerBondFeedback("selected", candidate.name, `${getSpiritkinDisplayName(candidate)} is selected. Bond now or keep meeting the others before you decide.`, { duration: 2200 });
       persistSession();
       render();
       revealCurrentFocus({ selector: ".selection-selection-confirmed, .selection-hero" });
@@ -10086,6 +10119,7 @@ async function onClick(event) {
       const bondedSpiritkin = state.pendingBondSpiritkin;
       state.selectionOverlaySpiritkin = null;
       setPrimarySpiritkin(bondedSpiritkin);
+      triggerBondFeedback("confirmed", bondedSpiritkin.name, `${getSpiritkinDisplayName(bondedSpiritkin)} is now bonded and active across your world.`, { duration: 2600 });
       render();
       revealCurrentFocus({ selector: ".bond-home-copy" });
       if (!state.voiceMuted) {
@@ -10125,8 +10159,7 @@ async function onClick(event) {
       state.selectedSpiritkin = candidate;
       state.selectionOverlaySpiritkin = candidate;
       state.rebondSpiritkin = null;
-      state.statusText = `${getSpiritkinDisplayName(candidate)} is in view. Preview the reveal before confirming any rebond.`;
-      state.statusError = false;
+      triggerBondFeedback("selected", candidate.name, `${getSpiritkinDisplayName(candidate)} is in view. Preview the reveal before confirming any rebond.`, { duration: 1800 });
       render();
       revealCurrentFocus({ selector: ".selection-overlay-shell, [data-focus-anchor='selection-overlay']" });
     }
@@ -10150,6 +10183,7 @@ async function onClick(event) {
   if (action === "close-bond-modal") {
     state.rebondSpiritkin = null;
     state.selectedSpiritkin = state.primarySpiritkin || state.selectedSpiritkin;
+    triggerBondFeedback("", "", `${getSpiritkinDisplayName(state.primarySpiritkin || state.selectedSpiritkin || { name: "Your current companion" })} remains your active companion.`, { duration: 1600 });
     render();
     return;
   }
@@ -10161,8 +10195,7 @@ async function onClick(event) {
       state.showHomeView = true;
       state.activePresenceTab = "profile";
       state.currentTab = "profile";
-      state.statusText = `${getSpiritkinDisplayName(rebondedSpiritkin)} is now your bonded companion.`;
-      state.statusError = false;
+      triggerBondFeedback("confirmed", rebondedSpiritkin.name, `${getSpiritkinDisplayName(rebondedSpiritkin)} is now your bonded companion.`, { duration: 2800 });
       persistSession();
       render();
       revealCurrentFocus({ selector: ".selection-view.bonded-home, .bond-home-copy, .presence-chip" });

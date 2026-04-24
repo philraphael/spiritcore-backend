@@ -1397,6 +1397,15 @@ button:disabled {
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), var(--shadow);
 }
 
+.sk-card.rebond-target {
+  border-color: color-mix(in srgb, var(--realm-accent) 56%, rgba(255,255,255,0.22));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--realm-accent) 28%, transparent),
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 18px 42px rgba(0,0,0,0.22);
+  animation: bondSelectionPulse 0.72s ease;
+}
+
 .sk-card.bonded {
   border-color: rgba(242, 219, 160, 0.34);
   box-shadow: inset 0 0 0 1px rgba(242, 219, 160, 0.18), var(--shadow);
@@ -1491,6 +1500,32 @@ button:disabled {
   font-weight: 700;
 }
 
+.presence-chip.is-bond-updated,
+.bond-home-copy.is-bond-updated,
+.selection-focus.bond-feedback-confirmed,
+.selection-focus.bond-feedback-armed {
+  animation: bondSelectionPulse 0.72s ease;
+}
+
+.bond-feedback-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--realm-accent) 38%, rgba(255,255,255,0.1));
+  background: color-mix(in srgb, var(--realm-accent-soft) 72%, rgba(255,255,255,0.05));
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.bond-feedback-banner::before {
+  content: "✓";
+  color: var(--gold);
+  font-weight: 800;
+}
+
 .sk-role {
   min-height: 48px;
 }
@@ -1531,6 +1566,7 @@ button:disabled {
   display: grid;
   align-content: center;
   gap: 14px;
+  transition: border-color 0.24s ease, box-shadow 0.24s ease, background 0.24s ease;
 }
 
 .bond-home-copy h2 {
@@ -1543,6 +1579,13 @@ button:disabled {
 .bond-home-copy p {
   color: var(--muted);
   margin: 0;
+}
+
+.bond-home-copy.is-bond-updated {
+  border-color: color-mix(in srgb, var(--realm-accent) 40%, rgba(255,255,255,0.14));
+  box-shadow:
+    0 22px 54px rgba(0,0,0,0.2),
+    inset 0 0 0 1px color-mix(in srgb, var(--realm-accent) 20%, transparent);
 }
 
 .bond-home-orientation {
@@ -2320,6 +2363,14 @@ button:disabled {
 
 .status-bar.error {
   color: #ff9ea3;
+}
+
+.status-bar.bond-feedback-selected,
+.status-bar.bond-feedback-armed,
+.status-bar.bond-feedback-confirmed {
+  color: var(--text);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--realm-accent) 24%, transparent);
+  animation: bondSelectionPulse 0.72s ease;
 }
 
 .modal-scrim {
@@ -5719,7 +5770,7 @@ button:disabled {
 .games-view {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 22px;
   animation: fadeIn 0.4s ease-out;
   scroll-margin-top: 88px;
 }
@@ -5727,14 +5778,14 @@ button:disabled {
 .games-intro {
   font-size: 0.85rem;
   color: var(--fg-muted);
-  line-height: 1.4;
-  margin-bottom: 8px;
+  line-height: 1.6;
+  margin-bottom: 12px;
 }
 
 .games-list {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 16px;
 }
 
 .game-status-box {
@@ -5771,7 +5822,7 @@ button:disabled {
 .active-game-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
   animation: fadeIn 0.35s ease-out;
   scroll-margin-top: 88px;
 }
@@ -5779,8 +5830,8 @@ button:disabled {
 .game-help-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 14px;
+  padding: 18px 20px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
@@ -5834,11 +5885,11 @@ button:disabled {
 .game-help-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
 }
 
 .game-help-card {
-  padding: 12px;
+  padding: 14px;
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -5856,8 +5907,23 @@ button:disabled {
 .game-help-card p {
   margin: 0;
   font-size: 0.83rem;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--text);
+}
+
+@keyframes bondSelectionPulse {
+  0% {
+    transform: scale(0.985);
+    filter: saturate(0.96);
+  }
+  55% {
+    transform: scale(1.01);
+    filter: saturate(1.08);
+  }
+  100% {
+    transform: scale(1);
+    filter: saturate(1);
+  }
 }
 
 .game-help-instructions {
