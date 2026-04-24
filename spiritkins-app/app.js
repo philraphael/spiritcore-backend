@@ -268,6 +268,7 @@ let _voiceTurnCaptureAfterAudio = false;
 let _scheduledAutoSpeechMessageId = null;
 let _lastAutoSpokenMessageId = null;
 let _nextSpeechRequestId = 0;
+let _bondManagerV2Timer = null;
 let _activeSpeechRequestId = 0;
 let _activeAudioRequestId = 0;
 let _pressedInteractiveEl = null;
@@ -3043,15 +3044,17 @@ if (typeof window !== "undefined") {
   window.state = state;
   window.__svToggleBondManagerV2 = (visible = true) => {
     state.devShowBondManagerV2 = !!visible;
-    if (!visible) {
-      state.devBondManagerV2Step = "browsing";
-      state.devBondManagerV2Target = "";
+    if (_bondManagerV2Timer) {
+      window.clearTimeout(_bondManagerV2Timer);
+      _bondManagerV2Timer = null;
     }
+    state.bondManagerState = visible ? "browsing" : "closed";
+    if (!visible) state.devBondManagerV2Target = "";
     render();
   };
   window.__svSetBondManagerV2Step = (step = "browsing", target = "") => {
     state.devShowBondManagerV2 = true;
-    state.devBondManagerV2Step = String(step || "browsing");
+    state.bondManagerState = String(step || "browsing");
     state.devBondManagerV2Target = String(target || "");
     render();
   };
@@ -10139,8 +10142,8 @@ function renderBondManagerV2(currentState) {
   const target = currentState.spiritkins.find((item) => item?.name === targetName)
     || currentState.spiritkins.find((item) => item?.name && item.name !== current?.name)
     || current;
-  const step = ["browsing", "preview", "confirm", "switching"].includes(String(currentState.devBondManagerV2Step || ""))
-    ? String(currentState.devBondManagerV2Step)
+  const step = ["browsing", "preview", "confirm", "switching", "complete"].includes(String(currentState.bondManagerState || ""))
+    ? String(currentState.bondManagerState)
     : "browsing";
   const currentProfile = getSpiritkinMediaProfile(current);
   const targetProfile = getSpiritkinMediaProfile(target);
@@ -10149,19 +10152,21 @@ function renderBondManagerV2(currentState) {
     browsing: "Choose a Spiritkin to preview",
     preview: targetProfile ? `${targetProfile.displayName} preview` : "Spiritkin preview",
     confirm: targetProfile && currentProfile ? `Switch from ${currentProfile.displayName} to ${targetProfile.displayName}?` : "Confirm switch",
-    switching: targetProfile ? `Switching to ${targetProfile.displayName}` : "Switching bond"
+    switching: targetProfile ? `Switching to ${targetProfile.displayName}` : "Switching bond",
+    complete: targetProfile ? `${targetProfile.displayName} ready` : "Switch complete"
   }[step];
   const stageCopy = {
     browsing: "Development-only isolated renderer. This screen is not connected to the live bond flow yet.",
     preview: "Preview fully replaces browsing in this renderer. No modal, no overlay, and no bonded-room competition.",
     confirm: "Confirm fully replaces preview in this renderer. This is a structural proof-of-layout step only.",
-    switching: "Switching is represented as a dedicated full-screen state so the transition can be validated without touching live bond logic yet."
+    switching: "Switching is represented as a dedicated full-screen state so the transition can be validated without touching live bond logic yet.",
+    complete: "Complete is still UI-only here. No real bond state is updated in this development renderer."
   }[step];
 
   let body = `
     <div class="bond-manager-v2-grid">
       ${currentState.spiritkins.map((spiritkin, index) => `
-        <article class="bond-manager-v2-card ${esc(spiritkin.ui.cls)} ${current?.name === spiritkin.name ? "is-current" : ""} ${target?.name === spiritkin.name ? "is-target" : ""}">
+        <article class="bond-manager-v2-card ${esc(spiritkin.ui.cls)} ${current?.name === spiritkin.name ? "is-current" : ""} ${target?.name === spiritkin.name ? "is-target" : ""}" data-action="v2-select-spiritkin" data-index="${index}" data-name="${esc(spiritkin.name)}">
           <div class="bond-manager-v2-card-head">
             <div>
               <div class="bond-manager-v2-card-kicker">${esc(spiritkin.ui.realm)}</div>
@@ -10176,7 +10181,7 @@ function renderBondManagerV2(currentState) {
     </div>
   `;
 
-  if ((step === "preview" || step === "confirm" || step === "switching") && target) {
+  if ((step === "preview" || step === "confirm" || step === "switching" || step === "complete") && target) {
     body = `
       <div class="bond-manager-v2-stage ${esc(step)}">
         ${buildBondManagerMediaStage(target)}
@@ -10185,7 +10190,7 @@ function renderBondManagerV2(currentState) {
           <h3>${esc(targetProfile?.displayName || getSpiritkinDisplayName(target))}</h3>
           <div class="bond-manager-v2-realm">${esc(targetProfile?.domainName || target?.ui?.realm || "")}</div>
           <p>${escDisplay(getSpiritkinSelectionContext(target?.name))}</p>
-          ${step === "confirm" && currentProfile && targetProfile ? `
+          ${(step === "confirm" || step === "complete") && currentProfile && targetProfile ? `
             <div class="bond-manager-v2-comparison">
               <div class="bond-manager-v2-compare current">
                 <span>Current</span>
@@ -10200,6 +10205,7 @@ function renderBondManagerV2(currentState) {
             </div>
           ` : ""}
           ${step === "switching" ? `<div class="bond-manager-v2-switching-note">Transition placeholder active. Live rebond logic is intentionally disconnected in this phase.</div>` : ""}
+          ${step === "complete" ? `<div class="bond-manager-v2-switching-note">UI simulation complete. Return to browsing or exit the V2 renderer when ready.</div>` : ""}
         </div>
       </div>
     `;
@@ -10215,7 +10221,7 @@ function renderBondManagerV2(currentState) {
             <p>${esc(stageCopy)}</p>
           </div>
           <div class="bond-manager-v2-progress">
-            ${["browsing", "preview", "confirm", "switching"].map((item, index) => `
+            ${["browsing", "preview", "confirm", "switching", "complete"].map((item, index) => `
               <div class="bond-manager-v2-step ${step === item ? "active" : ""}">
                 <span>${index + 1}</span>
                 <strong>${esc(item)}</strong>
@@ -10225,6 +10231,22 @@ function renderBondManagerV2(currentState) {
         </header>
         <div class="bond-manager-v2-panel">
           ${body}
+        </div>
+        <div class="bond-manager-v2-actions">
+          ${step === "browsing" ? `<button class="btn btn-ghost" data-action="v2-close-bond-manager">Close V2 renderer</button>` : ""}
+          ${step === "preview" ? `
+            <button class="btn btn-ghost" data-action="v2-back-to-browsing">Back</button>
+            <button class="btn btn-primary" data-action="v2-make-primary">Make Primary Companion</button>
+          ` : ""}
+          ${step === "confirm" ? `
+            <button class="btn btn-ghost" data-action="v2-back-to-preview">Back</button>
+            <button class="btn btn-primary" data-action="v2-confirm-switch">Confirm Switch</button>
+          ` : ""}
+          ${step === "switching" ? `<button class="btn btn-primary" disabled>Switching...</button>` : ""}
+          ${step === "complete" ? `
+            <button class="btn btn-ghost" data-action="v2-back-to-browsing">Browse again</button>
+            <button class="btn btn-primary" data-action="v2-close-bond-manager">Close V2 renderer</button>
+          ` : ""}
         </div>
       </div>
     </section>
@@ -10401,6 +10423,73 @@ async function onClick(event) {
   try {
 
   if (action === "noop") return;
+
+  if (state.devShowBondManagerV2) {
+    if (action === "v2-close-bond-manager") {
+      if (_bondManagerV2Timer) {
+        window.clearTimeout(_bondManagerV2Timer);
+        _bondManagerV2Timer = null;
+      }
+      state.devShowBondManagerV2 = false;
+      state.bondManagerState = "closed";
+      state.devBondManagerV2Target = "";
+      render();
+      return;
+    }
+
+    if (action === "v2-select-spiritkin") {
+      const candidate = state.spiritkins[Number(element.dataset.index)] ?? null;
+      if (candidate) {
+        state.selectedSpiritkin = candidate;
+        state.devBondManagerV2Target = candidate.name;
+        state.bondManagerState = "preview";
+        render();
+      }
+      return;
+    }
+
+    if (action === "v2-back-to-browsing") {
+      if (_bondManagerV2Timer) {
+        window.clearTimeout(_bondManagerV2Timer);
+        _bondManagerV2Timer = null;
+      }
+      state.bondManagerState = "browsing";
+      render();
+      return;
+    }
+
+    if (action === "v2-back-to-preview") {
+      if (_bondManagerV2Timer) {
+        window.clearTimeout(_bondManagerV2Timer);
+        _bondManagerV2Timer = null;
+      }
+      state.bondManagerState = "preview";
+      render();
+      return;
+    }
+
+    if (action === "v2-make-primary") {
+      state.bondManagerState = "confirm";
+      render();
+      return;
+    }
+
+    if (action === "v2-confirm-switch") {
+      if (_bondManagerV2Timer) {
+        window.clearTimeout(_bondManagerV2Timer);
+        _bondManagerV2Timer = null;
+      }
+      state.bondManagerState = "switching";
+      render();
+      _bondManagerV2Timer = window.setTimeout(() => {
+        _bondManagerV2Timer = null;
+        if (!state.devShowBondManagerV2) return;
+        state.bondManagerState = "complete";
+        render();
+      }, 520);
+      return;
+    }
+  }
 
   if (action === "dismiss-whisper") {
     state.showWhisperBanner = false;
