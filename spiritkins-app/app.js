@@ -284,6 +284,7 @@ let _sessionControlSyncTimer = null;
 let _queuedSessionControlArgs = null;
 let _lastSessionControlSignature = "";
 let _lastSessionControlAt = 0;
+let rebondTransitionTimer = null;
 
 const LONG_FORM_SILENCE_GRACE_MS = 1400;
 const WAKE_MODE_SILENCE_GRACE_MS = 1650;
@@ -2815,6 +2816,9 @@ const state = {
   statusError: false,
   bondFeedbackKind: "",
   bondFeedbackSpiritkin: "",
+  rebondTransitionActive: false,
+  rebondTransitionPhase: "",
+  rebondTransitionSpiritkin: "",
   mediaMuted: localStorage.getItem(MEDIA_MUTED_KEY) !== "0",
   voiceMuted: localStorage.getItem("sk_voice_muted") === "1",
   voiceListening: false,
@@ -4914,6 +4918,73 @@ function triggerBondFeedback(kind, spiritkinName, message, options = {}) {
       bondFeedbackTimer = null;
     }, duration);
   }
+}
+
+function clearRebondTransitionTimer() {
+  if (rebondTransitionTimer) {
+    window.clearTimeout(rebondTransitionTimer);
+    rebondTransitionTimer = null;
+  }
+}
+
+function playBondConfirmationTone() {
+  if (typeof window === "undefined") return;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  try {
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(392, now);
+    osc.frequency.exponentialRampToValueAtTime(587.33, now + 0.18);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.028, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.34);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.36);
+    osc.onended = () => {
+      gain.disconnect();
+      osc.disconnect();
+      ctx.close?.().catch?.(() => {});
+    };
+  } catch (_) {}
+}
+
+function beginRebondTransition(spiritkin) {
+  if (!spiritkin) return;
+  clearRebondTransitionTimer();
+  state.rebondTransitionActive = true;
+  state.rebondTransitionPhase = "fade-out";
+  state.rebondTransitionSpiritkin = spiritkin.name;
+  triggerBondFeedback("armed", spiritkin.name, `Switching bond to ${getSpiritkinDisplayName(spiritkin)}...`, { duration: 3200 });
+  render();
+
+  rebondTransitionTimer = window.setTimeout(() => {
+    setPrimarySpiritkin(spiritkin);
+    state.showHomeView = true;
+    state.activePresenceTab = "profile";
+    state.currentTab = "profile";
+    state.rebondTransitionActive = true;
+    state.rebondTransitionPhase = "fade-in";
+    state.rebondTransitionSpiritkin = spiritkin.name;
+    triggerBondFeedback("confirmed", spiritkin.name, `${getSpiritkinDisplayName(spiritkin)} is now your bonded companion.`, { duration: 3200 });
+    playBondConfirmationTone();
+    persistSession();
+    render();
+    revealCurrentFocus({ selector: ".selection-view.bonded-home, .bond-home-copy, .presence-chip" });
+
+    rebondTransitionTimer = window.setTimeout(() => {
+      state.rebondTransitionActive = false;
+      state.rebondTransitionPhase = "";
+      state.rebondTransitionSpiritkin = "";
+      render();
+      rebondTransitionTimer = null;
+    }, 380);
+  }, 240);
 }
 
 function openCrownGate() {
@@ -7973,11 +8044,12 @@ function buildApp() {
   const atmosphere = getAtmosphereSpiritkin();
   const atmosphereClass = atmosphere ? `realm-${atmosphere.ui.cls}` : "realm-neutral";
   const inEntryFlow = !state.entryAccepted || state.showCrownGateHome || state.spiritverseTrailerActive || state.spiritCoreWelcoming;
+  const rebondAppClass = state.rebondTransitionActive ? `rebond-transition rebond-${esc(state.rebondTransitionPhase || "active")}` : "";
   return `
     <div class="sv-bg ${atmosphereClass}"></div>
     <div class="sv-noise"></div>
     <div class="sv-orbit ${atmosphereClass}"></div>
-    <div class="app-shell ${atmosphereClass}">
+    <div class="app-shell ${atmosphereClass} ${rebondAppClass}">
       ${inEntryFlow ? "" : buildTopbar()}
       ${!inEntryFlow && state.showReturnSummary ? buildRetentionPanel() : ""}
       ${state.surveyOpen ? buildSurveyModal() : ""}
@@ -7986,6 +8058,7 @@ function buildApp() {
       ${state.showCrownGateHome || !state.entryAccepted ? buildCrownGateEntry() : (state.spiritverseTrailerActive ? buildSpiritverseArrival() : (state.spiritCoreWelcoming ? buildSpiritCoreWelcome() : buildMain()))}
       ${!inEntryFlow ? buildIssueReporter() : ""}
       ${buildBondModal()}
+      ${state.rebondTransitionActive ? `<div class="rebond-transition-overlay" aria-hidden="true"><div class="rebond-transition-copy">Bond transition in progress...</div></div>` : ""}
       ${state.entryTransitioning ? `
         <div class="crown-gate-overlay">
           <div class="crown-gate-veil"></div>
@@ -8024,8 +8097,8 @@ function buildWorldPulse() {
 function buildTopbar() {
   const active = state.primarySpiritkin;
   const wakeStatus = active ? getWakeModeStatus(active) : null;
-  const bondedFeedbackClass = active && state.bondFeedbackKind === "confirmed" && state.bondFeedbackSpiritkin === active.name
-    ? "is-bond-updated"
+  const bondedFeedbackClass = active && state.bondFeedbackSpiritkin === active.name
+    ? `is-bond-updated bond-feedback-${esc(state.bondFeedbackKind || "confirmed")}`
     : "";
   return `
     <header class="topbar" data-focus-anchor="topbar">
@@ -8733,7 +8806,7 @@ function buildBondedHomeView() {
   const spiritkin = state.primarySpiritkin;
   const { currentBond } = getBondStateForSpiritkin(spiritkin.name);
   return `
-    <section class="selection-view bonded-home ${esc(spiritkin.ui.cls)}" data-focus-anchor="bonded-home">
+    <section class="selection-view bonded-home ${esc(spiritkin.ui.cls)} ${state.rebondTransitionActive ? `rebond-${esc(state.rebondTransitionPhase || "active")}` : ""}" data-focus-anchor="bonded-home">
       <div class="bonded-world-shell">
         <div class="bonded-world-header panel-card">
           <div class="bonded-world-heading">
@@ -9931,6 +10004,9 @@ async function onClick(event) {
     return;
   }
   const action = element.dataset.action;
+  if (state.rebondTransitionActive && action !== "noop") {
+    return;
+  }
   if (element.matches?.(":disabled") || element.getAttribute?.("aria-disabled") === "true") {
     return;
   }
@@ -10191,14 +10267,7 @@ async function onClick(event) {
   if (action === "confirm-rebond") {
     if (state.rebondSpiritkin) {
       const rebondedSpiritkin = state.rebondSpiritkin;
-      setPrimarySpiritkin(rebondedSpiritkin);
-      state.showHomeView = true;
-      state.activePresenceTab = "profile";
-      state.currentTab = "profile";
-      triggerBondFeedback("confirmed", rebondedSpiritkin.name, `${getSpiritkinDisplayName(rebondedSpiritkin)} is now your bonded companion.`, { duration: 2800 });
-      persistSession();
-      render();
-      revealCurrentFocus({ selector: ".selection-view.bonded-home, .bond-home-copy, .presence-chip" });
+      beginRebondTransition(rebondedSpiritkin);
       if (!state.voiceMuted) {
         speakMoment(buildGreetingText(rebondedSpiritkin.name, "bondedReturn"), rebondedSpiritkin.ui.voice || "nova");
       }
