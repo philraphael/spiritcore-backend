@@ -402,6 +402,7 @@ const SPIRITKIN_WAKE_KEY_BY_NAME = {
 };
 const VOICE_WAKE_NAMES = Object.keys(SPIRITKIN_WAKE_KEY_BY_NAME);
 const VOICE_FILLER_PATTERNS = ["yeah", "ok", "okay", "uh", "uh huh", "mm", "hmm"];
+const VALID_BOND_MANAGER_STATES = ["closed", "browsing", "preview", "confirm", "switching", "complete"];
 
 function getSpiritkinDisplayName(spiritkinOrName) {
   const name = typeof spiritkinOrName === "object" ? spiritkinOrName?.name : spiritkinOrName;
@@ -607,6 +608,123 @@ function getSurveyDraftStatus() {
 
 function getSpiritkinSelectionContext(spiritkinName) {
   return displaySpiritkinText(CANON_SPIRITKIN_MAP[spiritkinName]?.selectionSummary || SPIRITKIN_SELECTION_CONTEXT[spiritkinName] || "");
+}
+
+function resolveSpiritkinRecord(spiritkinOrName) {
+  if (!spiritkinOrName) return null;
+  if (typeof spiritkinOrName === "object" && spiritkinOrName?.name) {
+    return spiritkinOrName.ui ? spiritkinOrName : normalizeStoredSpiritkin(spiritkinOrName);
+  }
+  const name = String(spiritkinOrName || "").trim();
+  return normalizeStoredSpiritkin(
+    state.spiritkins.find((item) => item?.name === name)
+    || state.primarySpiritkin
+    || state.selectedSpiritkin
+    || buildSpiritkinRecordFromName(name)
+  );
+}
+
+function getBondManagerCandidate() {
+  if (state.rebondSpiritkin?.name && state.primarySpiritkin?.name !== state.rebondSpiritkin.name) {
+    return state.rebondSpiritkin;
+  }
+  if (state.selectedSpiritkin?.name && state.primarySpiritkin?.name !== state.selectedSpiritkin.name) {
+    return state.selectedSpiritkin;
+  }
+  return null;
+}
+
+function clearBondManagerTransientState(options = {}) {
+  const {
+    preservePendingBond = false,
+    preserveFeedback = false,
+    preserveSelectedSpiritkin = false,
+  } = options;
+  let changed = false;
+
+  if (state.selectionOverlaySpiritkin) {
+    state.selectionOverlaySpiritkin = null;
+    changed = true;
+  }
+  if (state.rebondSpiritkin) {
+    state.rebondSpiritkin = null;
+    changed = true;
+  }
+  if (!preservePendingBond && state.pendingBondSpiritkin) {
+    state.pendingBondSpiritkin = null;
+    changed = true;
+  }
+  if (state.bondManagerState !== "closed") {
+    state.bondManagerState = "closed";
+    changed = true;
+  }
+  if (!preserveFeedback && (state.bondFeedbackKind || state.bondFeedbackSpiritkin)) {
+    state.bondFeedbackKind = "";
+    state.bondFeedbackSpiritkin = "";
+    changed = true;
+  }
+  if (!preserveSelectedSpiritkin && state.primarySpiritkin && (!state.selectedSpiritkin || state.selectedSpiritkin.name !== state.primarySpiritkin.name)) {
+    state.selectedSpiritkin = state.primarySpiritkin;
+    changed = true;
+  }
+  return changed;
+}
+
+function openBondManagerFlow(nextState = "browsing", spiritkinOrName = null) {
+  const candidate = resolveSpiritkinRecord(spiritkinOrName);
+  state.showHomeView = true;
+  state.activePresenceTab = "profile";
+  state.currentTab = "profile";
+  state.selectionOverlaySpiritkin = null;
+  state.pendingBondSpiritkin = null;
+  if (!VALID_BOND_MANAGER_STATES.includes(nextState) || nextState === "closed") {
+    clearBondManagerTransientState({ preserveFeedback: true });
+    if (state.primarySpiritkin) state.selectedSpiritkin = state.primarySpiritkin;
+    return;
+  }
+  state.bondManagerState = nextState;
+  if (candidate && state.primarySpiritkin?.name !== candidate.name) {
+    state.selectedSpiritkin = candidate;
+    state.rebondSpiritkin = candidate;
+  } else {
+    state.selectedSpiritkin = state.primarySpiritkin || candidate || state.selectedSpiritkin;
+    state.rebondSpiritkin = null;
+  }
+}
+
+function getSpiritkinMediaProfile(spiritkinOrName) {
+  const spiritkin = resolveSpiritkinRecord(spiritkinOrName);
+  if (!spiritkin) return null;
+  const name = spiritkin.name;
+  const authority = getSpiritkinMediaAuthority(name);
+  const mediaConfig = getSpiritkinMediaConfig(name);
+  const creatorFoundation = spiritkin.creatorFoundation && typeof spiritkin.creatorFoundation === "object"
+    ? spiritkin.creatorFoundation
+    : null;
+  const introTrailer = mediaConfig?.introTrailer?.path || creatorFoundation?.mediaSlots?.introTrailer?.runtimeUrl || "";
+  const idleVideo = resolveSpiritkinVideo(name, "idle") || creatorFoundation?.mediaSlots?.idle?.runtimeUrl || "";
+  const speakingVideo = resolveSpiritkinVideo(name, "speaking") || creatorFoundation?.mediaSlots?.speaking?.runtimeUrl || "";
+  const portrait = authority.portrait || getSpiritkinPortraitPath(name) || authority.focus || authority.profile || authority.fallbackCard || "";
+  const heroImage = authority.focus || authority.profile || portrait || authority.fallbackCard || "";
+  const wakeName = getWakeNameForSpiritkin(name);
+  const isCustom = !!(spiritkin.ui?.isCustom || creatorFoundation);
+  const isPremium = !!(spiritkin.ui?.isPremium || spiritkin.isPremium || creatorFoundation?.status === "premium");
+  return {
+    id: spiritkin.id || `spiritkin:${String(name || "").toLowerCase()}`,
+    name,
+    displayName: getSpiritkinDisplayName(name),
+    wakeNames: wakeName ? [wakeName] : [],
+    domainName: spiritkin.ui?.realm || "",
+    portrait,
+    heroImage,
+    trailerVideo: introTrailer,
+    idleVideo,
+    speakingVideo,
+    storyIntro: displaySpiritkinText(spiritkin.ui?.originStory || getSpiritkinIntroPrompt(spiritkin) || ""),
+    rarityTier: isCustom ? "custom" : (isPremium ? "premium" : "founder"),
+    isCustom,
+    isPremium,
+  };
 }
 
 const SK_META = {
@@ -2805,6 +2923,7 @@ const state = {
   pendingBondSpiritkin: null,
   selectionOverlaySpiritkin: null,
   rebondSpiritkin: null,
+  bondManagerState: "closed",
   conversationId: null,
   messages: [],
   loadingReply: false,
@@ -3623,6 +3742,11 @@ function normalizeInteractionState(source = "unknown") {
     changed = true;
   }
 
+  if (!VALID_BOND_MANAGER_STATES.includes(state.bondManagerState)) {
+    state.bondManagerState = "closed";
+    changed = true;
+  }
+
   if (state.selectedSpiritkin && !state.selectedSpiritkin.ui) {
     state.selectedSpiritkin = normalizeStoredSpiritkin(state.selectedSpiritkin);
     changed = true;
@@ -3641,6 +3765,12 @@ function normalizeInteractionState(source = "unknown") {
   if (!state.primarySpiritkin && state.selectedSpiritkin && !state.pendingBondSpiritkin) {
     state.selectedSpiritkin = null;
     changed = true;
+  }
+
+  if (!state.primarySpiritkin && state.bondManagerState !== "closed") {
+    if (clearBondManagerTransientState({ preservePendingBond: !!state.pendingBondSpiritkin, preserveFeedback: true, preserveSelectedSpiritkin: !!state.pendingBondSpiritkin })) {
+      changed = true;
+    }
   }
 
   if (state.conversationId && !state.selectedSpiritkin && state.primarySpiritkin) {
@@ -3696,6 +3826,27 @@ function normalizeInteractionState(source = "unknown") {
   if (state.entryAccepted && state.showCrownGateHome) {
     state.showCrownGateHome = false;
     changed = true;
+  }
+
+  const shouldResetBondLanding = !!(state.entryAccepted && state.primarySpiritkin && (
+    source === "boot"
+    || source === "finalizeCrownGateRoute"
+    || source === "setPrimarySpiritkin"
+    || source === "goHome"
+    || source === "bond-manager-complete"
+  ));
+  if (shouldResetBondLanding) {
+    if (clearBondManagerTransientState({ preserveFeedback: true })) {
+      changed = true;
+    }
+    if (!state.showHomeView) {
+      state.showHomeView = true;
+      changed = true;
+    }
+    if (state.activePresenceTab !== "profile") {
+      state.activePresenceTab = "profile";
+      changed = true;
+    }
   }
 
   const normalizedConversationId = typeof state.conversationId === "string" && state.conversationId.trim()
@@ -4878,9 +5029,11 @@ async function fetchDailyQuest() {
 function setPrimarySpiritkin(spiritkin) {
   state.primarySpiritkin = spiritkin;
   state.selectedSpiritkin = spiritkin;
-  state.showHomeView = false;
+  state.showHomeView = true;
   state.pendingBondSpiritkin = null;
   state.rebondSpiritkin = null;
+  state.selectionOverlaySpiritkin = null;
+  state.bondManagerState = "closed";
   // Reload events and quest for new spiritkin
   state.spiritverseEvent = null;
   state.dailyQuest = null;
@@ -4957,6 +5110,8 @@ function playBondConfirmationTone() {
 function beginRebondTransition(spiritkin) {
   if (!spiritkin) return;
   clearRebondTransitionTimer();
+  state.bondManagerState = "switching";
+  state.rebondSpiritkin = spiritkin;
   state.rebondTransitionActive = true;
   state.rebondTransitionPhase = "fade-out";
   state.rebondTransitionSpiritkin = spiritkin.name;
@@ -4968,6 +5123,7 @@ function beginRebondTransition(spiritkin) {
     state.showHomeView = true;
     state.activePresenceTab = "profile";
     state.currentTab = "profile";
+    state.bondManagerState = "complete";
     state.rebondTransitionActive = true;
     state.rebondTransitionPhase = "fade-in";
     state.rebondTransitionSpiritkin = spiritkin.name;
@@ -4981,6 +5137,8 @@ function beginRebondTransition(spiritkin) {
       state.rebondTransitionActive = false;
       state.rebondTransitionPhase = "";
       state.rebondTransitionSpiritkin = "";
+      clearBondManagerTransientState({ preserveFeedback: true });
+      normalizeInteractionState("bond-manager-complete");
       render();
       rebondTransitionTimer = null;
     }, 380);
@@ -5036,6 +5194,7 @@ async function finalizeCrownGateRoute({ skipped = false, source = "unspecified" 
   state.entryTransitioning = false;
   state.showHomeView = true;
   state.showCrownGateHome = false;
+  normalizeInteractionState("finalizeCrownGateRoute");
   logContinuityDebug("post-gate-route-begin", { skipped, source, route: getPostGateRoute() });
 
   const route = getPostGateRoute();
@@ -9919,30 +10078,131 @@ function buildBubble(message, spiritkin) {
   `;
 }
 
+function buildBondManagerMediaStage(spiritkin) {
+  const profile = getSpiritkinMediaProfile(spiritkin);
+  if (!profile) return "";
+  const hasTrailer = !!profile.trailerVideo && !selectionTrailerFailures.has(String(profile.name || "").trim());
+  const stillSrc = profile.heroImage || profile.portrait || getSpiritkinPortraitPath(profile.name);
+  return hasTrailer ? `
+    <div class="bond-manager-stage">
+      <div class="video-player-container spiritkin-intro spiritkin-intro-video selection-fullscreen-video">
+        <div class="video-player-wrapper spiritkin-intro spiritkin-intro-video selection-fullscreen-video">
+          <video class="video-player-element" data-trailer-kind="bond-manager" data-trailer-owner="${esc(profile.name)}" data-force-muted-autoplay="1" autoplay muted playsinline preload="metadata" loop poster="${esc(stillSrc || "")}">
+            <source src="${esc(profile.trailerVideo)}" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+          <div class="video-player-overlay"></div>
+          <div class="video-player-controls-overlay">
+            <button class="video-unmute-btn" data-action="toggle-media-audio" title="${esc(getMediaToggleState(state.mediaMuted).title)}" aria-pressed="${state.mediaMuted ? "false" : "true"}">
+              ${buildMediaToggleInner(state.mediaMuted)}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ` : `
+    <div class="bond-manager-stage">
+      ${buildCompositeVisualFrame(
+        stillSrc,
+        getSpiritkinPortraitPath(profile.name),
+        `${profile.displayName} bond preview`,
+        "bond-manager-still-art",
+        true,
+        { fallbackMode: "errorOnly", debugSlot: `${profile.name}-bond-manager` }
+      )}
+    </div>
+  `;
+}
+
 function buildBondModal() {
-  if (!state.rebondSpiritkin) return "";
-  const target = state.rebondSpiritkin;
+  if (!state.primarySpiritkin || state.bondManagerState === "closed") return "";
+  const current = state.primarySpiritkin;
+  const target = getBondManagerCandidate();
+  const targetProfile = getSpiritkinMediaProfile(target || current);
+  const currentProfile = getSpiritkinMediaProfile(current);
+  const modalClass = target?.ui?.cls || current.ui.cls;
+  const showPreview = state.bondManagerState === "preview" || state.bondManagerState === "confirm" || state.bondManagerState === "switching" || state.bondManagerState === "complete";
+
+  let heading = "Manage your bond";
+  let copy = "Choose another Spiritkin to preview a deliberate rebonding path. Your current companion remains primary until you confirm a switch.";
+  let body = `
+    <div class="bond-manager-grid">
+      ${state.spiritkins.map((spiritkin, index) => buildBondCard(spiritkin, index, !!state.primarySpiritkin && state.primarySpiritkin.name !== spiritkin.name)).join("")}
+    </div>
+  `;
+  let actions = `
+    <button class="btn btn-ghost" data-action="close-bond-modal">Close</button>
+  `;
+
+  if (showPreview && target && targetProfile && currentProfile) {
+    heading = state.bondManagerState === "confirm"
+      ? `Switch from ${getSpiritkinDisplayName(current)} to ${getSpiritkinDisplayName(target)}?`
+      : `${getSpiritkinDisplayName(target)} is in view`;
+    copy = state.bondManagerState === "confirm"
+      ? `${getSpiritkinDisplayName(current)} will step out as primary. ${getSpiritkinDisplayName(target)} will become your bonded companion, update your chamber, and reset the active conversation surface in this app.`
+      : `Preview ${getSpiritkinDisplayName(target)} before you make the switch. Compare the current bond, the chamber, and the companion media before you confirm anything.`;
+    body = `
+      <div class="bond-modal-body bond-manager-body">
+        ${buildBondManagerMediaStage(target)}
+        <div class="bond-manager-copy">
+          <div class="bond-manager-current">Currently bonded: ${esc(currentProfile.displayName)} · ${esc(currentProfile.domainName)}</div>
+          <h4>${esc(targetProfile.displayName)}</h4>
+          <div class="bond-modal-realm">${esc(targetProfile.domainName)}</div>
+          <p>${escDisplay(getSpiritkinSelectionContext(targetProfile.name))}</p>
+          <p>${escDisplay(targetProfile.storyIntro)}</p>
+          <div class="bond-manager-comparison">
+            <div class="bond-manager-compare-card current">
+              <span class="bond-manager-compare-label">Current</span>
+              <strong>${esc(currentProfile.displayName)}</strong>
+              <span>${esc(currentProfile.domainName)}</span>
+              <span>Wake: ${esc(currentProfile.wakeNames.join(", ") || "None")}</span>
+            </div>
+            <div class="bond-manager-compare-card selected">
+              <span class="bond-manager-compare-label">Selected</span>
+              <strong>${esc(targetProfile.displayName)}</strong>
+              <span>${esc(targetProfile.domainName)}</span>
+              <span>Wake: ${esc(targetProfile.wakeNames.join(", ") || "None")}</span>
+            </div>
+          </div>
+          <div class="bond-manager-status">
+            ${state.bondManagerState === "switching"
+              ? `Switching bond to ${esc(targetProfile.displayName)}...`
+              : state.bondManagerState === "complete"
+                ? `${esc(targetProfile.displayName)} now anchors your bonded room.`
+                : `Current vs selected is explicit here so the switch never feels ambiguous.`}
+          </div>
+        </div>
+      </div>
+    `;
+    actions = state.bondManagerState === "confirm"
+      ? `
+        <button class="btn btn-ghost" data-action="cancel-rebond">Cancel</button>
+        <button class="btn btn-primary" data-action="confirm-rebond">Confirm Switch</button>
+      `
+      : state.bondManagerState === "switching"
+        ? `<button class="btn btn-primary" disabled>Switching...</button>`
+        : state.bondManagerState === "complete"
+          ? `<button class="btn btn-primary" data-action="close-bond-modal">Return to bonded room</button>`
+          : `
+            <button class="btn btn-ghost" data-action="cancel-rebond">Cancel</button>
+            <button class="btn btn-primary" data-action="confirm-selection">Make Primary Companion</button>
+          `;
+  }
+
   return `
-    <div class="modal-scrim" data-action="close-bond-modal" data-focus-anchor="bond-modal">
-      <div class="bond-modal ${esc(target.ui.cls)}" data-action="noop">
+    <div class="modal-scrim" data-action="${state.bondManagerState === "switching" ? "noop" : "close-bond-modal"}" data-focus-anchor="bond-modal">
+      <div class="bond-modal bond-manager-modal ${esc(modalClass)} ${esc(`is-${state.bondManagerState}`)}" data-action="noop">
         <div class="bond-modal-head">
           <div>
-            <div class="eyebrow">Intentional rebonding</div>
-            <h3>Switch your primary companion to ${esc(getSpiritkinDisplayName(target))}?</h3>
+            <div class="eyebrow">Bond Manager · ${esc(state.bondManagerState)}</div>
+            <h3>${esc(heading)}</h3>
+            <p class="bond-manager-head-copy">${esc(copy)}</p>
           </div>
-          <button class="btn btn-ghost btn-sm" data-action="close-bond-modal">Close</button>
+          ${state.bondManagerState === "switching" ? "" : `<button class="btn btn-ghost btn-sm" data-action="close-bond-modal">Close</button>`}
         </div>
-        <div class="bond-modal-body">
-          ${buildPortrait(target.name, "portrait-mini", target.ui.cls)}
-          <div>
-            <div class="bond-modal-realm">${esc(target.ui.realm)}</div>
-            <p>Rebonding will end the current bonded session view, clear the active conversation in this app, and make ${esc(getSpiritkinDisplayName(target))} the new primary companion.</p>
-            <p>This keeps switching intentional instead of casual in-session hopping.</p>
-          </div>
-        </div>
+        ${body}
         <div class="bond-modal-actions">
-          <button class="btn btn-ghost" data-action="close-bond-modal">Cancel</button>
-          <button class="btn btn-primary" data-action="confirm-rebond">Confirm rebonding</button>
+          ${actions}
         </div>
       </div>
     </div>
@@ -10210,16 +10470,11 @@ async function onClick(event) {
 
   if (action === "open-bond-manager") {
     cleanupSpeechLifecycle("open-bond-manager", { renderOnFinish: false, clearStatus: false });
-    state.showHomeView = true;
-    state.activePresenceTab = "profile";
-    state.selectedSpiritkin = state.primarySpiritkin || state.selectedSpiritkin;
     state.conversationId = null;
     state.messages = [];
-    state.selectionOverlaySpiritkin = null;
-    state.pendingBondSpiritkin = null;
-    state.rebondSpiritkin = null;
+    openBondManagerFlow("browsing", state.primarySpiritkin);
     state.statusText = state.primarySpiritkin
-      ? `Bond manager opened. ${getSpiritkinDisplayName(state.primarySpiritkin)} remains primary until you confirm a rebonding choice.`
+      ? `Bond manager opened. ${getSpiritkinDisplayName(state.primarySpiritkin)} remains primary until you confirm a switch.`
       : "";
     state.statusError = false;
     normalizeInteractionState("open-bond-manager");
@@ -10232,12 +10487,11 @@ async function onClick(event) {
   if (action === "request-rebond") {
     const candidate = state.spiritkins.find((spiritkin) => spiritkin.name === element.dataset.name) ?? null;
     if (candidate) {
-      state.selectedSpiritkin = candidate;
-      state.selectionOverlaySpiritkin = candidate;
-      state.rebondSpiritkin = null;
-      triggerBondFeedback("selected", candidate.name, `${getSpiritkinDisplayName(candidate)} is in view. Preview the reveal before confirming any rebond.`, { duration: 1800 });
+      openBondManagerFlow("preview", candidate);
+      triggerBondFeedback("selected", candidate.name, `${getSpiritkinDisplayName(candidate)} is in view. Review the preview, then choose whether to make them primary.`, { duration: 2200 });
+      persistSession();
       render();
-      revealCurrentFocus({ selector: ".selection-overlay-shell, [data-focus-anchor='selection-overlay']" });
+      revealCurrentFocus({ selector: ".bond-manager-modal, [data-focus-anchor='bond-modal']" });
     }
     return;
   }
@@ -10257,16 +10511,46 @@ async function onClick(event) {
   }
 
   if (action === "close-bond-modal") {
-    state.rebondSpiritkin = null;
-    state.selectedSpiritkin = state.primarySpiritkin || state.selectedSpiritkin;
+    clearBondManagerTransientState({ preserveFeedback: true });
     triggerBondFeedback("", "", `${getSpiritkinDisplayName(state.primarySpiritkin || state.selectedSpiritkin || { name: "Your current companion" })} remains your active companion.`, { duration: 1600 });
+    persistSession();
     render();
+    return;
+  }
+
+  if (action === "confirm-selection") {
+    const candidate = getBondManagerCandidate();
+    if (candidate) {
+      state.bondManagerState = "confirm";
+      triggerBondFeedback("armed", candidate.name, `Switch from ${getSpiritkinDisplayName(state.primarySpiritkin)} to ${getSpiritkinDisplayName(candidate)}? Confirm to complete the rebond.`, { duration: 2600 });
+      persistSession();
+      render();
+      revealCurrentFocus({ selector: ".bond-manager-modal, [data-focus-anchor='bond-modal']" });
+    }
+    return;
+  }
+
+  if (action === "cancel-rebond") {
+    if (state.bondManagerState === "confirm" && state.rebondSpiritkin) {
+      state.bondManagerState = "preview";
+      triggerBondFeedback("selected", state.rebondSpiritkin.name, `${getSpiritkinDisplayName(state.rebondSpiritkin)} remains in preview. Choose again when ready.`, { duration: 1800 });
+      persistSession();
+      render();
+      revealCurrentFocus({ selector: ".bond-manager-modal, [data-focus-anchor='bond-modal']" });
+      return;
+    }
+    clearBondManagerTransientState({ preserveFeedback: true });
+    triggerBondFeedback("", "", `${getSpiritkinDisplayName(state.primarySpiritkin || state.selectedSpiritkin || { name: "Your current companion" })} remains your active companion.`, { duration: 1600 });
+    persistSession();
+    render();
+    revealCurrentFocus({ selector: ".selection-view.bonded-home, .bond-home-copy" });
     return;
   }
 
   if (action === "confirm-rebond") {
     if (state.rebondSpiritkin) {
       const rebondedSpiritkin = state.rebondSpiritkin;
+      state.bondManagerState = "switching";
       beginRebondTransition(rebondedSpiritkin);
       if (!state.voiceMuted) {
         speakMoment(buildGreetingText(rebondedSpiritkin.name, "bondedReturn"), rebondedSpiritkin.ui.voice || "nova");
