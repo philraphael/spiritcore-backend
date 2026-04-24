@@ -7,15 +7,20 @@
 .presence-tab-content[data-presence-surface="games"] .games-view {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
 }
 
 .presence-tab-content[data-presence-surface="games"] .active-game-panel {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .chat-layout.game-focus-mode .active-game-panel {
@@ -461,6 +466,8 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  width: 100%;
+  max-width: 100%;
   padding: 20px 18px;
   border-radius: 30px;
   overflow: hidden;
@@ -547,6 +554,7 @@
   display: grid;
   gap: 16px;
   width: 100%;
+  max-width: 100%;
   padding: 22px;
   border-radius: 30px;
   border: 1px solid rgba(255,255,255,0.08);
@@ -773,7 +781,8 @@
 }
 
 .chess-showcase-shell {
-  width: min(100%, 1120px);
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
   gap: 14px;
   padding: 22px;
@@ -793,7 +802,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: min(100%, 760px);
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto 4px;
   gap: 14px;
 }
@@ -803,7 +813,8 @@
 }
 
 .chess-showcase-meta {
-  width: min(100%, 760px);
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
   display: grid;
   gap: 4px;
@@ -825,26 +836,28 @@
 }
 
 .chess-showcase-footer {
-  width: min(100%, 760px);
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
   text-align: center;
   opacity: 0.92;
 }
 
 .sv-theme-expanded {
-  width: min(100%, 1240px);
-  min-width: min(100%, 900px);
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   padding: 24px;
 }
 
 .board-standard {
-  width: min(100%, 760px);
+  width: 100%;
+  max-width: 100%;
 }
 
 .board-grand {
-  width: min(84vmin, 860px);
-  max-width: min(100%, calc(100vw - 420px), calc(100vh - 180px));
+  width: 100%;
+  max-width: 100%;
 }
 
 /* ============================================================
@@ -960,15 +973,18 @@
   min-height: clamp(560px, 62vw, 980px);
   padding: 28px 24px;
   border-radius: 36px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .presence-tab-content[data-presence-surface="games"] .board-standard {
-  width: min(100%, 980px);
+  width: 100%;
+  max-width: 100%;
 }
 
 .presence-tab-content[data-presence-surface="games"] .board-grand {
-  width: min(100%, 1120px);
-  max-width: min(100%, calc(100vw - 420px));
+  width: 100%;
+  max-width: 100%;
 }
 
 .presence-tab-content[data-presence-surface="games"] #spiritverse-game-board {

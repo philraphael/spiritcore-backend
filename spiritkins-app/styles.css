@@ -4118,8 +4118,8 @@ button:disabled {
 }
 
 .world-shell-nav-wrap {
-  max-width: 520px;
   width: 100%;
+  max-width: 100%;
 }
 
 .world-nav-block {
@@ -4796,12 +4796,14 @@ button:disabled {
 .selection-overlay-shell {
   position: relative;
   z-index: 1;
-  width: min(1400px, calc(100vw - 40px));
-  min-height: min(900px, calc(100vh - 40px));
+  width: 100%;
+  max-width: 100%;
+  min-height: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.6fr);
   gap: 24px;
   padding: 28px;
+  box-sizing: border-box;
   border-radius: 32px;
   border: 1px solid rgba(255,255,255,0.12);
   background:
@@ -4905,8 +4907,8 @@ button:disabled {
 @media (max-width: 980px) {
   .selection-overlay-shell {
     grid-template-columns: 1fr;
-    width: min(100%, calc(100vw - 20px));
-    min-height: calc(100vh - 20px);
+    width: 100%;
+    min-height: 100%;
     padding: 18px;
   }
 
@@ -8368,6 +8370,11 @@ button[data-action="begin-quest"]:active,
   gap: 28px;
   align-items: start;
   isolation: isolate;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 16px;
+  box-sizing: border-box;
 }
 
 .chat-layout.game-focus-mode .world-shell-body {
@@ -8378,6 +8385,8 @@ button[data-action="begin-quest"]:active,
 .presence-panel {
   position: relative;
   top: auto;
+  width: 100%;
+  max-width: 100%;
   max-height: none;
   min-height: 920px;
   padding: 28px;
@@ -8397,6 +8406,8 @@ button[data-action="begin-quest"]:active,
 
 .presence-tab-content {
   padding: 0 0 12px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .presence-panel,
@@ -9568,62 +9579,74 @@ button[data-action="begin-quest"]:active,
 }
 
 /* ============================================================
-   UX COMPLETION PASS - GAMES SIZING / REBOND / TRAILER STAGE
+   FRONTEND HARD LOCK - SINGLE LAYOUT AUTHORITY
    ============================================================ */
 
 .chat-layout .world-shell-header,
 .chat-layout .world-shell-copy,
 .chat-layout .world-shell-nav-wrap,
+.chat-layout .presence-panel,
 .chat-layout .presence-panel-head,
-.chat-layout .presence-tab-content {
+.chat-layout .presence-tab-content,
+.selection-overlay-shell,
+.games-view,
+.active-game-panel,
+.game-board-container {
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .chat-layout .world-shell-copy h2,
 .chat-layout .world-shell-copy p,
 .chat-layout .presence-panel-room {
-  max-width: 100%;
   overflow-wrap: anywhere;
 }
 
-.world-shell-body.games-primary-layout > .presence-panel.is-primary-surface {
-  width: min(100%, 1280px);
+.world-shell-body,
+.world-shell-body.games-primary-layout {
+  max-width: 1280px;
   margin: 0 auto;
-}
-
-.world-shell-body.games-primary-layout .presence-panel-head,
-.world-shell-body.games-primary-layout .presence-tab-tools,
-.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .games-view,
-.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .active-game-panel {
-  width: min(100%, 1160px);
-  margin-inline: auto;
+  width: 100%;
+  padding: 0 16px;
   box-sizing: border-box;
 }
 
+.world-shell-body.games-primary-layout {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.world-shell-body.games-primary-layout > .presence-panel.is-primary-surface {
+  position: relative;
+  z-index: 3;
+  overflow: visible;
+}
+
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
 .world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .games-view {
-  padding-inline: clamp(2px, 1vw, 10px);
-  overflow-x: clip;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-x: hidden;
 }
 
 .world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .games-list {
-  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
 }
 
 .world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .game-board-container,
 .world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .sv-theme-shell,
 .world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] #spiritverse-game-board {
+  width: 100%;
   max-width: 100%;
-}
-
-.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .game-help-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.selection-overlay-shell {
-  width: min(1480px, calc(100vw - 32px));
-  min-height: min(920px, calc(100vh - 32px));
-  grid-template-columns: minmax(0, 1.65fr) minmax(340px, 0.78fr);
 }
 
 .selection-overlay-stage,
@@ -9631,18 +9654,19 @@ button[data-action="begin-quest"]:active,
 .selection-overlay-still-stage,
 .selection-overlay-copy {
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .selection-overlay-video-stage .video-player-wrapper,
 .selection-overlay-still-art,
 .selection-overlay-still-art .composite-visual-frame {
   width: 100%;
-  min-height: clamp(420px, 68vh, 860px);
+  max-width: 100%;
 }
 
 .selection-overlay-copy {
-  width: min(100%, 420px);
-  justify-self: end;
+  justify-self: stretch;
 }
 
 .selection-overlay-actions .btn {
@@ -9650,23 +9674,19 @@ button[data-action="begin-quest"]:active,
 }
 
 .modal-scrim {
-  padding: clamp(18px, 4vw, 36px);
+  padding: 20px;
 }
 
 .bond-modal {
-  width: min(760px, calc(100vw - 32px));
+  width: 100%;
+  max-width: 760px;
 }
 
-@media (max-width: 1100px) {
-  .selection-overlay-shell {
+@media (max-width: 1180px) {
+  .world-shell-body,
+  .world-shell-body.games-primary-layout,
+  .chat-layout.game-focus-mode .world-shell-body {
     grid-template-columns: 1fr;
-    width: min(100%, calc(100vw - 20px));
-    min-height: calc(100vh - 20px);
-  }
-
-  .selection-overlay-copy {
-    width: 100%;
-    justify-self: stretch;
   }
 }
 

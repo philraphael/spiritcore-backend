@@ -10057,7 +10057,7 @@ async function onClick(event) {
       if (state.primarySpiritkin && state.primarySpiritkin.name !== candidate.name) {
         state.rebondSpiritkin = candidate;
         state.pendingBondSpiritkin = null;
-        state.selectedSpiritkin = state.primarySpiritkin;
+        state.selectedSpiritkin = candidate;
         state.selectionOverlaySpiritkin = null;
         state.showHomeView = true;
         state.activePresenceTab = "profile";
@@ -10122,6 +10122,7 @@ async function onClick(event) {
   if (action === "request-rebond") {
     const candidate = state.spiritkins.find((spiritkin) => spiritkin.name === element.dataset.name) ?? null;
     if (candidate) {
+      state.selectedSpiritkin = candidate;
       state.selectionOverlaySpiritkin = candidate;
       state.rebondSpiritkin = null;
       state.statusText = `${getSpiritkinDisplayName(candidate)} is in view. Preview the reveal before confirming any rebond.`;
@@ -10148,6 +10149,7 @@ async function onClick(event) {
 
   if (action === "close-bond-modal") {
     state.rebondSpiritkin = null;
+    state.selectedSpiritkin = state.primarySpiritkin || state.selectedSpiritkin;
     render();
     return;
   }
