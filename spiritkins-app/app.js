@@ -1965,6 +1965,20 @@ function buildSpiritkinVideoFailureKey(name, src) {
   return `${String(name || "").trim().toLowerCase()}::${String(src || "").trim()}`;
 }
 
+function resolveSpiritkinVideoStateFromSrc(src) {
+  const normalized = String(src || "").toLowerCase();
+  if (!normalized) return "";
+  if (normalized.includes("/idle/")) return "idle";
+  if (normalized.includes("/speaking/")) return "speaking";
+  if (normalized.includes("/emotional/")) {
+    if (normalized.includes("/calm")) return "calm";
+    if (normalized.includes("/excited")) return "excited";
+    if (normalized.includes("/serious")) return "serious";
+    return "emotional";
+  }
+  return "";
+}
+
 function buildSpiritkinMediaFailureKey(name, surface, src) {
   return `${String(name || "").trim().toLowerCase()}::${String(surface || "").trim().toLowerCase()}::${String(src || "").trim()}`;
 }
@@ -1977,6 +1991,16 @@ function rememberSpiritkinVideoFailure(name, src) {
     ...(state.spiritkinVideoFailures || {}),
     [key]: true
   };
+  const failedState = resolveSpiritkinVideoStateFromSrc(src);
+  if (failedState) {
+    state.spiritkinVideoUnavailableStates = {
+      ...(state.spiritkinVideoUnavailableStates || {}),
+      [name]: {
+        ...(state.spiritkinVideoUnavailableStates?.[name] || {}),
+        [failedState]: true
+      }
+    };
+  }
   if (/\/(?:idle|speaking)\//i.test(String(src || ""))) {
     state.spiritkinVideoUnavailable = {
       ...(state.spiritkinVideoUnavailable || {}),
@@ -2003,6 +2027,11 @@ function rememberSpiritkinMediaFailure(name, surface, src) {
 function isSpiritkinVideoFailed(name, src) {
   if (!name || !src) return false;
   return !!state.spiritkinVideoFailures?.[buildSpiritkinVideoFailureKey(name, src)];
+}
+
+function isSpiritkinVideoStateUnavailable(name, desiredState) {
+  if (!name || !desiredState) return false;
+  return !!state.spiritkinVideoUnavailableStates?.[name]?.[String(desiredState)];
 }
 
 function isSpiritkinMediaFailed(name, surface, src) {
@@ -2123,6 +2152,7 @@ function getSpiritkinVisualState(name) {
 }
 
 function resolveSpiritkinVideoClip(name, desiredState) {
+  if (isSpiritkinVideoStateUnavailable(name, desiredState)) return "";
   const candidates = getManifestSpiritkinVideoCandidates(name, desiredState).filter((src) => !isSpiritkinVideoFailed(name, src));
   if (candidates.length) return candidates[0];
   const manifestResolved = resolveSpiritkinVideo(name, desiredState);
@@ -4403,6 +4433,12 @@ function syncEntryCinematics() {
 function mountActiveGameBoard(runId, attempt = 0) {
   if (runId !== _gameBoardMountRunId) return;
   if (!state.activeGame || !SpiritverseGames || state.activePresenceTab !== "games") return;
+  console.info("[Games] mount-scheduled", {
+    runId,
+    attempt,
+    tab: state.activePresenceTab,
+    gameType: state.activeGame?.type || null
+  });
   const container = document.getElementById("spiritverse-game-board");
   const boardStage = document.querySelector(".presence-tab-content[data-presence-surface='games'] .game-board-container");
   const canMount = !!container && !!boardStage
@@ -4410,20 +4446,48 @@ function mountActiveGameBoard(runId, attempt = 0) {
     && boardStage.offsetParent !== null
     && ((container.clientWidth || 0) > 0 || (boardStage.clientWidth || 0) > 0);
   if (!canMount) {
+    console.info("[Games] mount-container-missing", {
+      runId,
+      attempt,
+      hasContainer: !!container,
+      hasBoardStage: !!boardStage,
+      containerWidth: container?.clientWidth || 0,
+      boardStageWidth: boardStage?.clientWidth || 0,
+      tab: state.activePresenceTab,
+      gameType: state.activeGame?.type || null
+    });
     if (attempt < 1 && typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
       window.requestAnimationFrame(() => mountActiveGameBoard(runId, attempt + 1));
     }
     return;
   }
+  console.info("[Games] mount-container-found", {
+    runId,
+    attempt,
+    containerWidth: container.clientWidth || 0,
+    boardStageWidth: boardStage.clientWidth || 0,
+    tab: state.activePresenceTab,
+    gameType: state.activeGame?.type || null
+  });
   const spiritkin = state.selectedSpiritkin;
-  SpiritverseGames.render(
-    container,
-    state.activeGame,
-    spiritkin ? spiritkin.name : "Spiritkin",
-    state.gameSpiritkinMessage,
-    (move) => submitGameMove(move),
-    resolveSpiritkinDomainTheme(state.activeGame?.type, spiritkin?.name)
-  );
+  try {
+    SpiritverseGames.render(
+      container,
+      state.activeGame,
+      spiritkin ? spiritkin.name : "Spiritkin",
+      state.gameSpiritkinMessage,
+      (move) => submitGameMove(move),
+      resolveSpiritkinDomainTheme(state.activeGame?.type, spiritkin?.name)
+    );
+  } catch (error) {
+    console.error("[Games] render-failed", {
+      runId,
+      attempt,
+      gameType: state.activeGame?.type || null,
+      error: error?.message || String(error)
+    });
+    throw error;
+  }
 }
 
 function scheduleActiveGameBoardMount() {
