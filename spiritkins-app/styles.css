@@ -10182,3 +10182,73 @@ button[data-action="begin-quest"]:active,
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   FINAL GAMES LAYOUT WIDTH FIX
+   ============================================================ */
+
+.chat-layout.games-room-active {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.chat-layout.games-room-active .world-shell-body,
+.chat-layout.games-room-active .world-shell-body.games-primary-layout {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1280px;
+}
+
+.chat-layout.games-room-active .presence-panel.is-primary-surface {
+  position: relative;
+  top: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.chat-layout.games-room-active .presence-tab-content[data-presence-surface="games"] {
+  width: 100%;
+  justify-items: stretch;
+  overflow: visible;
+}
+
+.chat-layout.games-room-active .presence-tab-content[data-presence-surface="games"] .games-view,
+.chat-layout.games-room-active .presence-tab-content[data-presence-surface="games"] .active-game-panel {
+  width: min(100%, 1120px);
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.chat-layout.games-room-active .presence-tab-content[data-presence-surface="games"] .sv-theme-shell {
+  width: min(100%, 980px);
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.chat-layout.games-room-active .presence-tab-content[data-presence-surface="games"] .game-board-container {
+  width: min(90vw, 760px);
+  max-width: 760px;
+  min-width: min(100%, 520px);
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.chat-layout.games-room-active .presence-tab-content[data-presence-surface="games"] #spiritverse-game-board {
+  width: 100%;
+  max-width: 100%;
+  display: grid;
+  justify-items: center;
+}
+
+@media (max-width: 900px) {
+  .chat-layout.games-room-active .presence-tab-content[data-presence-surface="games"] .games-view,
+  .chat-layout.games-room-active .presence-tab-content[data-presence-surface="games"] .active-game-panel,
+  .chat-layout.games-room-active .presence-tab-content[data-presence-surface="games"] .sv-theme-shell {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .chat-layout.games-room-active .presence-tab-content[data-presence-surface="games"] .game-board-container {
+    width: min(94vw, 520px);
+    max-width: 520px;
+    min-width: 0;
+  }
+}

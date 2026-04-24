@@ -120,6 +120,7 @@ let bondFeedbackTimer = null;
 const selectionTrailerFailures = new Set();
 let _lastGamesHubLogKey = "";
 let _lastGamesBoardRenderLogKey = "";
+let _lastRenderedActiveGameSignature = "";
 const VOICE_GUIDANCE_KEY = "sk_voice_guidance_dismissed";
 const WAKE_MODE_KEY = "sk_foreground_wake_mode";
 
@@ -4499,6 +4500,17 @@ function mountActiveGameBoard(runId, attempt = 0) {
     tab: state.activePresenceTab,
     gameType: state.activeGame?.type || null
   });
+  const gameSignature = [
+    state.activeGame?.id || "no-id",
+    state.activeGame?.type || "unknown",
+    state.activeGame?.status || "unknown",
+    state.activeGame?.turn || "unknown",
+    Number(state.activeGame?.moveCount || 0),
+    Array.isArray(state.activeGame?.history) ? state.activeGame.history.length : 0
+  ].join(":");
+  if (_lastRenderedActiveGameSignature === gameSignature && container.firstElementChild) {
+    return;
+  }
   const spiritkin = state.selectedSpiritkin;
   try {
     SpiritverseGames.render(
@@ -4515,6 +4527,7 @@ function mountActiveGameBoard(runId, attempt = 0) {
       gameType: state.activeGame?.type || null,
       available: SpiritverseGames?.available !== false
     });
+    _lastRenderedActiveGameSignature = gameSignature;
   } catch (error) {
     console.error("[Games] render-failed", {
       runId,
@@ -4529,12 +4542,28 @@ function mountActiveGameBoard(runId, attempt = 0) {
 function scheduleActiveGameBoardMount() {
   _gameBoardMountRunId += 1;
   const runId = _gameBoardMountRunId;
-  if (state.activePresenceTab !== "games") return;
+  if (state.activePresenceTab !== "games") {
+    _lastRenderedActiveGameSignature = "";
+    return;
+  }
   if (!state.activeGame) {
+    _lastRenderedActiveGameSignature = "";
     console.info("[Games] mount-skipped-no-active-game", {
       runId,
       tab: state.activePresenceTab
     });
+    return;
+  }
+  const gameSignature = [
+    state.activeGame?.id || "no-id",
+    state.activeGame?.type || "unknown",
+    state.activeGame?.status || "unknown",
+    state.activeGame?.turn || "unknown",
+    Number(state.activeGame?.moveCount || 0),
+    Array.isArray(state.activeGame?.history) ? state.activeGame.history.length : 0
+  ].join(":");
+  const existingContainer = document.getElementById("spiritverse-game-board");
+  if (_lastRenderedActiveGameSignature === gameSignature && existingContainer?.firstElementChild) {
     return;
   }
   if (!SpiritverseGames) return;
@@ -9453,7 +9482,12 @@ function buildChatView() {
   const showFirstLoopGuide = !state.activeGame && safeMessages.length <= 1 && !state.loadingReply;
   const showSpiritCoreGuidance = !state.loadingReply && !state.showHomeView;
   const gamesSurfaceActive = state.activePresenceTab === "games";
-  const chatLayoutClass = `${esc(meta.cls)} ${state.activePresenceTab === "games" && state.activeGame ? "game-focus-mode" : ""}`.trim();
+  const gameBoardSurfaceActive = gamesSurfaceActive && !!state.activeGame;
+  const chatLayoutClass = [
+    esc(meta.cls),
+    gameBoardSurfaceActive ? "game-focus-mode" : "",
+    gameBoardSurfaceActive ? "games-room-active" : ""
+  ].filter(Boolean).join(" ");
   const spiritkinSpeaking = isSpiritkinSpeechActive(spiritkin.name);
   const roomMeta = getRoomDisplayMeta(state.activePresenceTab, spiritkin);
   if (state.activePresenceTab === "games" && !state.activeGame) {
