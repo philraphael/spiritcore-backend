@@ -118,6 +118,8 @@ let spiritGateTransitionRevealTimer = null;
 let spiritGateTransitionRouteTimer = null;
 let bondFeedbackTimer = null;
 const selectionTrailerFailures = new Set();
+let _lastGamesHubLogKey = "";
+let _lastGamesBoardRenderLogKey = "";
 const VOICE_GUIDANCE_KEY = "sk_voice_guidance_dismissed";
 const WAKE_MODE_KEY = "sk_foreground_wake_mode";
 
@@ -3228,8 +3230,9 @@ function buildSessionStateSignature(next) {
   });
 }
 
-function applySessionSnapshot(session, source = "backend") {
+function applySessionSnapshot(session, source = "backend", options = {}) {
   if (!session || typeof session !== "object") return false;
+  const { ignoreGameState = false } = options;
 
   const spiritkinRecord = buildSpiritkinRecordFromName(session.currentSpiritkin?.name || null);
   const recentMessages = Array.isArray(session.recentMessages)
@@ -3241,7 +3244,7 @@ function applySessionSnapshot(session, source = "backend") {
   const speechState = session.speechState && typeof session.speechState === "object"
     ? session.speechState
     : {};
-  const gameState = normalizeActiveGame(session.gameState);
+  const gameState = ignoreGameState ? null : normalizeActiveGame(session.gameState);
   const currentSurface = String(session.currentSurface || deriveCurrentSurfaceFromUI()).trim().toLowerCase() || "selection";
   const currentMode = String(session.currentMode || deriveCurrentModeFromUI()).trim().toLowerCase() || "idle";
   const nextActivePresenceTab = currentSurface === "profile"
@@ -3350,7 +3353,7 @@ function applySessionSnapshot(session, source = "backend") {
     currentSpiritkin: session.currentSpiritkin || null,
     currentSurface,
     currentMode,
-    currentGame: session.currentGame || (gameState ? {
+    currentGame: (ignoreGameState ? null : session.currentGame) || (gameState ? {
       type: gameState.type,
       name: gameState.name,
       status: gameState.status,
@@ -3446,7 +3449,7 @@ async function fetchSessionSnapshot(options = {}) {
 }
 
 async function syncSessionControl(overrides = {}, options = {}) {
-  const { renderOnFinish = false } = options;
+  const { renderOnFinish = false, ignoreGameState = false } = options;
   if (!state.userId) return null;
   const payload = buildSessionControlPayload(overrides);
   const signature = JSON.stringify(payload);
@@ -3474,7 +3477,7 @@ async function syncSessionControl(overrides = {}, options = {}) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.ok === false) throw new Error(data.message || "Failed to sync session control.");
-      const changed = applySessionSnapshot(data.session, "backend-control");
+      const changed = applySessionSnapshot(data.session, "backend-control", { ignoreGameState });
       persistSession();
       if (renderOnFinish && changed) render();
       return data.session;
@@ -3582,7 +3585,7 @@ let _surfaceTransitionRunId = 0;
 
 async function transitionPresenceSurface(tab, options = {}) {
   if (!VALID_PRESENCE_TABS.includes(tab)) return false;
-  const { announce = true } = options;
+  const { announce = true, preferHub = false } = options;
   const runId = ++_surfaceTransitionRunId;
   const previousTab = state.activePresenceTab;
   if (tab === "games" && tab !== previousTab) {
@@ -3593,6 +3596,14 @@ async function transitionPresenceSurface(tab, options = {}) {
     });
   }
   state.pendingPresenceTab = tab;
+  if (tab === "games" && preferHub) {
+    state.activeGame = null;
+    state.gameActive = false;
+    state.gameHelpOpen = false;
+    state.gameHelpFirstRun = false;
+    state.gameFeedback = null;
+    state.gameSpiritkinMessage = null;
+  }
   if (tab !== previousTab) {
     state.statusText = `Opening ${tab.replace("_", " ")}...`;
     state.statusError = false;
@@ -3606,7 +3617,7 @@ async function transitionPresenceSurface(tab, options = {}) {
       currentMode: deriveModeForSurface(tab),
       activeTab: tab,
       speechState: { turnPhase: state.sessionModel?.speechState?.turnPhase || "complete" },
-    });
+    }, { ignoreGameState: tab === "games" && preferHub });
   } finally {
     state.pendingPresenceTab = null;
   }
@@ -4518,7 +4529,15 @@ function mountActiveGameBoard(runId, attempt = 0) {
 function scheduleActiveGameBoardMount() {
   _gameBoardMountRunId += 1;
   const runId = _gameBoardMountRunId;
-  if (!state.activeGame || !SpiritverseGames || state.activePresenceTab !== "games") return;
+  if (state.activePresenceTab !== "games") return;
+  if (!state.activeGame) {
+    console.info("[Games] mount-skipped-no-active-game", {
+      runId,
+      tab: state.activePresenceTab
+    });
+    return;
+  }
+  if (!SpiritverseGames) return;
   console.info("[Games] mount-scheduled", {
     runId,
     tab: state.activePresenceTab,
@@ -6988,7 +7007,7 @@ async function startGameSession(gameType) {
       return false;
     }
     state.pendingGameType = gameType;
-    console.info("[Games] game selected", {
+    console.info("[Games] start-requested", {
       gameType,
       activeTab: state.activePresenceTab,
       hasConversation: !!state.conversationId
@@ -7064,6 +7083,11 @@ async function startGameSession(gameType) {
       spokenGameMessageId = message?.id || null;
     }
     normalizeInteractionState("startGameSession:success");
+    console.info("[Games] start-success", {
+      gameType,
+      status: state.activeGame?.status || null,
+      turn: state.activeGame?.turn || null
+    });
     logGameDebug("start-game-success", {
       gameType,
       status: state.activeGame?.status || null,
@@ -9432,6 +9456,28 @@ function buildChatView() {
   const chatLayoutClass = `${esc(meta.cls)} ${state.activePresenceTab === "games" && state.activeGame ? "game-focus-mode" : ""}`.trim();
   const spiritkinSpeaking = isSpiritkinSpeechActive(spiritkin.name);
   const roomMeta = getRoomDisplayMeta(state.activePresenceTab, spiritkin);
+  if (state.activePresenceTab === "games" && !state.activeGame) {
+    const hubKey = `${state.conversationId || "no-conversation"}:${state.pendingGameType || "idle"}:${spiritkin?.name || "unknown"}`;
+    if (_lastGamesHubLogKey !== hubKey) {
+      _lastGamesHubLogKey = hubKey;
+      console.info("[Games] hub-rendered", {
+        conversationId: state.conversationId || null,
+        pendingGameType: state.pendingGameType || null,
+        spiritkin: spiritkin?.name || null
+      });
+    }
+  }
+  if (state.activePresenceTab === "games" && state.activeGame) {
+    const boardKey = `${state.activeGame.type}:${state.activeGame.status}:${state.activeGame.moveCount || 0}`;
+    if (_lastGamesBoardRenderLogKey !== boardKey) {
+      _lastGamesBoardRenderLogKey = boardKey;
+      console.info("[Games] board-container-rendered", {
+        gameType: state.activeGame.type,
+        status: state.activeGame.status,
+        moveCount: state.activeGame.moveCount || 0
+      });
+    }
+  }
   const wakeMode = getWakeModeStatus(spiritkin);
 
   // Echoes & Charter Logic
@@ -11009,6 +11055,9 @@ async function onClick(event) {
   if (action === "open-games-hub") {
     state.showHomeView = false;
     state.selectedSpiritkin = state.primarySpiritkin || state.selectedSpiritkin;
+    state.activeGame = null;
+    state.gameActive = false;
+    state.pendingGameType = null;
     normalizeInteractionState("open-games-hub");
     if (!state.conversationId) {
       await beginConversation();
@@ -11016,7 +11065,7 @@ async function onClick(event) {
     if (state.conversationId) {
       state.showHomeView = false;
       normalizeInteractionState("open-games-hub:games");
-      await transitionPresenceSurface("games");
+      await transitionPresenceSurface("games", { preferHub: true });
     }
     return;
   }

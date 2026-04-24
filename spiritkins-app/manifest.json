@@ -1,7 +1,7 @@
 {
   "name": "Spiritkins",
   "short_name": "Spiritkins",
-  "start_url": "/app",
+  "start_url": "/app/",
   "scope": "/app/",
   "display": "standalone",
   "background_color": "#000000",
