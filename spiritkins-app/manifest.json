@@ -1,0 +1,23 @@
+{
+  "name": "Spiritkins",
+  "short_name": "Spiritkins",
+  "start_url": "/app",
+  "scope": "/app/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "/app/assets/ui/spiritcore-spiritkins-portraits.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/app/assets/ui/spiritcore-spiritkins-portraits.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
