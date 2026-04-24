@@ -287,6 +287,7 @@ let _lastSessionControlSignature = "";
 let _lastSessionControlAt = 0;
 let _gameBoardMountRunId = 0;
 let rebondTransitionTimer = null;
+let _deferredInstallPrompt = null;
 
 const LONG_FORM_SILENCE_GRACE_MS = 1400;
 const WAKE_MODE_SILENCE_GRACE_MS = 1650;
@@ -2983,6 +2984,8 @@ const state = {
   wakePauseReason: "",
   wakeModeStatus: "",
   settingsOpen: false,
+  installPromptAvailable: false,
+  pwaInstalled: false,
   voiceGuidanceDismissed: localStorage.getItem(VOICE_GUIDANCE_KEY) === "1",
   voiceTranscriptPreview: "",
   voicePermissionBlocked: false,
@@ -8797,6 +8800,24 @@ function buildSettingsModal() {
             True background wake mode still requires a native mobile wrapper or equivalent background-capable runtime.
           </div>
         </div>
+        <div class="settings-modal-section">
+          <div class="settings-row">
+            <div>
+              <strong>Install Spiritkins</strong>
+              <p>Save Spiritkins to your device for a standalone app shell when the browser allows installation.</p>
+            </div>
+            ${state.pwaInstalled
+              ? `<button class="btn btn-ghost btn-sm" disabled>Installed</button>`
+              : state.installPromptAvailable
+                ? `<button class="btn btn-primary btn-sm" data-action="install-pwa">Install Spiritkins</button>`
+                : `<button class="btn btn-ghost btn-sm" disabled>Unavailable</button>`}
+          </div>
+          <div class="settings-status-copy">${state.pwaInstalled
+            ? "Spiritkins is installed or already running in a standalone display mode."
+            : state.installPromptAvailable
+              ? "Your browser has exposed the install prompt for this session."
+              : "The install prompt appears only when the current browser and session allow installation."}</div>
+        </div>
       </div>
     </div>
   `;
@@ -11495,6 +11516,30 @@ async function onClick(event) {
     render();
     return;
   }
+  if (action === "install-pwa") {
+    if (!_deferredInstallPrompt) {
+      state.statusText = "Install is not available in this browser session yet.";
+      state.statusError = false;
+      render();
+      return;
+    }
+    try {
+      await _deferredInstallPrompt.prompt();
+      const outcome = await _deferredInstallPrompt.userChoice;
+      state.statusText = outcome?.outcome === "accepted"
+        ? "Install prompt accepted."
+        : "Install prompt dismissed.";
+      state.statusError = false;
+    } catch (error) {
+      state.statusText = error?.message || "Install prompt could not be opened.";
+      state.statusError = true;
+    } finally {
+      _deferredInstallPrompt = null;
+      state.installPromptAvailable = false;
+      render();
+    }
+    return;
+  }
 
   if (action === "bond-generated-spiritkin") {
     if (state.generatedSpiritkin) {
@@ -11874,6 +11919,30 @@ function installSpeechLifecycleGuards() {
   });
 }
 
+function installPwaExperience() {
+  if (typeof window === "undefined") return;
+  const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator?.standalone === true;
+  state.pwaInstalled = !!standalone;
+  state.installPromptAvailable = false;
+
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    _deferredInstallPrompt = event;
+    state.installPromptAvailable = true;
+    state.pwaInstalled = false;
+    render();
+  });
+
+  window.addEventListener("appinstalled", () => {
+    _deferredInstallPrompt = null;
+    state.installPromptAvailable = false;
+    state.pwaInstalled = true;
+    state.statusText = "Spiritkins installed.";
+    state.statusError = false;
+    render();
+  });
+}
+
 function initializeSpiritverseApp() {
   if (_spiritverseBootInitialized) {
     logInteraction("boot-skipped", { reason: "already-initialized" });
@@ -11883,6 +11952,7 @@ function initializeSpiritverseApp() {
   try {
     installGlobalInteractionDiagnostics();
     installSpeechLifecycleGuards();
+    installPwaExperience();
     bootstrapRetentionExperience();
     normalizeInteractionState("boot");
     logInteraction("boot", { rootReady: !!document.getElementById("root") });
