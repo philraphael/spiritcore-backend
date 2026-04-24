@@ -9816,7 +9816,7 @@ function buildBondModal() {
   if (!state.rebondSpiritkin) return "";
   const target = state.rebondSpiritkin;
   return `
-    <div class="modal-scrim" data-action="close-bond-modal">
+    <div class="modal-scrim" data-action="close-bond-modal" data-focus-anchor="bond-modal">
       <div class="bond-modal ${esc(target.ui.cls)}" data-action="noop">
         <div class="bond-modal-head">
           <div>
@@ -10029,7 +10029,6 @@ async function onClick(event) {
 
   if (action === "preview-primary" || action === "select-spiritkin") {
     const candidate = state.spiritkins[Number(element.dataset.index)] ?? null;
-    clearSelectionTrailerFailure(candidate?.name);
     state.selectedSpiritkin = candidate || state.selectedSpiritkin;
     state.selectionOverlaySpiritkin = candidate;
     state.showHomeView = !!state.primarySpiritkin;
@@ -10057,13 +10056,17 @@ async function onClick(event) {
     if (candidate) {
       if (state.primarySpiritkin && state.primarySpiritkin.name !== candidate.name) {
         state.rebondSpiritkin = candidate;
+        state.pendingBondSpiritkin = null;
         state.selectedSpiritkin = state.primarySpiritkin;
         state.selectionOverlaySpiritkin = null;
-        state.statusText = `${getSpiritkinDisplayName(candidate)} is previewed. Confirm rebonding only if you want to switch companions.`;
+        state.showHomeView = true;
+        state.activePresenceTab = "profile";
+        state.currentTab = "profile";
+        state.statusText = `${getSpiritkinDisplayName(candidate)} is ready. Confirm rebonding to make them your active companion.`;
         state.statusError = false;
         persistSession();
         render();
-        revealCurrentFocus({ selector: ".bond-modal-card, .selection-view" });
+        revealCurrentFocus({ selector: ".bond-modal, [data-focus-anchor='bond-modal'], .selection-view" });
         return;
       }
       state.pendingBondSpiritkin = candidate;
@@ -10119,7 +10122,6 @@ async function onClick(event) {
   if (action === "request-rebond") {
     const candidate = state.spiritkins.find((spiritkin) => spiritkin.name === element.dataset.name) ?? null;
     if (candidate) {
-      clearSelectionTrailerFailure(candidate?.name);
       state.selectionOverlaySpiritkin = candidate;
       state.rebondSpiritkin = null;
       state.statusText = `${getSpiritkinDisplayName(candidate)} is in view. Preview the reveal before confirming any rebond.`;
@@ -10154,7 +10156,14 @@ async function onClick(event) {
     if (state.rebondSpiritkin) {
       const rebondedSpiritkin = state.rebondSpiritkin;
       setPrimarySpiritkin(rebondedSpiritkin);
+      state.showHomeView = true;
+      state.activePresenceTab = "profile";
+      state.currentTab = "profile";
+      state.statusText = `${getSpiritkinDisplayName(rebondedSpiritkin)} is now your bonded companion.`;
+      state.statusError = false;
+      persistSession();
       render();
+      revealCurrentFocus({ selector: ".selection-view.bonded-home, .bond-home-copy, .presence-chip" });
       if (!state.voiceMuted) {
         speakMoment(buildGreetingText(rebondedSpiritkin.name, "bondedReturn"), rebondedSpiritkin.ui.voice || "nova");
       }

@@ -9566,3 +9566,117 @@ button[data-action="begin-quest"]:active,
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   UX COMPLETION PASS - GAMES SIZING / REBOND / TRAILER STAGE
+   ============================================================ */
+
+.chat-layout .world-shell-header,
+.chat-layout .world-shell-copy,
+.chat-layout .world-shell-nav-wrap,
+.chat-layout .presence-panel-head,
+.chat-layout .presence-tab-content {
+  min-width: 0;
+}
+
+.chat-layout .world-shell-copy h2,
+.chat-layout .world-shell-copy p,
+.chat-layout .presence-panel-room {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.world-shell-body.games-primary-layout > .presence-panel.is-primary-surface {
+  width: min(100%, 1280px);
+  margin: 0 auto;
+}
+
+.world-shell-body.games-primary-layout .presence-panel-head,
+.world-shell-body.games-primary-layout .presence-tab-tools,
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .games-view,
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .active-game-panel {
+  width: min(100%, 1160px);
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .games-view {
+  padding-inline: clamp(2px, 1vw, 10px);
+  overflow-x: clip;
+}
+
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .games-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  align-items: stretch;
+}
+
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .game-board-container,
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .sv-theme-shell,
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] #spiritverse-game-board {
+  max-width: 100%;
+}
+
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .game-help-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.selection-overlay-shell {
+  width: min(1480px, calc(100vw - 32px));
+  min-height: min(920px, calc(100vh - 32px));
+  grid-template-columns: minmax(0, 1.65fr) minmax(340px, 0.78fr);
+}
+
+.selection-overlay-stage,
+.selection-overlay-video-stage,
+.selection-overlay-still-stage,
+.selection-overlay-copy {
+  min-width: 0;
+}
+
+.selection-overlay-video-stage .video-player-wrapper,
+.selection-overlay-still-art,
+.selection-overlay-still-art .composite-visual-frame {
+  width: 100%;
+  min-height: clamp(420px, 68vh, 860px);
+}
+
+.selection-overlay-copy {
+  width: min(100%, 420px);
+  justify-self: end;
+}
+
+.selection-overlay-actions .btn {
+  min-height: 50px;
+}
+
+.modal-scrim {
+  padding: clamp(18px, 4vw, 36px);
+}
+
+.bond-modal {
+  width: min(760px, calc(100vw - 32px));
+}
+
+@media (max-width: 1100px) {
+  .selection-overlay-shell {
+    grid-template-columns: 1fr;
+    width: min(100%, calc(100vw - 20px));
+    min-height: calc(100vh - 20px);
+  }
+
+  .selection-overlay-copy {
+    width: 100%;
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 900px) {
+  .world-shell-body.games-primary-layout .presence-panel-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .game-help-grid {
+    grid-template-columns: 1fr;
+  }
+}
