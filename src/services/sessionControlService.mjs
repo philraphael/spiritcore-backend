@@ -144,6 +144,21 @@ export function createSessionControlService({ conversationService, messageServic
     }
   }
 
+  async function resolveSpiritkinIdForConversation({ conversationId, currentSpiritkinName = null }) {
+    if (currentSpiritkinName) {
+      const identity = await safeResolveSpiritkinByName(currentSpiritkinName);
+      if (identity?.id) return identity.id;
+    }
+
+    if (!conversationId) return null;
+    try {
+      const conversation = await conversationService.resolveByConversation(conversationId);
+      return conversation?.spiritkin_id || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   async function safeGetWorldData({ userId, conversationId }) {
     try {
       return await world.get({ userId, conversationId });
@@ -373,6 +388,10 @@ export function createSessionControlService({ conversationService, messageServic
 
     try {
       const worldData = await safeGetWorldData({ userId, conversationId });
+      const resolvedSpiritkinId = worldData.spiritkinId || await resolveSpiritkinIdForConversation({
+        conversationId,
+        currentSpiritkinName,
+      });
       const nextState = {
         ...(worldData.state || {}),
         flags: {
@@ -390,7 +409,7 @@ export function createSessionControlService({ conversationService, messageServic
       await world.upsert({
         userId,
         conversationId,
-        spiritkinId: worldData.spiritkinId,
+        spiritkinId: resolvedSpiritkinId,
         state: nextState,
       });
     } catch (_) {

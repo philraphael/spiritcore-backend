@@ -348,17 +348,20 @@ export const createEngagementEngine = ({ supabase, bus, worldService }) => {
       });
 
       // Update engagement record with current session start
-      await supabase
+      const { error: upsertError } = await supabase
         .from("user_engagement")
         .upsert({
           user_id: safeUserId,
           spiritkin_id: spiritkinId,
           last_session_at: nowIso(),
           last_bond_stage: bondStage,
-          last_echo_unlocks: (engRecord?.last_echo_unlocks ?? []).concat(newEchoUnlocks),
+          last_echo_unlocks: [...new Set((engRecord?.last_echo_unlocks ?? []).concat(newEchoUnlocks))],
           updated_at: nowIso(),
-        }, { onConflict: "user_id,spiritkin_id" })
-        .catch(() => {}); // Non-critical
+        }, { onConflict: "user_id,spiritkin_id" });
+
+      if (upsertError) {
+        console.warn("[EngagementEngine] engagement upsert failed:", upsertError.message);
+      }
 
       return {
         whisper,
