@@ -2924,6 +2924,9 @@ const state = {
   selectionOverlaySpiritkin: null,
   rebondSpiritkin: null,
   bondManagerState: "closed",
+  devShowBondManagerV2: false,
+  devBondManagerV2Step: "browsing",
+  devBondManagerV2Target: "",
   conversationId: null,
   messages: [],
   loadingReply: false,
@@ -3036,6 +3039,21 @@ if (typeof window !== "undefined") {
   };
   window.__svSpiritkinMediaFailure = (name, surface, src) => {
     rememberSpiritkinMediaFailure(name, surface, src);
+  };
+  window.state = state;
+  window.__svToggleBondManagerV2 = (visible = true) => {
+    state.devShowBondManagerV2 = !!visible;
+    if (!visible) {
+      state.devBondManagerV2Step = "browsing";
+      state.devBondManagerV2Target = "";
+    }
+    render();
+  };
+  window.__svSetBondManagerV2Step = (step = "browsing", target = "") => {
+    state.devShowBondManagerV2 = true;
+    state.devBondManagerV2Step = String(step || "browsing");
+    state.devBondManagerV2Target = String(target || "");
+    render();
   };
 }
 
@@ -8203,20 +8221,21 @@ function buildApp() {
   const atmosphere = getAtmosphereSpiritkin();
   const atmosphereClass = atmosphere ? `realm-${atmosphere.ui.cls}` : "realm-neutral";
   const inEntryFlow = !state.entryAccepted || state.showCrownGateHome || state.spiritverseTrailerActive || state.spiritCoreWelcoming;
+  const devBondManagerV2Active = !inEntryFlow && state.devShowBondManagerV2 === true;
   const rebondAppClass = state.rebondTransitionActive ? `rebond-transition rebond-${esc(state.rebondTransitionPhase || "active")}` : "";
   return `
     <div class="sv-bg ${atmosphereClass}"></div>
     <div class="sv-noise"></div>
     <div class="sv-orbit ${atmosphereClass}"></div>
     <div class="app-shell ${atmosphereClass} ${rebondAppClass}">
-      ${inEntryFlow ? "" : buildTopbar()}
-      ${!inEntryFlow && state.showReturnSummary ? buildRetentionPanel() : ""}
+      ${inEntryFlow || devBondManagerV2Active ? "" : buildTopbar()}
+      ${!inEntryFlow && !devBondManagerV2Active && state.showReturnSummary ? buildRetentionPanel() : ""}
       ${state.surveyOpen ? buildSurveyModal() : ""}
       ${state.tierModalOpen ? buildTierModal() : ""}
       ${state.settingsOpen ? buildSettingsModal() : ""}
-      ${state.showCrownGateHome || !state.entryAccepted ? buildCrownGateEntry() : (state.spiritverseTrailerActive ? buildSpiritverseArrival() : (state.spiritCoreWelcoming ? buildSpiritCoreWelcome() : buildMain()))}
-      ${!inEntryFlow ? buildIssueReporter() : ""}
-      ${buildBondModal()}
+      ${state.showCrownGateHome || !state.entryAccepted ? buildCrownGateEntry() : (state.spiritverseTrailerActive ? buildSpiritverseArrival() : (state.spiritCoreWelcoming ? buildSpiritCoreWelcome() : (devBondManagerV2Active ? renderBondManagerV2(state) : buildMain())))}
+      ${!inEntryFlow && !devBondManagerV2Active ? buildIssueReporter() : ""}
+      ${devBondManagerV2Active ? "" : buildBondModal()}
       ${state.rebondTransitionActive ? `<div class="rebond-transition-overlay" aria-hidden="true"><div class="rebond-transition-copy">Bond transition in progress...</div></div>` : ""}
       ${state.entryTransitioning ? `
         <div class="crown-gate-overlay">
@@ -10111,6 +10130,104 @@ function buildBondManagerMediaStage(spiritkin) {
         { fallbackMode: "errorOnly", debugSlot: `${profile.name}-bond-manager` }
       )}
     </div>
+  `;
+}
+
+function renderBondManagerV2(currentState) {
+  const current = currentState.primarySpiritkin || currentState.selectedSpiritkin || currentState.spiritkins?.[0] || null;
+  const targetName = String(currentState.devBondManagerV2Target || "").trim();
+  const target = currentState.spiritkins.find((item) => item?.name === targetName)
+    || currentState.spiritkins.find((item) => item?.name && item.name !== current?.name)
+    || current;
+  const step = ["browsing", "preview", "confirm", "switching"].includes(String(currentState.devBondManagerV2Step || ""))
+    ? String(currentState.devBondManagerV2Step)
+    : "browsing";
+  const currentProfile = getSpiritkinMediaProfile(current);
+  const targetProfile = getSpiritkinMediaProfile(target);
+  const themeClass = target?.ui?.cls || current?.ui?.cls || "lyra";
+  const stageHeading = {
+    browsing: "Choose a Spiritkin to preview",
+    preview: targetProfile ? `${targetProfile.displayName} preview` : "Spiritkin preview",
+    confirm: targetProfile && currentProfile ? `Switch from ${currentProfile.displayName} to ${targetProfile.displayName}?` : "Confirm switch",
+    switching: targetProfile ? `Switching to ${targetProfile.displayName}` : "Switching bond"
+  }[step];
+  const stageCopy = {
+    browsing: "Development-only isolated renderer. This screen is not connected to the live bond flow yet.",
+    preview: "Preview fully replaces browsing in this renderer. No modal, no overlay, and no bonded-room competition.",
+    confirm: "Confirm fully replaces preview in this renderer. This is a structural proof-of-layout step only.",
+    switching: "Switching is represented as a dedicated full-screen state so the transition can be validated without touching live bond logic yet."
+  }[step];
+
+  let body = `
+    <div class="bond-manager-v2-grid">
+      ${currentState.spiritkins.map((spiritkin, index) => `
+        <article class="bond-manager-v2-card ${esc(spiritkin.ui.cls)} ${current?.name === spiritkin.name ? "is-current" : ""} ${target?.name === spiritkin.name ? "is-target" : ""}">
+          <div class="bond-manager-v2-card-head">
+            <div>
+              <div class="bond-manager-v2-card-kicker">${esc(spiritkin.ui.realm)}</div>
+              <h3>${esc(getSpiritkinDisplayName(spiritkin))}</h3>
+            </div>
+            ${current?.name === spiritkin.name ? `<span class="bond-manager-v2-badge">Current</span>` : ""}
+          </div>
+          ${buildSpiritkinMediaPanel(spiritkin.name, "card")}
+          <p>${escDisplay(getSpiritkinSelectionContext(spiritkin.name))}</p>
+        </article>
+      `).join("")}
+    </div>
+  `;
+
+  if ((step === "preview" || step === "confirm" || step === "switching") && target) {
+    body = `
+      <div class="bond-manager-v2-stage ${esc(step)}">
+        ${buildBondManagerMediaStage(target)}
+        <div class="bond-manager-v2-copy">
+          <div class="bond-manager-v2-current">Current: ${esc(currentProfile?.displayName || "None")}</div>
+          <h3>${esc(targetProfile?.displayName || getSpiritkinDisplayName(target))}</h3>
+          <div class="bond-manager-v2-realm">${esc(targetProfile?.domainName || target?.ui?.realm || "")}</div>
+          <p>${escDisplay(getSpiritkinSelectionContext(target?.name))}</p>
+          ${step === "confirm" && currentProfile && targetProfile ? `
+            <div class="bond-manager-v2-comparison">
+              <div class="bond-manager-v2-compare current">
+                <span>Current</span>
+                <strong>${esc(currentProfile.displayName)}</strong>
+                <small>${esc(currentProfile.domainName)}</small>
+              </div>
+              <div class="bond-manager-v2-compare target">
+                <span>Selected</span>
+                <strong>${esc(targetProfile.displayName)}</strong>
+                <small>${esc(targetProfile.domainName)}</small>
+              </div>
+            </div>
+          ` : ""}
+          ${step === "switching" ? `<div class="bond-manager-v2-switching-note">Transition placeholder active. Live rebond logic is intentionally disconnected in this phase.</div>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <section class="bond-manager-v2 ${esc(themeClass)}" data-focus-anchor="bond-manager-v2">
+      <div class="bond-manager-v2-shell">
+        <header class="bond-manager-v2-header">
+          <div>
+            <div class="eyebrow">Bond Manager V2</div>
+            <h2>${esc(stageHeading)}</h2>
+            <p>${esc(stageCopy)}</p>
+          </div>
+          <div class="bond-manager-v2-progress">
+            ${["browsing", "preview", "confirm", "switching"].map((item, index) => `
+              <div class="bond-manager-v2-step ${step === item ? "active" : ""}">
+                <span>${index + 1}</span>
+                <strong>${esc(item)}</strong>
+              </div>
+            `).join("")}
+          </div>
+        </header>
+        <div class="bond-manager-v2-panel">
+          ${body}
+        </div>
+      </div>
+    </section>
   `;
 }
 
