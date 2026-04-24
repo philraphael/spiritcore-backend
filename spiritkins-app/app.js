@@ -261,6 +261,7 @@ let _recognitionRunId = 0;
 let _recognitionStopRequested = false;
 let _lastVoiceSubmission = { text: "", at: 0 };
 let _lastUserSubmission = { text: "", at: 0, source: "" };
+let _lastListeningStartAttempt = { at: 0, source: "" };
 let _voiceAwaitingUserTurn = false;
 let _voiceTurnCaptureAfterAudio = false;
 let _scheduledAutoSpeechMessageId = null;
@@ -271,9 +272,11 @@ let _activeAudioRequestId = 0;
 let _pressedInteractiveEl = null;
 let _lastSpeechFingerprint = { key: "", at: 0 };
 let _pendingVoiceTurn = null;
+let _spiritkinVideoFailureRenderQueued = false;
 
 const LONG_FORM_SILENCE_GRACE_MS = 1400;
 const WAKE_MODE_SILENCE_GRACE_MS = 1650;
+const AUTO_LISTEN_START_COOLDOWN_MS = 1400;
 
 function claimSpeechRequest() {
   _activeSpeechRequestId = ++_nextSpeechRequestId;
@@ -1835,10 +1838,25 @@ function buildSpiritkinMediaFailureKey(name, surface, src) {
 
 function rememberSpiritkinVideoFailure(name, src) {
   if (!name || !src) return;
+  const key = buildSpiritkinVideoFailureKey(name, src);
+  if (state.spiritkinVideoFailures?.[key]) return;
   state.spiritkinVideoFailures = {
     ...(state.spiritkinVideoFailures || {}),
-    [buildSpiritkinVideoFailureKey(name, src)]: true
+    [key]: true
   };
+  if (/\/(?:idle|speaking)\//i.test(String(src || ""))) {
+    state.spiritkinVideoUnavailable = {
+      ...(state.spiritkinVideoUnavailable || {}),
+      [name]: true
+    };
+  }
+  if (!_spiritkinVideoFailureRenderQueued && typeof window !== "undefined") {
+    _spiritkinVideoFailureRenderQueued = true;
+    window.requestAnimationFrame(() => {
+      _spiritkinVideoFailureRenderQueued = false;
+      render();
+    });
+  }
 }
 
 function rememberSpiritkinMediaFailure(name, surface, src) {
@@ -1862,9 +1880,34 @@ function isSpiritkinMediaFailed(name, surface, src) {
 function canRenderSpiritkinVideo(name, classSignature = "") {
   const activeName = state.selectedSpiritkin?.name || state.primarySpiritkin?.name || null;
   if (!name || !activeName || activeName !== name) return false;
+  if (state.spiritkinVideoUnavailable?.[name]) return false;
   const classes = String(classSignature || "");
   if (/portrait-card|portrait-md/.test(classes)) return false;
   return true;
+}
+
+function isAutoListeningStartSource(source = "") {
+  const normalized = String(source || "").trim().toLowerCase();
+  return !!(
+    normalized === "auto-turn" ||
+    normalized === "voice-mode-enable" ||
+    normalized === "wake-mode-enable" ||
+    normalized === "unmute" ||
+    normalized === "wake-mode-unmute" ||
+    normalized.startsWith("wake-mode-")
+  );
+}
+
+function markListeningStartAttempt(source = "") {
+  _lastListeningStartAttempt = {
+    at: Date.now(),
+    source: String(source || "")
+  };
+}
+
+function withinListeningStartCooldown(source = "") {
+  if (!isAutoListeningStartSource(source)) return false;
+  return (Date.now() - (_lastListeningStartAttempt.at || 0)) < AUTO_LISTEN_START_COOLDOWN_MS;
 }
 
 function getSpiritkinVisualState(name) {
@@ -7046,7 +7089,6 @@ function render() {
     syncSelectionTrailers();
     syncEntryCinematics();
     if (state.voiceMode) maybeAutoOpenGameMic();
-    if (shouldAutoResumeWakeMode()) scheduleWakeResume("render");
     if (typeof window.__svMarkBootReady === "function") {
       window.__svMarkBootReady();
     }
@@ -8765,6 +8807,8 @@ function buildChatView() {
   const gameFeedback = state.activeGame ? state.gameFeedback : null;
   const showFirstLoopGuide = !state.activeGame && safeMessages.length <= 1 && !state.loadingReply;
   const showSpiritCoreGuidance = !state.loadingReply && !state.showHomeView;
+  const gamesSurfaceActive = state.activePresenceTab === "games";
+  const activeGamePrimary = gamesSurfaceActive && !!state.activeGame;
   const chatLayoutClass = `${esc(meta.cls)} ${state.activePresenceTab === "games" && state.activeGame ? "game-focus-mode" : ""}`.trim();
   const spiritkinSpeaking = isSpiritkinSpeechActive(spiritkin.name);
   const roomMeta = getRoomDisplayMeta(state.activePresenceTab, spiritkin);
@@ -8788,8 +8832,8 @@ function buildChatView() {
           ${buildRoomSubnav(state.activePresenceTab)}
         </div>
       </div>
-      <div class="world-shell-body">
-      <section class="presence-panel presence-panel-${esc(state.activePresenceTab)}">
+      <div class="world-shell-body ${gamesSurfaceActive ? "games-primary-layout" : ""}">
+      <section class="presence-panel presence-panel-${esc(state.activePresenceTab)} ${gamesSurfaceActive ? "is-primary-surface" : ""}">
         <div class="presence-panel-head">
           <div>
             <div class="mode-pill strong">${esc(meta.realm)}</div>
@@ -9272,7 +9316,7 @@ function buildChatView() {
           ` : ''}
         </div>
       </section>
-      <aside class="chat-stage chat-stage-${esc(state.activePresenceTab)}">
+      <aside class="chat-stage chat-stage-${esc(state.activePresenceTab)} ${gamesSurfaceActive ? "is-secondary-surface" : ""} ${activeGamePrimary ? "chat-stage-games-rail" : ""}">
         <div class="chat-header-bar">
           <div class="chat-header-info">
             ${buildSigil(meta, "header", meta.symbol)}
@@ -10587,10 +10631,24 @@ function startListening(options = {}) {
     return;
   }
 
-  if (_recognition || state.loadingReply || _audioPlaying) {
+  if (_recognition || state.voiceListening) {
+    console.info("[Voice] start-suppressed-already-listening", { source });
     return;
   }
 
+  if (withinListeningStartCooldown(source)) {
+    console.info("[Voice] start-suppressed-cooldown", {
+      source,
+      cooldownMs: AUTO_LISTEN_START_COOLDOWN_MS
+    });
+    return;
+  }
+
+  if (state.loadingReply || _audioPlaying) {
+    return;
+  }
+
+  markListeningStartAttempt(source);
   clearVoiceLoopTimer();
   clearSpeechHoldTimer();
   _pendingVoiceTurn = createPendingVoiceTurn(source);

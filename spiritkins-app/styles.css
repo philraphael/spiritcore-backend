@@ -9524,9 +9524,80 @@ button[data-action="begin-quest"]:active,
     grid-template-columns: 1fr auto auto;
   }
 
-  .settings-modal-card {
+.settings-modal-card {
     width: min(100vw - 20px, 680px);
     padding: 18px;
     border-radius: 22px;
+  }
+}
+
+/* ============================================================
+   FRONTEND STABILITY PASS — RENDER LOOP / GAMES SHELL AUTHORITY
+   ============================================================ */
+
+.world-shell-body.games-primary-layout {
+  grid-template-columns: minmax(0, 1.68fr) minmax(300px, 0.52fr);
+  align-items: stretch;
+}
+
+.world-shell-body.games-primary-layout > .presence-panel.is-primary-surface {
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.world-shell-body.games-primary-layout > .chat-stage.is-secondary-surface {
+  position: sticky;
+  top: 14px;
+  z-index: 1;
+  min-width: 0;
+  max-width: 420px;
+  overflow: auto;
+}
+
+.world-shell-body.games-primary-layout > .chat-stage.is-secondary-surface::before {
+  pointer-events: none;
+  z-index: 0;
+}
+
+.world-shell-body.games-primary-layout > .chat-stage.is-secondary-surface > * {
+  position: relative;
+  z-index: 1;
+}
+
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .games-view,
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .active-game-panel,
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .game-board-container,
+.world-shell-body.games-primary-layout .presence-tab-content[data-presence-surface="games"] .sv-theme-shell {
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+}
+
+.chat-layout.game-focus-mode .world-shell-body.games-primary-layout {
+  grid-template-columns: minmax(0, 1.82fr) minmax(280px, 0.42fr);
+}
+
+.chat-layout.game-focus-mode .world-shell-body.games-primary-layout > .chat-stage.is-secondary-surface {
+  opacity: 1;
+  transform: none;
+}
+
+@media (max-width: 1180px) {
+  .world-shell-body.games-primary-layout,
+  .chat-layout.game-focus-mode .world-shell-body.games-primary-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .world-shell-body.games-primary-layout > .chat-stage.is-secondary-surface {
+    position: relative;
+    top: auto;
+    max-width: none;
   }
 }
