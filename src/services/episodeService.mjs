@@ -22,11 +22,14 @@ export function createEpisodeService({ supabase }) {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
     if (!text) throw new AppError("VALIDATION", "text is required", 400);
     const dbUserId = toUuid(userId);
+    const episodeText = String(text);
     const payload = {
       user_id: dbUserId,
       spiritkin_id: spiritkinId,
       conversation_id: conversationId,
-      content: String(text),
+      // Keep legacy and current episode schemas in sync during the transition.
+      summary: episodeText,
+      content: episodeText,
       emotion_snapshot: emotion,
       created_at: nowIso(),
     };
