@@ -71,8 +71,10 @@ function createSpiritverseGamesFallback() {
     available: false,
     echoAnswer: "",
     reset() {},
-    render(targetId) {
-      const target = typeof document !== "undefined" ? document.getElementById(targetId) : null;
+    render(targetRef) {
+      const target = typeof document === "undefined"
+        ? null
+        : (typeof targetRef === "string" ? document.getElementById(targetRef) : targetRef);
       if (target) {
         target.innerHTML = `
           <div class="panel-card" style="padding:20px;text-align:left;">
@@ -268,6 +270,7 @@ let _voiceTurnCaptureAfterAudio = false;
 let _scheduledAutoSpeechMessageId = null;
 let _lastAutoSpokenMessageId = null;
 let _nextSpeechRequestId = 0;
+let _bondManagerV2Timer = null;
 let _activeSpeechRequestId = 0;
 let _activeAudioRequestId = 0;
 let _pressedInteractiveEl = null;
@@ -284,6 +287,7 @@ let _sessionControlSyncTimer = null;
 let _queuedSessionControlArgs = null;
 let _lastSessionControlSignature = "";
 let _lastSessionControlAt = 0;
+let _gameBoardMountRunId = 0;
 let rebondTransitionTimer = null;
 let _deferredInstallPrompt = null;
 
@@ -1964,6 +1968,20 @@ function buildSpiritkinVideoFailureKey(name, src) {
   return `${String(name || "").trim().toLowerCase()}::${String(src || "").trim()}`;
 }
 
+function resolveSpiritkinVideoStateFromSrc(src) {
+  const normalized = String(src || "").toLowerCase();
+  if (!normalized) return "";
+  if (normalized.includes("/idle/")) return "idle";
+  if (normalized.includes("/speaking/")) return "speaking";
+  if (normalized.includes("/emotional/")) {
+    if (normalized.includes("/calm")) return "calm";
+    if (normalized.includes("/excited")) return "excited";
+    if (normalized.includes("/serious")) return "serious";
+    return "emotional";
+  }
+  return "";
+}
+
 function buildSpiritkinMediaFailureKey(name, surface, src) {
   return `${String(name || "").trim().toLowerCase()}::${String(surface || "").trim().toLowerCase()}::${String(src || "").trim()}`;
 }
@@ -1976,6 +1994,16 @@ function rememberSpiritkinVideoFailure(name, src) {
     ...(state.spiritkinVideoFailures || {}),
     [key]: true
   };
+  const failedState = resolveSpiritkinVideoStateFromSrc(src);
+  if (failedState) {
+    state.spiritkinVideoUnavailableStates = {
+      ...(state.spiritkinVideoUnavailableStates || {}),
+      [name]: {
+        ...(state.spiritkinVideoUnavailableStates?.[name] || {}),
+        [failedState]: true
+      }
+    };
+  }
   if (/\/(?:idle|speaking)\//i.test(String(src || ""))) {
     state.spiritkinVideoUnavailable = {
       ...(state.spiritkinVideoUnavailable || {}),
@@ -2002,6 +2030,11 @@ function rememberSpiritkinMediaFailure(name, surface, src) {
 function isSpiritkinVideoFailed(name, src) {
   if (!name || !src) return false;
   return !!state.spiritkinVideoFailures?.[buildSpiritkinVideoFailureKey(name, src)];
+}
+
+function isSpiritkinVideoStateUnavailable(name, desiredState) {
+  if (!name || !desiredState) return false;
+  return !!state.spiritkinVideoUnavailableStates?.[name]?.[String(desiredState)];
 }
 
 function isSpiritkinMediaFailed(name, surface, src) {
@@ -2122,6 +2155,7 @@ function getSpiritkinVisualState(name) {
 }
 
 function resolveSpiritkinVideoClip(name, desiredState) {
+  if (isSpiritkinVideoStateUnavailable(name, desiredState)) return "";
   const candidates = getManifestSpiritkinVideoCandidates(name, desiredState).filter((src) => !isSpiritkinVideoFailed(name, src));
   if (candidates.length) return candidates[0];
   const manifestResolved = resolveSpiritkinVideo(name, desiredState);
@@ -2925,6 +2959,9 @@ const state = {
   selectionOverlaySpiritkin: null,
   rebondSpiritkin: null,
   bondManagerState: "closed",
+  devShowBondManagerV2: false,
+  devBondManagerV2Step: "browsing",
+  devBondManagerV2Target: "",
   conversationId: null,
   messages: [],
   loadingReply: false,
@@ -3039,6 +3076,25 @@ if (typeof window !== "undefined") {
   };
   window.__svSpiritkinMediaFailure = (name, surface, src) => {
     rememberSpiritkinMediaFailure(name, surface, src);
+  };
+  window.state = state;
+  window.__svToggleBondManagerV2 = (visible = true) => {
+    state.devShowBondManagerV2 = !!visible;
+    if (_bondManagerV2Timer) {
+      window.clearTimeout(_bondManagerV2Timer);
+      _bondManagerV2Timer = null;
+    }
+    state.devBondManagerV2Step = visible ? "browsing" : "closed";
+    state.bondManagerState = visible ? "browsing" : "closed";
+    if (!visible) state.devBondManagerV2Target = "";
+    render();
+  };
+  window.__svSetBondManagerV2Step = (step = "browsing", target = "") => {
+    state.devShowBondManagerV2 = true;
+    state.devBondManagerV2Step = String(step || "browsing");
+    state.bondManagerState = String(step || "browsing");
+    state.devBondManagerV2Target = String(target || "");
+    render();
   };
 }
 
@@ -3529,6 +3585,13 @@ async function transitionPresenceSurface(tab, options = {}) {
   const { announce = true } = options;
   const runId = ++_surfaceTransitionRunId;
   const previousTab = state.activePresenceTab;
+  if (tab === "games" && tab !== previousTab) {
+    console.info("[Games] tab activated", {
+      fromTab: previousTab || null,
+      toTab: tab,
+      activeGame: state.activeGame?.type || null
+    });
+  }
   state.pendingPresenceTab = tab;
   if (tab !== previousTab) {
     state.statusText = `Opening ${tab.replace("_", " ")}...`;
@@ -4290,6 +4353,8 @@ function syncEntryCinematics() {
       const attemptKey = String(spiritGateActiveAttemptId || "gate");
       const isCurrentAttempt = gateVideo.dataset.gateAttemptId === attemptKey;
       gateVideo.dataset.gateAttemptId = attemptKey;
+      gateVideo.dataset.previewPrimed = "0";
+      gateVideo.preload = "auto";
       armSpiritGateFallback("gate-video-playback");
       if (!isCurrentAttempt) {
         gateVideo.currentTime = 0;
@@ -4309,14 +4374,23 @@ function syncEntryCinematics() {
       clearSpiritGateFallback();
       clearSpiritGateTransitionTimers();
       if (previewingGate) {
+        gateVideo.preload = "metadata";
         gateVideo.muted = true;
         gateVideo.defaultMuted = true;
         gateVideo.playsInline = true;
-        gateVideo.pause?.();
-        gateVideo.currentTime = 0;
+        if (gateVideo.dataset.previewPrimed !== "1") {
+          gateVideo.pause?.();
+          try {
+            gateVideo.currentTime = 0;
+          } catch (_) {}
+          gateVideo.dataset.previewPrimed = "1";
+        }
       } else {
+        gateVideo.dataset.previewPrimed = "0";
         gateVideo.pause?.();
-        gateVideo.currentTime = 0;
+        try {
+          gateVideo.currentTime = 0;
+        } catch (_) {}
       }
     }
   } else if (state.entryVideoStarted && state.crownGateOpening) {
@@ -4366,6 +4440,95 @@ function syncEntryCinematics() {
       clearSpiritGateArrivalFallback();
     }
   }
+}
+
+function mountActiveGameBoard(runId, attempt = 0) {
+  if (runId !== _gameBoardMountRunId) return;
+  if (!state.activeGame || !SpiritverseGames || state.activePresenceTab !== "games") return;
+  console.info("[Games] mount attempt", {
+    runId,
+    attempt,
+    tab: state.activePresenceTab,
+    gameType: state.activeGame?.type || null
+  });
+  const container = document.getElementById("spiritverse-game-board");
+  const boardStage = document.querySelector(".presence-tab-content[data-presence-surface='games'] .game-board-container");
+  const containerRect = container?.getBoundingClientRect?.() || { width: 0, height: 0 };
+  const boardStageRect = boardStage?.getBoundingClientRect?.() || { width: 0, height: 0 };
+  const canMount = !!container && !!boardStage
+    && container.offsetParent !== null
+    && boardStage.offsetParent !== null
+    && ((container.clientWidth || 0) > 0 || (boardStage.clientWidth || 0) > 0 || (containerRect.width || 0) > 0 || (boardStageRect.width || 0) > 0)
+    && ((container.clientHeight || 0) > 0 || (boardStage.clientHeight || 0) > 0 || (containerRect.height || 0) > 0 || (boardStageRect.height || 0) > 0);
+  if (!canMount) {
+    console.info("[Games] mount-container-missing", {
+      runId,
+      attempt,
+      hasContainer: !!container,
+      hasBoardStage: !!boardStage,
+      containerWidth: container?.clientWidth || 0,
+      boardStageWidth: boardStage?.clientWidth || 0,
+      containerHeight: container?.clientHeight || 0,
+      boardStageHeight: boardStage?.clientHeight || 0,
+      tab: state.activePresenceTab,
+      gameType: state.activeGame?.type || null
+    });
+    if (attempt < 1 && typeof window !== "undefined") {
+      window.setTimeout(() => mountActiveGameBoard(runId, attempt + 1), 120);
+    }
+    return;
+  }
+  console.info("[Games] mount-container-found", {
+    runId,
+    attempt,
+    containerWidth: container.clientWidth || 0,
+    boardStageWidth: boardStage.clientWidth || 0,
+    containerHeight: container.clientHeight || 0,
+    boardStageHeight: boardStage.clientHeight || 0,
+    tab: state.activePresenceTab,
+    gameType: state.activeGame?.type || null
+  });
+  const spiritkin = state.selectedSpiritkin;
+  try {
+    SpiritverseGames.render(
+      container,
+      state.activeGame,
+      spiritkin ? spiritkin.name : "Spiritkin",
+      state.gameSpiritkinMessage,
+      (move) => submitGameMove(move),
+      resolveSpiritkinDomainTheme(state.activeGame?.type, spiritkin?.name)
+    );
+    console.info("[Games] render success", {
+      runId,
+      attempt,
+      gameType: state.activeGame?.type || null,
+      available: SpiritverseGames?.available !== false
+    });
+  } catch (error) {
+    console.error("[Games] render-failed", {
+      runId,
+      attempt,
+      gameType: state.activeGame?.type || null,
+      error: error?.message || String(error)
+    });
+    throw error;
+  }
+}
+
+function scheduleActiveGameBoardMount() {
+  _gameBoardMountRunId += 1;
+  const runId = _gameBoardMountRunId;
+  if (!state.activeGame || !SpiritverseGames || state.activePresenceTab !== "games") return;
+  console.info("[Games] mount-scheduled", {
+    runId,
+    tab: state.activePresenceTab,
+    gameType: state.activeGame?.type || null
+  });
+  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(() => mountActiveGameBoard(runId, 0));
+    return;
+  }
+  window.setTimeout(() => mountActiveGameBoard(runId, 0), 0);
 }
 
 function getActiveVoice() {
@@ -6825,6 +6988,11 @@ async function startGameSession(gameType) {
       return false;
     }
     state.pendingGameType = gameType;
+    console.info("[Games] game selected", {
+      gameType,
+      activeTab: state.activePresenceTab,
+      hasConversation: !!state.conversationId
+    });
     state.activePresenceTab = "games";
     state.showHomeView = false;
     normalizeInteractionState("startGameSession:prepare");
@@ -7520,20 +7688,7 @@ function performRender() {
       textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
     }
 
-    // Render visual game board after DOM update
-    if (state.activeGame && SpiritverseGames) {
-      requestAnimationFrame(() => {
-        const spiritkin = state.selectedSpiritkin;
-        SpiritverseGames.render(
-          'spiritverse-game-board',
-          state.activeGame,
-          spiritkin ? spiritkin.name : 'Spiritkin',
-          state.gameSpiritkinMessage,
-          (move) => submitGameMove(move),
-          resolveSpiritkinDomainTheme(state.activeGame?.type, spiritkin?.name)
-        );
-      });
-    }
+    scheduleActiveGameBoardMount();
   } catch (error) {
     console.error("[Spiritverse Render Failure]", error);
     const buildMarker = document.querySelector('meta[name="spiritverse-build"]')?.content || "unknown-build";
@@ -8206,20 +8361,21 @@ function buildApp() {
   const atmosphere = getAtmosphereSpiritkin();
   const atmosphereClass = atmosphere ? `realm-${atmosphere.ui.cls}` : "realm-neutral";
   const inEntryFlow = !state.entryAccepted || state.showCrownGateHome || state.spiritverseTrailerActive || state.spiritCoreWelcoming;
+  const devBondManagerV2Active = !inEntryFlow && state.devShowBondManagerV2 === true;
   const rebondAppClass = state.rebondTransitionActive ? `rebond-transition rebond-${esc(state.rebondTransitionPhase || "active")}` : "";
   return `
     <div class="sv-bg ${atmosphereClass}"></div>
     <div class="sv-noise"></div>
     <div class="sv-orbit ${atmosphereClass}"></div>
     <div class="app-shell ${atmosphereClass} ${rebondAppClass}">
-      ${inEntryFlow ? "" : buildTopbar()}
-      ${!inEntryFlow && state.showReturnSummary ? buildRetentionPanel() : ""}
+      ${inEntryFlow || devBondManagerV2Active ? "" : buildTopbar()}
+      ${!inEntryFlow && !devBondManagerV2Active && state.showReturnSummary ? buildRetentionPanel() : ""}
       ${state.surveyOpen ? buildSurveyModal() : ""}
       ${state.tierModalOpen ? buildTierModal() : ""}
       ${state.settingsOpen ? buildSettingsModal() : ""}
-      ${state.showCrownGateHome || !state.entryAccepted ? buildCrownGateEntry() : (state.spiritverseTrailerActive ? buildSpiritverseArrival() : (state.spiritCoreWelcoming ? buildSpiritCoreWelcome() : buildMain()))}
-      ${!inEntryFlow ? buildIssueReporter() : ""}
-      ${buildBondModal()}
+      ${state.showCrownGateHome || !state.entryAccepted ? buildCrownGateEntry() : (state.spiritverseTrailerActive ? buildSpiritverseArrival() : (state.spiritCoreWelcoming ? buildSpiritCoreWelcome() : (devBondManagerV2Active ? renderBondManagerV2(state) : buildMain())))}
+      ${!inEntryFlow && !devBondManagerV2Active ? buildIssueReporter() : ""}
+      ${devBondManagerV2Active ? "" : buildBondModal()}
       ${state.rebondTransitionActive ? `<div class="rebond-transition-overlay" aria-hidden="true"><div class="rebond-transition-copy">Bond transition in progress...</div></div>` : ""}
       ${state.entryTransitioning ? `
         <div class="crown-gate-overlay">
@@ -8356,7 +8512,7 @@ function buildEntry() {
               data-entry-video="gate"
               muted
               playsinline
-              preload="auto"
+              preload="metadata"
               poster="/app/assets/rooms/Spiritverse%20background%20base%20theme.png"
             >
               <source src="/videos/gate_entrance_final.mp4" type="video/mp4">
@@ -8441,7 +8597,7 @@ function buildCrownGateEntry() {
               data-entry-video="gate"
               muted
               playsinline
-              preload="auto"
+              preload="metadata"
               poster="/app/assets/rooms/Spiritverse%20background%20base%20theme.png"
             >
               <source src="/videos/gate_entrance_final.mp4" type="video/mp4">
@@ -10135,6 +10291,125 @@ function buildBondManagerMediaStage(spiritkin) {
   `;
 }
 
+function renderBondManagerV2(currentState) {
+  const current = currentState.primarySpiritkin || currentState.selectedSpiritkin || currentState.spiritkins?.[0] || null;
+  const targetName = String(currentState.devBondManagerV2Target || "").trim();
+  const target = currentState.spiritkins.find((item) => item?.name === targetName)
+    || currentState.spiritkins.find((item) => item?.name && item.name !== current?.name)
+    || current;
+  const step = ["browsing", "preview", "confirm", "switching", "complete"].includes(String(currentState.devBondManagerV2Step || ""))
+    ? String(currentState.devBondManagerV2Step)
+    : ["browsing", "preview", "confirm", "switching", "complete"].includes(String(currentState.bondManagerState || ""))
+      ? String(currentState.bondManagerState)
+    : "browsing";
+  const currentProfile = getSpiritkinMediaProfile(current);
+  const targetProfile = getSpiritkinMediaProfile(target);
+  const themeClass = target?.ui?.cls || current?.ui?.cls || "lyra";
+  const stageHeading = {
+    browsing: "Choose a Spiritkin to preview",
+    preview: targetProfile ? `${targetProfile.displayName} preview` : "Spiritkin preview",
+    confirm: targetProfile && currentProfile ? `Switch from ${currentProfile.displayName} to ${targetProfile.displayName}?` : "Confirm switch",
+    switching: targetProfile ? `Switching to ${targetProfile.displayName}` : "Switching bond",
+    complete: targetProfile ? `${targetProfile.displayName} ready` : "Switch complete"
+  }[step];
+  const stageCopy = {
+    browsing: "Development-only isolated renderer. This screen is not connected to the live bond flow yet.",
+    preview: "Preview fully replaces browsing in this renderer. No modal, no overlay, and no bonded-room competition.",
+    confirm: "Confirm fully replaces preview in this renderer. This is a structural proof-of-layout step only.",
+    switching: "Switching is represented as a dedicated full-screen state so the transition can be validated without touching live bond logic yet.",
+    complete: "Complete is still UI-only here. No real bond state is updated in this development renderer."
+  }[step];
+
+  let body = `
+    <div class="bond-manager-v2-grid">
+      ${currentState.spiritkins.map((spiritkin, index) => `
+        <article class="bond-manager-v2-card ${esc(spiritkin.ui.cls)} ${current?.name === spiritkin.name ? "is-current" : ""} ${target?.name === spiritkin.name ? "is-target" : ""}" data-action="v2-select-spiritkin" data-index="${index}" data-name="${esc(spiritkin.name)}">
+          <div class="bond-manager-v2-card-head">
+            <div>
+              <div class="bond-manager-v2-card-kicker">${esc(spiritkin.ui.realm)}</div>
+              <h3>${esc(getSpiritkinDisplayName(spiritkin))}</h3>
+            </div>
+            ${current?.name === spiritkin.name ? `<span class="bond-manager-v2-badge">Current</span>` : ""}
+          </div>
+          ${buildSpiritkinMediaPanel(spiritkin.name, "card")}
+          <p>${escDisplay(getSpiritkinSelectionContext(spiritkin.name))}</p>
+        </article>
+      `).join("")}
+    </div>
+  `;
+
+  if ((step === "preview" || step === "confirm" || step === "switching" || step === "complete") && target) {
+    body = `
+      <div class="bond-manager-v2-stage ${esc(step)}">
+        ${buildBondManagerMediaStage(target)}
+        <div class="bond-manager-v2-copy">
+          <div class="bond-manager-v2-current">Current: ${esc(currentProfile?.displayName || "None")}</div>
+          <h3>${esc(targetProfile?.displayName || getSpiritkinDisplayName(target))}</h3>
+          <div class="bond-manager-v2-realm">${esc(targetProfile?.domainName || target?.ui?.realm || "")}</div>
+          <p>${escDisplay(getSpiritkinSelectionContext(target?.name))}</p>
+          ${(step === "confirm" || step === "complete") && currentProfile && targetProfile ? `
+            <div class="bond-manager-v2-comparison">
+              <div class="bond-manager-v2-compare current">
+                <span>Current</span>
+                <strong>${esc(currentProfile.displayName)}</strong>
+                <small>${esc(currentProfile.domainName)}</small>
+              </div>
+              <div class="bond-manager-v2-compare target">
+                <span>Selected</span>
+                <strong>${esc(targetProfile.displayName)}</strong>
+                <small>${esc(targetProfile.domainName)}</small>
+              </div>
+            </div>
+          ` : ""}
+          ${step === "switching" ? `<div class="bond-manager-v2-switching-note">Transition placeholder active. Live rebond logic is intentionally disconnected in this phase.</div>` : ""}
+          ${step === "complete" ? `<div class="bond-manager-v2-switching-note">UI simulation complete. Return to browsing or exit the V2 renderer when ready.</div>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <section class="bond-manager-v2 ${esc(themeClass)}" data-focus-anchor="bond-manager-v2">
+      <div class="bond-manager-v2-shell">
+        <header class="bond-manager-v2-header">
+          <div>
+            <div class="eyebrow">Bond Manager V2</div>
+            <h2>${esc(stageHeading)}</h2>
+            <p>${esc(stageCopy)}</p>
+          </div>
+          <div class="bond-manager-v2-progress">
+            ${["browsing", "preview", "confirm", "switching", "complete"].map((item, index) => `
+              <div class="bond-manager-v2-step ${step === item ? "active" : ""}">
+                <span>${index + 1}</span>
+                <strong>${esc(item)}</strong>
+              </div>
+            `).join("")}
+          </div>
+        </header>
+        <div class="bond-manager-v2-panel">
+          ${body}
+        </div>
+        <div class="bond-manager-v2-actions">
+          ${step === "browsing" ? `<button class="btn btn-ghost" data-action="v2-close-bond-manager">Close V2 renderer</button>` : ""}
+          ${step === "preview" ? `
+            <button class="btn btn-ghost" data-action="v2-back-to-browsing">Back</button>
+            <button class="btn btn-primary" data-action="v2-make-primary">Make Primary Companion</button>
+          ` : ""}
+          ${step === "confirm" ? `
+            <button class="btn btn-ghost" data-action="v2-back-to-preview">Back</button>
+            <button class="btn btn-primary" data-action="v2-confirm-switch">Confirm Switch</button>
+          ` : ""}
+          ${step === "switching" ? `<button class="btn btn-primary" disabled>Switching...</button>` : ""}
+          ${step === "complete" ? `
+            <button class="btn btn-ghost" data-action="v2-back-to-browsing">Browse again</button>
+            <button class="btn btn-primary" data-action="v2-close-bond-manager">Close V2 renderer</button>
+          ` : ""}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function buildBondModal() {
   if (!state.primarySpiritkin || state.bondManagerState === "closed") return "";
   const current = state.primarySpiritkin;
@@ -10305,6 +10580,90 @@ async function onClick(event) {
   try {
 
   if (action === "noop") return;
+
+  if (state.devShowBondManagerV2) {
+    if (action === "v2-close-bond-manager") {
+      if (_bondManagerV2Timer) {
+        window.clearTimeout(_bondManagerV2Timer);
+        _bondManagerV2Timer = null;
+      }
+      state.devShowBondManagerV2 = false;
+      state.devBondManagerV2Step = "closed";
+      state.bondManagerState = "closed";
+      state.devBondManagerV2Target = "";
+      render();
+      return;
+    }
+
+    if (action === "v2-select-spiritkin") {
+      const candidate = state.spiritkins[Number(element.dataset.index)] ?? null;
+      if (candidate) {
+        state.selectedSpiritkin = candidate;
+        state.devBondManagerV2Target = candidate.name;
+        state.devBondManagerV2Step = "preview";
+        state.bondManagerState = "preview";
+        render();
+      }
+      return;
+    }
+
+    if (action === "v2-back-to-browsing") {
+      if (_bondManagerV2Timer) {
+        window.clearTimeout(_bondManagerV2Timer);
+        _bondManagerV2Timer = null;
+      }
+      state.devBondManagerV2Step = "browsing";
+      state.bondManagerState = "browsing";
+      render();
+      return;
+    }
+
+    if (action === "v2-back-to-preview") {
+      if (_bondManagerV2Timer) {
+        window.clearTimeout(_bondManagerV2Timer);
+        _bondManagerV2Timer = null;
+      }
+      state.devBondManagerV2Step = "preview";
+      state.bondManagerState = "preview";
+      render();
+      return;
+    }
+
+    if (action === "v2-make-primary") {
+      state.devBondManagerV2Step = "confirm";
+      state.bondManagerState = "confirm";
+      render();
+      return;
+    }
+
+    if (action === "v2-confirm-switch") {
+      const targetName = String(state.devBondManagerV2Target || state.selectedSpiritkin?.name || "").trim();
+      const candidate = state.spiritkins.find((item) => item?.name === targetName) ?? state.selectedSpiritkin ?? null;
+      if (!candidate) return;
+      if (_bondManagerV2Timer) {
+        window.clearTimeout(_bondManagerV2Timer);
+        _bondManagerV2Timer = null;
+      }
+      state.devBondManagerV2Step = "switching";
+      state.bondManagerState = "switching";
+      render();
+      _bondManagerV2Timer = window.setTimeout(() => {
+        _bondManagerV2Timer = null;
+        if (!state.devShowBondManagerV2) return;
+        beginRebondTransition(candidate);
+        _bondManagerV2Timer = window.setTimeout(() => {
+          _bondManagerV2Timer = null;
+          if (!state.devShowBondManagerV2) return;
+          state.devBondManagerV2Step = "complete";
+          state.bondManagerState = "complete";
+          state.devBondManagerV2Target = candidate.name;
+          state.selectedSpiritkin = state.primarySpiritkin || candidate;
+          render();
+        }, 760);
+      }, 520);
+      return;
+    }
+  }
 
   if (action === "dismiss-whisper") {
     state.showWhisperBanner = false;

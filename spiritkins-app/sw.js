@@ -2,11 +2,16 @@ const SHELL_CACHE = "spiritkins-shell-v1";
 const APP_SHELL = [
   "/app",
   "/app/manifest.json",
+  "/app/sw.js",
   "/app/styles.css",
   "/app/spiritverse-games.css",
   "/app/app.js",
   "/app/spiritverse-games.js",
-  "/app/reveal-animation.js"
+  "/app/reveal-animation.js",
+  "/app/assets/pwa/icon-192x192.png",
+  "/app/assets/pwa/icon-512x512.png",
+  "/app/assets/pwa/splash-540x720.png",
+  "/app/assets/pwa/splash-1280x720.png"
 ];
 
 self.addEventListener("install", (event) => {
