@@ -403,7 +403,6 @@ const SPIRITKIN_WAKE_KEY_BY_NAME = {
 const VOICE_WAKE_NAMES = Object.keys(SPIRITKIN_WAKE_KEY_BY_NAME);
 const VOICE_FILLER_PATTERNS = ["yeah", "ok", "okay", "uh", "uh huh", "mm", "hmm"];
 const VALID_BOND_MANAGER_STATES = ["closed", "browsing", "preview", "confirm", "switching", "complete"];
-const VALID_APP_MODES = ["bonded", "bond-manager"];
 
 function getSpiritkinDisplayName(spiritkinOrName) {
   const name = typeof spiritkinOrName === "object" ? spiritkinOrName?.name : spiritkinOrName;
@@ -640,7 +639,6 @@ function clearBondManagerTransientState(options = {}) {
     preservePendingBond = false,
     preserveFeedback = false,
     preserveSelectedSpiritkin = false,
-    preserveAppMode = false,
   } = options;
   let changed = false;
 
@@ -660,10 +658,6 @@ function clearBondManagerTransientState(options = {}) {
     state.bondManagerState = "closed";
     changed = true;
   }
-  if (!preserveAppMode && state.appMode !== "bonded") {
-    state.appMode = "bonded";
-    changed = true;
-  }
   if (!preserveFeedback && (state.bondFeedbackKind || state.bondFeedbackSpiritkin)) {
     state.bondFeedbackKind = "";
     state.bondFeedbackSpiritkin = "";
@@ -681,7 +675,6 @@ function openBondManagerFlow(nextState = "browsing", spiritkinOrName = null) {
   state.showHomeView = true;
   state.activePresenceTab = "profile";
   state.currentTab = "profile";
-  state.appMode = "bond-manager";
   state.selectionOverlaySpiritkin = null;
   state.pendingBondSpiritkin = null;
   if (!VALID_BOND_MANAGER_STATES.includes(nextState) || nextState === "closed") {
@@ -2931,7 +2924,6 @@ const state = {
   selectionOverlaySpiritkin: null,
   rebondSpiritkin: null,
   bondManagerState: "closed",
-  appMode: "bonded",
   conversationId: null,
   messages: [],
   loadingReply: false,
@@ -3755,11 +3747,6 @@ function normalizeInteractionState(source = "unknown") {
     changed = true;
   }
 
-  if (!VALID_APP_MODES.includes(state.appMode)) {
-    state.appMode = "bonded";
-    changed = true;
-  }
-
   if (state.selectedSpiritkin && !state.selectedSpiritkin.ui) {
     state.selectedSpiritkin = normalizeStoredSpiritkin(state.selectedSpiritkin);
     changed = true;
@@ -3860,11 +3847,6 @@ function normalizeInteractionState(source = "unknown") {
       state.activePresenceTab = "profile";
       changed = true;
     }
-  }
-
-  if (state.appMode === "bond-manager" && !state.primarySpiritkin) {
-    state.appMode = "bonded";
-    changed = true;
   }
 
   const normalizedConversationId = typeof state.conversationId === "string" && state.conversationId.trim()
@@ -5156,7 +5138,6 @@ function beginRebondTransition(spiritkin) {
       state.rebondTransitionPhase = "";
       state.rebondTransitionSpiritkin = "";
       clearBondManagerTransientState({ preserveFeedback: true });
-      state.appMode = "bonded";
       normalizeInteractionState("bond-manager-complete");
       render();
       rebondTransitionTimer = null;
@@ -8222,7 +8203,6 @@ function buildApp() {
   const atmosphere = getAtmosphereSpiritkin();
   const atmosphereClass = atmosphere ? `realm-${atmosphere.ui.cls}` : "realm-neutral";
   const inEntryFlow = !state.entryAccepted || state.showCrownGateHome || state.spiritverseTrailerActive || state.spiritCoreWelcoming;
-  const bondManagerActive = !inEntryFlow && state.appMode === "bond-manager";
   const rebondAppClass = state.rebondTransitionActive ? `rebond-transition rebond-${esc(state.rebondTransitionPhase || "active")}` : "";
   return `
     <div class="sv-bg ${atmosphereClass}"></div>
@@ -8230,12 +8210,13 @@ function buildApp() {
     <div class="sv-orbit ${atmosphereClass}"></div>
     <div class="app-shell ${atmosphereClass} ${rebondAppClass}">
       ${inEntryFlow ? "" : buildTopbar()}
-      ${!inEntryFlow && !bondManagerActive && state.showReturnSummary ? buildRetentionPanel() : ""}
+      ${!inEntryFlow && state.showReturnSummary ? buildRetentionPanel() : ""}
       ${state.surveyOpen ? buildSurveyModal() : ""}
       ${state.tierModalOpen ? buildTierModal() : ""}
       ${state.settingsOpen ? buildSettingsModal() : ""}
       ${state.showCrownGateHome || !state.entryAccepted ? buildCrownGateEntry() : (state.spiritverseTrailerActive ? buildSpiritverseArrival() : (state.spiritCoreWelcoming ? buildSpiritCoreWelcome() : buildMain()))}
-      ${!inEntryFlow && !bondManagerActive ? buildIssueReporter() : ""}
+      ${!inEntryFlow ? buildIssueReporter() : ""}
+      ${buildBondModal()}
       ${state.rebondTransitionActive ? `<div class="rebond-transition-overlay" aria-hidden="true"><div class="rebond-transition-copy">Bond transition in progress...</div></div>` : ""}
       ${state.entryTransitioning ? `
         <div class="crown-gate-overlay">
@@ -8712,10 +8693,6 @@ function buildMain() {
   }
 
   syncPrimarySelection();
-
-  if (state.primarySpiritkin && state.appMode === "bond-manager") {
-    return buildBondManagerModeView();
-  }
 
   if (!state.showHomeView && state.conversationId && state.selectedSpiritkin?.ui) {
     return buildChatView();
@@ -10137,8 +10114,8 @@ function buildBondManagerMediaStage(spiritkin) {
   `;
 }
 
-function buildBondManagerView() {
-  if (!state.primarySpiritkin || state.appMode !== "bond-manager" || state.bondManagerState === "closed") return "";
+function buildBondModal() {
+  if (!state.primarySpiritkin || state.bondManagerState === "closed") return "";
   const current = state.primarySpiritkin;
   const target = getBondManagerCandidate();
   const targetProfile = getSpiritkinMediaProfile(target || current);
@@ -10147,16 +10124,14 @@ function buildBondManagerView() {
   const showPreview = state.bondManagerState === "preview" || state.bondManagerState === "confirm" || state.bondManagerState === "switching" || state.bondManagerState === "complete";
 
   let heading = "Manage your bond";
-  let copy = "Step 1 · Browsing. Choose another Spiritkin to preview a deliberate rebonding path. Your current companion remains primary until you confirm a switch.";
+  let copy = "Choose another Spiritkin to preview a deliberate rebonding path. Your current companion remains primary until you confirm a switch.";
   let body = `
-    <div class="bond-manager-screen browsing">
-      <div class="bond-manager-grid">
-        ${state.spiritkins.map((spiritkin, index) => buildBondCard(spiritkin, index, !!state.primarySpiritkin && state.primarySpiritkin.name !== spiritkin.name)).join("")}
-      </div>
+    <div class="bond-manager-grid">
+      ${state.spiritkins.map((spiritkin, index) => buildBondCard(spiritkin, index, !!state.primarySpiritkin && state.primarySpiritkin.name !== spiritkin.name)).join("")}
     </div>
   `;
   let actions = `
-    <button class="btn btn-ghost" data-action="close-bond-modal">Return to bonded room</button>
+    <button class="btn btn-ghost" data-action="close-bond-modal">Close</button>
   `;
 
   if (showPreview && target && targetProfile && currentProfile) {
@@ -10164,15 +10139,10 @@ function buildBondManagerView() {
       ? `Switch from ${getSpiritkinDisplayName(current)} to ${getSpiritkinDisplayName(target)}?`
       : `${getSpiritkinDisplayName(target)} is in view`;
     copy = state.bondManagerState === "confirm"
-      ? `Step 3 · Confirm. ${getSpiritkinDisplayName(current)} will step out as primary. ${getSpiritkinDisplayName(target)} will become your bonded companion, update your chamber, and reset the active conversation surface in this app.`
-      : state.bondManagerState === "switching"
-        ? `Step 4 · Switching. The bonded room will return once ${getSpiritkinDisplayName(target)} fully takes over as your active companion.`
-        : state.bondManagerState === "complete"
-          ? `Step complete. ${getSpiritkinDisplayName(target)} now anchors your bonded room.`
-          : `Step 2 · Preview. Compare the current bond, the selected Spiritkin, and the chamber identity before you decide.`;
+      ? `${getSpiritkinDisplayName(current)} will step out as primary. ${getSpiritkinDisplayName(target)} will become your bonded companion, update your chamber, and reset the active conversation surface in this app.`
+      : `Preview ${getSpiritkinDisplayName(target)} before you make the switch. Compare the current bond, the chamber, and the companion media before you confirm anything.`;
     body = `
-      <div class="bond-manager-screen ${esc(state.bondManagerState)}">
-        <div class="bond-modal-body bond-manager-body">
+      <div class="bond-modal-body bond-manager-body">
         ${buildBondManagerMediaStage(target)}
         <div class="bond-manager-copy">
           <div class="bond-manager-current">Currently bonded: ${esc(currentProfile.displayName)} · ${esc(currentProfile.domainName)}</div>
@@ -10202,7 +10172,6 @@ function buildBondManagerView() {
                 : `Current vs selected is explicit here so the switch never feels ambiguous.`}
           </div>
         </div>
-      </div>
       </div>
     `;
     actions = state.bondManagerState === "confirm"
@@ -10248,119 +10217,6 @@ function buildSvStrip() {
         <strong>Spiritverse</strong> — one bonded companion, one living presence. Memory, atmosphere, and identity stay intact across every session.
       </div>
     </div>
-  `;
-}
-
-function buildBondManagerModeView() {
-  if (!state.primarySpiritkin || state.appMode !== "bond-manager" || state.bondManagerState === "closed") return "";
-  const current = state.primarySpiritkin;
-  const target = getBondManagerCandidate();
-  const targetProfile = getSpiritkinMediaProfile(target || current);
-  const currentProfile = getSpiritkinMediaProfile(current);
-  const modeClass = target?.ui?.cls || current.ui.cls;
-  const showPreview = state.bondManagerState === "preview" || state.bondManagerState === "confirm" || state.bondManagerState === "switching" || state.bondManagerState === "complete";
-
-  let heading = "Manage your bond";
-  let copy = "Step 1: browsing. Choose another Spiritkin to preview a deliberate rebonding path. Your current companion remains primary until you confirm a switch.";
-  let body = `
-    <div class="bond-manager-screen browsing">
-      <div class="bond-manager-grid">
-        ${state.spiritkins.map((spiritkin, index) => buildBondCard(spiritkin, index, !!state.primarySpiritkin && state.primarySpiritkin.name !== spiritkin.name)).join("")}
-      </div>
-    </div>
-  `;
-  let actions = `<button class="btn btn-ghost" data-action="close-bond-modal">Return to bonded room</button>`;
-
-  if (showPreview && target && targetProfile && currentProfile) {
-    heading = state.bondManagerState === "confirm"
-      ? `Switch from ${getSpiritkinDisplayName(current)} to ${getSpiritkinDisplayName(target)}?`
-      : `${getSpiritkinDisplayName(target)} is in view`;
-    copy = state.bondManagerState === "confirm"
-      ? `Step 3: confirm. ${getSpiritkinDisplayName(current)} will step out as primary. ${getSpiritkinDisplayName(target)} will become your bonded companion, update your chamber, and reset the active conversation surface in this app.`
-      : state.bondManagerState === "switching"
-        ? `Step 4: switching. The bonded room will return once ${getSpiritkinDisplayName(target)} fully takes over as your active companion.`
-        : state.bondManagerState === "complete"
-          ? `Step complete. ${getSpiritkinDisplayName(target)} now anchors your bonded room.`
-          : `Step 2: preview. Compare the current bond, the selected Spiritkin, and the chamber identity before you decide.`;
-    body = `
-      <div class="bond-manager-screen ${esc(state.bondManagerState)}">
-        <div class="bond-modal-body bond-manager-body">
-          ${buildBondManagerMediaStage(target)}
-          <div class="bond-manager-copy">
-            <div class="bond-manager-current">Currently bonded: ${esc(currentProfile.displayName)} / ${esc(currentProfile.domainName)}</div>
-            <h4>${esc(targetProfile.displayName)}</h4>
-            <div class="bond-modal-realm">${esc(targetProfile.domainName)}</div>
-            <p>${escDisplay(getSpiritkinSelectionContext(targetProfile.name))}</p>
-            <p>${escDisplay(targetProfile.storyIntro)}</p>
-            <div class="bond-manager-comparison">
-              <div class="bond-manager-compare-card current">
-                <span class="bond-manager-compare-label">Current</span>
-                <strong>${esc(currentProfile.displayName)}</strong>
-                <span>${esc(currentProfile.domainName)}</span>
-                <span>Wake: ${esc(currentProfile.wakeNames.join(", ") || "None")}</span>
-              </div>
-              <div class="bond-manager-compare-card selected">
-                <span class="bond-manager-compare-label">Selected</span>
-                <strong>${esc(targetProfile.displayName)}</strong>
-                <span>${esc(targetProfile.domainName)}</span>
-                <span>Wake: ${esc(targetProfile.wakeNames.join(", ") || "None")}</span>
-              </div>
-            </div>
-            <div class="bond-manager-status">
-              ${state.bondManagerState === "switching"
-                ? `Switching bond to ${esc(targetProfile.displayName)}...`
-                : state.bondManagerState === "complete"
-                  ? `${esc(targetProfile.displayName)} now anchors your bonded room.`
-                  : `Current vs selected is explicit here so the switch never feels ambiguous.`}
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    actions = state.bondManagerState === "confirm"
-      ? `
-        <button class="btn btn-ghost" data-action="cancel-rebond">Cancel</button>
-        <button class="btn btn-primary" data-action="confirm-rebond">Confirm Switch</button>
-      `
-      : state.bondManagerState === "switching"
-        ? `<button class="btn btn-primary" disabled>Switching...</button>`
-        : state.bondManagerState === "complete"
-          ? `<button class="btn btn-primary" data-action="close-bond-modal">Return to bonded room</button>`
-          : `
-            <button class="btn btn-ghost" data-action="cancel-rebond">Cancel</button>
-            <button class="btn btn-primary" data-action="confirm-selection">Make Primary Companion</button>
-          `;
-  }
-
-  return `
-    <section class="bond-manager-mode ${esc(modeClass)}" data-focus-anchor="bond-manager-mode">
-      <div class="bond-manager-shell">
-        <div class="bond-manager-header panel-card">
-          <div>
-            <div class="eyebrow">Bond Manager · ${esc(state.bondManagerState)}</div>
-            <h2>${esc(heading)}</h2>
-            <p class="bond-manager-head-copy">${esc(copy)}</p>
-          </div>
-          <div class="bond-manager-header-actions">
-            ${state.bondManagerState === "switching" ? "" : `<button class="btn btn-ghost" data-action="close-bond-modal">Return to bonded room</button>`}
-          </div>
-        </div>
-        <div class="bond-manager-progress" aria-label="Bond manager progress">
-          ${["browsing", "preview", "confirm", "switching"].map((step, index) => `
-            <div class="bond-manager-progress-step ${state.bondManagerState === step ? "active" : (VALID_BOND_MANAGER_STATES.indexOf(state.bondManagerState) > VALID_BOND_MANAGER_STATES.indexOf(step) ? "complete" : "")}">
-              <span>${index + 1}</span>
-              <strong>${step}</strong>
-            </div>
-          `).join("")}
-        </div>
-        <div class="bond-manager-panel panel-card">
-          ${body}
-        </div>
-        <div class="bond-manager-actions panel-card">
-          ${actions}
-        </div>
-      </div>
-    </section>
   `;
 }
 
@@ -10635,7 +10491,7 @@ async function onClick(event) {
       triggerBondFeedback("selected", candidate.name, `${getSpiritkinDisplayName(candidate)} is in view. Review the preview, then choose whether to make them primary.`, { duration: 2200 });
       persistSession();
       render();
-      revealCurrentFocus({ selector: ".bond-manager-mode, [data-focus-anchor='bond-manager-mode']" });
+      revealCurrentFocus({ selector: ".bond-manager-modal, [data-focus-anchor='bond-modal']" });
     }
     return;
   }
@@ -10669,7 +10525,7 @@ async function onClick(event) {
       triggerBondFeedback("armed", candidate.name, `Switch from ${getSpiritkinDisplayName(state.primarySpiritkin)} to ${getSpiritkinDisplayName(candidate)}? Confirm to complete the rebond.`, { duration: 2600 });
       persistSession();
       render();
-      revealCurrentFocus({ selector: ".bond-manager-mode, [data-focus-anchor='bond-manager-mode']" });
+      revealCurrentFocus({ selector: ".bond-manager-modal, [data-focus-anchor='bond-modal']" });
     }
     return;
   }
@@ -10680,7 +10536,7 @@ async function onClick(event) {
       triggerBondFeedback("selected", state.rebondSpiritkin.name, `${getSpiritkinDisplayName(state.rebondSpiritkin)} remains in preview. Choose again when ready.`, { duration: 1800 });
       persistSession();
       render();
-      revealCurrentFocus({ selector: ".bond-manager-mode, [data-focus-anchor='bond-manager-mode']" });
+      revealCurrentFocus({ selector: ".bond-manager-modal, [data-focus-anchor='bond-modal']" });
       return;
     }
     clearBondManagerTransientState({ preserveFeedback: true });
