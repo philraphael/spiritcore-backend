@@ -3048,12 +3048,14 @@ if (typeof window !== "undefined") {
       window.clearTimeout(_bondManagerV2Timer);
       _bondManagerV2Timer = null;
     }
+    state.devBondManagerV2Step = visible ? "browsing" : "closed";
     state.bondManagerState = visible ? "browsing" : "closed";
     if (!visible) state.devBondManagerV2Target = "";
     render();
   };
   window.__svSetBondManagerV2Step = (step = "browsing", target = "") => {
     state.devShowBondManagerV2 = true;
+    state.devBondManagerV2Step = String(step || "browsing");
     state.bondManagerState = String(step || "browsing");
     state.devBondManagerV2Target = String(target || "");
     render();
@@ -10142,8 +10144,10 @@ function renderBondManagerV2(currentState) {
   const target = currentState.spiritkins.find((item) => item?.name === targetName)
     || currentState.spiritkins.find((item) => item?.name && item.name !== current?.name)
     || current;
-  const step = ["browsing", "preview", "confirm", "switching", "complete"].includes(String(currentState.bondManagerState || ""))
-    ? String(currentState.bondManagerState)
+  const step = ["browsing", "preview", "confirm", "switching", "complete"].includes(String(currentState.devBondManagerV2Step || ""))
+    ? String(currentState.devBondManagerV2Step)
+    : ["browsing", "preview", "confirm", "switching", "complete"].includes(String(currentState.bondManagerState || ""))
+      ? String(currentState.bondManagerState)
     : "browsing";
   const currentProfile = getSpiritkinMediaProfile(current);
   const targetProfile = getSpiritkinMediaProfile(target);
@@ -10431,6 +10435,7 @@ async function onClick(event) {
         _bondManagerV2Timer = null;
       }
       state.devShowBondManagerV2 = false;
+      state.devBondManagerV2Step = "closed";
       state.bondManagerState = "closed";
       state.devBondManagerV2Target = "";
       render();
@@ -10442,6 +10447,7 @@ async function onClick(event) {
       if (candidate) {
         state.selectedSpiritkin = candidate;
         state.devBondManagerV2Target = candidate.name;
+        state.devBondManagerV2Step = "preview";
         state.bondManagerState = "preview";
         render();
       }
@@ -10453,6 +10459,7 @@ async function onClick(event) {
         window.clearTimeout(_bondManagerV2Timer);
         _bondManagerV2Timer = null;
       }
+      state.devBondManagerV2Step = "browsing";
       state.bondManagerState = "browsing";
       render();
       return;
@@ -10463,29 +10470,43 @@ async function onClick(event) {
         window.clearTimeout(_bondManagerV2Timer);
         _bondManagerV2Timer = null;
       }
+      state.devBondManagerV2Step = "preview";
       state.bondManagerState = "preview";
       render();
       return;
     }
 
     if (action === "v2-make-primary") {
+      state.devBondManagerV2Step = "confirm";
       state.bondManagerState = "confirm";
       render();
       return;
     }
 
     if (action === "v2-confirm-switch") {
+      const targetName = String(state.devBondManagerV2Target || state.selectedSpiritkin?.name || "").trim();
+      const candidate = state.spiritkins.find((item) => item?.name === targetName) ?? state.selectedSpiritkin ?? null;
+      if (!candidate) return;
       if (_bondManagerV2Timer) {
         window.clearTimeout(_bondManagerV2Timer);
         _bondManagerV2Timer = null;
       }
+      state.devBondManagerV2Step = "switching";
       state.bondManagerState = "switching";
       render();
       _bondManagerV2Timer = window.setTimeout(() => {
         _bondManagerV2Timer = null;
         if (!state.devShowBondManagerV2) return;
-        state.bondManagerState = "complete";
-        render();
+        beginRebondTransition(candidate);
+        _bondManagerV2Timer = window.setTimeout(() => {
+          _bondManagerV2Timer = null;
+          if (!state.devShowBondManagerV2) return;
+          state.devBondManagerV2Step = "complete";
+          state.bondManagerState = "complete";
+          state.devBondManagerV2Target = candidate.name;
+          state.selectedSpiritkin = state.primarySpiritkin || candidate;
+          render();
+        }, 760);
       }, 520);
       return;
     }
