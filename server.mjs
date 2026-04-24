@@ -306,13 +306,19 @@ app.get("/command-center.css", { preHandler: app.requireAdminAccess }, async (re
 
 app.get("/app/:asset", async (req, reply) => {
   const { asset } = req.params;
-  if (!["app.js", "app-constants.js", "app-helpers.js", "styles.css", "reveal-animation.js", "spiritverse-echoes.js", "video-player.js", "command-center.js", "command-center.css", "spirit-icons.svg", "spirit-background.jpg", "spiritverse-games.js", "spiritverse-games.css"].includes(asset)) {
+  if (!["app.js", "app-constants.js", "app-helpers.js", "styles.css", "reveal-animation.js", "spiritverse-echoes.js", "video-player.js", "command-center.js", "command-center.css", "spirit-icons.svg", "spirit-background.jpg", "spiritverse-games.js", "spiritverse-games.css", "manifest.json", "sw.js"].includes(asset)) {
     return reply.code(404).send({ ok: false, error: "Not found" });
   }
 
   const filePath = path.join(USER_APP_DIR, asset);
   const content = await readFile(filePath, "utf8");
-  const mime = asset.endsWith(".js") ? "text/javascript; charset=utf-8" : (asset.endsWith(".css") ? "text/css; charset=utf-8" : "application/octet-stream");
+  const mime = asset.endsWith(".js")
+    ? "text/javascript; charset=utf-8"
+    : asset.endsWith(".css")
+      ? "text/css; charset=utf-8"
+      : asset.endsWith(".json")
+        ? "application/manifest+json; charset=utf-8"
+        : "application/octet-stream";
   reply.header("Cache-Control", "no-store, max-age=0, must-revalidate");
   reply.header("X-Spiritverse-Build", SPIRITVERSE_APP_BUILD);
   return reply.type(mime).send(content);
