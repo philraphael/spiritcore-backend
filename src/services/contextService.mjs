@@ -45,10 +45,10 @@ export function createContextService({ supabase, emotionService, episodeService,
   /**
    * Assemble the full context bundle for a conversation turn.
    *
-   * @param {{ userId, spiritkinId, conversationId, recentText, policy, spiritkinName, bondStage, prefetchedAdaptiveProfile }} opts
+   * @param {{ userId, spiritkinId, conversationId, recentText, policy, spiritkinName, bondStage, prefetchedAdaptiveProfile, sessionContext }} opts
    * @returns {Promise<object>}
    */
-  async function buildContext({ userId, spiritkinId = null, conversationId = null, recentText = "", policy = {}, spiritkinName = null, bondStage = 0, prefetchedAdaptiveProfile = null }) {
+  async function buildContext({ userId, spiritkinId = null, conversationId = null, recentText = "", policy = {}, spiritkinName = null, bondStage = 0, prefetchedAdaptiveProfile = null, sessionContext = null }) {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
 
     const maxMemories = policy.max_memories ?? 5;
@@ -121,6 +121,7 @@ export function createContextService({ supabase, emotionService, episodeService,
       weightedMemoryCount: weightedMemories.length,
       structuredMemoryCount: structuredValue.top?.length ?? 0,
       hasAdaptiveProfile: Boolean(adaptiveProfileValue),
+      hasSessionState: Boolean(sessionContext),
       emotionLabel,
     });
 
@@ -134,6 +135,7 @@ export function createContextService({ supabase, emotionService, episodeService,
       memories: memoriesValue,
       weighted_memories: weightedMemories,
       recent_conversation: recentConversationValue,
+      session_state: sessionContext || null,
       // New hierarchical memory layers
       semantic_facts: hierarchicalValue.semantic ?? [],
       episodic_milestones: hierarchicalValue.episodic ?? [],

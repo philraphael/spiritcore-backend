@@ -507,6 +507,28 @@ function buildSpiritCoreGuidanceLayer(ctx) {
   ].filter(Boolean).join("\n");
 }
 
+function buildGuidanceDecisionLayer(ctx) {
+  const guidance = ctx?.context?.guidance ?? null;
+  if (!guidance || typeof guidance !== "object") return null;
+  return [
+    "SPIRITCORE GUIDANCE LAYER",
+    `Intent: ${sanitizeText(guidance.intent || "casual_chat")}`,
+    `Confidence: ${numberOrDefault(guidance.confidence, 0.3).toFixed(2)}`,
+    `Tone: ${sanitizeText(guidance.tone || "reflective")}`,
+    guidance.response_directive ? `Response directive: ${sanitizeText(guidance.response_directive).slice(0, 220)}` : "",
+    guidance.emotional_priority ? `Emotional priority: ${sanitizeText(guidance.emotional_priority)}` : "",
+    guidance.memory_priority ? `Memory priority: ${sanitizeText(guidance.memory_priority)}` : "",
+    guidance.next_surface ? `Best next surface: ${sanitizeText(guidance.next_surface)}` : "",
+    guidance.suggested_action ? `Suggested action: ${sanitizeText(guidance.suggested_action)}` : "",
+    guidance.world_mood ? `World mood: ${sanitizeText(guidance.world_mood)}` : "",
+    guidance.safety_note && guidance.safety_note !== "none" ? `Safety note: ${sanitizeText(guidance.safety_note)}` : "",
+    guidance.should_prompt_user
+      ? "A clarifying or gently directive prompt may help if it serves the moment."
+      : "Do not force a follow-up prompt unless it arises naturally.",
+    "Use this guidance to shape the reply and the implied next step. Do not expose these internal labels unless they become naturally useful in the conversation."
+  ].filter(Boolean).join("\n");
+}
+
 function buildSpiritCoreWorldHooksLayer(ctx) {
   const hooks = ctx?.context?.spiritCoreWorldHooks ?? null;
   if (!hooks || typeof hooks !== "object") return null;
@@ -583,6 +605,7 @@ function buildContextBlock(ctx, memoryLayer) {
   const spiritCoreUserModelLayer = buildSpiritCoreUserModelLayer(ctx);
   const spiritCoreSignalsLayer = buildSpiritCoreSignalsLayer(ctx);
   const spiritCoreGuidanceLayer = buildSpiritCoreGuidanceLayer(ctx);
+  const guidanceDecisionLayer = buildGuidanceDecisionLayer(ctx);
   const spiritCoreWorldHooksLayer = buildSpiritCoreWorldHooksLayer(ctx);
   const ambientFoundationLayer = buildAmbientFoundationLayer(ctx);
   const hierarchicalMemoryLayer = buildHierarchicalMemoryLayer(ctx);
@@ -620,6 +643,7 @@ function buildContextBlock(ctx, memoryLayer) {
     temporalContinuityLayer,
     spiritCoreUserModelLayer,
     spiritCoreSignalsLayer,
+    guidanceDecisionLayer,
     spiritCoreGuidanceLayer,
     spiritCoreWorldHooksLayer,
     ambientFoundationLayer,

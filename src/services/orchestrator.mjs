@@ -24,6 +24,7 @@ import { withTimeout } from "../utils/timeout.mjs";
 import { createTraceLogger, logStage } from "../logger.mjs";
 import { incrementMetric } from "../routes/health.mjs";
 import { config } from "../config.mjs";
+import { createGuidanceService } from "./guidanceService.mjs";
 
 export const createOrchestrator = ({
   bus,
@@ -47,6 +48,7 @@ export const createOrchestrator = ({
   adaptiveProfileService,
   spiritCoreAdaptiveService,
 }) => {
+  const guidanceService = createGuidanceService();
   const interact = async ({ userId, input, spiritkin, conversationId, context = {} }) => {
     if (!userId) throw new AppError("VALIDATION", "userId is required", 400);
     if (!input || typeof input !== "string") {
@@ -115,6 +117,12 @@ export const createOrchestrator = ({
         policy: {},
         spiritkinName: resolvedIdentity.name,
         bondStage: 0,
+        sessionContext: {
+          currentSurface: context?.surfaceContext?.activeSurface ?? context?.activeTab ?? "profile",
+          currentMode: context?.activeGameType ? "game" : "conversation",
+          activeTab: context?.surfaceContext?.activeTab ?? context?.activeTab ?? null,
+          speechState: context?.speechState || null,
+        },
       }),
       world.get({ userId, conversationId: convId }),
       spiritMemoryEngine
@@ -262,6 +270,37 @@ export const createOrchestrator = ({
       worldState: nextWorldState,
     }) ?? null;
 
+    let guidance = null;
+    try {
+      guidance = guidanceService.buildGuidance({
+        message: input,
+        adaptiveProfile,
+        emotion: contextBundle?.emotion || null,
+        weightedMemories: contextBundle?.weighted_memories || [],
+        recentConversation: contextBundle?.recent_conversation || [],
+        worldState: nextWorldState,
+        sessionContext: contextBundle?.session_state || {
+          currentSurface: context?.surfaceContext?.activeSurface ?? context?.activeTab ?? "profile",
+          currentMode: context?.activeGameType ? "game" : "conversation",
+          activeTab: context?.surfaceContext?.activeTab ?? context?.activeTab ?? null,
+        },
+      });
+      console.info("[Guidance] built", {
+        traceId,
+        spiritkin: resolvedIdentity.name,
+        intent: guidance?.intent || null,
+        tone: guidance?.tone || null,
+        nextSurface: guidance?.next_surface || null,
+        shouldPromptUser: Boolean(guidance?.should_prompt_user),
+      });
+    } catch (error) {
+      console.warn("[Guidance] fallback", {
+        traceId,
+        spiritkin: resolvedIdentity.name,
+        error: error?.message || String(error),
+      });
+    }
+
     const spiritCoreEnvelope = spiritCoreAdaptiveService
       ? await spiritCoreAdaptiveService.buildRuntimeEnvelope({
           userId,
@@ -303,6 +342,7 @@ export const createOrchestrator = ({
       spiritCoreReturnPackage: spiritCoreEnvelope?.returnPackage || null,
       spiritCoreWorldHooks: spiritCoreEnvelope?.worldHooks || null,
       spiritCoreAmbientFoundation: spiritCoreEnvelope?.ambientFoundation || null,
+      guidance,
     };
 
     console.info("[Orchestrator] prompt context injected", {
@@ -333,6 +373,7 @@ export const createOrchestrator = ({
           memories: contextBundle?.memories,
           weightedMemories: contextBundle?.weighted_memories,
           recentConversation: contextBundle?.recent_conversation,
+          guidance,
           episodes: contextBundle?.episodes,
           emotion: contextBundle?.emotion,
           summary: contextBundle?.summary_episode,
