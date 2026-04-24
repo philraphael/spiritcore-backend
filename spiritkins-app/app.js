@@ -285,6 +285,7 @@ let _sessionControlSyncTimer = null;
 let _queuedSessionControlArgs = null;
 let _lastSessionControlSignature = "";
 let _lastSessionControlAt = 0;
+let _gameBoardMountRunId = 0;
 let rebondTransitionTimer = null;
 
 const LONG_FORM_SILENCE_GRACE_MS = 1400;
@@ -4310,6 +4311,8 @@ function syncEntryCinematics() {
       const attemptKey = String(spiritGateActiveAttemptId || "gate");
       const isCurrentAttempt = gateVideo.dataset.gateAttemptId === attemptKey;
       gateVideo.dataset.gateAttemptId = attemptKey;
+      gateVideo.dataset.previewPrimed = "0";
+      gateVideo.preload = "auto";
       armSpiritGateFallback("gate-video-playback");
       if (!isCurrentAttempt) {
         gateVideo.currentTime = 0;
@@ -4329,14 +4332,23 @@ function syncEntryCinematics() {
       clearSpiritGateFallback();
       clearSpiritGateTransitionTimers();
       if (previewingGate) {
+        gateVideo.preload = "metadata";
         gateVideo.muted = true;
         gateVideo.defaultMuted = true;
         gateVideo.playsInline = true;
-        gateVideo.pause?.();
-        gateVideo.currentTime = 0;
+        if (gateVideo.dataset.previewPrimed !== "1") {
+          gateVideo.pause?.();
+          try {
+            gateVideo.currentTime = 0;
+          } catch (_) {}
+          gateVideo.dataset.previewPrimed = "1";
+        }
       } else {
+        gateVideo.dataset.previewPrimed = "0";
         gateVideo.pause?.();
-        gateVideo.currentTime = 0;
+        try {
+          gateVideo.currentTime = 0;
+        } catch (_) {}
       }
     }
   } else if (state.entryVideoStarted && state.crownGateOpening) {
@@ -4386,6 +4398,43 @@ function syncEntryCinematics() {
       clearSpiritGateArrivalFallback();
     }
   }
+}
+
+function mountActiveGameBoard(runId, attempt = 0) {
+  if (runId !== _gameBoardMountRunId) return;
+  if (!state.activeGame || !SpiritverseGames || state.activePresenceTab !== "games") return;
+  const container = document.getElementById("spiritverse-game-board");
+  const boardStage = document.querySelector(".presence-tab-content[data-presence-surface='games'] .game-board-container");
+  const canMount = !!container && !!boardStage
+    && container.offsetParent !== null
+    && boardStage.offsetParent !== null
+    && ((container.clientWidth || 0) > 0 || (boardStage.clientWidth || 0) > 0);
+  if (!canMount) {
+    if (attempt < 1 && typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(() => mountActiveGameBoard(runId, attempt + 1));
+    }
+    return;
+  }
+  const spiritkin = state.selectedSpiritkin;
+  SpiritverseGames.render(
+    container,
+    state.activeGame,
+    spiritkin ? spiritkin.name : "Spiritkin",
+    state.gameSpiritkinMessage,
+    (move) => submitGameMove(move),
+    resolveSpiritkinDomainTheme(state.activeGame?.type, spiritkin?.name)
+  );
+}
+
+function scheduleActiveGameBoardMount() {
+  _gameBoardMountRunId += 1;
+  const runId = _gameBoardMountRunId;
+  if (!state.activeGame || !SpiritverseGames || state.activePresenceTab !== "games") return;
+  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(() => mountActiveGameBoard(runId, 0));
+    return;
+  }
+  window.setTimeout(() => mountActiveGameBoard(runId, 0), 0);
 }
 
 function getActiveVoice() {
@@ -7540,20 +7589,7 @@ function performRender() {
       textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
     }
 
-    // Render visual game board after DOM update
-    if (state.activeGame && SpiritverseGames) {
-      requestAnimationFrame(() => {
-        const spiritkin = state.selectedSpiritkin;
-        SpiritverseGames.render(
-          'spiritverse-game-board',
-          state.activeGame,
-          spiritkin ? spiritkin.name : 'Spiritkin',
-          state.gameSpiritkinMessage,
-          (move) => submitGameMove(move),
-          resolveSpiritkinDomainTheme(state.activeGame?.type, spiritkin?.name)
-        );
-      });
-    }
+    scheduleActiveGameBoardMount();
   } catch (error) {
     console.error("[Spiritverse Render Failure]", error);
     const buildMarker = document.querySelector('meta[name="spiritverse-build"]')?.content || "unknown-build";
@@ -8377,7 +8413,7 @@ function buildEntry() {
               data-entry-video="gate"
               muted
               playsinline
-              preload="auto"
+              preload="metadata"
               poster="/app/assets/rooms/Spiritverse%20background%20base%20theme.png"
             >
               <source src="/videos/gate_entrance_final.mp4" type="video/mp4">
@@ -8462,7 +8498,7 @@ function buildCrownGateEntry() {
               data-entry-video="gate"
               muted
               playsinline
-              preload="auto"
+              preload="metadata"
               poster="/app/assets/rooms/Spiritverse%20background%20base%20theme.png"
             >
               <source src="/videos/gate_entrance_final.mp4" type="video/mp4">
