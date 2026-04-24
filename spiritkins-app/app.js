@@ -275,10 +275,19 @@ let _pendingVoiceTurn = null;
 let _spiritkinVideoFailureRenderQueued = false;
 let _isRendering = false;
 let _renderCycleGuard = false;
+let _renderScheduled = false;
+let _renderRequestedWhileRendering = false;
+let _sessionControlSyncInFlight = false;
+let _sessionControlSyncPromise = null;
+let _sessionControlSyncTimer = null;
+let _queuedSessionControlArgs = null;
+let _lastSessionControlSignature = "";
+let _lastSessionControlAt = 0;
 
 const LONG_FORM_SILENCE_GRACE_MS = 1400;
 const WAKE_MODE_SILENCE_GRACE_MS = 1650;
 const AUTO_LISTEN_START_COOLDOWN_MS = 1400;
+const SESSION_CONTROL_SYNC_DEBOUNCE_MS = 140;
 
 function claimSpeechRequest() {
   _activeSpeechRequestId = ++_nextSpeechRequestId;
@@ -3013,6 +3022,27 @@ function deriveCurrentModeFromUI() {
   return "selection";
 }
 
+function buildSessionStateSignature(next) {
+  return JSON.stringify({
+    userId: next.userId || null,
+    conversationId: next.conversationId || null,
+    selectedSpiritkin: next.selectedSpiritkinName || null,
+    primarySpiritkin: next.primarySpiritkinName || null,
+    activePresenceTab: next.activePresenceTab || null,
+    currentTab: next.currentTab || null,
+    showHomeView: !!next.showHomeView,
+    voiceListening: !!next.voiceListening,
+    activeGame: next.activeGame || null,
+    messageCount: next.messageCount || 0,
+    lastMessageRole: next.lastMessageRole || null,
+    sessionSurface: next.sessionSurface || null,
+    sessionMode: next.sessionMode || null,
+    turnPhase: next.turnPhase || null,
+    speechPaused: !!next.speechPaused,
+    spiritCoreHash: next.spiritCoreHash || null,
+  });
+}
+
 function applySessionSnapshot(session, source = "backend") {
   if (!session || typeof session !== "object") return false;
 
@@ -3029,6 +3059,78 @@ function applySessionSnapshot(session, source = "backend") {
   const gameState = normalizeActiveGame(session.gameState);
   const currentSurface = String(session.currentSurface || deriveCurrentSurfaceFromUI()).trim().toLowerCase() || "selection";
   const currentMode = String(session.currentMode || deriveCurrentModeFromUI()).trim().toLowerCase() || "idle";
+  const nextActivePresenceTab = currentSurface === "profile"
+    ? "profile"
+    : (VALID_PRESENCE_TABS.includes(currentSurface)
+      ? currentSurface
+      : (gameState ? "games" : state.activePresenceTab));
+  const nextShowHomeView = currentSurface === "profile"
+    ? currentMode === "bond_home"
+    : false;
+  const nextSelectedSpiritkin = spiritkinRecord?.name || state.selectedSpiritkin?.name || null;
+  const nextPrimarySpiritkin = (!state.primarySpiritkin && spiritkinRecord && FOUNDING_PILLARS.includes(spiritkinRecord.name))
+    ? spiritkinRecord.name
+    : (state.primarySpiritkin?.name || null);
+  const nextSignature = buildSessionStateSignature({
+    userId: session.userId || state.userId,
+    conversationId: conversationState.conversationId || session.sessionId || null,
+    selectedSpiritkinName: nextSelectedSpiritkin,
+    primarySpiritkinName: nextPrimarySpiritkin,
+    activePresenceTab: nextActivePresenceTab,
+    currentTab: nextActivePresenceTab,
+    showHomeView: nextShowHomeView,
+    voiceListening: !!speechState.isListening,
+    activeGame: gameState ? {
+      type: gameState.type,
+      status: gameState.status,
+      turn: gameState.turn,
+      moveCount: gameState.moveCount,
+      historyLength: Array.isArray(gameState.history) ? gameState.history.length : 0,
+    } : null,
+    messageCount: recentMessages.length,
+    lastMessageRole: recentMessages[recentMessages.length - 1]?.role || null,
+    sessionSurface: currentSurface,
+    sessionMode: currentMode,
+    turnPhase: normalizeTurnPhaseValue(speechState.turnPhase),
+    speechPaused: !!speechState.isPaused,
+    spiritCoreHash: session.spiritCore ? JSON.stringify({
+      activeGuidance: session.spiritCore.activeGuidance || null,
+      ambient: session.spiritCore.ambient || null,
+      returnPackage: session.spiritCore.returnPackage || null,
+    }) : null,
+  });
+  const currentSignature = buildSessionStateSignature({
+    userId: state.userId,
+    conversationId: state.conversationId,
+    selectedSpiritkinName: state.selectedSpiritkin?.name || null,
+    primarySpiritkinName: state.primarySpiritkin?.name || null,
+    activePresenceTab: state.activePresenceTab,
+    currentTab: state.currentTab,
+    showHomeView: state.showHomeView,
+    voiceListening: state.voiceListening,
+    activeGame: state.activeGame ? {
+      type: state.activeGame.type,
+      status: state.activeGame.status,
+      turn: state.activeGame.turn,
+      moveCount: state.activeGame.moveCount,
+      historyLength: Array.isArray(state.activeGame.history) ? state.activeGame.history.length : 0,
+    } : null,
+    messageCount: Array.isArray(state.messages) ? state.messages.length : 0,
+    lastMessageRole: state.messages?.[state.messages.length - 1]?.role || null,
+    sessionSurface: state.sessionModel?.currentSurface || null,
+    sessionMode: state.sessionModel?.currentMode || null,
+    turnPhase: state.sessionModel?.speechState?.turnPhase || null,
+    speechPaused: !!state.sessionModel?.speechState?.isPaused,
+    spiritCoreHash: state.spiritCore ? JSON.stringify({
+      activeGuidance: state.spiritCore.activeGuidance || null,
+      ambient: state.spiritCore.ambient || null,
+      returnPackage: state.spiritCore.returnPackage || null,
+    }) : null,
+  });
+
+  if (nextSignature === currentSignature) {
+    return false;
+  }
 
   state.userId = session.userId || state.userId;
   state.conversationId = conversationState.conversationId || session.sessionId || null;
@@ -3120,8 +3222,8 @@ async function fetchSessionSnapshot(options = {}) {
     const res = await fetch(`${API}/v1/session/snapshot?${query.toString()}`);
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.ok === false) throw new Error(data.message || "Failed to fetch session snapshot.");
-    applySessionSnapshot(data.session, "backend-snapshot");
-    if (renderOnFinish) render();
+    const changed = applySessionSnapshot(data.session, "backend-snapshot");
+    if (renderOnFinish && changed) render();
     return data.session;
   } catch (error) {
     if (!silent) {
@@ -3161,6 +3263,57 @@ async function fetchSessionSnapshot(options = {}) {
 async function syncSessionControl(overrides = {}, options = {}) {
   const { renderOnFinish = false } = options;
   if (!state.userId) return null;
+  const payload = buildSessionControlPayload(overrides);
+  const signature = JSON.stringify(payload);
+  const now = Date.now();
+
+  if (_sessionControlSyncInFlight) {
+    _queuedSessionControlArgs = { overrides, options };
+    return _sessionControlSyncPromise;
+  }
+
+  if (!options.force && signature === _lastSessionControlSignature && (now - _lastSessionControlAt) < SESSION_CONTROL_SYNC_DEBOUNCE_MS) {
+    return null;
+  }
+
+  _lastSessionControlSignature = signature;
+  _lastSessionControlAt = now;
+  _sessionControlSyncInFlight = true;
+
+  _sessionControlSyncPromise = (async () => {
+    try {
+      const res = await fetch(`${API}/v1/session/control`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.message || "Failed to sync session control.");
+      const changed = applySessionSnapshot(data.session, "backend-control");
+      persistSession();
+      if (renderOnFinish && changed) render();
+      return data.session;
+    } catch (error) {
+      logContinuityDebug("session-control-sync-failed", {
+        message: error.message,
+        payload,
+      });
+      return null;
+    } finally {
+      _sessionControlSyncInFlight = false;
+      _sessionControlSyncPromise = null;
+      if (_queuedSessionControlArgs) {
+        const queued = _queuedSessionControlArgs;
+        _queuedSessionControlArgs = null;
+        syncSessionControlSoon(queued.overrides, queued.options);
+      }
+    }
+  })();
+
+  return _sessionControlSyncPromise;
+}
+
+function buildSessionControlPayload(overrides = {}) {
 
   const speechState = {
     isSpeaking: !!_audioPlaying,
@@ -3183,26 +3336,7 @@ async function syncSessionControl(overrides = {}, options = {}) {
       turnPhase: normalizeTurnPhaseValue((overrides.speechState || {}).turnPhase || speechState.turnPhase),
     },
   };
-
-  try {
-    const res = await fetch(`${API}/v1/session/control`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.ok === false) throw new Error(data.message || "Failed to sync session control.");
-    applySessionSnapshot(data.session, "backend-control");
-    persistSession();
-    if (renderOnFinish) render();
-    return data.session;
-  } catch (error) {
-    logContinuityDebug("session-control-sync-failed", {
-      message: error.message,
-      payload,
-    });
-    return null;
-  }
+  return payload;
 }
 
 function setAuthoritativeTurnPhase(turnPhase, overrides = {}) {
@@ -3223,7 +3357,17 @@ function setAuthoritativeTurnPhase(turnPhase, overrides = {}) {
 }
 
 function syncSessionControlSoon(overrides = {}, options = {}) {
-  Promise.resolve().then(() => syncSessionControl(overrides, options)).catch(() => {});
+  _queuedSessionControlArgs = { overrides, options };
+  if (_sessionControlSyncTimer) {
+    clearTimeout(_sessionControlSyncTimer);
+  }
+  _sessionControlSyncTimer = window.setTimeout(() => {
+    _sessionControlSyncTimer = null;
+    const queued = _queuedSessionControlArgs;
+    _queuedSessionControlArgs = null;
+    if (!queued) return;
+    syncSessionControl(queued.overrides, queued.options).catch(() => {});
+  }, SESSION_CONTROL_SYNC_DEBOUNCE_MS);
 }
 
 function getPresenceSurfaceFocusSelector(tab) {
@@ -7079,13 +7223,9 @@ function markGameHelpSeen(gameType) {
   writeJson(GAME_HELP_SEEN_KEY, state.gameHelpSeen);
 }
 
-function render() {
+function performRender() {
   const root = document.getElementById("root");
   if (!root) return;
-  if (_isRendering) return;
-  if (_renderCycleGuard) return;
-  _isRendering = true;
-  _renderCycleGuard = true;
   try {
     syncWakeModeSessionDefault();
     enforceEntryVoiceSilence();
@@ -7155,12 +7295,40 @@ function render() {
     if (typeof window.__svMarkBootReady === "function") {
       window.__svMarkBootReady();
     }
-  } finally {
-    _isRendering = false;
-    window.setTimeout(() => {
-      _renderCycleGuard = false;
-    }, 0);
   }
+}
+
+function render() {
+  if (_isRendering) {
+    _renderRequestedWhileRendering = true;
+    return;
+  }
+  if (_renderScheduled) return;
+  _renderScheduled = true;
+  const scheduleFrame = typeof window !== "undefined" && typeof window.requestAnimationFrame === "function"
+    ? window.requestAnimationFrame.bind(window)
+    : (cb) => window.setTimeout(cb, 0);
+  scheduleFrame(() => {
+    _renderScheduled = false;
+    if (_isRendering || _renderCycleGuard) {
+      _renderRequestedWhileRendering = true;
+      return;
+    }
+    _isRendering = true;
+    _renderCycleGuard = true;
+    try {
+      performRender();
+    } finally {
+      _isRendering = false;
+      window.setTimeout(() => {
+        _renderCycleGuard = false;
+        if (_renderRequestedWhileRendering) {
+          _renderRequestedWhileRendering = false;
+          render();
+        }
+      }, 0);
+    }
+  });
 }
 
 function getAutoMicTurnKey(game) {
