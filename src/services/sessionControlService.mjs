@@ -83,6 +83,43 @@ function buildCurrentGame(activeGame) {
   };
 }
 
+function buildFallbackSession({
+  userId,
+  conversationId = null,
+  spiritkinIdentity = null,
+  currentSurface = "selection",
+  currentMode = "idle",
+  activeTab = null,
+  speechState = null,
+  worldState = null,
+}) {
+  return {
+    ok: true,
+    session: {
+      sessionId: conversationId,
+      userId,
+      currentSpiritkin: spiritkinIdentity
+        ? {
+            id: spiritkinIdentity.id,
+            name: spiritkinIdentity.name,
+            title: spiritkinIdentity.title || null,
+            role: spiritkinIdentity.role || null,
+          }
+        : null,
+      currentSurface,
+      currentMode,
+      activeTab,
+      currentGame: null,
+      gameState: null,
+      conversationState: buildConversationState([], conversationId),
+      speechState,
+      memoryContext: buildMemoryContext(worldState || createDefaultWorldState()),
+      recentMessages: [],
+      controlUpdatedAt: null,
+    },
+  };
+}
+
 function createDefaultWorldState() {
   return {
     scene: { name: "default", display_name: "The Spiritverse", mood: "peaceful", description: null },
@@ -373,14 +410,17 @@ export function createSessionControlService({ conversationService, messageServic
     requestContext = null,
   }) {
     const normalizedSpeech = normalizeSpeechState(speechState || {});
+    const resolvedSurface = normalizeSurface(currentSurface);
+    const resolvedMode = normalizeMode(currentMode);
+    const resolvedActiveTab = activeTab ? String(activeTab).trim().toLowerCase() : null;
     if (!conversationId) {
       return getSnapshot({
         userId,
         conversationId: null,
         spiritkinName: currentSpiritkinName,
-        currentSurface,
-        currentMode,
-        activeTab,
+        currentSurface: resolvedSurface,
+        currentMode: resolvedMode,
+        activeTab: resolvedActiveTab,
         speechStateOverride: normalizedSpeech,
         requestContext,
       });
@@ -397,9 +437,9 @@ export function createSessionControlService({ conversationService, messageServic
         flags: {
           ...(worldData.state?.flags || {}),
           spiritcore_session: {
-            currentSurface: normalizeSurface(currentSurface),
-            currentMode: normalizeMode(currentMode),
-            activeTab: activeTab ? String(activeTab) : null,
+            currentSurface: resolvedSurface,
+            currentMode: resolvedMode,
+            activeTab: resolvedActiveTab,
             speechState: normalizedSpeech,
             updatedAt: new Date().toISOString(),
           },
@@ -420,11 +460,32 @@ export function createSessionControlService({ conversationService, messageServic
       userId,
       conversationId,
       spiritkinName: currentSpiritkinName,
-      currentSurface,
-      currentMode,
-      activeTab,
+      currentSurface: resolvedSurface,
+      currentMode: resolvedMode,
+      activeTab: resolvedActiveTab,
       speechStateOverride: normalizedSpeech,
       requestContext,
+    }).catch(async (error) => {
+      console.error("[SessionControl] updateControl fallback", {
+        userId,
+        conversationId,
+        currentSpiritkinName,
+        currentSurface: resolvedSurface,
+        currentMode: resolvedMode,
+        activeTab: resolvedActiveTab,
+        message: error?.message || String(error),
+      });
+      const spiritkinIdentity = await safeResolveSpiritkinByName(currentSpiritkinName);
+      return buildFallbackSession({
+        userId,
+        conversationId,
+        spiritkinIdentity,
+        currentSurface: resolvedSurface,
+        currentMode: resolvedMode,
+        activeTab: resolvedActiveTab,
+        speechState: normalizedSpeech,
+        worldState: createDefaultWorldState(),
+      });
     });
   }
 

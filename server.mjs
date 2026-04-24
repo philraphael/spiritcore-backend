@@ -2,7 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import "dotenv/config";
-import { readFile } from "fs/promises";
+import { readFile, stat } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -112,24 +112,49 @@ function getStaticAssetMimeType(filePath) {
   return "application/octet-stream";
 }
 
-async function sendStaticAssetFromRoot(reply, rootDir, requestedPath) {
-  const requested = String(requestedPath || "").replace(/\\/g, "/");
+function decodeStaticAssetRequestPath(requestedPath) {
+  const raw = String(requestedPath || "");
+  if (!raw) return "";
+  try {
+    return decodeURIComponent(raw).replace(/\\/g, "/");
+  } catch {
+    return "";
+  }
+}
+
+function resolveStaticAssetPath(rootDir, requestedPath) {
+  const requested = decodeStaticAssetRequestPath(requestedPath);
   if (!requested || requested.includes("..")) {
-    return reply.code(404).send({ ok: false, error: "Not found" });
+    return null;
   }
 
   const resolvedPath = path.resolve(rootDir, requested);
   const normalizedRoot = `${path.resolve(rootDir)}${path.sep}`;
   if (!resolvedPath.startsWith(normalizedRoot)) {
-    return reply.code(404).send({ ok: false, error: "Not found" });
+    return null;
   }
+  return resolvedPath;
+}
 
+async function sendStaticAssetFile(reply, filePath) {
   try {
-    const content = await readFile(resolvedPath);
-    return reply.type(getStaticAssetMimeType(resolvedPath)).send(content);
-  } catch (_err) {
+    const fileStat = await stat(filePath);
+    if (!fileStat.isFile()) {
+      return reply.code(404).send({ ok: false, error: "Not found" });
+    }
+    const content = await readFile(filePath);
+    return reply.type(getStaticAssetMimeType(filePath)).send(content);
+  } catch {
     return reply.code(404).send({ ok: false, error: "Not found" });
   }
+}
+
+async function sendStaticAssetFromRoot(reply, rootDir, requestedPath) {
+  const resolvedPath = resolveStaticAssetPath(rootDir, requestedPath);
+  if (!resolvedPath) {
+    return reply.code(404).send({ ok: false, error: "Not found" });
+  }
+  return sendStaticAssetFile(reply, resolvedPath);
 }
 
 function setAdminSessionCookie(req, reply) {
@@ -343,21 +368,29 @@ app.get("/generated-spiritkins/*", async (req, reply) => {
 
 // Serve portrait images from public/portraits
 app.get("/portraits/:filename", async (req, reply) => {
-  const { filename } = req.params;
+  const filename = decodeStaticAssetRequestPath(req.params.filename);
   // Whitelist portrait filenames to prevent directory traversal
   const allowedPortraits = ["lyra_portrait.png", "raien_portrait.png", "kairo_portrait.png"];
   if (!allowedPortraits.includes(filename)) {
     return reply.code(404).send({ ok: false, error: "Portrait not found" });
   }
 
-  try {
-    const filePath = path.join(USER_APP_DIR, "public", "portraits", filename);
-    const content = await readFile(filePath);
-    return reply.type("image/png").send(content);
-  } catch (err) {
-    app.log.warn(`Failed to serve portrait ${filename}: ${err.message}`);
-    return reply.code(404).send({ ok: false, error: "Portrait not found" });
+  const portraitCandidates = [
+    path.join(USER_APP_DIR, "public", "portraits", filename),
+    path.join(ACTIVE_ASSET_DIR, "ui", filename),
+  ];
+
+  for (const filePath of portraitCandidates) {
+    try {
+      const fileStat = await stat(filePath);
+      if (!fileStat.isFile()) continue;
+      const content = await readFile(filePath);
+      return reply.type("image/png").send(content);
+    } catch {}
   }
+
+  app.log.warn(`Failed to serve portrait ${filename}: not found in known portrait roots`);
+  return reply.code(404).send({ ok: false, error: "Portrait not found" });
 });
 
 // Serve cinematic videos from public/videos
@@ -379,7 +412,7 @@ app.get("/videos/:filename", async (req, reply) => {
 });
 
 app.get("/world-art/:filename", async (req, reply) => {
-  const { filename } = req.params;
+  const filename = decodeStaticAssetRequestPath(req.params.filename);
   const allowedWorldArt = new Set([
     "Book Covers All.png",
     "Book Covers.png",
@@ -403,6 +436,8 @@ app.get("/world-art/:filename", async (req, reply) => {
     for (const dir of ACTIVE_WORLD_ART_DIRS) {
       const filePath = path.join(dir, filename);
       try {
+        const fileStat = await stat(filePath);
+        if (!fileStat.isFile()) continue;
         const content = await readFile(filePath);
         const ext = path.extname(filename).toLowerCase();
         const mime = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : "application/octet-stream";
