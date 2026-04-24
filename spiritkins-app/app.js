@@ -273,6 +273,8 @@ let _pressedInteractiveEl = null;
 let _lastSpeechFingerprint = { key: "", at: 0 };
 let _pendingVoiceTurn = null;
 let _spiritkinVideoFailureRenderQueued = false;
+let _isRendering = false;
+let _renderCycleGuard = false;
 
 const LONG_FORM_SILENCE_GRACE_MS = 1400;
 const WAKE_MODE_SILENCE_GRACE_MS = 1650;
@@ -7080,9 +7082,12 @@ function markGameHelpSeen(gameType) {
 function render() {
   const root = document.getElementById("root");
   if (!root) return;
+  if (_isRendering) return;
+  if (_renderCycleGuard) return;
+  _isRendering = true;
+  _renderCycleGuard = true;
   try {
     syncWakeModeSessionDefault();
-    normalizeInteractionState("render");
     enforceEntryVoiceSilence();
     root.innerHTML = buildApp();
     syncMountedMedia({ attemptPlay: false });
@@ -7150,6 +7155,11 @@ function render() {
     if (typeof window.__svMarkBootReady === "function") {
       window.__svMarkBootReady();
     }
+  } finally {
+    _isRendering = false;
+    window.setTimeout(() => {
+      _renderCycleGuard = false;
+    }, 0);
   }
 }
 
@@ -8808,7 +8818,6 @@ function buildChatView() {
   const showFirstLoopGuide = !state.activeGame && safeMessages.length <= 1 && !state.loadingReply;
   const showSpiritCoreGuidance = !state.loadingReply && !state.showHomeView;
   const gamesSurfaceActive = state.activePresenceTab === "games";
-  const activeGamePrimary = gamesSurfaceActive && !!state.activeGame;
   const chatLayoutClass = `${esc(meta.cls)} ${state.activePresenceTab === "games" && state.activeGame ? "game-focus-mode" : ""}`.trim();
   const spiritkinSpeaking = isSpiritkinSpeechActive(spiritkin.name);
   const roomMeta = getRoomDisplayMeta(state.activePresenceTab, spiritkin);
@@ -9316,7 +9325,8 @@ function buildChatView() {
           ` : ''}
         </div>
       </section>
-      <aside class="chat-stage chat-stage-${esc(state.activePresenceTab)} ${gamesSurfaceActive ? "is-secondary-surface" : ""} ${activeGamePrimary ? "chat-stage-games-rail" : ""}">
+      ${!gamesSurfaceActive ? `
+      <aside class="chat-stage chat-stage-${esc(state.activePresenceTab)}">
         <div class="chat-header-bar">
           <div class="chat-header-info">
             ${buildSigil(meta, "header", meta.symbol)}
@@ -9535,6 +9545,7 @@ function buildChatView() {
 
         ${state.statusText ? `<div class="status-bar ${state.statusError ? "error" : ""}">${esc(state.statusText)}</div>` : ""}
       </aside>
+      ` : ""}
       </div>
     </section>
 
@@ -10981,6 +10992,7 @@ function initializeSpiritverseApp() {
     installGlobalInteractionDiagnostics();
     installSpeechLifecycleGuards();
     bootstrapRetentionExperience();
+    normalizeInteractionState("boot");
     logInteraction("boot", { rootReady: !!document.getElementById("root") });
     render();
     fetchSessionSnapshot({ silent: true, renderOnFinish: false })
