@@ -44,6 +44,7 @@ export const createOrchestrator = ({
   engagementEngine,
   spiritMemoryEngine,
   responseEngine,
+  adaptiveProfileService,
   spiritCoreAdaptiveService,
 }) => {
   const interact = async ({ userId, input, spiritkin, conversationId, context = {} }) => {
@@ -149,6 +150,27 @@ export const createOrchestrator = ({
     // Stage 5: Memory policy
     const policyState = await memory.computePolicyState({ userId });
     bus.emit("orchestrator.memory.policy", { traceId, policyState });
+
+    let adaptiveProfile = contextBundle?.adaptive_profile || null;
+    if (adaptiveProfileService && spiritkinId) {
+      try {
+        const adaptiveUpdate = await adaptiveProfileService.updateFromMessage({
+          userId,
+          spiritkinId,
+          message: input,
+          recentMessages: contextBundle?.recent_conversation || [],
+          emotionState: contextBundle?.emotion || null,
+          existingProfile: adaptiveProfile,
+        });
+        adaptiveProfile = adaptiveUpdate?.profile || adaptiveProfile;
+      } catch (error) {
+        console.warn("[Orchestrator] adaptive profile update failed:", error.message);
+      }
+    }
+
+    if (adaptiveProfile) {
+      contextBundle.adaptive_profile = adaptiveProfile;
+    }
 
     // Stage 7: Safety pre-pass
     logStage(log, "safety_prepass");
@@ -261,8 +283,9 @@ export const createOrchestrator = ({
             ...context,
             recentText: input,
             emotion: contextBundle?.emotion || null,
+            adaptiveProfile,
           },
-          storedAdaptiveProfile: nextWorldState?.flags?.spiritcore_adaptive_profile || null,
+          storedAdaptiveProfile: adaptiveProfile || nextWorldState?.flags?.spiritcore_adaptive_profile || null,
         })
       : null;
 
@@ -272,7 +295,7 @@ export const createOrchestrator = ({
 
     const authoritativeContext = {
       ...(context || {}),
-      adaptiveProfile: spiritCoreEnvelope?.adaptiveProfile || context?.adaptiveProfile || null,
+      adaptiveProfile: spiritCoreEnvelope?.adaptiveProfile || adaptiveProfile || context?.adaptiveProfile || null,
       spiritCoreUserModel: spiritCoreEnvelope?.userModel || null,
       spiritCoreSignals: spiritCoreEnvelope?.emotionalSignals || null,
       spiritCoreGuidance: spiritCoreEnvelope?.guidance || null,
@@ -281,6 +304,17 @@ export const createOrchestrator = ({
       spiritCoreWorldHooks: spiritCoreEnvelope?.worldHooks || null,
       spiritCoreAmbientFoundation: spiritCoreEnvelope?.ambientFoundation || null,
     };
+
+    console.info("[Orchestrator] prompt context injected", {
+      traceId,
+      spiritkin: resolvedIdentity.name,
+      hasAdaptiveProfile: Boolean(authoritativeContext.adaptiveProfile),
+      responseStyle: authoritativeContext.adaptiveProfile?.response_style || null,
+      tonePreference: authoritativeContext.adaptiveProfile?.tone_preference || null,
+      recentConversationCount: contextBundle?.recent_conversation?.length ?? 0,
+      weightedMemoryCount: contextBundle?.weighted_memories?.length ?? 0,
+      emotionLabel: contextBundle?.emotion?.label || contextBundle?.emotion?.tone || null,
+    });
 
     const rawAdapterResult = await withTimeout(
       adapter.generate({
@@ -297,6 +331,8 @@ export const createOrchestrator = ({
           policyState,
           world: nextWorldState,
           memories: contextBundle?.memories,
+          weightedMemories: contextBundle?.weighted_memories,
+          recentConversation: contextBundle?.recent_conversation,
           episodes: contextBundle?.episodes,
           emotion: contextBundle?.emotion,
           summary: contextBundle?.summary_episode,

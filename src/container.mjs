@@ -51,6 +51,7 @@ import { createSessionControlService }  from "./services/sessionControlService.m
 import { createSpiritkinGeneratorService } from "./services/spiritkinGeneratorService.mjs";
 import { createSpiritkinGeneratorProviderStack } from "./services/spiritkinGeneratorProviderStack.mjs";
 import { createSpiritCoreAdaptiveService } from "./services/spiritCoreAdaptiveService.mjs";
+import { createAdaptiveProfileService } from "./services/adaptiveProfileService.mjs";
 
 /**
  * Build and return the fully wired service container.
@@ -89,6 +90,7 @@ export function buildContainer() {
   // --- Phase E: Messages Ledger + Safety Governor ---
   const messageService  = createMessageService({ supabase });
   const safetyGovernor  = createSafetyGovernor({ supabase });
+  const adaptiveProfileService = createAdaptiveProfileService({ supabase });
   const spiritCoreAdaptiveService = createSpiritCoreAdaptiveService({
     supabase,
     structuredMemoryService,
@@ -113,9 +115,11 @@ export function buildContainer() {
     emotionService,
     episodeService,
     memoryService,
+    messageService,
     hierarchicalMemoryService,
     structuredMemoryService,
     worldService,
+    adaptiveProfileService,
   });
 
   // --- Adapters ---
@@ -154,6 +158,7 @@ export function buildContainer() {
     engagementEngine,            // Phase I: proactive engagement
     spiritMemoryEngine,          // Phase K: 10x unified memory
     responseEngine,
+    adaptiveProfileService,
     spiritCoreAdaptiveService,
   });
 
@@ -186,6 +191,7 @@ export function buildContainer() {
     structuredMemoryService,
     engagementEngine,
     responseEngine,
+    adaptiveProfileService,
     spiritCoreAdaptiveService,
     gameEngine,                  // Phase J
     spiritMemoryEngine,          // Phase K

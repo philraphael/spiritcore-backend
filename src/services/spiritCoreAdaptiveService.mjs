@@ -27,6 +27,18 @@ function average(values = [], fallback = 0) {
 
 function normalizeAdaptiveProfile(raw = {}) {
   return {
+    tone_preference: typeof raw?.tone_preference === "string" && raw.tone_preference.trim()
+      ? raw.tone_preference.trim()
+      : "grounded",
+    depth_level: typeof raw?.depth_level === "string" && raw.depth_level.trim()
+      ? raw.depth_level.trim()
+      : "balanced",
+    response_style: typeof raw?.response_style === "string" && raw.response_style.trim()
+      ? raw.response_style.trim()
+      : "balanced",
+    emotional_expression: typeof raw?.emotional_expression === "string" && raw.emotional_expression.trim()
+      ? raw.emotional_expression.trim()
+      : "warm",
     toneStyle: typeof raw?.toneStyle === "string" && raw.toneStyle.trim() ? raw.toneStyle.trim() : "grounded",
     intensity: clamp01(raw?.intensity, 0.45),
     playfulness: clamp01(raw?.playfulness, 0.3),
@@ -483,11 +495,15 @@ function buildWorldHooks({ spiritkinIdentity, worldState = {}, signals, surfaceP
 }
 
 function mergeStoredAdaptiveProfile(stored = {}, generated = {}) {
-  const base = normalizeAdaptiveProfile(stored);
-  const incoming = normalizeAdaptiveProfile(generated);
-  return {
-    ...base,
-    toneStyle: incoming.toneStyle || base.toneStyle,
+    const base = normalizeAdaptiveProfile(stored);
+    const incoming = normalizeAdaptiveProfile(generated);
+    return {
+      ...base,
+      tone_preference: incoming.tone_preference || base.tone_preference,
+      depth_level: incoming.depth_level || base.depth_level,
+      response_style: incoming.response_style || base.response_style,
+      emotional_expression: incoming.emotional_expression || base.emotional_expression,
+      toneStyle: incoming.toneStyle || base.toneStyle,
     intensity: Number(average([base.intensity, incoming.intensity], base.intensity).toFixed(3)),
     playfulness: Number(average([base.playfulness, incoming.playfulness], base.playfulness).toFixed(3)),
     competitiveness: Number(average([base.competitiveness, incoming.competitiveness], base.competitiveness).toFixed(3)),
@@ -605,9 +621,15 @@ export function createSpiritCoreAdaptiveService({ supabase, structuredMemoryServ
       : { top: [], corrections: [], milestones: [], preferences: [], brief: "", hasMemories: false };
 
     const requestAdaptive = requestContext?.adaptiveProfile || requestContext?.localAdaptiveProfile || {};
+    const persistedAdaptive = engagement?.adaptive_profile && typeof engagement.adaptive_profile === "object"
+      ? engagement.adaptive_profile
+      : {};
     const structuredAdaptive = buildStructuredMemoryAdaptiveProfile(structured);
     const unifiedAdaptiveProfile = mergeStoredAdaptiveProfile(
-      mergeStoredAdaptiveProfile(storedAdaptiveProfile, structuredAdaptive),
+      mergeStoredAdaptiveProfile(
+        mergeStoredAdaptiveProfile(storedAdaptiveProfile, persistedAdaptive),
+        structuredAdaptive
+      ),
       requestAdaptive
     );
     const signals = deriveContextSignals({

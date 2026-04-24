@@ -271,6 +271,10 @@ function buildAdaptiveLayer(ctx) {
 
   const parts = [];
   parts.push("ADAPTIVE PERSONALITY LAYER");
+  if (adaptive.tone_preference) parts.push(`Tone preference label: ${sanitizeText(adaptive.tone_preference)}`);
+  if (adaptive.depth_level) parts.push(`Depth level: ${sanitizeText(adaptive.depth_level)}`);
+  if (adaptive.response_style) parts.push(`Response style: ${sanitizeText(adaptive.response_style)}`);
+  if (adaptive.emotional_expression) parts.push(`Emotional expression: ${sanitizeText(adaptive.emotional_expression)}`);
   parts.push(`User tone style: ${sanitizeText(adaptive.toneStyle || "grounded")}`);
   parts.push(`Intensity: ${numberOrDefault(adaptive.intensity, 0.45).toFixed(2)}`);
   parts.push(`Playfulness: ${numberOrDefault(adaptive.playfulness, 0.3).toFixed(2)}`);
@@ -344,6 +348,57 @@ function buildAdaptiveLayer(ctx) {
   parts.push("Never infer race, ethnicity, gender identity, disability, religion, or any protected trait from style. Adapt only to conversational behavior and explicit user preference.");
 
   return parts.join("\n");
+}
+
+function buildRecentConversationLayer(ctx) {
+  const recentConversation = Array.isArray(ctx?.context?.recentConversation)
+    ? ctx.context.recentConversation
+    : Array.isArray(ctx?.context?.recent_conversation)
+      ? ctx.context.recent_conversation
+      : [];
+  if (!recentConversation.length) return null;
+
+  const lines = recentConversation
+    .slice(-6)
+    .map((entry) => {
+      const role = entry?.role === "assistant" ? "Spiritkin" : entry?.role === "user" ? "User" : "System";
+      const content = sanitizeText(entry?.content || "").slice(0, 180);
+      return content ? `- ${role}: ${content}` : "";
+    })
+    .filter(Boolean);
+
+  if (!lines.length) return null;
+  return [
+    "RECENT CONVERSATION THREAD",
+    "Use this to preserve continuity and avoid answering a fragment as if it were the entire exchange.",
+    ...lines,
+  ].join("\n");
+}
+
+function buildWeightedMemoryLayer(ctx) {
+  const weightedMemories = Array.isArray(ctx?.context?.weightedMemories)
+    ? ctx.context.weightedMemories
+    : Array.isArray(ctx?.context?.weighted_memories)
+      ? ctx.context.weighted_memories
+      : [];
+  if (!weightedMemories.length) return null;
+
+  const lines = weightedMemories
+    .slice(0, 4)
+    .map((memory, index) => {
+      const summary = sanitizeText(memory?.content ?? memory?.summary ?? memory?.text ?? "").slice(0, 180);
+      const kind = sanitizeText(memory?.kind || "memory");
+      const weight = numberOrDefault(memory?.weight, 0).toFixed(3);
+      return summary ? `${index + 1}. [${kind}] [weight=${weight}] ${summary}` : "";
+    })
+    .filter(Boolean);
+
+  if (!lines.length) return null;
+  return [
+    "WEIGHTED MEMORY CONTEXT",
+    "These are the strongest non-structured recall candidates for the current turn. Use sparingly and only when they improve the reply.",
+    ...lines,
+  ].join("\n");
 }
 
 function buildAmbientFoundationLayer(ctx) {
@@ -521,6 +576,8 @@ function buildContextBlock(ctx, memoryLayer) {
   const worldLayer = buildWorldLayer(ctx);
   const gameLayer = buildGameLayer(ctx);
   const adaptiveLayer = buildAdaptiveLayer(ctx);
+  const recentConversationLayer = buildRecentConversationLayer(ctx);
+  const weightedMemoryLayer = buildWeightedMemoryLayer(ctx);
   const evolutionLayer = buildEvolutionLayer(ctx);
   const temporalContinuityLayer = buildTemporalContinuityLayer(ctx);
   const spiritCoreUserModelLayer = buildSpiritCoreUserModelLayer(ctx);
@@ -552,8 +609,10 @@ function buildContextBlock(ctx, memoryLayer) {
       "Do not break canon, drift into generic assistant voice, or flatten this Spiritkin into neutral support language."
     ].filter(Boolean).join("\n\n"),
     returningUserBlock,
+    recentConversationLayer,
     spiritMemoryBriefLayer,
     hierarchicalMemoryLayer,
+    weightedMemoryLayer,
     worldLayer,
     gameLayer,
     adaptiveLayer,
