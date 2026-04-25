@@ -6,7 +6,12 @@
   "main": "server.mjs",
   "scripts": {
     "dev": "node --watch server.mjs",
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "check:server": "node --check server.mjs",
+    "check:app": "node --check spiritkins-app/app.js",
+    "check:games": "node --check spiritkins-app/spiritverse-games.js",
+    "diagnostics:endpoints": "node scripts/endpoint-diagnostics.mjs",
+    "test": "npm run check:server && npm run check:app && npm run check:games && npm run diagnostics:endpoints"
   },
   "engines": {
     "node": ">=20"
