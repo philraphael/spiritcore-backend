@@ -9,31 +9,21 @@ function buildVideoUrl(spiritkin, folder, filename) {
   return `${VIDEO_ROOT}/${encodePathPart(spiritkin)}/${encodePathPart(folder)}/${encodePathPart(filename)}`;
 }
 
-function createSpiritkinVideoSet(name) {
+function createSpiritkinVideoSet(name, availableStates = {}) {
   return {
     name,
-    fallbackAvailable: true,
+    fallbackAvailable: false,
     states: {
-      idle: [
-        buildVideoUrl(name, "idle", "idle_01.mp4"),
-      ],
-      speaking: [
-        buildVideoUrl(name, "speaking", "speaking_01.mp4"),
-      ],
+      idle: availableStates.idle ? [buildVideoUrl(name, "idle", "idle_01.mp4")] : [],
+      speaking: availableStates.speaking ? [buildVideoUrl(name, "speaking", "speaking_01.mp4")] : [],
       listening: [],
       attentive: [],
       reflective: [],
       gameFocused: [],
       emotional: {
-        calm: [
-          buildVideoUrl(name, "emotional", "calm_01.mp4"),
-        ],
-        excited: [
-          buildVideoUrl(name, "emotional", "excited_01.mp4"),
-        ],
-        serious: [
-          buildVideoUrl(name, "emotional", "serious_01.mp4"),
-        ],
+        calm: availableStates.calm ? [buildVideoUrl(name, "emotional", "calm_01.mp4")] : [],
+        excited: availableStates.excited ? [buildVideoUrl(name, "emotional", "excited_01.mp4")] : [],
+        serious: availableStates.serious ? [buildVideoUrl(name, "emotional", "serious_01.mp4")] : [],
       },
       special: []
     },
@@ -51,8 +41,10 @@ const SPIRITKIN_VIDEO_MANIFEST = {
   Lyra: createSpiritkinVideoSet("Lyra"),
   Raien: createSpiritkinVideoSet("Raien"),
   Kairo: createSpiritkinVideoSet("Kairo"),
-  Elaria: createSpiritkinVideoSet("Elaria"),
-  Thalassar: createSpiritkinVideoSet("Thalassar"),
+  Solis: createSpiritkinVideoSet("Solis"),
+  Neris: createSpiritkinVideoSet("Neris"),
+  Elaria: createSpiritkinVideoSet("Solis"),
+  Thalassar: createSpiritkinVideoSet("Neris"),
 };
 
 function cloneStateList(entries) {

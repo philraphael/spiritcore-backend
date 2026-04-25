@@ -64,6 +64,7 @@ import { spiritkins as CANON_SPIRITKINS, realms as CANON_REALMS, charter as CANO
 import { resolveGameAssetUrl } from "./data/gameAssetManifest.js";
 import { getGameTheme } from "./data/gameThemes.js";
 import { createPendingCreatorMediaSlots, getSpiritkinMediaConfig, SPIRITKIN_CREATOR_FOUNDATION } from "./data/spiritkinRuntimeConfig.js";
+import { getSpiritkinMediaManifest, resolveSpiritkinMediaPath } from "./data/spiritkinMediaManifest.js";
 import { getSpiritkinVideoCandidates as getManifestSpiritkinVideoCandidates, resolveSpiritkinVideo } from "./data/spiritkinVideoManifest.js";
 
 function createSpiritverseGamesFallback() {
@@ -231,13 +232,17 @@ const AUTHORITATIVE_FOUNDER_MEDIA = {
 function getSpiritkinMediaAuthority(name) {
   const composite = COMPOSITE_VISUAL_ASSETS.spiritkins[String(name || "").trim()] || {};
   const override = AUTHORITATIVE_FOUNDER_MEDIA[String(name || "").trim()] || {};
+  const manifest = getSpiritkinMediaManifest(name);
+  const manifestHero = manifest?.heroImage?.status === "ready" ? manifest.heroImage.path : "";
+  const manifestPortrait = manifest?.portrait?.status === "ready" ? manifest.portrait.path : "";
+  const manifestFallback = manifest?.fallbackImage?.status === "ready" ? manifest.fallbackImage.path : "";
   return {
-    founderCard: override.founderCard || composite.card || "",
-    focus: override.focus || composite.focus || composite.profile || "",
-    profile: override.profile || composite.profile || composite.focus || "",
-    bonded: override.bonded || composite.profile || composite.focus || "",
-    fallbackCard: override.fallbackCard || composite.card || composite.focus || "",
-    portrait: override.portrait || "",
+    founderCard: override.founderCard || composite.card || manifestFallback || manifestHero || "",
+    focus: override.focus || manifestHero || composite.focus || composite.profile || "",
+    profile: override.profile || manifestHero || composite.profile || composite.focus || "",
+    bonded: override.bonded || manifestHero || composite.profile || composite.focus || "",
+    fallbackCard: override.fallbackCard || manifestFallback || composite.card || composite.focus || "",
+    portrait: override.portrait || manifestPortrait || "",
     canonSupplement: override.canonSupplement || composite.card || ""
   };
 }
@@ -710,12 +715,14 @@ function getSpiritkinMediaProfile(spiritkinOrName) {
   const name = spiritkin.name;
   const authority = getSpiritkinMediaAuthority(name);
   const mediaConfig = getSpiritkinMediaConfig(name);
+  const mediaManifest = getSpiritkinMediaManifest(name);
   const creatorFoundation = spiritkin.creatorFoundation && typeof spiritkin.creatorFoundation === "object"
     ? spiritkin.creatorFoundation
     : null;
-  const introTrailer = mediaConfig?.introTrailer?.path || creatorFoundation?.mediaSlots?.introTrailer?.runtimeUrl || "";
-  const idleVideo = resolveSpiritkinVideo(name, "idle") || creatorFoundation?.mediaSlots?.idle?.runtimeUrl || "";
-  const speakingVideo = resolveSpiritkinVideo(name, "speaking") || creatorFoundation?.mediaSlots?.speaking?.runtimeUrl || "";
+  const introTrailer = resolveSpiritkinMediaPath(name, "trailerVideo") || mediaConfig?.introTrailer?.path || creatorFoundation?.mediaSlots?.introTrailer?.runtimeUrl || "";
+  const idleVideo = resolveSpiritkinMediaPath(name, "idleVideo") || resolveSpiritkinVideo(name, "idle") || creatorFoundation?.mediaSlots?.idle?.runtimeUrl || "";
+  const speakingVideo = resolveSpiritkinMediaPath(name, "speakingVideo") || resolveSpiritkinVideo(name, "speaking") || creatorFoundation?.mediaSlots?.speaking?.runtimeUrl || "";
+  const calmVideo = resolveSpiritkinMediaPath(name, "calmVideo") || resolveSpiritkinVideo(name, "calm") || "";
   const portrait = authority.portrait || getSpiritkinPortraitPath(name) || authority.focus || authority.profile || authority.fallbackCard || "";
   const heroImage = authority.focus || authority.profile || portrait || authority.fallbackCard || "";
   const wakeName = getWakeNameForSpiritkin(name);
@@ -732,6 +739,8 @@ function getSpiritkinMediaProfile(spiritkinOrName) {
     trailerVideo: introTrailer,
     idleVideo,
     speakingVideo,
+    calmVideo,
+    fallbackImage: mediaManifest?.fallbackImage?.status === "ready" ? mediaManifest.fallbackImage.path : (authority.fallbackCard || portrait || heroImage),
     storyIntro: displaySpiritkinText(spiritkin.ui?.originStory || getSpiritkinIntroPrompt(spiritkin) || ""),
     rarityTier: isCustom ? "custom" : (isPremium ? "premium" : "founder"),
     isCustom,
@@ -2001,6 +2010,8 @@ function portraitSvg(name) {
 function getSpiritkinPortraitPath(name) {
   const authority = getSpiritkinMediaAuthority(name);
   if (authority.portrait) return authority.portrait;
+  const manifestPortrait = resolveSpiritkinMediaPath(name, "portrait");
+  if (manifestPortrait) return manifestPortrait;
   const portraitMap = {
     "Lyra": "/portraits/lyra_portrait.png",
     "Raien": "/portraits/raien_portrait.png",
@@ -4241,11 +4252,6 @@ function markSelectionTrailerFailure(name, detail = {}) {
   const normalizedName = String(name || "").trim();
   if (!normalizedName || selectionTrailerFailures.has(normalizedName)) return;
   selectionTrailerFailures.add(normalizedName);
-  console.warn("TRAILER_PLAY_FAIL", {
-    spiritkin: normalizedName,
-    fallback: "still",
-    ...detail
-  });
   if (state.pendingBondSpiritkin?.name === normalizedName) {
     render();
   }
@@ -4258,27 +4264,13 @@ function syncSelectionTrailers() {
   const activeRevealSpiritkin = state.selectionOverlaySpiritkin || state.pendingBondSpiritkin || null;
   const revealName = activeRevealSpiritkin?.name || "";
   if (!revealName || selectionTrailerFailures.has(revealName)) return;
-  const mediaConfig = getSpiritkinMediaConfig(revealName);
-  const trailerPath = mediaConfig?.introTrailer?.path || "";
+  const trailerPath = resolveSpiritkinMediaPath(revealName, "trailerVideo") || getSpiritkinMediaConfig(revealName)?.introTrailer?.path || "";
   if (!trailerPath) return;
-
-  console.info("TRAILER_SELECTED", {
-    spiritkin: revealName,
-    src: trailerPath,
-    muted: state.mediaMuted
-  });
 
   const trailers = Array.from(document.querySelectorAll(".spiritkin-intro-video .video-player-element[data-trailer-kind='intro']"));
   trailers.forEach((video) => {
     const owner = video.dataset.trailerOwner || revealName;
     const src = video.currentSrc || video.querySelector("source")?.src || trailerPath;
-    console.info("TRAILER_MOUNTED", {
-      spiritkin: owner,
-      src,
-      muted: video.muted,
-      hidden: video.offsetParent === null
-    });
-
     if (video.dataset.trailerBound !== "1") {
       video.dataset.trailerBound = "1";
       video.addEventListener("error", () => {
@@ -4290,12 +4282,7 @@ function syncSelectionTrailers() {
         });
       });
       video.addEventListener("loadedmetadata", () => {
-        console.info("TRAILER_PLAY_ATTEMPT", {
-          spiritkin: owner,
-          src,
-          phase: "metadata-ready",
-          muted: video.muted
-        });
+        video.dataset.trailerReady = "1";
       });
     }
 
@@ -4308,40 +4295,14 @@ function syncSelectionTrailers() {
       video.defaultMuted = !!forceMuted;
       video.muted = !!forceMuted;
       video.volume = forceMuted ? 0 : 1;
-      console.info("TRAILER_PLAY_ATTEMPT", {
-        spiritkin: owner,
-        src,
-        phase: label,
-        muted: video.muted
-      });
       const playback = video.play?.();
       if (!playback?.then) {
-        console.info("TRAILER_PLAY_SUCCESS", {
-          spiritkin: owner,
-          src,
-          phase: label,
-          muted: video.muted,
-          mode: "sync"
-        });
         return Promise.resolve();
       }
-      return playback.then(() => {
-        console.info("TRAILER_PLAY_SUCCESS", {
-          spiritkin: owner,
-          src,
-          phase: label,
-          muted: video.muted
-        });
-      });
+      return playback.then(() => {});
     };
 
     if (!video.paused && !video.ended && video.readyState >= 2) {
-      console.info("TRAILER_PLAY_SUCCESS", {
-        spiritkin: owner,
-        src,
-        phase: "already-playing",
-        muted: video.muted
-      });
       return;
     }
 
@@ -9171,8 +9132,7 @@ function buildBondSelectionView() {
 }
 
 function buildSpiritkinSelectionOverlay(spiritkin) {
-  const mediaConfig = getSpiritkinMediaConfig(spiritkin?.name);
-  const trailerPath = mediaConfig?.introTrailer?.path || "";
+  const trailerPath = resolveSpiritkinMediaPath(spiritkin?.name, "trailerVideo") || getSpiritkinMediaConfig(spiritkin?.name)?.introTrailer?.path || "";
   const hasTrailer = !!trailerPath && !selectionTrailerFailures.has(String(spiritkin?.name || "").trim());
   const authority = getSpiritkinMediaAuthority(spiritkin?.name);
   const stillSrc = authority.focus || authority.profile || authority.fallbackCard || getSpiritkinPortraitPath(spiritkin?.name);
