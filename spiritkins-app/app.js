@@ -126,6 +126,7 @@ const WAKE_MODE_KEY = "sk_foreground_wake_mode";
 const PRESENCE_ENGINE_KEY = "sv.presence_engine.v1";
 const PRESENCE_IDLE_MIN_MS = 5 * 60 * 1000;
 const PRESENCE_IDLE_MAX_MS = 30 * 60 * 1000;
+const PRESENCE_TAB_NARRATION_KEY = "sv.presence_tab_narration";
 
 const CANON_SPIRITKIN_MAP = Object.fromEntries(CANON_SPIRITKINS.map((spiritkin) => [spiritkin.name, spiritkin]));
 const SPIRITVERSE_ECHOES = {
@@ -1430,11 +1431,11 @@ function getMeta(name) {
 const GREETING_PROMPTS = {
   Lyra: {
     greetings: [
-      "I'm here. Take your time.",
-      "Welcome back. What's on your heart?",
-      "The space is open for you.",
-      "I've been holding this stillness for you.",
-      "Let's find what matters most right now."
+      "Welcome back. I’m here.",
+      "Take your time.",
+      "Good to see you again.",
+      "We can start quietly.",
+      "I’m here when you’re ready."
     ],
     contextual: {
       newSession: "This is our first conversation. I'd like to know: what brought you here today?",
@@ -1452,11 +1453,11 @@ const GREETING_PROMPTS = {
   
   Raien: {
     greetings: [
-      "You showed up. That already matters.",
-      "Let's see what we're working with.",
-      "Ready to face what's next?",
-      "The energy is charged. What do you need?",
-      "Time to cut through the noise."
+      "Good to see you.",
+      "Let’s get into it.",
+      "We can keep this simple.",
+      "I’m here. What do you need?",
+      "Take a second. Then we move."
     ],
     contextual: {
       newSession: "New energy. New possibilities. What's calling you?",
@@ -1474,11 +1475,11 @@ const GREETING_PROMPTS = {
   
   Kairo: {
     greetings: [
-      "The stars aligned. You're here.",
-      "Interesting timing. Let's see what unfolds.",
-      "The patterns are shifting. Pay attention.",
-      "Welcome to the moment.",
-      "What does your intuition say right now?"
+      "Welcome back.",
+      "You’re here. That’s enough to start.",
+      "Let’s take a look together.",
+      "Still with you.",
+      "We can ease into this."
     ],
     contextual: {
       newSession: "A new thread in the tapestry. What does it feel like?",
@@ -1496,11 +1497,11 @@ const GREETING_PROMPTS = {
 
   Elaria: {
     greetings: [
-      "The Crown Gate has opened. Speak clearly.",
-      "The Archive is listening.",
-      "Let us begin with what is true.",
-      "A rightful page is open before us.",
-      "What is ready to be named?"
+      "Welcome back. We can begin.",
+      "I’m here. Speak plainly.",
+      "Let’s start with what matters.",
+      "Take your time. We’ll keep it clear.",
+      "Good to see you again."
     ],
     contextual: {
       newSession: "A new record is opening. What truth belongs here first?",
@@ -1518,11 +1519,11 @@ const GREETING_PROMPTS = {
 
   Thalassar: {
     greetings: [
-      "The tide has returned you here.",
-      "Come closer. There is depth beneath this moment.",
-      "The Chorus is listening below the surface.",
-      "Let us hear what is moving underneath.",
-      "There is no need to rush the deeper current."
+      "Welcome back. No rush.",
+      "I’m here. Take your time.",
+      "We can go gently.",
+      "Still with you.",
+      "Good to see you again."
     ],
     contextual: {
       newSession: "The tide is new tonight. What rises first when you listen inward?",
@@ -1554,24 +1555,73 @@ function getGreetingChoices(spiritkinName) {
 }
 
 const RETURNING_GREETING_STATE_KEY = "sv.returning_greeting_state.v1";
+let _sessionGreetingDelivered = false;
+const _spokenGreetingKeys = new Set();
+
+function shouldSpeakGreetingOnce(key = "") {
+  const normalized = String(key || "").trim();
+  if (!normalized) return false;
+  if (_spokenGreetingKeys.has(normalized)) return false;
+  _spokenGreetingKeys.add(normalized);
+  return true;
+}
+
+function pickLineWithoutImmediateRepeat(lines = [], recent = []) {
+  const filteredLines = Array.isArray(lines) ? lines.filter(Boolean) : [];
+  if (!filteredLines.length) return "";
+  const recentLines = Array.isArray(recent) ? recent.filter(Boolean) : [];
+  const pool = filteredLines.filter((line) => !recentLines.includes(line));
+  return (pool.length ? pool : filteredLines)[Math.floor(Math.random() * (pool.length ? pool.length : filteredLines.length))] || filteredLines[0] || "";
+}
 
 function pickGreetingVariant(spiritkinName, context = "newSession") {
   const greetings = GREETING_PROMPTS[spiritkinName]?.greetings || [];
   const contextualGreeting = getContextualGreeting(spiritkinName, context);
-  if (context !== "returningUser" || greetings.length === 0) {
-    return contextualGreeting || getGreeting(spiritkinName);
-  }
-
   const saved = readJson(RETURNING_GREETING_STATE_KEY, {});
   const spiritState = saved?.[spiritkinName] && typeof saved[spiritkinName] === "object" ? saved[spiritkinName] : {};
-  const recent = Array.isArray(spiritState.recent) ? spiritState.recent.filter((line) => greetings.includes(line)) : [];
-  const pool = greetings.filter((line) => !recent.includes(line));
-  const selected = (pool.length ? pool : greetings)[Math.floor(Math.random() * (pool.length ? pool.length : greetings.length))] || getGreeting(spiritkinName);
-  const nextRecent = [selected, ...recent.filter((line) => line !== selected)].slice(0, 3);
+  const recentByContext = spiritState.recentByContext && typeof spiritState.recentByContext === "object" ? spiritState.recentByContext : {};
+  const contextPools = {
+    newSession: greetings,
+    returningUser: [
+      "Welcome back. I’m here.",
+      "Good to see you again.",
+      "Still with you.",
+      "Take your time.",
+      "We can start when you’re ready."
+    ],
+    bondedReturn: [
+      "Welcome back. I’m here.",
+      "Good to see you again.",
+      "Still with you.",
+      "Take your time.",
+      "We can pick up from here."
+    ],
+    tabChange: [
+      "Still with you.",
+      "I’m here.",
+      "Take your time."
+    ],
+    idlePresence: [
+      "I’m here when you’re ready.",
+      "Take your time.",
+      "Still with you."
+    ]
+  };
+  const activePool = contextPools[context] || greetings;
+  if (!activePool.length) {
+    return contextualGreeting || getGreeting(spiritkinName);
+  }
+  const recent = Array.isArray(recentByContext[context]) ? recentByContext[context].filter((line) => activePool.includes(line)) : [];
+  const selected = pickLineWithoutImmediateRepeat(activePool, recent) || contextualGreeting || getGreeting(spiritkinName);
+  const nextRecent = [selected, ...recent.filter((line) => line !== selected)].slice(0, 2);
   writeJson(RETURNING_GREETING_STATE_KEY, {
     ...saved,
     [spiritkinName]: {
-      recent: nextRecent,
+      ...spiritState,
+      recentByContext: {
+        ...recentByContext,
+        [context]: nextRecent,
+      },
       lastAt: nowIso(),
     },
   });
@@ -4996,6 +5046,7 @@ function buildPresenceTabNarration(tab, spiritkin, currentBond, stageData, depth
 }
 
 async function narratePresenceTab(tab) {
+  if (localStorage.getItem(PRESENCE_TAB_NARRATION_KEY) !== "1") return;
   const spiritkin = state.selectedSpiritkin || state.primarySpiritkin;
   if (!spiritkin || state.voiceMuted || state.gameLoading) return;
   cleanupSpeechLifecycle("presence-tab-narration", { renderOnFinish: false, clearStatus: false });
@@ -5143,10 +5194,12 @@ async function performReadAloud(scope = state.activePresenceTab) {
 async function deliverConversationGreeting(context = "newSession") {
   const spiritkin = state.selectedSpiritkin;
   if (!spiritkin || state.messages.some((message) => message.role === "assistant")) return;
+  if (_sessionGreetingDelivered) return;
   const greetingMessage = pushAssistantMoment(buildGreetingText(spiritkin.name, context), {
     spiritkinName: spiritkin.name,
     spiritkinVoice: spiritkin.ui.voice || "nova"
   });
+  _sessionGreetingDelivered = true;
   render();
   scrollThread({ reveal: true });
   maybeSpeakMessageLater(greetingMessage?.id, { armUserTurn: shouldKeepVoiceLoopActive() });
@@ -5536,7 +5589,7 @@ async function finalizeCrownGateRoute({ skipped = false, source = "unspecified" 
 
   state.spiritverseTrailerActive = false;
   render();
-  if (route === "bonded-home" && state.primarySpiritkin && !state.voiceMuted) {
+  if (route === "bonded-home" && state.primarySpiritkin && !state.voiceMuted && shouldSpeakGreetingOnce(`post-gate:${state.primarySpiritkin.name}`)) {
     cleanupSpeechLifecycle("post-gate-returning-user-greeting", { renderOnFinish: false, clearStatus: false });
     await speakMoment(buildGreetingText(state.primarySpiritkin.name, "returningUser"), state.primarySpiritkin.ui.voice || "nova");
   }
@@ -11024,7 +11077,7 @@ async function onClick(event) {
       triggerBondFeedback("confirmed", bondedSpiritkin.name, `${getSpiritkinDisplayName(bondedSpiritkin)} is now bonded and active across your world.`, { duration: 2600 });
       render();
       revealCurrentFocus({ selector: ".bond-home-copy" });
-      if (!state.voiceMuted) {
+      if (!state.voiceMuted && shouldSpeakGreetingOnce(`bonded:${bondedSpiritkin.name}`)) {
         speakMoment(buildGreetingText(bondedSpiritkin.name, "bondedReturn"), bondedSpiritkin.ui.voice || "nova");
       }
       return;
@@ -11118,7 +11171,7 @@ async function onClick(event) {
       const rebondedSpiritkin = state.rebondSpiritkin;
       state.bondManagerState = "switching";
       beginRebondTransition(rebondedSpiritkin);
-      if (!state.voiceMuted) {
+      if (!state.voiceMuted && shouldSpeakGreetingOnce(`rebonded:${rebondedSpiritkin.name}`)) {
         speakMoment(buildGreetingText(rebondedSpiritkin.name, "bondedReturn"), rebondedSpiritkin.ui.voice || "nova");
       }
       return;
@@ -12077,6 +12130,7 @@ function stopListening(options = {}) {
 let _presenceLifecycleInstalled = false;
 let _presenceCheckInShownThisSession = false;
 let _lastPresenceInteractionRecordedAt = 0;
+let _lastPresenceRenderedMessage = "";
 
 function persistPresenceState() {
   state.presence = normalizePresenceState({
@@ -12084,6 +12138,21 @@ function persistPresenceState() {
     lastEmotion: getLatestPresenceEmotion(),
   });
   writeJson(PRESENCE_ENGINE_KEY, state.presence);
+}
+
+function setPresenceCheckInMessage(message = "", options = {}) {
+  const nextMessage = String(message || "").trim();
+  if ((state.presence?.checkInMessage || "") === nextMessage && !options.force) return false;
+  state.presence.checkInMessage = nextMessage;
+  state.presence.checkInShownAt = nextMessage ? nowIso() : null;
+  persistPresenceState();
+  if (!nextMessage) {
+    _lastPresenceRenderedMessage = "";
+    return true;
+  }
+  if (_lastPresenceRenderedMessage === nextMessage && !options.force) return false;
+  _lastPresenceRenderedMessage = nextMessage;
+  return true;
 }
 
 function markPresenceSeen(reason = "seen") {
@@ -12100,15 +12169,29 @@ function buildPresenceCheckInMessage(awayMs = 0) {
   const lastEmotion = sanitizeTone(state.presence?.lastEmotion || "");
   const returnedAfter = Math.round(awayMs / 60000);
   if (/(overwhelm|overwhelmed|anxious|heavy|strained|tense)/.test(lastEmotion)) {
-    return `You seemed ${lastEmotion} earlier… how are you now?`;
+    return pickLineWithoutImmediateRepeat([
+      `You seemed ${lastEmotion} earlier. How are you now?`,
+      `Earlier felt ${lastEmotion}. How does it feel now?`,
+    ], [_lastPresenceRenderedMessage]);
   }
   if (/(sad|grief|lonely|tired|hurt)/.test(lastEmotion)) {
-    return `You felt ${lastEmotion} earlier… I’m here with you now.`;
+    return pickLineWithoutImmediateRepeat([
+      `You seemed ${lastEmotion} earlier. I’m here.`,
+      `Earlier felt ${lastEmotion}. Take your time.`,
+    ], [_lastPresenceRenderedMessage]);
   }
   if (returnedAfter >= 20) {
-    return "Hey… I was wondering if you’d come back.";
+    return pickLineWithoutImmediateRepeat([
+      "Welcome back. I’m here.",
+      "Good to see you again.",
+      "Still with you.",
+    ], [_lastPresenceRenderedMessage]);
   }
-  return "Hey… welcome back. I’m still here.";
+  return pickLineWithoutImmediateRepeat([
+    "Welcome back. I’m here.",
+    "Good to see you again.",
+    "Take your time.",
+  ], [_lastPresenceRenderedMessage]);
 }
 
 function recordPresenceInteraction(reason = "interaction") {
@@ -12117,8 +12200,8 @@ function recordPresenceInteraction(reason = "interaction") {
   _lastPresenceInteractionRecordedAt = now;
   markPresenceSeen("interaction");
   if (state.presence.checkInMessage) {
-    state.presence.checkInMessage = "";
-    state.presence.checkInShownAt = null;
+    setPresenceCheckInMessage("");
+    return;
   }
   persistPresenceState();
 }
@@ -12135,10 +12218,8 @@ function maybeShowPresenceReturnCheckIn(reason = "return") {
     return false;
   }
   const message = buildPresenceCheckInMessage(awayMs);
-  state.presence.checkInMessage = message;
-  state.presence.checkInShownAt = nowIso();
   _presenceCheckInShownThisSession = true;
-  persistPresenceState();
+  if (!setPresenceCheckInMessage(message)) return false;
   console.info("[Presence] check-in", {
     reason,
     awayMinutes: Math.round(awayMs / 60000),
