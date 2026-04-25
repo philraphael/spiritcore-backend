@@ -1341,6 +1341,17 @@ function normalizeActiveGame(game) {
   return normalized;
 }
 
+function getActiveGameRenderSignature(game = state.activeGame) {
+  if (!game || typeof game !== "object") return "";
+  return [
+    game.id || "no-id",
+    game.type || "unknown",
+    game.status || "unknown",
+    game.turn || "unknown",
+    Number(game.moveCount || 0)
+  ].join(":");
+}
+
 function getOrCreateUid() {
   let id = localStorage.getItem(UID_KEY);
   if (!id) {
@@ -4467,10 +4478,12 @@ function mountActiveGameBoard(runId, attempt = 0) {
   const boardStage = document.querySelector(".presence-tab-content[data-presence-surface='games'] .game-board-container");
   const containerRect = container?.getBoundingClientRect?.() || { width: 0, height: 0 };
   const boardStageRect = boardStage?.getBoundingClientRect?.() || { width: 0, height: 0 };
+  const containerWidth = Math.max(container?.clientWidth || 0, Math.round(containerRect.width || 0));
+  const boardStageWidth = Math.max(boardStage?.clientWidth || 0, Math.round(boardStageRect.width || 0));
   const canMount = !!container && !!boardStage
     && container.offsetParent !== null
     && boardStage.offsetParent !== null
-    && ((container.clientWidth || 0) > 0 || (boardStage.clientWidth || 0) > 0 || (containerRect.width || 0) > 0 || (boardStageRect.width || 0) > 0)
+    && Math.max(containerWidth, boardStageWidth) >= 200
     && ((container.clientHeight || 0) > 0 || (boardStage.clientHeight || 0) > 0 || (containerRect.height || 0) > 0 || (boardStageRect.height || 0) > 0);
   if (!canMount) {
     console.info("[Games] mount-container-missing", {
@@ -4478,14 +4491,14 @@ function mountActiveGameBoard(runId, attempt = 0) {
       attempt,
       hasContainer: !!container,
       hasBoardStage: !!boardStage,
-      containerWidth: container?.clientWidth || 0,
-      boardStageWidth: boardStage?.clientWidth || 0,
+      containerWidth,
+      boardStageWidth,
       containerHeight: container?.clientHeight || 0,
       boardStageHeight: boardStage?.clientHeight || 0,
       tab: state.activePresenceTab,
       gameType: state.activeGame?.type || null
     });
-    if (attempt < 1 && typeof window !== "undefined") {
+    if (attempt < 3 && typeof window !== "undefined") {
       window.setTimeout(() => mountActiveGameBoard(runId, attempt + 1), 120);
     }
     return;
@@ -4500,14 +4513,7 @@ function mountActiveGameBoard(runId, attempt = 0) {
     tab: state.activePresenceTab,
     gameType: state.activeGame?.type || null
   });
-  const gameSignature = [
-    state.activeGame?.id || "no-id",
-    state.activeGame?.type || "unknown",
-    state.activeGame?.status || "unknown",
-    state.activeGame?.turn || "unknown",
-    Number(state.activeGame?.moveCount || 0),
-    Array.isArray(state.activeGame?.history) ? state.activeGame.history.length : 0
-  ].join(":");
+  const gameSignature = getActiveGameRenderSignature(state.activeGame);
   if (_lastRenderedActiveGameSignature === gameSignature && container.firstElementChild) {
     return;
   }
@@ -4554,14 +4560,7 @@ function scheduleActiveGameBoardMount() {
     });
     return;
   }
-  const gameSignature = [
-    state.activeGame?.id || "no-id",
-    state.activeGame?.type || "unknown",
-    state.activeGame?.status || "unknown",
-    state.activeGame?.turn || "unknown",
-    Number(state.activeGame?.moveCount || 0),
-    Array.isArray(state.activeGame?.history) ? state.activeGame.history.length : 0
-  ].join(":");
+  const gameSignature = getActiveGameRenderSignature(state.activeGame);
   const existingContainer = document.getElementById("spiritverse-game-board");
   if (_lastRenderedActiveGameSignature === gameSignature && existingContainer?.firstElementChild) {
     return;
@@ -7710,7 +7709,23 @@ function performRender() {
   try {
     syncWakeModeSessionDefault();
     enforceEntryVoiceSilence();
+    const activeGameSignature = state.activePresenceTab === "games" ? getActiveGameRenderSignature(state.activeGame) : "";
+    const previousBoard = activeGameSignature ? document.getElementById("spiritverse-game-board") : null;
+    const preservedBoardNodes = activeGameSignature
+      && _lastRenderedActiveGameSignature === activeGameSignature
+      && previousBoard?.firstElementChild
+      ? Array.from(previousBoard.childNodes)
+      : null;
     root.innerHTML = buildApp();
+    if (preservedBoardNodes?.length) {
+      const nextBoard = root.querySelector("#spiritverse-game-board");
+      const nextBoardStage = root.querySelector(".presence-tab-content[data-presence-surface='games'] .game-board-container");
+      const stageRect = nextBoardStage?.getBoundingClientRect?.() || { width: 0 };
+      const nextBoardWidth = Math.max(nextBoard?.clientWidth || 0, Math.round(stageRect.width || 0));
+      if (nextBoard && nextBoardWidth >= 200) {
+        nextBoard.replaceChildren(...preservedBoardNodes);
+      }
+    }
     syncMountedMedia({ attemptPlay: false });
     syncSelectionTrailers();
     syncEntryCinematics();

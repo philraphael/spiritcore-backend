@@ -10250,5 +10250,12 @@ button[data-action="begin-quest"]:active,
     width: min(94vw, 520px);
     max-width: 520px;
     min-width: 0;
+    overflow: visible;
+  }
+
+  .chat-layout.games-room-active .presence-tab-content[data-presence-surface="games"] #spiritverse-game-board {
+    width: min(94vw, 520px);
+    max-width: 100%;
+    margin: 0 auto;
   }
 }
