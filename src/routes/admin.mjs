@@ -6,6 +6,7 @@
  * GET /v1/admin/stats                 — global system stats
  */
 import { createDryRunJob, RUNWAY_SUPPORTED_ASSET_KINDS } from "../services/runwayProvider.mjs";
+import { createPromotionPlan } from "../services/generatedAssetPipeline.mjs";
 
 export async function adminRoutes(fastify, opts) {
   const { supabase, messageService, registry, issueReportService, spiritkinGeneratorService } = opts;
@@ -216,6 +217,69 @@ export async function adminRoutes(fastify, opts) {
     preHandler: requireAdminAccess,
     schema: runwayDryRunSchema,
   }, handleRunwayDryRun);
+
+  async function handleGeneratedAssetPromotionPlan(req, reply) {
+    try {
+      const promotionPlan = createPromotionPlan({
+        ...req.body,
+        requestedBy: req.adminAccess?.source || "admin_promotion_plan",
+      });
+      return {
+        ok: true,
+        route: req.routeOptions?.url || req.url,
+        operatorApprovalRequired: true,
+        noFileWrites: true,
+        noManifestUpdates: true,
+        promotionPlan,
+      };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({
+        ok: false,
+        error: err.code ?? "GENERATED_ASSET_PROMOTION_PLAN_ERROR",
+        message: err.message,
+        details: err.detail || {},
+      });
+    }
+  }
+
+  const generatedAssetPromotionPlanSchema = {
+    body: {
+      type: "object",
+      required: ["sourcePath", "assetKind"],
+      properties: {
+        id: { type: "string", nullable: true },
+        assetId: { type: "string", nullable: true },
+        provider: { type: "string", nullable: true },
+        providerJobId: { type: "string", nullable: true },
+        lifecycleState: { type: "string", nullable: true },
+        sourcePath: { type: "string", minLength: 1 },
+        artifactPath: { type: "string", nullable: true },
+        sourceKind: { type: "string", nullable: true },
+        artifactFileName: { type: "string", nullable: true },
+        metadataFileName: { type: "string", nullable: true },
+        assetKind: { type: "string", minLength: 1 },
+        spiritkinId: { type: "string", nullable: true },
+        spiritkinName: { type: "string", nullable: true },
+        targetId: { type: "string", nullable: true },
+        realmId: { type: "string", nullable: true },
+        gameType: { type: "string", nullable: true },
+        themeId: { type: "string", nullable: true },
+        versionTag: { type: "string", nullable: true },
+        reviewNotes: { type: "string", nullable: true },
+      },
+    },
+  };
+
+  fastify.post("/admin/generated-assets/promotion-plan", {
+    preHandler: requireAdminAccess,
+    schema: generatedAssetPromotionPlanSchema,
+  }, handleGeneratedAssetPromotionPlan);
+
+  fastify.post("/v1/admin/generated-assets/promotion-plan", {
+    preHandler: requireAdminAccess,
+    schema: generatedAssetPromotionPlanSchema,
+  }, handleGeneratedAssetPromotionPlan);
 
   fastify.post("/v1/admin/generator/image", {
     preHandler: requireAdminAccess,

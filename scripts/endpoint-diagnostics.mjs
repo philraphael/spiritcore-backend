@@ -236,6 +236,37 @@ async function main() {
       },
       describe: (result) => result?.body?.job?.externalApiCall === false ? "no-cost dry run returned" : "unexpected external call flag",
     });
+    await run("generated-asset-promotion-plan-unauth", "POST", "/admin/generated-assets/promotion-plan", {
+      body: {
+        sourcePath: "Spiritverse_MASTER_ASSETS/INCOMING/generated/lyra/trailer/artifact.mp4",
+        spiritkinId: "Lyra",
+        assetKind: "trailer",
+        versionTag: "diag-trailer",
+      },
+      allowStatuses: [403],
+      describe: () => "admin promotion plan blocked without admin key",
+    });
+    await run("generated-asset-promotion-plan-malformed", "POST", "/admin/generated-assets/promotion-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        sourcePath: "Spiritverse_MASTER_ASSETS/INCOMING/generated/lyra/trailer/artifact.txt",
+        spiritkinId: "Lyra",
+        assetKind: "trailer",
+      },
+      allowStatuses: [422],
+      describe: () => "authenticated malformed promotion plan rejected",
+    });
+    await run("generated-asset-promotion-plan-valid", "POST", "/admin/generated-assets/promotion-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        sourcePath: "Spiritverse_MASTER_ASSETS/INCOMING/generated/lyra/trailer/artifact.mp4",
+        spiritkinId: "Lyra",
+        assetKind: "trailer",
+        providerJobId: "diag-runway-task",
+        versionTag: "diag-trailer",
+      },
+      describe: (result) => result?.body?.promotionPlan?.operatorApprovalRequired === true ? "operator approval required" : "unexpected approval flag",
+    });
 
     const conversation = await run("conversation-bootstrap", "POST", "/v1/conversations", {
       body: {
