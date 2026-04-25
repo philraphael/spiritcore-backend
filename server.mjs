@@ -73,6 +73,37 @@ const app = Fastify({
 
 app.decorate("requireAdminAccess", createAdminAccessGuard({ config, logger: app.log }));
 
+async function legacyRouteGate(req, reply) {
+  const routePath = req.routeOptions?.url || req.url || "unknown";
+  const enabled = config.env !== "production" || config.legacyRoutes.enabled;
+  if (!enabled) {
+    app.log.warn({
+      route: routePath,
+      env: config.env,
+      enableLegacyRoutes: false,
+    }, "[SpiritCore] Blocked legacy route. Set ENABLE_LEGACY_ROUTES=true only for explicit compatibility windows.");
+    return reply.code(410).send({
+      ok: false,
+      error: {
+        code: "LEGACY_ROUTE_DISABLED",
+        message: "This legacy compatibility route is disabled in production. Use the v1 SpiritCore authority routes.",
+        details: {
+          route: routePath,
+          envVar: "ENABLE_LEGACY_ROUTES",
+        },
+      },
+      request_id: req.request_id,
+      time: nowIso(),
+    });
+  }
+
+  app.log.warn({
+    route: routePath,
+    env: config.env,
+    enableLegacyRoutes: config.legacyRoutes.enabled,
+  }, "[SpiritCore] Legacy route used; compatibility path bypasses the main v1 authority surface.");
+}
+
 await app.register(cors, { origin: config.corsOrigin });
 
 // Rate limiter registered via Phase F module (replaces inline registration)
@@ -459,7 +490,7 @@ app.get("/world-art/:filename", async (req, reply) => {
 
 /* ------------------------ Runtime endpoints ------------------------ */
 
-app.post("/runtime/interaction/:userId", async (req, reply) => {
+app.post("/runtime/interaction/:userId", { preHandler: legacyRouteGate }, async (req, reply) => {
   try {
     const urlUserId = req.params.userId;
 
@@ -517,7 +548,7 @@ app.post("/runtime/interaction/:userId", async (req, reply) => {
   }
 });
 
-app.post("/runtime/spirit/:userId", async (req, reply) => {
+app.post("/runtime/spirit/:userId", { preHandler: legacyRouteGate }, async (req, reply) => {
   try {
     const userId = req.params.userId;
     const profile = req.body?.profile || { voiceTone: "Lyra", traits: ["warm"] }; // LEGACY SHIM — v0 compat only
@@ -529,7 +560,7 @@ app.post("/runtime/spirit/:userId", async (req, reply) => {
   }
 });
 
-app.post("/runtime/conversation/bootstrap", async (req, reply) => {
+app.post("/runtime/conversation/bootstrap", { preHandler: legacyRouteGate }, async (req, reply) => {
   try {
     // BootstrapEngine exists in your runtime folder but your server used runtime.resolveContextByConversation,
     // so this endpoint is currently a lightweight passthrough that can be expanded later.
@@ -543,7 +574,7 @@ app.post("/runtime/conversation/bootstrap", async (req, reply) => {
   }
 });
 
-app.get("/runtime/context/:conversation_id", async (req, reply) => {
+app.get("/runtime/context/:conversation_id", { preHandler: legacyRouteGate }, async (req, reply) => {
   try {
     const conversation_id = req.params.conversation_id;
     const ctx = await runtime.resolveContextByConversation(conversation_id);
@@ -553,7 +584,7 @@ app.get("/runtime/context/:conversation_id", async (req, reply) => {
   }
 });
 
-app.get("/runtime/episodes/:conversation_id", async (req, reply) => {
+app.get("/runtime/episodes/:conversation_id", { preHandler: legacyRouteGate }, async (req, reply) => {
   try {
     const conversation_id = req.params.conversation_id;
     // EpisodeEngine is inside runtime; simplest: query the same table EpisodeEngine uses.
@@ -573,7 +604,7 @@ app.get("/runtime/episodes/:conversation_id", async (req, reply) => {
 
 /* ------------------------ v0 endpoints (legacy API) ------------------------ */
 
-app.post("/v0/message", async (req, reply) => {
+app.post("/v0/message", { preHandler: legacyRouteGate }, async (req, reply) => {
   try {
     const missing = requireFields(req.body, ["conversation_id", "content"]);
     if (missing) return sendError(reply, 400, "BAD_REQUEST", `Missing fields: ${missing.join(", ")}`, {}, req.request_id);
@@ -600,7 +631,7 @@ app.post("/v0/message", async (req, reply) => {
   }
 });
 
-app.get("/v0/health", async (req, reply) => {
+app.get("/v0/health", { preHandler: legacyRouteGate }, async (req, reply) => {
   try {
     // Simple DB ping
     const { error } = await supabase.from("conversations").select("id").limit(1);
@@ -615,7 +646,7 @@ app.get("/v0/health", async (req, reply) => {
   }
 });
 
-app.post("/v0/conversations", async (req, reply) => {
+app.post("/v0/conversations", { preHandler: legacyRouteGate }, async (req, reply) => {
   try {
     const { data, error } = await supabase
       .from("conversations")
@@ -631,7 +662,7 @@ app.post("/v0/conversations", async (req, reply) => {
   }
 });
 
-app.get("/v0/world_state/:conversation_id", async (req, reply) => {
+app.get("/v0/world_state/:conversation_id", { preHandler: legacyRouteGate }, async (req, reply) => {
   try {
     const conversation_id = req.params.conversation_id;
 
@@ -649,7 +680,7 @@ app.get("/v0/world_state/:conversation_id", async (req, reply) => {
   }
 });
 
-app.post("/v0/world_state/:conversation_id", async (req, reply) => {
+app.post("/v0/world_state/:conversation_id", { preHandler: legacyRouteGate }, async (req, reply) => {
   try {
     const conversation_id = req.params.conversation_id;
     const state_json = req.body?.state_json ?? {};
@@ -668,7 +699,7 @@ app.post("/v0/world_state/:conversation_id", async (req, reply) => {
   }
 });
 
-app.get("/v0/memory/list/:conversation_id", async (req, reply) => {
+app.get("/v0/memory/list/:conversation_id", { preHandler: legacyRouteGate }, async (req, reply) => {
   try {
     const conversation_id = req.params.conversation_id;
     const limit = safeLimit(req.query?.limit, 1, 50, 10);
@@ -688,7 +719,7 @@ app.get("/v0/memory/list/:conversation_id", async (req, reply) => {
   }
 });
 
-app.post("/v0/memory/pin", async (req, reply) => {
+app.post("/v0/memory/pin", { preHandler: legacyRouteGate }, async (req, reply) => {
   try {
     const missing = requireFields(req.body, ["memory_id"]);
     if (missing) return sendError(reply, 400, "BAD_REQUEST", `Missing fields: ${missing.join(", ")}`, {}, req.request_id);

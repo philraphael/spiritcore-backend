@@ -5,6 +5,8 @@ const PORT = Number(process.env.SPIRITCORE_DIAG_PORT || 3115);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const STARTUP_TIMEOUT_MS = 45000;
 const REQUEST_TIMEOUT_MS = 15000;
+const LEGACY_ROUTES_DISABLED_IN_PRODUCTION = process.env.NODE_ENV === "production"
+  && !["1", "true", "yes", "on"].includes(String(process.env.ENABLE_LEGACY_ROUTES || "").trim().toLowerCase());
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -122,11 +124,12 @@ async function main() {
 
     try {
       const result = await request(method, path, options);
+      const allowedStatus = Array.isArray(options.allowStatuses) && options.allowStatuses.includes(result.status);
       const entry = {
         name,
         method,
         path,
-        pass: result.ok,
+        pass: result.ok || allowedStatus,
         status: result.status,
         skipped: false,
         summary: summarizeJson(result.body),
@@ -163,7 +166,10 @@ async function main() {
 
     await run("health", "GET", "/health");
     await run("ready", "GET", "/ready");
-    await run("legacy-health", "GET", "/v0/health");
+    await run("legacy-health", "GET", "/v0/health", LEGACY_ROUTES_DISABLED_IN_PRODUCTION ? {
+      allowStatuses: [410],
+      describe: () => "legacy route gated in production",
+    } : {});
 
     await run("app-shell", "GET", "/app");
     await run("app-js", "GET", "/app/app.js");
@@ -220,9 +226,19 @@ async function main() {
     await run("bond-journal", "GET", `/v1/bond-journal?userId=${encodeURIComponent(userId)}&conversationId=${encodeURIComponent(conversationId || "")}`);
     await run("runtime-bootstrap", "POST", "/runtime/conversation/bootstrap", {
       body: { conversation_id: conversationId },
+      ...(LEGACY_ROUTES_DISABLED_IN_PRODUCTION ? {
+        allowStatuses: [410],
+        describe: () => "legacy route gated in production",
+      } : {}),
     });
-    await run("runtime-context", "GET", `/runtime/context/${encodeURIComponent(conversationId || "")}`);
-    await run("runtime-episodes", "GET", `/runtime/episodes/${encodeURIComponent(conversationId || "")}`);
+    await run("runtime-context", "GET", `/runtime/context/${encodeURIComponent(conversationId || "")}`, LEGACY_ROUTES_DISABLED_IN_PRODUCTION ? {
+      allowStatuses: [410],
+      describe: () => "legacy route gated in production",
+    } : {});
+    await run("runtime-episodes", "GET", `/runtime/episodes/${encodeURIComponent(conversationId || "")}`, LEGACY_ROUTES_DISABLED_IN_PRODUCTION ? {
+      allowStatuses: [410],
+      describe: () => "legacy route gated in production",
+    } : {});
     await run("games-state", "GET", `/v1/games/state/${encodeURIComponent(conversationId || "")}?userId=${encodeURIComponent(userId)}`);
 
     await run("interact", "POST", "/v1/interact", {

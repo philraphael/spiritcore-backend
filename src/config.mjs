@@ -40,6 +40,9 @@ export const config = {
   port: Number(process.env.PORT || 3005),
   debug: parseBooleanEnv(process.env.DEBUG, false),
   useLLM: parseBooleanEnv(process.env.USE_LLM, false),
+  legacyRoutes: {
+    enabled: parseBooleanEnv(process.env.ENABLE_LEGACY_ROUTES, false),
+  },
 
   supabase: {
     url: process.env.SUPABASE_URL || "",
