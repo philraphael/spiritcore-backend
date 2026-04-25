@@ -11,7 +11,8 @@
     "check:app": "node --check spiritkins-app/app.js",
     "check:games": "node --check spiritkins-app/spiritverse-games.js",
     "diagnostics:endpoints": "node scripts/endpoint-diagnostics.mjs",
-    "test": "npm run check:server && npm run check:app && npm run check:games && npm run diagnostics:endpoints"
+    "diagnostics:schema": "node scripts/schema-verify.mjs",
+    "test": "npm run check:server && npm run check:app && npm run check:games && npm run diagnostics:endpoints && npm run diagnostics:schema"
   },
   "engines": {
     "node": ">=20"
