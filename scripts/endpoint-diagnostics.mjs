@@ -254,6 +254,18 @@ async function main() {
         }) === true,
         detail: "valid staging request can use transient credential path",
       },
+      {
+        name: "runway-transient-alternate-header-allowed",
+        pass: canUseRunwayTransientStagingCredentials(validStagingBypassBody, {
+          "x-spiritcore-runway-token": "mock-runway-key",
+          "x-runway-transient-execute": "false",
+          "x-runway-transient-provider-execution": "false",
+        }, {
+          NODE_ENV: "staging",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === true,
+        detail: "alternate transient key header accepted in staging",
+      },
     ].map((check) => ({
       ...check,
       method: "INTERNAL",
@@ -369,6 +381,26 @@ async function main() {
         && result?.body?.job?.executionGates?.missingGates?.includes("RUNWAY_DRY_RUN_EXECUTE=true is required")
         ? "mock transient key reached execution gate without provider call"
         : "unexpected transient credential result",
+    });
+    await run("runway-execution-spike-transient-alt-header-no-exec", "POST", "/admin/runway/execution-spike", {
+      headers: {
+        "x-spiritcore-runway-token": "mock-runway-key",
+        "x-runway-transient-execute": "false",
+        "x-runway-transient-provider-execution": "false",
+      },
+      body: {
+        targetId: "test-realm",
+        assetKind: "portrait",
+        promptIntent: "Diagnostic alternate transient credential header request shaping only.",
+        styleProfile: "spiritverse_internal_test",
+        safetyLevel: "internal_review",
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.transientKeyProvided === true
+        && result?.body?.transientKeyHeaderSource === "x-spiritcore-runway-token"
+        && result?.body?.job?.executionGates?.missingGates?.includes("RUNWAY_DRY_RUN_EXECUTE=true is required")
+        ? "alternate transient key header reached execution gate without provider call"
+        : "unexpected alternate transient credential result",
     });
     await run("runway-execution-spike-staging-bypass-malformed", "POST", "/admin/runway/execution-spike", {
       body: {

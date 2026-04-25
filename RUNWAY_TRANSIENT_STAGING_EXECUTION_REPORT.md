@@ -14,8 +14,12 @@ The path is limited to:
 The route recognizes these headers only for a qualifying staging test request:
 
 - `x-runway-transient-key`
+- `x-spiritcore-runway-token`
+- `x-spiritcore-transient-key`
 - `x-runway-transient-execute`
 - `x-runway-transient-provider-execution`
+
+The key is read from the first non-empty value in that order.
 
 The transient key is not logged, stored, persisted, written to files, or copied into global process state. It is used only to build the per-request Runway provider config and env context passed to `createExecutionSpikeJob`.
 
@@ -28,7 +32,7 @@ The transient path is honored only when all of the following are true:
 - `targetId` starts with `test-`
 - `assetKind` is `realm_background` or `portrait`
 - `safetyLevel` is `internal_review`
-- `x-runway-transient-key` is present
+- one allowed transient key header is present
 
 Real provider execution still requires:
 
@@ -45,6 +49,7 @@ The route logs only:
 
 - `stagingBypassUsed`
 - `transientKeyProvided`
+- `transientKeyHeaderSource`
 - `transientExecuteRequested`
 - `transientProviderExecutionRequested`
 - `targetId`
@@ -71,6 +76,7 @@ Endpoint diagnostics verify:
 
 - production cannot use the transient header path
 - malformed requests cannot use the transient header path
+- the alternate transient key header is accepted in the staging mock path
 - staging valid requests without transient credentials remain dry-run
 - staging valid requests with a mock transient key reach the execution gate without calling the provider
 
