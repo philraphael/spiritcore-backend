@@ -72,7 +72,7 @@ async function request(method, path, { body, headers = {} } = {}) {
 
 function isSkippableSpeechResponse(result) {
   const message = result?.body?.error?.message || result?.body?.message || "";
-  return result?.status === 500 && /tts not available|api key not configured|adapter/i.test(String(message));
+  return [500, 502, 503].includes(result?.status) && /speech synthesis|tts not available|api key not configured|adapter/i.test(String(message));
 }
 
 function printResult(entry) {
@@ -256,6 +256,21 @@ async function main() {
       describe: (result) => previewText(result?.body?.message || result?.body?.error?.message),
     });
 
+    await run("speech-invalid-payload", "POST", "/v1/speech", {
+      body: { text: "", voice: "alloy" },
+      allowStatuses: [400],
+      describe: () => "expected 400 invalid empty text",
+    });
+    await run("speech-invalid-voice", "POST", "/v1/speech", {
+      body: { text: "Invalid voice diagnostic.", voice: "not-a-voice" },
+      allowStatuses: [400],
+      describe: () => "expected 400 invalid voice",
+    });
+    await run("speech-too-long", "POST", "/v1/speech", {
+      body: { text: "x".repeat(1201), voice: "alloy" },
+      allowStatuses: [400],
+      describe: () => "expected 400 text too long",
+    });
     const speech = await run("speech", "POST", "/v1/speech", {
       body: { text: "Diagnostic speech synthesis check.", voice: "alloy" },
       describe: (result) => result?.ok ? "audio/mpeg returned" : previewText(result?.body?.error?.message || result?.body?.message),

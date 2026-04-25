@@ -33,7 +33,7 @@ import { createPendingCreatorMediaSlots, listRuntimeVideoFiles, SPIRITKIN_CREATO
 // ── Phase F: Production hardening ───────────────────────────────────────────
 import { validateConfig, config } from "./src/config.mjs";
 import { getPinoOptions, setAppLogger } from "./src/logger.mjs";
-import { registerRateLimiter }    from "./src/middleware/rateLimiter.mjs";
+import { registerRateLimiter, speechRateLimitConfig } from "./src/middleware/rateLimiter.mjs";
 import { createAdminAccessGuard, extractAdminToken } from "./src/middleware/adminAccess.mjs";
 import { gameRoutes }             from "./src/routes/games.mjs";
 import { veilCrossingRoutes }     from "./src/routes/veilCrossing.mjs";
@@ -63,6 +63,21 @@ const SPIRITVERSE_APP_BUILD = "20260424214500";
 const PORT = config.port;
 const USE_LLM = config.useLLM;
 const DEBUG = config.debug;
+const SPEECH_MAX_TEXT_LENGTH = 1200;
+const ALLOWED_SPEECH_VOICES = new Set([
+  "alloy",
+  "ash",
+  "ballad",
+  "coral",
+  "echo",
+  "fable",
+  "nova",
+  "onyx",
+  "sage",
+  "shimmer",
+]);
+const ALLOWED_SPEECH_FORMATS = new Set(["mp3"]);
+const ALLOWED_SPEECH_MODELS = new Set(["tts-1"]);
 
 // Fastify app with structured Pino logger
 const app = Fastify({
@@ -130,6 +145,58 @@ function safeLimit(n, min, max, fallback) {
   const x = Number(n);
   if (!Number.isFinite(x)) return fallback;
   return Math.max(min, Math.min(max, x));
+}
+
+function normalizeSpeechRequest(body = {}) {
+  const errors = [];
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(body || {}, key);
+
+  if (typeof body?.text !== "string") {
+    errors.push("text must be a string");
+  }
+  const text = typeof body?.text === "string" ? body.text.trim() : "";
+  if (typeof body?.text === "string" && !text) {
+    errors.push("text must not be empty");
+  }
+  if (text.length > SPEECH_MAX_TEXT_LENGTH) {
+    errors.push(`text must be ${SPEECH_MAX_TEXT_LENGTH} characters or fewer`);
+  }
+
+  const voice = typeof body?.voice === "string" ? body.voice.trim().toLowerCase() : "";
+  if (!voice) {
+    errors.push("voice is required");
+  } else if (!ALLOWED_SPEECH_VOICES.has(voice)) {
+    errors.push("voice is not supported");
+  }
+
+  let format = "mp3";
+  if (hasOwn("format")) {
+    if (typeof body.format !== "string") {
+      errors.push("format must be a string");
+    } else {
+      format = body.format.trim().toLowerCase();
+      if (!ALLOWED_SPEECH_FORMATS.has(format)) errors.push("format is not supported");
+    }
+  }
+
+  let model = "tts-1";
+  if (hasOwn("model")) {
+    if (typeof body.model !== "string") {
+      errors.push("model must be a string");
+    } else {
+      model = body.model.trim();
+      if (!ALLOWED_SPEECH_MODELS.has(model)) errors.push("model is not supported");
+    }
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    text,
+    voice,
+    format,
+    model,
+  };
 }
 
 function getStaticAssetMimeType(filePath) {
@@ -836,20 +903,34 @@ await app.register(async (instance) => {
 
 // TTS endpoint
 // OpenAI speech synthesis for Spiritkins voices
-app.post("/v1/speech", async (req, reply) => {
+app.post("/v1/speech", { config: speechRateLimitConfig() }, async (req, reply) => {
   try {
-    const { text, voice } = req.body;
-    if (!text || !voice) {
-      return sendError(reply, 400, "BAD_REQUEST", "Missing text or voice for speech generation.", {}, req.request_id);
+    const speech = normalizeSpeechRequest(req.body || {});
+    if (!speech.ok) {
+      return sendError(reply, 400, "BAD_REQUEST", "Invalid speech request.", {
+        fields: speech.errors,
+        maxTextLength: SPEECH_MAX_TEXT_LENGTH,
+        allowedVoices: [...ALLOWED_SPEECH_VOICES],
+        allowedFormats: [...ALLOWED_SPEECH_FORMATS],
+        allowedModels: [...ALLOWED_SPEECH_MODELS],
+      }, req.request_id);
     }
     const activeAdapter = container.adapters.getActive();
     if (!activeAdapter || activeAdapter.name !== "openai" || !activeAdapter.generateSpeech) {
-      return sendError(reply, 500, "INTERNAL", "TTS not available for current adapter.", {}, req.request_id);
+      return sendError(reply, 503, "SPEECH_UNAVAILABLE", "Speech synthesis is not available for the current adapter. Use text-only fallback.", {}, req.request_id);
     }
-    const audioBuffer = await activeAdapter.generateSpeech(text, voice);
+    if (!config.openai.apiKey) {
+      return sendError(reply, 503, "SPEECH_UNAVAILABLE", "Speech synthesis provider is not configured. Use text-only fallback.", {}, req.request_id);
+    }
+    const audioBuffer = await activeAdapter.generateSpeech(speech.text, speech.voice);
     return reply.type("audio/mpeg").send(Buffer.from(audioBuffer));
   } catch (e) {
-    return sendError(reply, 500, "INTERNAL", String(e?.message ?? e), {}, req.request_id);
+    req.log.warn({
+      errorCode: e?.code || null,
+      statusCode: e?.httpCode || null,
+      message: e?.message || String(e),
+    }, "[SpeechRoute] provider failure");
+    return sendError(reply, 502, "SPEECH_PROVIDER_ERROR", "Speech synthesis failed. Use text-only fallback.", {}, req.request_id);
   }
 });
 

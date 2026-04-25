@@ -94,3 +94,32 @@ export function adapterRateLimitConfig() {
     },
   };
 }
+
+export function speechRateLimitConfig() {
+  return {
+    rateLimit: {
+      hook: "preHandler",
+      max: Math.max(1, Math.min(config.rateLimit.adapterMax, 20)),
+      timeWindow: config.rateLimit.timeWindowMs,
+      errorResponseBuilder(req, context) {
+        return {
+          statusCode: 429,
+          ok: false,
+          error: {
+            code: "RATE_LIMIT",
+            message: `Speech synthesis limit reached. Limit: ${context.max} per ${context.after}. Please pause briefly and try again.`,
+            retryAfter: context.ttl,
+          },
+        };
+      },
+      onExceeded(req, key) {
+        req.log.warn({
+          route: req.routeOptions?.url ?? req.url,
+          method: req.method,
+          rate_limit_key: key,
+          user_id: req.body?.userId ?? req.headers["x-user-id"] ?? null,
+        }, "[rate-limit] speech throttled");
+      },
+    },
+  };
+}
