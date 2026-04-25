@@ -123,6 +123,9 @@ let _lastGamesBoardRenderLogKey = "";
 let _lastRenderedActiveGameSignature = "";
 const VOICE_GUIDANCE_KEY = "sk_voice_guidance_dismissed";
 const WAKE_MODE_KEY = "sk_foreground_wake_mode";
+const PRESENCE_ENGINE_KEY = "sv.presence_engine.v1";
+const PRESENCE_IDLE_MIN_MS = 5 * 60 * 1000;
+const PRESENCE_IDLE_MAX_MS = 30 * 60 * 1000;
 
 const CANON_SPIRITKIN_MAP = Object.fromEntries(CANON_SPIRITKINS.map((spiritkin) => [spiritkin.name, spiritkin]));
 const SPIRITVERSE_ECHOES = {
@@ -858,6 +861,18 @@ function readJson(key, fallback) {
 
 function writeJson(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
+function normalizePresenceState(raw = null) {
+  return {
+    lastSeenAt: normalizeTimestamp(raw?.lastSeenAt, nowIso()),
+    lastInteractionAt: normalizeTimestamp(raw?.lastInteractionAt, nowIso()),
+    lastEmotion: sanitizeTone(raw?.lastEmotion || ""),
+    idleDuration: clampInt(raw?.idleDuration, 0),
+    engagementScore: clampInt(raw?.engagementScore, 0),
+    checkInMessage: typeof raw?.checkInMessage === "string" ? raw.checkInMessage : "",
+    checkInShownAt: normalizeTimestamp(raw?.checkInShownAt, null),
+  };
 }
 
 function normalizeRetentionTelemetry(raw = null) {
@@ -3015,6 +3030,16 @@ function getStageSignals() {
   return { emotionTone: "", sceneName: "" };
 }
 
+function getLatestPresenceEmotion() {
+  for (let index = state.messages.length - 1; index >= 0; index -= 1) {
+    const message = state.messages[index];
+    if (message?.role !== "assistant") continue;
+    const tone = sanitizeTone(message.emotionTone || "");
+    if (tone) return tone;
+  }
+  return sanitizeTone(state.presence?.lastEmotion || "");
+}
+
 const state = {
   userId: getOrCreateUid(),
   sessionModel: createDefaultSessionModel(),
@@ -3071,6 +3096,7 @@ const state = {
   wakePaused: (normalizeVoiceModeValue(localStorage.getItem("sk_voice_mode")) === "wake" || localStorage.getItem(WAKE_MODE_KEY) === "1"),
   wakePauseReason: "",
   wakeModeStatus: "",
+  presence: normalizePresenceState(readJson(PRESENCE_ENGINE_KEY, null)),
   settingsOpen: false,
   installPromptAvailable: false,
   pwaInstalled: false,
@@ -5146,6 +5172,11 @@ function persistSession() {
     preserveVisibility: true
   });
   writeRetentionState();
+  state.presence = normalizePresenceState({
+    ...state.presence,
+    lastEmotion: getLatestPresenceEmotion(),
+  });
+  writeJson(PRESENCE_ENGINE_KEY, state.presence);
   logContinuityDebug("session-persisted", {
     persistedConversationId: state.conversationId || null,
     persistedSelectedSpiritkin: state.selectedSpiritkin?.name || null,
@@ -8560,6 +8591,7 @@ function buildTopbar() {
       <div class="topbar-right">
         ${!state.showReturnSummary && (state.returnSummary || state.dailyMoment || state.weeklyMoment || state.retentionUnlocks.length) ? `<button class="btn btn-ghost btn-sm" data-action="reopen-return-summary">While away</button>` : ""}
         ${active ? `<div class="presence-chip ${esc(active.ui.cls)} ${bondedFeedbackClass}">Bonded: ${esc(getSpiritkinDisplayName(active))}</div>` : `<div class="presence-chip">Choose a companion</div>`}
+        ${active ? `<div class="wake-status-chip standby" title="${esc(state.presence?.checkInMessage || "Spiritkin presence is steady in this session.")}">${esc(getPresenceStatusLabel())}</div>` : ""}
         ${wakeStatus && active ? `<div class="wake-status-chip ${esc(wakeStatus.cls)}" title="${esc(wakeStatus.detail)}">Wake ${esc(wakeStatus.label)}</div>` : ""}
         ${state.entryAccepted && state.primarySpiritkin ? `<button class="btn btn-ghost btn-sm" data-action="open-bond-manager">Manage bond</button>` : ""}
         ${state.entryAccepted ? `<button class="btn btn-ghost btn-sm" data-action="open-settings">Settings</button>` : ""}
@@ -10308,7 +10340,7 @@ function buildChatView() {
           <button class="composer-send" data-action="send" ${state.loadingReply || !state.conversationId ? "disabled" : ""} title="Send message">Send</button>
         </div>
 
-        ${state.statusText ? `<div class="status-bar ${state.statusError ? "error" : ""} ${state.bondFeedbackKind ? `bond-feedback-${esc(state.bondFeedbackKind)}` : ""}">${esc(state.statusText)}</div>` : ""}
+        ${(state.statusText || state.presence?.checkInMessage) ? `<div class="status-bar ${state.statusError ? "error" : ""} ${state.bondFeedbackKind ? `bond-feedback-${esc(state.bondFeedbackKind)}` : ""}">${esc(state.statusText || state.presence.checkInMessage)}</div>` : ""}
       </aside>
       ` : ""}
       </div>
@@ -12042,6 +12074,114 @@ function stopListening(options = {}) {
   cleanupSpeechLifecycle("stop-listening", { renderOnFinish: true, clearStatus: true });
 }
 
+let _presenceLifecycleInstalled = false;
+let _presenceCheckInShownThisSession = false;
+let _lastPresenceInteractionRecordedAt = 0;
+
+function persistPresenceState() {
+  state.presence = normalizePresenceState({
+    ...state.presence,
+    lastEmotion: getLatestPresenceEmotion(),
+  });
+  writeJson(PRESENCE_ENGINE_KEY, state.presence);
+}
+
+function markPresenceSeen(reason = "seen") {
+  const timestamp = nowIso();
+  state.presence.lastSeenAt = timestamp;
+  state.presence.idleDuration = 0;
+  if (reason === "interaction") {
+    state.presence.lastInteractionAt = timestamp;
+    state.presence.engagementScore = clampInt((state.presence.engagementScore || 0) + 1, 0, 999);
+  }
+}
+
+function buildPresenceCheckInMessage(awayMs = 0) {
+  const lastEmotion = sanitizeTone(state.presence?.lastEmotion || "");
+  const returnedAfter = Math.round(awayMs / 60000);
+  if (/(overwhelm|overwhelmed|anxious|heavy|strained|tense)/.test(lastEmotion)) {
+    return `You seemed ${lastEmotion} earlier… how are you now?`;
+  }
+  if (/(sad|grief|lonely|tired|hurt)/.test(lastEmotion)) {
+    return `You felt ${lastEmotion} earlier… I’m here with you now.`;
+  }
+  if (returnedAfter >= 20) {
+    return "Hey… I was wondering if you’d come back.";
+  }
+  return "Hey… welcome back. I’m still here.";
+}
+
+function recordPresenceInteraction(reason = "interaction") {
+  const now = Date.now();
+  if ((now - _lastPresenceInteractionRecordedAt) < 1200) return;
+  _lastPresenceInteractionRecordedAt = now;
+  markPresenceSeen("interaction");
+  if (state.presence.checkInMessage) {
+    state.presence.checkInMessage = "";
+    state.presence.checkInShownAt = null;
+  }
+  persistPresenceState();
+}
+
+function maybeShowPresenceReturnCheckIn(reason = "return") {
+  if (_presenceCheckInShownThisSession) return false;
+  if (!state.entryAccepted || !state.primarySpiritkin || state.showCrownGateHome || state.spiritverseTrailerActive || state.spiritCoreWelcoming) return false;
+  const referenceAt = state.presence?.lastInteractionAt || state.presence?.lastSeenAt || null;
+  const awayMs = referenceAt ? Math.max(0, Date.now() - new Date(referenceAt).getTime()) : 0;
+  markPresenceSeen("seen");
+  state.presence.idleDuration = awayMs;
+  if (awayMs < PRESENCE_IDLE_MIN_MS || awayMs > PRESENCE_IDLE_MAX_MS) {
+    persistPresenceState();
+    return false;
+  }
+  const message = buildPresenceCheckInMessage(awayMs);
+  state.presence.checkInMessage = message;
+  state.presence.checkInShownAt = nowIso();
+  _presenceCheckInShownThisSession = true;
+  persistPresenceState();
+  console.info("[Presence] check-in", {
+    reason,
+    awayMinutes: Math.round(awayMs / 60000),
+    lastEmotion: state.presence.lastEmotion || null,
+  });
+  render();
+  return true;
+}
+
+function getPresenceStatusLabel() {
+  if (state.presence?.checkInMessage) return "Presence returned";
+  if ((state.presence?.engagementScore || 0) > 0) return "Presence steady";
+  return "Presence quiet";
+}
+
+function installPresenceLifecycleGuards() {
+  if (_presenceLifecycleInstalled) return;
+  _presenceLifecycleInstalled = true;
+
+  ["pointerdown", "keydown", "touchstart"].forEach((eventName) => {
+    window.addEventListener(eventName, () => recordPresenceInteraction(eventName), { passive: true });
+  });
+  window.addEventListener("scroll", () => recordPresenceInteraction("scroll"), { passive: true });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      markPresenceSeen("seen");
+      persistPresenceState();
+      return;
+    }
+    maybeShowPresenceReturnCheckIn("visibility");
+  });
+
+  window.addEventListener("focus", () => {
+    maybeShowPresenceReturnCheckIn("focus");
+  });
+
+  window.addEventListener("blur", () => {
+    markPresenceSeen("seen");
+    persistPresenceState();
+  });
+}
+
 let _spiritverseBootInitialized = false;
 let _speechLifecycleGuardsInstalled = false;
 
@@ -12137,11 +12277,13 @@ function initializeSpiritverseApp() {
   try {
     installGlobalInteractionDiagnostics();
     installSpeechLifecycleGuards();
+    installPresenceLifecycleGuards();
     installPwaExperience();
     bootstrapRetentionExperience();
     normalizeInteractionState("boot");
     logInteraction("boot", { rootReady: !!document.getElementById("root") });
     render();
+    maybeShowPresenceReturnCheckIn("boot");
     fetchSessionSnapshot({ silent: true, renderOnFinish: false })
       .then(() => {
         if (state.conversationId) {
