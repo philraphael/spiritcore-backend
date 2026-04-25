@@ -300,8 +300,8 @@ export function canExecuteRunwayProvider(config = {}, env = process.env, authCon
   const adminMode = config?.adminAuth?.mode || env.ADMIN_AUTH_MODE || "auto";
   const adminGuardActive = !!authContext?.allowed && !authContext?.bypassed;
 
-  if ((config?.env || env.NODE_ENV || "development") === "production") {
-    missingGates.push("NODE_ENV must not be production");
+  if ((config?.env || env.NODE_ENV || "development") !== "staging") {
+    missingGates.push("NODE_ENV=staging is required");
   }
   if (!(adminMode === "enforce" || adminGuardActive)) {
     missingGates.push("ADMIN_AUTH_MODE must be enforce or admin guard must be active with a real credential");

@@ -9,6 +9,18 @@ import { config } from "../config.mjs";
 import { createDryRunJob, createExecutionSpikeJob, RUNWAY_SUPPORTED_ASSET_KINDS } from "../services/runwayProvider.mjs";
 import { createPromotionPlan } from "../services/generatedAssetPipeline.mjs";
 
+function isTrueEnv(value) {
+  return String(value || "").trim().toLowerCase() === "true";
+}
+
+export function canUseRunwayStagingTestBypass(body = {}, env = process.env) {
+  return env.NODE_ENV === "staging"
+    && isTrueEnv(env.RUNWAY_STAGING_TEST_BYPASS)
+    && /^test-/i.test(String(body?.targetId || "").trim())
+    && ["realm_background", "portrait"].includes(String(body?.assetKind || "").trim())
+    && String(body?.safetyLevel || "").trim() === "internal_review";
+}
+
 export async function adminRoutes(fastify, opts) {
   const { supabase, messageService, registry, issueReportService, spiritkinGeneratorService } = opts;
   const requireAdminAccess = fastify.requireAdminAccess;
@@ -220,6 +232,7 @@ export async function adminRoutes(fastify, opts) {
   }, handleRunwayDryRun);
 
   async function handleRunwayExecutionSpike(req, reply) {
+    const stagingBypassUsed = Boolean(req.runwayStagingBypassUsed);
     try {
       const result = await createExecutionSpikeJob({
         ...req.body,
@@ -229,6 +242,14 @@ export async function adminRoutes(fastify, opts) {
         env: process.env,
         authContext: req.adminAccess || {},
       });
+      fastify.log?.warn?.({
+        route: req.routeOptions?.url || req.url,
+        stagingBypassUsed,
+        targetId: req.body?.targetId || null,
+        assetKind: req.body?.assetKind || null,
+        safetyLevel: req.body?.safetyLevel || null,
+        externalApiCall: Boolean(result.externalApiCall),
+      }, "[runway] execution spike access");
       if (!result.ok) {
         return reply.code(502).send({
           ok: false,
@@ -258,13 +279,29 @@ export async function adminRoutes(fastify, opts) {
     }
   }
 
+  async function requireRunwayExecutionSpikeAccess(req, reply) {
+    if (canUseRunwayStagingTestBypass(req.body, process.env)) {
+      req.runwayStagingBypassUsed = true;
+      req.adminAccess = {
+        allowed: true,
+        bypassed: true,
+        mode: "staging-test-bypass",
+        source: "staging-test-bypass",
+      };
+      return;
+    }
+
+    req.runwayStagingBypassUsed = false;
+    return requireAdminAccess(req, reply);
+  }
+
   fastify.post("/admin/runway/execution-spike", {
-    preHandler: requireAdminAccess,
+    preHandler: requireRunwayExecutionSpikeAccess,
     schema: runwayDryRunSchema,
   }, handleRunwayExecutionSpike);
 
   fastify.post("/v1/admin/runway/execution-spike", {
-    preHandler: requireAdminAccess,
+    preHandler: requireRunwayExecutionSpikeAccess,
     schema: runwayDryRunSchema,
   }, handleRunwayExecutionSpike);
 

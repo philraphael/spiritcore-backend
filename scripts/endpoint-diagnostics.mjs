@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import process from "node:process";
+import { canUseRunwayStagingTestBypass } from "../src/routes/admin.mjs";
 
 const PORT = Number(process.env.SPIRITCORE_DIAG_PORT || 3115);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -82,6 +83,12 @@ function printResult(entry) {
   console.log(`${status.padEnd(4)} ${entry.method.padEnd(6)} ${entry.path}${detail}`);
 }
 
+function printInternalResult(entry) {
+  const status = entry.pass ? "PASS" : "FAIL";
+  const detail = entry.detail ? ` :: ${entry.detail}` : "";
+  console.log(`${status.padEnd(4)} ${entry.method.padEnd(6)} ${entry.path}${detail}`);
+}
+
 async function waitForHealth() {
   const startedAt = Date.now();
   while ((Date.now() - startedAt) < STARTUP_TIMEOUT_MS) {
@@ -100,8 +107,10 @@ async function main() {
     env: {
       ...process.env,
       PORT: String(PORT),
+      NODE_ENV: "staging",
       ADMIN_AUTH_MODE: "enforce",
       ADMIN_API_KEY: DIAG_ADMIN_KEY,
+      RUNWAY_STAGING_TEST_BYPASS: "true",
       RUNWAY_DRY_RUN_EXECUTE: "false",
       RUNWAY_ALLOW_PROVIDER_EXECUTION: "false",
       RUNWAY_API_KEY: "",
@@ -168,6 +177,54 @@ async function main() {
   process.on("SIGTERM", cleanup);
 
   try {
+    const validStagingBypassBody = {
+      targetId: "test-realm",
+      assetKind: "realm_background",
+      promptIntent: "Diagnostic execution spike request shaping only.",
+      styleProfile: "spiritverse_internal_test",
+      safetyLevel: "internal_review",
+    };
+    const bypassChecks = [
+      {
+        name: "runway-staging-bypass-production-denied",
+        pass: canUseRunwayStagingTestBypass(validStagingBypassBody, {
+          NODE_ENV: "production",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === false,
+        detail: "production does not allow staging bypass",
+      },
+      {
+        name: "runway-staging-bypass-malformed-denied",
+        pass: canUseRunwayStagingTestBypass({
+          ...validStagingBypassBody,
+          targetId: "real-realm",
+        }, {
+          NODE_ENV: "staging",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === false,
+        detail: "non-test target cannot use staging bypass",
+      },
+      {
+        name: "runway-staging-bypass-valid-allowed",
+        pass: canUseRunwayStagingTestBypass(validStagingBypassBody, {
+          NODE_ENV: "staging",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === true,
+        detail: "valid staging test request can use bypass",
+      },
+    ].map((check) => ({
+      ...check,
+      method: "INTERNAL",
+      path: check.name,
+      skipped: false,
+      status: null,
+      summary: null,
+    }));
+    for (const entry of bypassChecks) {
+      results.push(entry);
+      printInternalResult(entry);
+    }
+
     await waitForHealth();
 
     await run("health", "GET", "/health");
@@ -239,7 +296,7 @@ async function main() {
       },
       describe: (result) => result?.body?.job?.externalApiCall === false ? "no-cost dry run returned" : "unexpected external call flag",
     });
-    await run("runway-execution-spike-unauth", "POST", "/admin/runway/execution-spike", {
+    await run("runway-execution-spike-staging-bypass-valid", "POST", "/admin/runway/execution-spike", {
       body: {
         targetId: "test-realm",
         assetKind: "realm_background",
@@ -247,8 +304,21 @@ async function main() {
         styleProfile: "spiritverse_internal_test",
         safetyLevel: "internal_review",
       },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.job?.executionGates?.missingGates?.includes("RUNWAY_DRY_RUN_EXECUTE=true is required")
+        ? "staging bypass reached execution gate without provider call"
+        : "unexpected execution spike bypass result",
+    });
+    await run("runway-execution-spike-staging-bypass-malformed", "POST", "/admin/runway/execution-spike", {
+      body: {
+        targetId: "real-realm",
+        assetKind: "realm_background",
+        promptIntent: "Malformed staging bypass should not skip admin auth.",
+        styleProfile: "spiritverse_internal_test",
+        safetyLevel: "internal_review",
+      },
       allowStatuses: [403],
-      describe: () => "admin execution spike blocked without admin key",
+      describe: () => "malformed staging bypass request rejected by normal admin auth",
     });
     await run("runway-execution-spike-malformed", "POST", "/admin/runway/execution-spike", {
       headers: { "x-admin-key": DIAG_ADMIN_KEY },
