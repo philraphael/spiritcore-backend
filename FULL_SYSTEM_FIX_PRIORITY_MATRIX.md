@@ -1,0 +1,35 @@
+# Full System Fix Priority Matrix
+
+| ID | Area | Severity | Issue | User impact | Technical risk | Recommended fix | Estimated effort | Should fix before Runway? | Should fix before beta? |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| P0-01 | Assets/Media | Critical | Spiritkin video manifest references missing video files, confirmed 404s for Kairo idle/speaking paths | Broken or degraded companion media | Repeated retries, poor polish, Runway slot ambiguity | Add manifest existence check, stable fallbacks, and suppress repeated missing media loads | 0.5-1 day | yes | yes |
+| P0-02 | Testing | Critical | No root `npm test`, `lint`, or `build` scripts | No reliable launch gate | Regressions ship unnoticed | Add test script covering syntax checks and diagnostics; add lint/build when toolchain exists | 0.5 day | yes | yes |
+| P0-03 | Routes | Critical | Legacy `/runtime/*` and `/v0/*` routes remain live | Inconsistent behavior | Bypasses current authority/schema | Mark deprecated, add auth/gating where needed, route usage telemetry, migration plan | 1-2 days | yes | yes |
+| P0-04 | Frontend Render | Critical | Full-root `innerHTML` rerenders remain central | Blinking/remount risk on mobile/game/voice | State loss and CPU spikes | Isolate voice/status/presence/game DOM updates and add remount tests | 2-4 days | no | yes |
+| P0-05 | Schema | Critical | No live schema diagnostic verifying tables/columns/indexes | Persistence can silently degrade | Runtime failures after deploy | Add read-only schema check for expected tables/columns/indexes/RLS assumptions | 0.5-1 day | yes | yes |
+| P1-01 | Security | High | CORS defaults to allow all origins if unset | Wider API exposure | Browser-origin abuse | Require explicit production CORS allowlist and startup warning/failure | 0.5 day | yes | yes |
+| P1-02 | Security | High | Admin auth `auto` can bypass locally and must be enforced in prod | Admin exposure if env wrong | Sensitive data/job routes exposed | Add production config assertion and deployment checklist test | 0.5 day | yes | yes |
+| P1-03 | Speech | High | `/v1/speech` lacks strict length/voice/cost validation | Cost spikes, abusive TTS | Adapter spend and privacy risk | Add text length cap, voice allowlist, route-specific rate limit, audit log | 0.5-1 day | yes | yes |
+| P1-04 | SpiritCore Authority | High | Welcome, quests, events, return check-ins, and bond flows are partly frontend/service-driven | Less personalized experience | Authority fragmentation | Define which surfaces must call orchestrator vs lightweight services | 1-2 days | yes | yes |
+| P1-05 | Games | High | Game start/list/state/end are not fully conversationally governed | Game flow can feel detached | Split authority between gameEngine and SpiritCore | Add SpiritCore context hooks for start/end and game guidance | 1-2 days | no | yes |
+| P1-06 | Routes | High | Some route modules are unregistered (`entitlements`, `memory`, `world`) | Confusing API surface | Dead code and stale docs | Decide register/deprecate/remove plan; document live route map | 0.5 day | no | yes |
+| P1-07 | Routes | High | Games/admin/generator routes lack consistent Fastify schemas | Bad payloads reach services | Runtime exceptions and inconsistent 400s | Add body/query/response schemas for all v1 routes | 1-2 days | yes | yes |
+| P1-08 | PWA | High | Service worker cache name is static (`spiritkins-shell-v1`) | Users can see stale builds | Hard-to-debug beta regressions | Version cache by build marker and add update UX | 0.5-1 day | no | yes |
+| P1-09 | Privacy | High | Mic/transcript/memory retention disclosures are incomplete | User trust/legal risk | Compliance debt | Add clear consent/disclosure UX for voice, TTS, memory extraction, retention | 1 day | yes | yes |
+| P1-10 | Runway | High | No finalized media job lifecycle for generated videos | Runway outputs hard to manage | Orphaned assets/cost/retry issues | Define job persistence, review queue, slot mapping, promotion rules | 1-3 days | yes | no |
+| P2-01 | Backend | Medium | `server.mjs` mixes static, legacy, v1, TTS, and generator logic | Harder maintenance | Higher regression risk | Split server wiring after audit into focused modules | 2-3 days | no | no |
+| P2-02 | Frontend | Medium | `app.js` combines state, render, voice, games, PWA, copy, onboarding | Slower changes | Merge conflicts and regressions | Gradually extract modules by feature after tests exist | 3-5 days | no | no |
+| P2-03 | Console/Logs | Medium | Backend/frontend console noise is high | Harder debugging | Signal loss in production logs | Gate debug logs behind flags and reduce info logs | 0.5-1 day | no | yes |
+| P2-04 | Assets | Medium | ACTIVE/Game_Themes/ARCHIVE duplicate placeholder assets | Confusing media authority | Wrong asset promoted or served | Add asset ownership/readme and dedupe plan | 0.5-1 day | yes | no |
+| P2-05 | Repo Hygiene | Medium | Many root-level historical reports clutter production repo | Harder onboarding | Misplaced docs hide current truth | Move old reports to `docs/reports/archive` in separate cleanup | 0.5 day | no | no |
+| P2-06 | Repo Hygiene | Medium | `.gitignore` says SQL migrations are local but SQL files exist in root | Policy drift | Migration tracking confusion | Decide migrations tracked vs local and update ignore/docs | 0.5 day | yes | yes |
+| P2-07 | Voice | Medium | Wake mode is foreground-only but needs clearer UX | User expectation mismatch | Privacy/support issues | Explicitly label web wake as foreground/manual-resume only | 0.5 day | no | yes |
+| P2-08 | Performance | Medium | Large JS files and no bundling/splitting | Slower load/mobile CPU | Battery and startup cost | Add size budget and plan module splitting after smoke tests | 1-2 days | no | no |
+| P2-09 | PWA | Medium | Icons/screenshots need beta-quality verification | Weak install polish | PWA warnings | Verify asset existence, dimensions, maskable icons, screenshots | 0.5 day | no | yes |
+| P2-10 | Games | Medium | Game UI still placeholder/theatrical in places | Less premium feel | Runway phase may mask UX issues | Do functional QA now; defer visual refresh to game-theme phase | 1-2 days | no | yes |
+| P3-01 | Copy | Low | Repetitive mystical phrases across greetings/presence/games | Tone fatigue | Brand polish issue | Create copy inventory and targeted rewrite pass | 1 day | no | no |
+| P3-02 | Copy | Low | Spiritkins need stronger unique voice distinction | Less memorable companions | Lower retention | Strengthen per-Spiritkin style guides and examples | 1-2 days | no | no |
+| P3-03 | Native | Low | Background wake impossible in web/PWA | No always-on wake | Requires native app architecture | Defer native wake design until after web beta | TBD | no | no |
+| P3-04 | Analytics | Low | Analytics/admin dashboards are basic | Less operator insight | Slower triage | Expand after beta instrumentation settles | 2-4 days | no | no |
+| P3-05 | Compliance | Low | Export/delete/retention controls are not productized | Future compliance gap | Regulatory debt | Plan post-beta data rights workflow | TBD | no | no |
+
