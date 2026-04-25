@@ -7823,7 +7823,11 @@ button[data-action="begin-quest"]:active,
   display: grid;
   gap: 22px;
   min-height: calc(100dvh - 32px);
-  overflow: visible;
+  max-height: calc(100dvh - 24px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   margin: auto 0;
 }
 
@@ -8020,6 +8024,7 @@ button[data-action="begin-quest"]:active,
   background:
     linear-gradient(180deg, rgba(7, 13, 22, 0), rgba(7, 13, 22, 0.88) 26%, rgba(7, 13, 22, 0.98) 100%);
   backdrop-filter: blur(14px);
+  z-index: 2;
 }
 
 .entry-cta {
@@ -8097,6 +8102,11 @@ button[data-action="begin-quest"]:active,
   border-radius: 18px;
   border: 1px solid rgba(242, 219, 160, 0.15);
   background: rgba(255, 255, 255, 0.04);
+}
+
+.entry-consent-card {
+  display: grid;
+  gap: 10px;
 }
 
 .entry-consent-head {
@@ -8330,6 +8340,18 @@ button[data-action="begin-quest"]:active,
   .entry-pillars {
     gap: 8px;
   }
+
+  .entry-action-rail::before {
+    content: "Scroll to continue";
+    position: absolute;
+    top: -18px;
+    right: 0;
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(242, 219, 160, 0.8);
+    pointer-events: none;
+  }
 }
 
 @media (max-height: 720px) {
@@ -8355,6 +8377,11 @@ button[data-action="begin-quest"]:active,
     padding: 13px 14px;
   }
 
+  .entry-consent-check {
+    gap: 10px;
+    margin-top: 8px;
+  }
+
   .entry-action-rail {
     gap: 10px;
     padding-top: 10px;
@@ -8363,6 +8390,33 @@ button[data-action="begin-quest"]:active,
   .entry-main-cta,
   .entry-skip-btn {
     min-height: 48px;
+  }
+}
+
+@media (max-width: 900px) {
+  .entry-copy {
+    width: min(100%, calc(100% - 12px));
+    padding: 18px 16px 14px;
+    gap: 14px;
+  }
+
+  .entry-screen-gate .entry-sub,
+  .entry-consent-head span,
+  .entry-returning-note,
+  .entry-consent-check {
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+
+  .entry-requirement-bar {
+    gap: 6px;
+    padding: 12px 14px;
+  }
+
+  .entry-action-rail {
+    bottom: -14px;
+    padding-top: 12px;
+    padding-bottom: 4px;
   }
 }
 
