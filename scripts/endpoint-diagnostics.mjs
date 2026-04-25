@@ -3,6 +3,7 @@ import process from "node:process";
 
 const PORT = Number(process.env.SPIRITCORE_DIAG_PORT || 3115);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
+const DIAG_ADMIN_KEY = process.env.SPIRITCORE_DIAG_ADMIN_KEY || "diagnostic-admin-key";
 const STARTUP_TIMEOUT_MS = 45000;
 const REQUEST_TIMEOUT_MS = 15000;
 const LEGACY_ROUTES_DISABLED_IN_PRODUCTION = process.env.NODE_ENV === "production"
@@ -99,6 +100,8 @@ async function main() {
     env: {
       ...process.env,
       PORT: String(PORT),
+      ADMIN_AUTH_MODE: "enforce",
+      ADMIN_API_KEY: DIAG_ADMIN_KEY,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -198,6 +201,41 @@ async function main() {
     await run("events-all", "GET", "/v1/spiritverse/events/all");
     await run("quests-daily", "GET", `/v1/quests/daily?userId=${encodeURIComponent(userId)}&spiritkinName=Lyra&bondStage=1`);
     await run("games-list", "GET", "/v1/games/list");
+    await run("runway-dry-run-unauth", "POST", "/admin/runway/dry-run", {
+      body: {
+        spiritkinId: "Lyra",
+        assetKind: "trailer",
+        promptIntent: "Diagnostic no-cost Runway request shaping.",
+        styleProfile: "spiritverse_cinematic",
+        safetyLevel: "strict",
+      },
+      allowStatuses: [403],
+      describe: () => "admin route blocked without admin key",
+    });
+    await run("runway-dry-run-malformed", "POST", "/admin/runway/dry-run", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        spiritkinId: "Lyra",
+        assetKind: "not-supported",
+        promptIntent: "",
+        styleProfile: "spiritverse_cinematic",
+        safetyLevel: "strict",
+      },
+      allowStatuses: [400, 422],
+      describe: () => "authenticated malformed dry run rejected",
+    });
+    await run("runway-dry-run-valid", "POST", "/admin/runway/dry-run", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        spiritkinId: "Lyra",
+        assetKind: "trailer",
+        promptIntent: "Create a short internal-review trailer preserving Lyra's gentle emotional anchor identity.",
+        styleProfile: "spiritverse_cinematic",
+        safetyLevel: "strict",
+        durationSec: 8,
+      },
+      describe: (result) => result?.body?.job?.externalApiCall === false ? "no-cost dry run returned" : "unexpected external call flag",
+    });
 
     const conversation = await run("conversation-bootstrap", "POST", "/v1/conversations", {
       body: {

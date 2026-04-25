@@ -5,6 +5,7 @@
  * GET /v1/admin/messages/:conversationId — fetch transcript for a conversation
  * GET /v1/admin/stats                 — global system stats
  */
+import { createDryRunJob, RUNWAY_SUPPORTED_ASSET_KINDS } from "../services/runwayProvider.mjs";
 
 export async function adminRoutes(fastify, opts) {
   const { supabase, messageService, registry, issueReportService, spiritkinGeneratorService } = opts;
@@ -157,6 +158,64 @@ export async function adminRoutes(fastify, opts) {
       return reply.code(500).send({ ok: false, error: "GENERATOR_PROVIDER_STATUS_ERROR", message: err.message });
     }
   });
+
+  async function handleRunwayDryRun(req, reply) {
+    try {
+      const job = createDryRunJob({
+        ...req.body,
+        requestedBy: req.adminAccess?.source || "admin_dry_run",
+      });
+      return {
+        ok: true,
+        route: req.routeOptions?.url || req.url,
+        noCost: true,
+        externalApiCall: false,
+        job,
+      };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({
+        ok: false,
+        error: err.code ?? "RUNWAY_DRY_RUN_ERROR",
+        message: err.message,
+        details: err.detail || {},
+        supportedAssetKinds: RUNWAY_SUPPORTED_ASSET_KINDS,
+      });
+    }
+  }
+
+  const runwayDryRunSchema = {
+    body: {
+      type: "object",
+      required: ["assetKind", "promptIntent", "styleProfile", "safetyLevel"],
+      properties: {
+        spiritkinId: { type: "string", nullable: true },
+        spiritkinName: { type: "string", nullable: true },
+        targetId: { type: "string", nullable: true },
+        realmId: { type: "string", nullable: true },
+        gameType: { type: "string", nullable: true },
+        themeId: { type: "string", nullable: true },
+        assetKind: { type: "string", minLength: 1 },
+        promptIntent: { type: "string", minLength: 1 },
+        styleProfile: { type: "string", minLength: 1 },
+        safetyLevel: { type: "string", minLength: 1 },
+        durationSec: { type: "number", nullable: true },
+        aspectRatio: { type: "string", nullable: true },
+        sourceAssets: { type: "array", items: { type: "string" }, nullable: true },
+        negativePrompt: { type: "string", nullable: true },
+      },
+    },
+  };
+
+  fastify.post("/admin/runway/dry-run", {
+    preHandler: requireAdminAccess,
+    schema: runwayDryRunSchema,
+  }, handleRunwayDryRun);
+
+  fastify.post("/v1/admin/runway/dry-run", {
+    preHandler: requireAdminAccess,
+    schema: runwayDryRunSchema,
+  }, handleRunwayDryRun);
 
   fastify.post("/v1/admin/generator/image", {
     preHandler: requireAdminAccess,
