@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
 import process from "node:process";
-import { canUseRunwayStagingTestBypass } from "../src/routes/admin.mjs";
+import {
+  canUseRunwayStagingTestBypass,
+  canUseRunwayTransientStagingCredentials,
+} from "../src/routes/admin.mjs";
 
 const PORT = Number(process.env.SPIRITCORE_DIAG_PORT || 3115);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -212,6 +215,45 @@ async function main() {
         }) === true,
         detail: "valid staging test request can use bypass",
       },
+      {
+        name: "runway-transient-production-denied",
+        pass: canUseRunwayTransientStagingCredentials(validStagingBypassBody, {
+          "x-runway-transient-key": "mock-runway-key",
+          "x-runway-transient-execute": "true",
+          "x-runway-transient-provider-execution": "true",
+        }, {
+          NODE_ENV: "production",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === false,
+        detail: "production cannot use transient credential path",
+      },
+      {
+        name: "runway-transient-malformed-denied",
+        pass: canUseRunwayTransientStagingCredentials({
+          ...validStagingBypassBody,
+          targetId: "real-realm",
+        }, {
+          "x-runway-transient-key": "mock-runway-key",
+          "x-runway-transient-execute": "true",
+          "x-runway-transient-provider-execution": "true",
+        }, {
+          NODE_ENV: "staging",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === false,
+        detail: "malformed request cannot use transient credential path",
+      },
+      {
+        name: "runway-transient-valid-allowed",
+        pass: canUseRunwayTransientStagingCredentials(validStagingBypassBody, {
+          "x-runway-transient-key": "mock-runway-key",
+          "x-runway-transient-execute": "false",
+          "x-runway-transient-provider-execution": "false",
+        }, {
+          NODE_ENV: "staging",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === true,
+        detail: "valid staging request can use transient credential path",
+      },
     ].map((check) => ({
       ...check,
       method: "INTERNAL",
@@ -308,6 +350,25 @@ async function main() {
         && result?.body?.job?.executionGates?.missingGates?.includes("RUNWAY_DRY_RUN_EXECUTE=true is required")
         ? "staging bypass reached execution gate without provider call"
         : "unexpected execution spike bypass result",
+    });
+    await run("runway-execution-spike-transient-mock-no-exec", "POST", "/admin/runway/execution-spike", {
+      headers: {
+        "x-runway-transient-key": "mock-runway-key",
+        "x-runway-transient-execute": "false",
+        "x-runway-transient-provider-execution": "false",
+      },
+      body: {
+        targetId: "test-realm",
+        assetKind: "realm_background",
+        promptIntent: "Diagnostic transient credential path request shaping only.",
+        styleProfile: "spiritverse_internal_test",
+        safetyLevel: "internal_review",
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.transientKeyProvided === true
+        && result?.body?.job?.executionGates?.missingGates?.includes("RUNWAY_DRY_RUN_EXECUTE=true is required")
+        ? "mock transient key reached execution gate without provider call"
+        : "unexpected transient credential result",
     });
     await run("runway-execution-spike-staging-bypass-malformed", "POST", "/admin/runway/execution-spike", {
       body: {

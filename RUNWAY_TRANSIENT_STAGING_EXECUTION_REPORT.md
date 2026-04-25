@@ -1,0 +1,81 @@
+# Runway Transient Staging Execution Report
+
+## Purpose
+
+This phase adds a temporary request-scoped credential path for the Runway execution spike route so one A10 staging test can run when Railway staging environment variable injection is blocked.
+
+The path is limited to:
+
+- `POST /admin/runway/execution-spike`
+- `POST /v1/admin/runway/execution-spike`
+
+## Temporary Headers
+
+The route recognizes these headers only for a qualifying staging test request:
+
+- `x-runway-transient-key`
+- `x-runway-transient-execute`
+- `x-runway-transient-provider-execution`
+
+The transient key is not logged, stored, persisted, written to files, or copied into global process state. It is used only to build the per-request Runway provider config and env context passed to `createExecutionSpikeJob`.
+
+## Required Gates
+
+The transient path is honored only when all of the following are true:
+
+- `NODE_ENV=staging`
+- `RUNWAY_STAGING_TEST_BYPASS=true`
+- `targetId` starts with `test-`
+- `assetKind` is `realm_background` or `portrait`
+- `safetyLevel` is `internal_review`
+- `x-runway-transient-key` is present
+
+Real provider execution still requires:
+
+- `NODE_ENV=staging`
+- a Runway API key, either staging env or transient request header
+- `RUNWAY_DRY_RUN_EXECUTE=true` or `x-runway-transient-execute=true`
+- `RUNWAY_ALLOW_PROVIDER_EXECUTION=true` or `x-runway-transient-provider-execution=true`
+- `ADMIN_AUTH_MODE=enforce` or an active real admin guard
+- execution-spike target and safety restrictions
+
+## Safe Logging
+
+The route logs only:
+
+- `stagingBypassUsed`
+- `transientKeyProvided`
+- `transientExecuteRequested`
+- `transientProviderExecutionRequested`
+- `targetId`
+- `assetKind`
+- `safetyLevel`
+- `externalApiCall`
+
+No secrets or request header values are logged.
+
+## No Promotion Guarantees
+
+This phase does not:
+
+- add frontend controls
+- expose Runway to users
+- write generated assets
+- update manifests
+- promote to `ACTIVE`
+- alter generated asset review or promotion behavior
+
+## Diagnostics
+
+Endpoint diagnostics verify:
+
+- production cannot use the transient header path
+- malformed requests cannot use the transient header path
+- staging valid requests without transient credentials remain dry-run
+- staging valid requests with a mock transient key reach the execution gate without calling the provider
+
+Diagnostics do not require or use a real Runway API key.
+
+## One-Test Operator Procedure
+
+For the real A10 test, the operator should paste the Runway key into a secure PowerShell prompt and send it only as an HTTPS request header. The command should not echo the key and should not save it to disk.
