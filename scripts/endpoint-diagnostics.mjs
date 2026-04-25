@@ -102,6 +102,9 @@ async function main() {
       PORT: String(PORT),
       ADMIN_AUTH_MODE: "enforce",
       ADMIN_API_KEY: DIAG_ADMIN_KEY,
+      RUNWAY_DRY_RUN_EXECUTE: "false",
+      RUNWAY_ALLOW_PROVIDER_EXECUTION: "false",
+      RUNWAY_API_KEY: "",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -235,6 +238,40 @@ async function main() {
         durationSec: 8,
       },
       describe: (result) => result?.body?.job?.externalApiCall === false ? "no-cost dry run returned" : "unexpected external call flag",
+    });
+    await run("runway-execution-spike-unauth", "POST", "/admin/runway/execution-spike", {
+      body: {
+        targetId: "test-realm",
+        assetKind: "realm_background",
+        promptIntent: "Diagnostic execution spike request shaping only.",
+        styleProfile: "spiritverse_internal_test",
+        safetyLevel: "internal_review",
+      },
+      allowStatuses: [403],
+      describe: () => "admin execution spike blocked without admin key",
+    });
+    await run("runway-execution-spike-malformed", "POST", "/admin/runway/execution-spike", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        targetId: "test-realm",
+        assetKind: "not-supported",
+        promptIntent: "",
+        styleProfile: "spiritverse_internal_test",
+        safetyLevel: "internal_review",
+      },
+      allowStatuses: [400, 422],
+      describe: () => "authenticated malformed execution spike rejected",
+    });
+    await run("runway-execution-spike-no-flags", "POST", "/admin/runway/execution-spike", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        targetId: "test-realm",
+        assetKind: "realm_background",
+        promptIntent: "Shape one internal review realm background test request without provider execution.",
+        styleProfile: "spiritverse_internal_test",
+        safetyLevel: "internal_review",
+      },
+      describe: (result) => result?.body?.externalApiCall === false ? "execution gates returned dry run" : "unexpected provider execution",
     });
     await run("generated-asset-promotion-plan-unauth", "POST", "/admin/generated-assets/promotion-plan", {
       body: {

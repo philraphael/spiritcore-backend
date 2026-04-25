@@ -64,6 +64,20 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function parseBoolean(value) {
+  return ["1", "true", "yes", "on"].includes(String(value || "").trim().toLowerCase());
+}
+
+function normalizeBaseUrl(value) {
+  return String(value || "").trim().replace(/\/+$/g, "");
+}
+
+function normalizePathPart(value, fallback = "") {
+  const normalized = String(value || fallback).trim();
+  if (!normalized) return fallback;
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+}
+
 function normalizeText(value, max = 400) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
 }
@@ -278,4 +292,193 @@ export function createDryRunJob(input = {}) {
     estimatedRiskNotes: estimateRiskNotes(normalized),
     createdAt: nowIso(),
   };
+}
+
+export function canExecuteRunwayProvider(config = {}, env = process.env, authContext = {}) {
+  const missingGates = [];
+  const runway = config?.generator?.video?.runway || {};
+  const adminMode = config?.adminAuth?.mode || env.ADMIN_AUTH_MODE || "auto";
+  const adminGuardActive = !!authContext?.allowed && !authContext?.bypassed;
+
+  if ((config?.env || env.NODE_ENV || "development") === "production") {
+    missingGates.push("NODE_ENV must not be production");
+  }
+  if (!(adminMode === "enforce" || adminGuardActive)) {
+    missingGates.push("ADMIN_AUTH_MODE must be enforce or admin guard must be active with a real credential");
+  }
+  if (!runway.apiKey && !env.RUNWAY_API_KEY) {
+    missingGates.push("RUNWAY_API_KEY is required");
+  }
+  if (!parseBoolean(env.RUNWAY_DRY_RUN_EXECUTE)) {
+    missingGates.push("RUNWAY_DRY_RUN_EXECUTE=true is required");
+  }
+  if (!parseBoolean(env.RUNWAY_ALLOW_PROVIDER_EXECUTION)) {
+    missingGates.push("RUNWAY_ALLOW_PROVIDER_EXECUTION=true is required");
+  }
+
+  return {
+    ok: missingGates.length === 0,
+    missingGates,
+  };
+}
+
+export function buildRunwayApiPayload(job = {}) {
+  const normalized = job.normalizedJobRequest || {};
+  const promptPackage = job.promptPackage || buildRunwayPrompt(normalized);
+  return {
+    model: job.providerModel || "gen3a_turbo",
+    promptText: promptPackage.prompt,
+    negativePromptText: promptPackage.negativePrompt,
+    ratio: normalized.aspectRatio || "16:9",
+    duration: normalized.durationSec || (normalized.mediaType === "video" ? 8 : undefined),
+    seed: job.seed || undefined,
+    metadata: {
+      spike: true,
+      targetType: normalized.targetType,
+      targetId: normalized.targetId,
+      assetKind: normalized.assetKind,
+      safetyLevel: normalized.safetyLevel,
+      requestedBy: normalized.requestedBy,
+    },
+  };
+}
+
+export function normalizeRunwayResponse(response = {}) {
+  const providerJobId = response.id || response.taskId || response.task_id || response.generationId || response.uuid || null;
+  const rawStatus = response.status || response.state || response.taskStatus || "submitted";
+  const normalizedStatus = String(rawStatus || "").toLowerCase();
+  const status = ["queued", "pending", "submitted"].includes(normalizedStatus)
+    ? "queued"
+    : (["running", "processing", "generating"].includes(normalizedStatus) ? "generating" : normalizedStatus);
+
+  return {
+    provider: "runway",
+    providerJobId,
+    status: status || "submitted",
+    rawStatus,
+    responseKeys: Object.keys(response || {}).slice(0, 20),
+    submittedAt: nowIso(),
+  };
+}
+
+export async function submitRunwayJob(job = {}) {
+  const runway = job._runwayConfig || {};
+  const baseUrl = normalizeBaseUrl(runway.baseUrl);
+  const apiKey = runway.apiKey;
+  if (!baseUrl || !apiKey) {
+    throw new Error("Runway provider is not configured.");
+  }
+
+  const payload = buildRunwayApiPayload(job);
+  const response = await fetch(`${baseUrl}${normalizePathPart(runway.generatePath, "/v1/video/generate")}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "X-Runway-Version": runway.version || "2024-11-06",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const text = await response.text();
+  let parsed = {};
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch {
+    parsed = { message: "Provider returned a non-JSON response." };
+  }
+  if (!response.ok) {
+    throw new Error(`Runway provider request failed with status ${response.status}.`);
+  }
+  return normalizeRunwayResponse(parsed);
+}
+
+export async function pollRunwayJobStatus(providerJobId) {
+  return {
+    provider: "runway",
+    providerJobId: normalizeText(providerJobId, 160),
+    status: "not_polled",
+    externalApiCall: false,
+    note: "Status polling is intentionally stubbed for the execution spike.",
+    checkedAt: nowIso(),
+  };
+}
+
+export async function createExecutionSpikeJob(input = {}, { config = {}, env = process.env, authContext = {} } = {}) {
+  const dryRunJob = createDryRunJob({
+    ...input,
+    requestedBy: input.requestedBy || authContext?.source || "admin_execution_spike",
+  });
+  const baseGates = canExecuteRunwayProvider(config, env, authContext);
+  const normalized = dryRunJob.normalizedJobRequest || {};
+  const spikeGateFailures = [];
+  if (!["realm_background", "portrait"].includes(normalized.assetKind)) {
+    spikeGateFailures.push("execution spike assetKind must be realm_background or portrait");
+  }
+  if (normalized.safetyLevel !== "internal_review") {
+    spikeGateFailures.push("execution spike safetyLevel must be internal_review");
+  }
+  if (!/^test[-_]/i.test(String(normalized.targetId || ""))) {
+    spikeGateFailures.push("execution spike targetId must be a non-production test target such as test-realm or test-spiritkin");
+  }
+  const gates = {
+    ok: baseGates.ok && spikeGateFailures.length === 0,
+    missingGates: [...baseGates.missingGates, ...spikeGateFailures],
+  };
+  const runway = config?.generator?.video?.runway || {};
+
+  const job = {
+    ...dryRunJob,
+    lifecycleState: gates.ok ? "queued" : "dry_run",
+    executionSpike: true,
+    externalApiCall: false,
+    executionGates: gates,
+    providerModel: runway.model || "gen3a_turbo",
+    apiPayloadPreview: buildRunwayApiPayload({
+      ...dryRunJob,
+      providerModel: runway.model || "gen3a_turbo",
+    }),
+  };
+
+  if (!gates.ok) {
+    return {
+      ok: true,
+      executed: false,
+      externalApiCall: false,
+      job,
+    };
+  }
+
+  try {
+    const providerResult = await submitRunwayJob({
+      ...job,
+      _runwayConfig: runway,
+    });
+    return {
+      ok: true,
+      executed: true,
+      externalApiCall: true,
+      job: {
+        ...job,
+        lifecycleState: "queued",
+        externalApiCall: true,
+        providerResult,
+      },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      executed: true,
+      externalApiCall: true,
+      job: {
+        ...job,
+        lifecycleState: "failed",
+        externalApiCall: true,
+      },
+      error: {
+        code: "RUNWAY_PROVIDER_ERROR",
+        message: error?.message || "Runway provider execution spike failed.",
+      },
+    };
+  }
 }

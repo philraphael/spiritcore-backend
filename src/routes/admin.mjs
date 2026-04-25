@@ -5,7 +5,8 @@
  * GET /v1/admin/messages/:conversationId — fetch transcript for a conversation
  * GET /v1/admin/stats                 — global system stats
  */
-import { createDryRunJob, RUNWAY_SUPPORTED_ASSET_KINDS } from "../services/runwayProvider.mjs";
+import { config } from "../config.mjs";
+import { createDryRunJob, createExecutionSpikeJob, RUNWAY_SUPPORTED_ASSET_KINDS } from "../services/runwayProvider.mjs";
 import { createPromotionPlan } from "../services/generatedAssetPipeline.mjs";
 
 export async function adminRoutes(fastify, opts) {
@@ -217,6 +218,55 @@ export async function adminRoutes(fastify, opts) {
     preHandler: requireAdminAccess,
     schema: runwayDryRunSchema,
   }, handleRunwayDryRun);
+
+  async function handleRunwayExecutionSpike(req, reply) {
+    try {
+      const result = await createExecutionSpikeJob({
+        ...req.body,
+        requestedBy: req.adminAccess?.source || "admin_execution_spike",
+      }, {
+        config,
+        env: process.env,
+        authContext: req.adminAccess || {},
+      });
+      if (!result.ok) {
+        return reply.code(502).send({
+          ok: false,
+          route: req.routeOptions?.url || req.url,
+          externalApiCall: result.externalApiCall,
+          error: result.error,
+          job: result.job,
+        });
+      }
+      return {
+        ok: true,
+        route: req.routeOptions?.url || req.url,
+        executionSpike: true,
+        executed: result.executed,
+        externalApiCall: result.externalApiCall,
+        job: result.job,
+      };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({
+        ok: false,
+        error: err.code ?? "RUNWAY_EXECUTION_SPIKE_ERROR",
+        message: err.message,
+        details: err.detail || {},
+        supportedAssetKinds: RUNWAY_SUPPORTED_ASSET_KINDS,
+      });
+    }
+  }
+
+  fastify.post("/admin/runway/execution-spike", {
+    preHandler: requireAdminAccess,
+    schema: runwayDryRunSchema,
+  }, handleRunwayExecutionSpike);
+
+  fastify.post("/v1/admin/runway/execution-spike", {
+    preHandler: requireAdminAccess,
+    schema: runwayDryRunSchema,
+  }, handleRunwayExecutionSpike);
 
   async function handleGeneratedAssetPromotionPlan(req, reply) {
     try {
