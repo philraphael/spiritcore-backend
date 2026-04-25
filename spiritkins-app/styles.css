@@ -10259,3 +10259,13 @@ button[data-action="begin-quest"]:active,
     margin: 0 auto;
   }
 }
+.voice-mode-switcher {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.voice-mode-switcher .btn {
+  min-width: 88px;
+}
