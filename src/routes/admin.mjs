@@ -37,6 +37,7 @@ import {
   createSpiritCoreDefaultOperatorPlan,
   createSpiritkinMotionPackPlan,
   createSpiritkinMotionStateExecutionPlan,
+  createSpiritkinSourceReferencePlan,
   createSpiritGateSegmentPlan,
   createSpiritGateEnhancementPlanFromCurrentSource,
   createSpiritGateEnhancementExecutionPlan,
@@ -135,6 +136,7 @@ const MEDIA_PLANNING_BYPASS_ROUTES = Object.freeze([
   "GET /admin/media/spiritgate-source-summary",
   "POST /admin/media/operator-experience-plan",
   "POST /admin/media/motion-pack-plan",
+  "POST /admin/media/spiritkin-source-reference-plan",
   "POST /admin/media/spiritkin-motion-pack-plan",
   "GET /admin/media/spiritkin-source-summary/:spiritkinId",
   "POST /admin/media/spiritcore-avatar-pack-plan",
@@ -1082,6 +1084,30 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const spiritkinSourceReferencePlanSchema = {
+    body: {
+      type: "object",
+      required: ["entityId", "packId", "requestedAssetTypes", "availableSources"],
+      properties: {
+        entityId: { type: "string", minLength: 1 },
+        packId: { type: "string", minLength: 1 },
+        requestedAssetTypes: { type: "array", minItems: 1, items: { type: "string" } },
+        availableSources: {
+          type: "object",
+          additionalProperties: true,
+          properties: {
+            close_portrait: { type: "string", nullable: true },
+            medium_body: { type: "string", nullable: true },
+            full_body: { type: "string", nullable: true },
+            seated_or_perched: { type: "string", nullable: true },
+            realm_environment: { type: "string", nullable: true },
+            approved_motion_reference: { type: "string", nullable: true },
+          },
+        },
+      },
+    },
+  };
+
   const sequenceComposePlanSchema = {
     body: {
       type: "object",
@@ -1336,6 +1362,13 @@ export async function adminRoutes(fastify, opts) {
     schema: motionPackBatchPlanSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     motionPackPlan: createMotionPackBatchPlan(req.body),
+  }), req, reply));
+
+  fastify.post("/admin/media/spiritkin-source-reference-plan", {
+    preHandler: requireMediaPlanningAccess,
+    schema: spiritkinSourceReferencePlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    spiritkinSourceReferencePlan: createSpiritkinSourceReferencePlan(req.body),
   }), req, reply));
 
   fastify.get("/admin/media/spiritkin-source-summary/:spiritkinId", {

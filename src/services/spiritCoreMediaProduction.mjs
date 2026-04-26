@@ -110,6 +110,29 @@ export const SPIRITKIN_MOTION_SHOT_PROFILES = Object.freeze([
   "wider_body",
 ]);
 
+export const SPIRITKIN_MOTION_SOURCE_CATEGORIES = Object.freeze([
+  "close_portrait",
+  "medium_body",
+  "full_body",
+  "seated_or_perched",
+  "realm_environment",
+  "approved_motion_reference",
+]);
+
+export const SPIRITKIN_MOTION_SOURCE_CATEGORY_RULES = Object.freeze({
+  idle_01: ["close_portrait"],
+  idle_02: ["close_portrait"],
+  speaking_01: ["close_portrait"],
+  speaking_02: ["close_portrait"],
+  listen_01: ["close_portrait"],
+  think_01: ["close_portrait", "approved_motion_reference"],
+  gesture_01: ["close_portrait", "approved_motion_reference"],
+  gesture_02: ["medium_body"],
+  greeting_or_entry_01: ["medium_body"],
+  sit_or_perch_01: ["seated_or_perched"],
+  walk_loop_01: ["full_body", "realm_environment"],
+});
+
 export const SPIRITKIN_MOTION_INTENSITIES = Object.freeze(["low", "medium"]);
 export const SPIRITKIN_IMAGE_TO_VIDEO_RATIOS = Object.freeze([
   "1280:720",
@@ -708,6 +731,53 @@ function backgroundClarityModeForAssetType(assetType) {
   return "clear_stable_background_no_extra_blur";
 }
 
+function normalizeAvailableMotionSources(value = {}) {
+  const sources = {};
+  for (const category of SPIRITKIN_MOTION_SOURCE_CATEGORIES) {
+    const raw = value && typeof value === "object" ? value[category] : "";
+    const sourceRef = normalizeText(raw, 1200);
+    sources[category] = sourceRef || null;
+  }
+  return sources;
+}
+
+function sourceCategoriesForMotionAsset(assetType) {
+  return SPIRITKIN_MOTION_SOURCE_CATEGORY_RULES[assetType] || ["close_portrait"];
+}
+
+function selectMotionSourceForAsset(assetType, availableSources = {}) {
+  const requiredCategories = sourceCategoriesForMotionAsset(assetType);
+  const selectedCategory = requiredCategories.find((category) => Boolean(availableSources[category])) || null;
+  return {
+    assetType,
+    requiredSourceCategories: requiredCategories,
+    requiredSourceCategory: requiredCategories.length === 1 ? requiredCategories[0] : requiredCategories.join(" or "),
+    selectedSourceCategory: selectedCategory,
+    selectedSourceRef: selectedCategory ? availableSources[selectedCategory] : null,
+    blockedUntilSourceExists: !selectedCategory,
+    sourceStatus: selectedCategory ? "ready" : "missing_required_source",
+  };
+}
+
+function recommendedStillForSourceCategory(category, entityId) {
+  if (category === "medium_body") {
+    return `Create an approved medium-body canonical still for ${entityId} before greeting_or_entry_01 or gesture_02 generation.`;
+  }
+  if (category === "full_body") {
+    return `Create an approved full-body canonical still for ${entityId} before walk_loop_01 generation.`;
+  }
+  if (category === "seated_or_perched") {
+    return `Create an approved seated or perched canonical still for ${entityId} before sit_or_perch_01 generation.`;
+  }
+  if (category === "realm_environment") {
+    return `Create or approve a realm environment reference for ${entityId} before larger ambient movement generation.`;
+  }
+  if (category === "approved_motion_reference") {
+    return `Use an approved prior motion clip for ${entityId} when a still source is not enough to communicate the state.`;
+  }
+  return `Use the approved close portrait source for ${entityId}.`;
+}
+
 function buildMotionGenerationPrompt({ canonicalName, assetType, stateTrigger, promptIntent, styleProfile, controls }) {
   if (controls.generationMode === "diagnostic_idle") {
     return [
@@ -1014,6 +1084,76 @@ export function createMotionPackBatchPlan(input = {}) {
     premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
     noIngestPerformed: true,
     noActiveWritePerformed: true,
+    ...lifecycleNoWriteFlags(),
+  };
+}
+
+export function createSpiritkinSourceReferencePlan(input = {}) {
+  const entityId = normalizeText(input.entityId || input.spiritkinId, 120).toLowerCase();
+  const packId = normalizeText(input.packId || `${slugify(entityId)}-motion-pack-v1`, 160);
+  const requestedAssetTypes = Array.isArray(input.requestedAssetTypes)
+    ? input.requestedAssetTypes.map((assetType) => normalizeText(assetType, 80)).filter(Boolean)
+    : [];
+  const availableSources = normalizeAvailableMotionSources(input.availableSources || {});
+  const errors = [];
+  if (!entityId) errors.push("entityId is required");
+  if (!packId) errors.push("packId is required");
+  if (!requestedAssetTypes.length) errors.push("requestedAssetTypes are required");
+  for (const assetType of requestedAssetTypes) {
+    if (!SPIRITKIN_MOTION_PACK_ASSET_TYPES.includes(assetType)) {
+      errors.push(`requestedAssetTypes contains unsupported assetType ${assetType}`);
+    }
+  }
+  if (errors.length) {
+    throw new ValidationError("Invalid Spiritkin source reference plan request.", errors);
+  }
+
+  const sourceSelections = [...new Set(requestedAssetTypes)].map((assetType) => {
+    const selection = selectMotionSourceForAsset(assetType, availableSources);
+    return {
+      ...selection,
+      assetKind: motionAssetKindForType(assetType),
+      generationMode: SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES[assetType] || "diagnostic_idle",
+      shotProfile: normalizeShotProfile(assetType.startsWith("walk") ? "wider_body" : (assetType === "gesture_02" || assetType === "greeting_or_entry_01" ? "medium_shot" : "close_portrait")),
+      poseVariant: poseVariantForAssetType(assetType),
+      motionCompletionRule: motionCompletionRuleForAssetType(assetType),
+      backgroundClarityMode: backgroundClarityModeForAssetType(assetType),
+      timingIntent: timingIntentForAssetType(assetType),
+      recommendation: selection.blockedUntilSourceExists
+        ? `Do not generate ${assetType} until ${selection.requiredSourceCategory} exists.`
+        : `Use ${selection.selectedSourceCategory} for ${assetType}.`,
+    };
+  });
+  const missingCategories = [...new Set(sourceSelections
+    .filter((selection) => selection.blockedUntilSourceExists)
+    .flatMap((selection) => selection.requiredSourceCategories))];
+
+  return {
+    ok: true,
+    planId: `source_ref_plan_${slugify(entityId)}_${slugify(packId)}_${Date.now()}`,
+    entityId,
+    packId,
+    sourceCategories: [...SPIRITKIN_MOTION_SOURCE_CATEGORIES],
+    availableSources,
+    requestedAssetTypes: [...new Set(requestedAssetTypes)],
+    sourceSelections,
+    generationBlockedAssetTypes: sourceSelections
+      .filter((selection) => selection.blockedUntilSourceExists)
+      .map((selection) => selection.assetType),
+    readyAssetTypes: sourceSelections
+      .filter((selection) => !selection.blockedUntilSourceExists)
+      .map((selection) => selection.assetType),
+    recommendedNextSourceStills: missingCategories.map((category) => ({
+      sourceCategory: category,
+      recommendation: recommendedStillForSourceCategory(category, entityId),
+    })),
+    planningNotes: [
+      "close portrait sources remain appropriate for close and micro-motion states",
+      "medium-body, full-body, seated, realm, or approved motion references are required before larger framing states",
+      "do not spend provider credits on blocked states until the matching source reference exists",
+    ],
+    premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+    noIngestPerformed: true,
     ...lifecycleNoWriteFlags(),
   };
 }
@@ -2368,6 +2508,8 @@ export function getMediaCatalogSummary() {
     })),
     assistantCapabilityRoadmap: [...SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP],
     sourceMediaTypes: [...SOURCE_MEDIA_TYPES],
+    spiritkinMotionSourceCategories: [...SPIRITKIN_MOTION_SOURCE_CATEGORIES],
+    spiritkinMotionSourceCategoryRules: { ...SPIRITKIN_MOTION_SOURCE_CATEGORY_RULES },
     premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
     defaultOperatorTypes: [...SPIRITCORE_DEFAULT_OPERATOR_TYPES],
     spiritkinMotionPackAssetTypes: [...SPIRITKIN_MOTION_PACK_ASSET_TYPES],
@@ -2380,12 +2522,16 @@ export function getMediaCatalogSummary() {
       "POST /admin/media/promotion-plan",
       "POST /admin/media/production-sequence-plan",
       "POST /admin/media/operator-experience-plan",
+      "POST /admin/media/motion-pack-plan",
+      "POST /admin/media/spiritkin-source-reference-plan",
       "POST /admin/media/spiritkin-motion-pack-plan",
       "GET /admin/media/spiritkin-source-summary/:spiritkinId",
       "POST /admin/media/spiritkin-motion-state-execute",
       "POST /admin/media/spiritcore-avatar-pack-plan",
       "POST /admin/media/assembly-plan",
       "POST /admin/media/assemble-video",
+      "POST /admin/media/sequence-compose-plan",
+      "POST /admin/media/sequence-compose-execute",
       "POST /admin/media/source-reference-plan",
       "GET /admin/media/spiritgate-source-summary",
       "POST /admin/media/spiritgate-enhancement-plan-from-current-source",

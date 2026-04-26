@@ -34,6 +34,7 @@ import {
   createSpiritCoreDefaultOperatorPlan,
   createSpiritkinMotionPackPlan,
   createSpiritkinMotionStateExecutionPlan,
+  createSpiritkinSourceReferencePlan,
   createSpiritGateSegmentPlan,
   createSpiritGateEnhancementPlanFromCurrentSource,
   createSpiritGateEnhancementExecutionPlan,
@@ -45,6 +46,7 @@ import {
   resolveExistingSpiritGateSource,
   resolveExistingSpiritkinSource,
   SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES,
+  SPIRITKIN_MOTION_SOURCE_CATEGORY_RULES,
   SPIRITCORE_AVATAR_PACK_ASSET_TYPES,
   SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP,
   SPIRITKIN_MOTION_PACK_ASSET_TYPES,
@@ -1459,6 +1461,59 @@ async function main() {
         detail: "motion pack wave planning returns structured no-generation settings",
       },
       {
+        name: "media-spiritkin-multi-source-reference-plan",
+        pass: (() => {
+          const result = createSpiritkinSourceReferencePlan({
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            requestedAssetTypes: [
+              "idle_01",
+              "speaking_01",
+              "listen_01",
+              "think_01",
+              "gesture_01",
+              "gesture_02",
+              "greeting_or_entry_01",
+              "sit_or_perch_01",
+              "walk_loop_01",
+            ],
+            availableSources: {
+              close_portrait: "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png",
+              medium_body: null,
+              full_body: null,
+              seated_or_perched: null,
+              realm_environment: null,
+              approved_motion_reference: null,
+            },
+          });
+          const byAsset = Object.fromEntries(result.sourceSelections.map((selection) => [selection.assetType, selection]));
+          return result.ok === true
+            && SPIRITKIN_MOTION_SOURCE_CATEGORY_RULES.greeting_or_entry_01.includes("medium_body")
+            && byAsset.greeting_or_entry_01.requiredSourceCategories.includes("medium_body")
+            && byAsset.greeting_or_entry_01.blockedUntilSourceExists === true
+            && byAsset.gesture_02.requiredSourceCategories.includes("medium_body")
+            && byAsset.gesture_02.blockedUntilSourceExists === true
+            && byAsset.sit_or_perch_01.requiredSourceCategories.includes("seated_or_perched")
+            && byAsset.sit_or_perch_01.blockedUntilSourceExists === true
+            && byAsset.walk_loop_01.requiredSourceCategories.includes("full_body")
+            && byAsset.walk_loop_01.requiredSourceCategories.includes("realm_environment")
+            && byAsset.walk_loop_01.blockedUntilSourceExists === true
+            && byAsset.idle_01.selectedSourceCategory === "close_portrait"
+            && byAsset.speaking_01.selectedSourceCategory === "close_portrait"
+            && byAsset.listen_01.selectedSourceCategory === "close_portrait"
+            && byAsset.think_01.selectedSourceCategory === "close_portrait"
+            && byAsset.gesture_01.selectedSourceCategory === "close_portrait"
+            && result.generationBlockedAssetTypes.includes("greeting_or_entry_01")
+            && result.recommendedNextSourceStills.some((item) => item.sourceCategory === "medium_body")
+            && result.noProviderCall === true
+            && result.noIngestPerformed === true
+            && result.noActiveWritePerformed === true
+            && result.noManifestUpdatePerformed === true
+            && result.premiumMemberGeneration.enabled === false;
+        })(),
+        detail: "multi-source Spiritkin motion planning maps larger states to proper source categories without writes",
+      },
+      {
         name: "media-sequence-compose-plan-approved-only",
         pass: (() => {
           const result = createSequenceComposePlan({
@@ -2152,6 +2207,53 @@ async function main() {
         && result?.body?.motionPackPlan?.noManifestUpdatePerformed === true
         ? "motion pack generation wave planned without provider, ingest, manifest, or ACTIVE writes"
         : "unexpected motion pack batch plan",
+    });
+    await run("media-spiritkin-source-reference-plan", "POST", "/admin/media/spiritkin-source-reference-plan", {
+      headers: { "x-media-planning-test": "true" },
+      body: {
+        entityId: "lyra",
+        packId: "lyra-motion-pack-v1",
+        requestedAssetTypes: [
+          "idle_01",
+          "speaking_01",
+          "listen_01",
+          "gesture_02",
+          "greeting_or_entry_01",
+          "sit_or_perch_01",
+          "walk_loop_01",
+        ],
+        availableSources: {
+          close_portrait: "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png",
+          medium_body: null,
+          full_body: null,
+          seated_or_perched: null,
+          realm_environment: null,
+          approved_motion_reference: null,
+        },
+      },
+      describe: (result) => {
+        const selections = result?.body?.spiritkinSourceReferencePlan?.sourceSelections || [];
+        const byAsset = Object.fromEntries(selections.map((selection) => [selection.assetType, selection]));
+        return result?.body?.mediaPlanningBypassUsed === true
+          && byAsset.idle_01?.selectedSourceCategory === "close_portrait"
+          && byAsset.speaking_01?.selectedSourceCategory === "close_portrait"
+          && byAsset.listen_01?.selectedSourceCategory === "close_portrait"
+          && byAsset.gesture_02?.requiredSourceCategories?.includes("medium_body")
+          && byAsset.gesture_02?.blockedUntilSourceExists === true
+          && byAsset.greeting_or_entry_01?.requiredSourceCategories?.includes("medium_body")
+          && byAsset.greeting_or_entry_01?.blockedUntilSourceExists === true
+          && byAsset.sit_or_perch_01?.requiredSourceCategories?.includes("seated_or_perched")
+          && byAsset.sit_or_perch_01?.blockedUntilSourceExists === true
+          && byAsset.walk_loop_01?.requiredSourceCategories?.includes("full_body")
+          && byAsset.walk_loop_01?.requiredSourceCategories?.includes("realm_environment")
+          && byAsset.walk_loop_01?.blockedUntilSourceExists === true
+          && result?.body?.spiritkinSourceReferencePlan?.noProviderCall === true
+          && result?.body?.spiritkinSourceReferencePlan?.noIngestPerformed === true
+          && result?.body?.spiritkinSourceReferencePlan?.noActiveWritePerformed === true
+          && result?.body?.spiritkinSourceReferencePlan?.noManifestUpdatePerformed === true
+          ? "Spiritkin source reference plan blocks larger states until proper sources exist"
+          : "unexpected Spiritkin source reference plan result";
+      },
     });
     await run("media-spiritkin-source-summary-lyra", "GET", "/admin/media/spiritkin-source-summary/lyra", {
       headers: {
