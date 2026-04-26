@@ -19,7 +19,11 @@ import {
   submitRunwayJob,
 } from "../services/runwayProvider.mjs";
 import { createPromotionPlan } from "../services/generatedAssetPipeline.mjs";
-import { ingestReviewedMediaAsset } from "../services/mediaAssetIngestService.mjs";
+import {
+  createApprovedAssetRegistryBackfillPlan,
+  executeApprovedAssetRegistryBackfill,
+  ingestReviewedMediaAsset,
+} from "../services/mediaAssetIngestService.mjs";
 import { ingestSourceStill } from "../services/sourceStillIngestService.mjs";
 import {
   buildGenerationTemplate,
@@ -157,6 +161,7 @@ const MEDIA_PLANNING_BYPASS_ROUTES = Object.freeze([
   "POST /admin/media/source-reference-plan",
   "POST /admin/media/source-reference-registry-plan",
   "POST /admin/media/command-center-catalog",
+  "POST /admin/media/approved-asset-registry-backfill-plan",
 ]);
 
 function mediaPlanningRouteKey(method = "", route = "") {
@@ -221,6 +226,25 @@ export function canUseSourceStillIngestStagingBypass({
     && MEDIA_INGEST_BYPASS_ENTITY_IDS.includes(entityId)
     && SPIRITKIN_MOTION_SOURCE_CATEGORIES.includes(sourceCategory)
     && sourceUrl.startsWith("https://");
+}
+
+export function canUseApprovedAssetRegistryBackfillStagingBypass({
+  method = "",
+  route = "",
+  headers = {},
+  body = {},
+  env = process.env,
+} = {}) {
+  const headerEnabled = isTrueEnv(headers["x-media-ingest-test"]);
+  const envEnabled = isTrueEnv(env.RUNWAY_STAGING_TEST_BYPASS) || isTrueEnv(env.MEDIA_STAGING_TEST_BYPASS);
+  const entityId = String(body?.entityId || "").trim().toLowerCase();
+  const packId = String(body?.packId || "").trim().toLowerCase();
+  return env.NODE_ENV === "staging"
+    && envEnabled
+    && headerEnabled
+    && mediaPlanningRouteKey(method, route) === "POST /admin/media/approved-asset-registry-backfill-execute"
+    && MEDIA_INGEST_BYPASS_ENTITY_IDS.includes(entityId)
+    && packId.endsWith("motion-pack-v1");
 }
 
 function readRunwayTransientHeaders(body = {}, headers = {}, env = process.env) {
@@ -427,6 +451,33 @@ export async function adminRoutes(fastify, opts) {
   }
 
   // ── GET /v1/admin/conversations/recent ──────────────────────────────────────
+  async function requireApprovedAssetRegistryBackfillAccess(req, reply) {
+    const route = req.routeOptions?.url || req.routerPath || req.url;
+    const allowed = canUseApprovedAssetRegistryBackfillStagingBypass({
+      method: req.method,
+      route,
+      headers: req.headers || {},
+      body: req.body || {},
+      env: process.env,
+    });
+    req.approvedRegistryBackfillBypassUsed = Boolean(allowed);
+    fastify.log?.warn?.({
+      approvedRegistryBackfillBypassUsed: Boolean(allowed),
+      route,
+      method: req.method,
+    }, "[admin] approved asset registry backfill access");
+    if (allowed) {
+      req.adminAccess = {
+        allowed: true,
+        bypassed: true,
+        mode: "staging-approved-registry-backfill-bypass",
+        source: "staging-approved-registry-backfill-bypass",
+      };
+      return;
+    }
+    return requireAdminAccess(req, reply);
+  }
+
   fastify.get("/v1/admin/conversations/recent", { preHandler: requireAdminAccess }, async (req, reply) => {
     try {
       const limit = Math.min(Number(req.query?.limit ?? 50), 200);
@@ -1367,6 +1418,23 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const approvedAssetRegistryBackfillSchema = {
+    body: {
+      type: "object",
+      required: ["entityId", "packId"],
+      properties: {
+        entityId: { type: "string", minLength: 1 },
+        packId: { type: "string", minLength: 1 },
+        approvedMetadataPaths: {
+          type: "array",
+          items: { type: "string", minLength: 1 },
+          nullable: true,
+        },
+        dryRun: { type: "boolean", nullable: true },
+      },
+    },
+  };
+
   function mediaRouteResult(route, builder, req, reply) {
     try {
       return {
@@ -1571,6 +1639,8 @@ export async function adminRoutes(fastify, opts) {
           savedPath: ingestResult.savedPath,
           metadataPath: ingestResult.metadataPath,
           rawArchivePath: ingestResult.rawArchivePath,
+          registryPath: ingestResult.registryPath,
+          registryUpdated: ingestResult.registryUpdated,
           approvalState: ingestResult.approvalState,
           activePromotionPerformed: false,
         },
@@ -1592,6 +1662,90 @@ export async function adminRoutes(fastify, opts) {
         noActiveWritePerformed: true,
         noManifestUpdatePerformed: true,
         providerGenerationPerformed: false,
+      });
+    }
+  });
+
+  fastify.post("/admin/media/approved-asset-registry-backfill-plan", {
+    preHandler: requireMediaPlanningAccess,
+    schema: approvedAssetRegistryBackfillSchema,
+  }, async (req, reply) => {
+    const route = req.routeOptions?.url || req.url;
+    try {
+      const plan = await createApprovedAssetRegistryBackfillPlan({
+        ...req.body,
+        dryRun: req.body?.dryRun !== false,
+      });
+      return {
+        ok: true,
+        route,
+        approvedAssetRegistryBackfillPlan: plan,
+        mediaPlanningBypassUsed: Boolean(req.mediaPlanningBypassUsed),
+        externalApiCall: false,
+        noProviderCall: true,
+        noGenerationPerformed: true,
+        noIngestPerformed: true,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({
+        ok: false,
+        route,
+        error: err.code ?? "APPROVED_ASSET_REGISTRY_BACKFILL_PLAN_ERROR",
+        message: err.message,
+        details: err.detail || {},
+        externalApiCall: false,
+        noProviderCall: true,
+        noGenerationPerformed: true,
+        noIngestPerformed: true,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
+  });
+
+  fastify.post("/admin/media/approved-asset-registry-backfill-execute", {
+    preHandler: requireApprovedAssetRegistryBackfillAccess,
+    schema: approvedAssetRegistryBackfillSchema,
+  }, async (req, reply) => {
+    const route = req.routeOptions?.url || req.url;
+    try {
+      const result = await executeApprovedAssetRegistryBackfill({
+        ...req.body,
+        dryRun: false,
+      });
+      return {
+        ok: true,
+        route,
+        approvedAssetRegistryBackfill: result,
+        approvedRegistryBackfillBypassUsed: Boolean(req.approvedRegistryBackfillBypassUsed),
+        externalApiCall: false,
+        noProviderCall: true,
+        noGenerationPerformed: true,
+        noIngestPerformed: true,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({
+        ok: false,
+        route,
+        error: err.code ?? "APPROVED_ASSET_REGISTRY_BACKFILL_EXECUTE_ERROR",
+        message: err.message,
+        details: err.detail || {},
+        externalApiCall: false,
+        noProviderCall: true,
+        noGenerationPerformed: true,
+        noIngestPerformed: true,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
       });
     }
   });

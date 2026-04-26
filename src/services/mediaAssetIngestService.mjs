@@ -1,9 +1,16 @@
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ValidationError } from "../errors.mjs";
 
 const DEFAULT_ROOT = "Spiritverse_MASTER_ASSETS";
+const APPROVED_REGISTRY_RELATIVE_PATH = path.posix.join(
+  DEFAULT_ROOT,
+  "APPROVED",
+  "_registry",
+  "approved_media_assets.registry.json",
+);
+const APPROVED_REGISTRY_VERSION = "approved-media-assets-v1";
 const ALLOWED_STATUSES = new Set(["approved"]);
 const VIDEO_ASSET_TYPES = new Set([
   "idle_01",
@@ -74,6 +81,62 @@ function safeJoin(root, relativePath) {
     throw new ValidationError("Resolved media ingest path escaped the configured asset root.", ["path"]);
   }
   return absoluteTarget;
+}
+
+function normalizeRelativePath(value = "") {
+  return String(value || "").replace(/\\/g, "/").replace(/^\/+/, "");
+}
+
+function registryKey(record = {}) {
+  return [
+    slugPart(record.entityId, ""),
+    normalizeText(record.packId, 160),
+    slugPart(record.assetType, ""),
+    slugPart(record.variant || "v1", "v1"),
+    normalizeText(record.providerJobId, 160),
+  ].join("|");
+}
+
+function normalizeRegistryRecord(input = {}) {
+  return {
+    entityId: slugPart(input.entityId, ""),
+    packId: normalizeText(input.packId, 160),
+    assetType: slugPart(input.assetType, ""),
+    variant: slugPart(input.variant || "v1", "v1"),
+    status: slugPart(input.status || input.approvalState || "approved", "approved"),
+    provider: slugPart(input.provider || "runway", "runway"),
+    providerJobId: normalizeText(input.providerJobId, 160),
+    savedPath: normalizeRelativePath(input.savedPath || input.approvedRelativePath),
+    metadataPath: normalizeRelativePath(input.metadataPath || input.metadataRelativePath),
+    rawArchivePath: input.rawArchivePath ? normalizeRelativePath(input.rawArchivePath) : null,
+    sourceAssetRef: normalizeText(input.sourceAssetRef, 1000),
+    durationSec: Number.isFinite(Number(input.durationSec)) ? Number(input.durationSec) : null,
+    ratio: normalizeText(input.ratio, 40),
+    generationMode: normalizeText(input.generationMode, 80),
+    reviewNotes: normalizeText(input.reviewNotes, 2000),
+    approvedBy: normalizeText(input.approvedBy, 120),
+    approvedAt: normalizeText(input.approvedAt || input.ingestedAt || input.createdAt || nowIso(), 80),
+    registryVersion: APPROVED_REGISTRY_VERSION,
+  };
+}
+
+function validateApprovedRegistryRecord(record = {}) {
+  const errors = [];
+  if (!record.entityId) errors.push("entityId is required");
+  if (!record.packId) errors.push("packId is required");
+  if (!record.assetType) errors.push("assetType is required");
+  if (!record.variant) errors.push("variant is required");
+  if (record.status !== "approved") errors.push("status must be approved");
+  if (!record.provider) errors.push("provider is required");
+  if (!record.providerJobId) errors.push("providerJobId is required");
+  if (!record.savedPath) errors.push("savedPath is required");
+  if (!record.metadataPath) errors.push("metadataPath is required");
+  if (!record.sourceAssetRef) errors.push("sourceAssetRef is required");
+  if (!record.approvedBy) errors.push("approvedBy is required");
+  if (record.savedPath.includes("/ACTIVE/") || record.metadataPath.includes("/ACTIVE/")) {
+    errors.push("approved registry records must not point to ACTIVE");
+  }
+  return errors;
 }
 
 function parseDataUrl(value = "") {
@@ -165,6 +228,203 @@ export function buildMediaAssetIngestRecord(input = {}, options = {}) {
   };
 }
 
+export function getApprovedMediaAssetRegistryPath() {
+  return APPROVED_REGISTRY_RELATIVE_PATH;
+}
+
+export async function loadApprovedMediaAssetRegistry(options = {}) {
+  const workspaceRoot = path.resolve(options.workspaceRoot || process.cwd());
+  const registryPath = safeJoin(workspaceRoot, APPROVED_REGISTRY_RELATIVE_PATH);
+  try {
+    const parsed = JSON.parse(await readFile(registryPath, "utf8"));
+    const records = Array.isArray(parsed.records) ? parsed.records : [];
+    return {
+      ok: true,
+      registryPath: APPROVED_REGISTRY_RELATIVE_PATH,
+      registryVersion: parsed.registryVersion || APPROVED_REGISTRY_VERSION,
+      updatedAt: parsed.updatedAt || null,
+      records: records.map(normalizeRegistryRecord),
+      exists: true,
+    };
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return {
+        ok: true,
+        registryPath: APPROVED_REGISTRY_RELATIVE_PATH,
+        registryVersion: APPROVED_REGISTRY_VERSION,
+        updatedAt: null,
+        records: [],
+        exists: false,
+      };
+    }
+    throw err;
+  }
+}
+
+export async function upsertApprovedMediaAssetRegistryRecords(records = [], options = {}) {
+  const normalizedRecords = records.map(normalizeRegistryRecord);
+  const invalid = normalizedRecords
+    .map((record) => ({ record, errors: validateApprovedRegistryRecord(record) }))
+    .filter((item) => item.errors.length);
+  if (invalid.length) {
+    throw new ValidationError("Invalid approved media asset registry record.", invalid.flatMap((item) => item.errors));
+  }
+
+  const workspaceRoot = path.resolve(options.workspaceRoot || process.cwd());
+  const existing = await loadApprovedMediaAssetRegistry({ workspaceRoot });
+  const byKey = new Map(existing.records.map((record) => [registryKey(record), record]));
+  let inserted = 0;
+  let updated = 0;
+  for (const record of normalizedRecords) {
+    const key = registryKey(record);
+    if (byKey.has(key)) {
+      updated += 1;
+    } else {
+      inserted += 1;
+    }
+    byKey.set(key, record);
+  }
+
+  const payload = {
+    registryVersion: APPROVED_REGISTRY_VERSION,
+    updatedAt: nowIso(),
+    records: [...byKey.values()].sort((a, b) => registryKey(a).localeCompare(registryKey(b))),
+    noActiveWritePerformed: true,
+    noManifestUpdatePerformed: true,
+    providerGenerationPerformed: false,
+  };
+  const absoluteRegistryPath = safeJoin(workspaceRoot, APPROVED_REGISTRY_RELATIVE_PATH);
+  await mkdir(path.dirname(absoluteRegistryPath), { recursive: true });
+  await writeFile(absoluteRegistryPath, JSON.stringify(payload, null, 2), "utf8");
+
+  return {
+    ok: true,
+    registryPath: APPROVED_REGISTRY_RELATIVE_PATH,
+    registryUpdated: normalizedRecords.length > 0,
+    inserted,
+    updated,
+    recordCount: payload.records.length,
+    noActiveWritePerformed: true,
+    noManifestUpdatePerformed: true,
+    providerGenerationPerformed: false,
+  };
+}
+
+export function buildApprovedRegistryRecordFromMetadata(metadata = {}, metadataPath = "") {
+  return normalizeRegistryRecord({
+    ...metadata,
+    metadataPath: metadata.metadataPath || metadataPath,
+    savedPath: metadata.savedPath,
+    rawArchivePath: metadata.rawArchivePath,
+    approvedAt: metadata.approvedAt || metadata.ingestedAt || metadata.createdAt,
+  });
+}
+
+async function findApprovedMetadataPaths(root, entityId) {
+  const approvedRoot = safeJoin(root, path.posix.join(DEFAULT_ROOT, "APPROVED", slugPart(entityId, "")));
+  const results = [];
+  async function walk(dir) {
+    let entries = [];
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch (err) {
+      if (err.code === "ENOENT") return;
+      throw err;
+    }
+    for (const entry of entries) {
+      const absolute = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "source_stills") continue;
+        await walk(absolute);
+      } else if (/\.metadata\.json$/i.test(entry.name)) {
+        results.push(path.relative(root, absolute).replace(/\\/g, "/"));
+      }
+    }
+  }
+  await walk(approvedRoot);
+  return results;
+}
+
+export async function createApprovedAssetRegistryBackfillPlan(input = {}, options = {}) {
+  const entityId = slugPart(input.entityId, "");
+  const packId = normalizeText(input.packId, 160);
+  if (!entityId) throw new ValidationError("entityId is required for approved asset registry backfill.", ["entityId"]);
+  if (!packId) throw new ValidationError("packId is required for approved asset registry backfill.", ["packId"]);
+
+  const workspaceRoot = path.resolve(options.workspaceRoot || process.cwd());
+  const explicitPaths = Array.isArray(input.approvedMetadataPaths)
+    ? input.approvedMetadataPaths.map(normalizeRelativePath).filter(Boolean)
+    : [];
+  const metadataPaths = explicitPaths.length ? explicitPaths : await findApprovedMetadataPaths(workspaceRoot, entityId);
+  const registry = await loadApprovedMediaAssetRegistry({ workspaceRoot });
+  const existingKeys = new Set(registry.records.map(registryKey));
+  const candidates = [];
+
+  for (const metadataPath of metadataPaths) {
+    const candidate = {
+      metadataPath,
+      valid: false,
+      duplicate: false,
+      missingFields: [],
+      registryRecord: null,
+    };
+    try {
+      const metadata = JSON.parse(await readFile(safeJoin(workspaceRoot, metadataPath), "utf8"));
+      const record = buildApprovedRegistryRecordFromMetadata(metadata, metadataPath);
+      candidate.registryRecord = record;
+      candidate.missingFields = validateApprovedRegistryRecord(record);
+      candidate.duplicate = existingKeys.has(registryKey(record));
+      candidate.valid = candidate.missingFields.length === 0;
+    } catch (err) {
+      candidate.missingFields = [`metadata could not be read: ${err.message}`];
+    }
+    candidates.push(candidate);
+  }
+
+  return {
+    ok: true,
+    entityId,
+    packId,
+    registryPath: APPROVED_REGISTRY_RELATIVE_PATH,
+    dryRun: input.dryRun !== false,
+    discoveredApprovedMetadataCandidates: metadataPaths,
+    proposedRegistryRecords: candidates.filter((candidate) => candidate.valid).map((candidate) => candidate.registryRecord),
+    duplicateRecords: candidates.filter((candidate) => candidate.duplicate).map((candidate) => candidate.metadataPath),
+    missingFields: candidates.filter((candidate) => candidate.missingFields.length).map((candidate) => ({
+      metadataPath: candidate.metadataPath,
+      missingFields: candidate.missingFields,
+    })),
+    candidates,
+    noProviderCall: true,
+    noGenerationPerformed: true,
+    noPromotionPerformed: true,
+    noManifestUpdatePerformed: true,
+    noActiveWritePerformed: true,
+  };
+}
+
+export async function executeApprovedAssetRegistryBackfill(input = {}, options = {}) {
+  const plan = await createApprovedAssetRegistryBackfillPlan({
+    ...input,
+    dryRun: false,
+  }, options);
+  const recordsToUpsert = plan.proposedRegistryRecords;
+  const registryResult = await upsertApprovedMediaAssetRegistryRecords(recordsToUpsert, options);
+  return {
+    ...plan,
+    dryRun: false,
+    registryUpdated: registryResult.registryUpdated,
+    registryInserted: registryResult.inserted,
+    registryUpdatedExisting: registryResult.updated,
+    registryRecordCount: registryResult.recordCount,
+    noProviderCall: true,
+    noGenerationPerformed: true,
+    noPromotionPerformed: true,
+    noManifestUpdatePerformed: true,
+    noActiveWritePerformed: true,
+  };
+}
+
 export function validateMediaAssetIngestRecord(record = {}) {
   const errors = [];
   if (!record.entityId) errors.push("entityId is required");
@@ -233,11 +493,18 @@ export async function ingestReviewedMediaAsset(input = {}, options = {}) {
     await writeFile(rawArchivePath, binary);
   }
 
+  const registryRecord = buildApprovedRegistryRecordFromMetadata(metadata, record.metadataRelativePath);
+  const registryResult = await upsertApprovedMediaAssetRegistryRecords([registryRecord], {
+    workspaceRoot,
+  });
+
   return {
     ok: true,
     savedPath: record.approvedRelativePath,
     metadataPath: record.metadataRelativePath,
     rawArchivePath: record.archiveRawProviderExport ? record.rawArchiveRelativePath : null,
+    registryPath: registryResult.registryPath,
+    registryUpdated: registryResult.registryUpdated,
     approvalState: "approved",
     activePromotionPerformed: false,
     noActiveWritePerformed: true,

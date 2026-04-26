@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import {
@@ -9,6 +9,7 @@ import {
   canUseMediaPlanningStagingBypass,
   canUseMediaIngestStagingBypass,
   canUseSourceStillIngestStagingBypass,
+  canUseApprovedAssetRegistryBackfillStagingBypass,
   canUseSpiritkinMotionStateStagingBypass,
   canUseSpiritGateEnhancementStagingBypass,
 } from "../src/routes/admin.mjs";
@@ -58,7 +59,12 @@ import {
 } from "../src/services/spiritCoreMediaProduction.mjs";
 import {
   buildMediaAssetIngestRecord,
+  createApprovedAssetRegistryBackfillPlan,
+  executeApprovedAssetRegistryBackfill,
+  getApprovedMediaAssetRegistryPath,
   ingestReviewedMediaAsset,
+  loadApprovedMediaAssetRegistry,
+  upsertApprovedMediaAssetRegistryRecords,
   validateMediaAssetIngestRecord,
 } from "../src/services/mediaAssetIngestService.mjs";
 import {
@@ -708,10 +714,16 @@ async function main() {
             path.join(process.cwd(), "runtime_data", "diagnostics", "media-ingest", result.metadataPath),
             "utf8",
           ));
+          const registry = await loadApprovedMediaAssetRegistry({
+            workspaceRoot: path.join(process.cwd(), "runtime_data", "diagnostics", "media-ingest"),
+          });
           return validation.ok
             && record.approvedRelativePath === "Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/lyra_motion_pack_v1_speaking_01_diag_approved_20260426_5d7764c247.mp4"
             && result.savedPath === record.approvedRelativePath
             && result.metadataPath.endsWith(".metadata.json")
+            && result.registryPath === getApprovedMediaAssetRegistryPath()
+            && result.registryUpdated === true
+            && registry.records.some((item) => item.entityId === "lyra" && item.assetType === "speaking_01")
             && metadata.providerJobId === input.providerJobId
             && metadata.approvalState === "approved"
             && metadata.activePromotionPerformed === false
@@ -761,6 +773,143 @@ async function main() {
             && metadata.providerGenerationPerformed === false;
         })(),
         detail: "ingest filenames avoid duplicate entity prefix while metadata preserves original packId",
+      },
+      {
+        name: "media-approved-registry-upsert-idempotent",
+        pass: await (async () => {
+          const workspaceRoot = path.join(process.cwd(), "runtime_data", "diagnostics", "approved-registry-idempotent");
+          const record = {
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            assetType: "idle_01",
+            variant: "v1",
+            status: "approved",
+            provider: "runway",
+            providerJobId: "registry-idempotent-job",
+            savedPath: "Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/lyra_motion_pack_v1_idle_01_v1_approved_20260426_registryid.mp4",
+            metadataPath: "Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/lyra_motion_pack_v1_idle_01_v1_approved_20260426_registryid.metadata.json",
+            rawArchivePath: null,
+            sourceAssetRef: "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png",
+            durationSec: 5,
+            ratio: "720:1280",
+            generationMode: "diagnostic_idle",
+            reviewNotes: "Diagnostic idempotent registry upsert.",
+            approvedBy: "endpoint-diagnostics",
+            approvedAt: "2026-04-26T12:00:00.000Z",
+          };
+          const first = await upsertApprovedMediaAssetRegistryRecords([record], { workspaceRoot });
+          const second = await upsertApprovedMediaAssetRegistryRecords([record], { workspaceRoot });
+          const registry = await loadApprovedMediaAssetRegistry({ workspaceRoot });
+          return first.registryPath === getApprovedMediaAssetRegistryPath()
+            && first.inserted >= 0
+            && second.updated === 1
+            && registry.records.filter((item) => item.providerJobId === "registry-idempotent-job").length === 1
+            && second.noActiveWritePerformed === true
+            && second.noManifestUpdatePerformed === true
+            && second.providerGenerationPerformed === false;
+        })(),
+        detail: "approved asset registry upsert is idempotent and avoids ACTIVE/manifest/provider behavior",
+      },
+      {
+        name: "media-approved-registry-backfill-plan-and-execute",
+        pass: await (async () => {
+          const workspaceRoot = path.join(process.cwd(), "runtime_data", "diagnostics", "approved-registry-backfill");
+          const foundationAssets = [
+            ["idle_01", "diagnostic_idle", "backfill-idle-job"],
+            ["speaking_01", "subtle_speaking", "backfill-speaking-job"],
+            ["listen_01", "attentive_listening", "backfill-listen-job"],
+            ["gesture_01", "gentle_gesture", "backfill-gesture-job"],
+          ];
+          const metadataPaths = [];
+          for (const [assetType, generationMode, providerJobId] of foundationAssets) {
+            const metadataPath = `Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/lyra_motion_pack_v1_${assetType}_v1_approved_20260426_backfill.metadata.json`;
+            metadataPaths.push(metadataPath);
+            const metadata = {
+              entityId: "lyra",
+              packId: "lyra-motion-pack-v1",
+              assetType,
+              variant: "v1",
+              status: "approved",
+              provider: "runway",
+              providerJobId,
+              savedPath: metadataPath.replace(".metadata.json", ".mp4"),
+              metadataPath,
+              rawArchivePath: null,
+              sourceAssetRef: "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png",
+              durationSec: 5,
+              ratio: "720:1280",
+              generationMode,
+              reviewNotes: "Diagnostic backfilled approved asset.",
+              approvedBy: "endpoint-diagnostics",
+              ingestedAt: "2026-04-26T12:00:00.000Z",
+              activePromotionPerformed: false,
+              noActiveWritePerformed: true,
+              noManifestUpdatePerformed: true,
+            };
+            await mkdir(path.dirname(path.join(workspaceRoot, metadataPath)), { recursive: true });
+            await writeFile(path.join(workspaceRoot, metadataPath), JSON.stringify(metadata, null, 2), "utf8");
+          }
+          const plan = await createApprovedAssetRegistryBackfillPlan({
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            approvedMetadataPaths: metadataPaths,
+            dryRun: true,
+          }, { workspaceRoot });
+          const executed = await executeApprovedAssetRegistryBackfill({
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            approvedMetadataPaths: metadataPaths,
+          }, { workspaceRoot });
+          const catalog = await createCommandCenterMediaCatalog({
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            requestedAssetTypes: ["idle_01", "speaking_01", "listen_01"],
+            includeApprovedAssets: true,
+            includeSourceReadiness: true,
+            includeSequenceCandidates: true,
+          }, { workspaceRoot });
+          return plan.dryRun === true
+            && plan.noActiveWritePerformed === true
+            && plan.noManifestUpdatePerformed === true
+            && plan.noProviderCall === true
+            && plan.proposedRegistryRecords.some((item) => item.assetType === "listen_01")
+            && executed.registryUpdated === true
+            && executed.noActiveWritePerformed === true
+            && executed.noManifestUpdatePerformed === true
+            && catalog.approvedAssetDiscoveryMode === "approved_registry"
+            && catalog.approvedAssets.some((item) => item.assetType === "listen_01")
+            && catalog.sequenceCandidates.some((candidate) => candidate.sequenceId === "conversation_presence_01" && candidate.status === "ready")
+            && catalog.sequenceCandidates.some((candidate) => candidate.sequenceId === "greeting_short_01" && candidate.status === "ready");
+        })(),
+        detail: "approved registry backfill plans read-only, execute writes only registry, and catalog reads registry",
+      },
+      {
+        name: "media-approved-registry-backfill-bypass-production-denied",
+        pass: canUseApprovedAssetRegistryBackfillStagingBypass({
+          method: "POST",
+          route: "/admin/media/approved-asset-registry-backfill-execute",
+          headers: { "x-media-ingest-test": "true" },
+          env: { NODE_ENV: "production", MEDIA_STAGING_TEST_BYPASS: "true" },
+          body: {
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+          },
+        }) === false,
+        detail: "production cannot use approved registry backfill bypass",
+      },
+      {
+        name: "media-approved-registry-backfill-bypass-staging-allowed",
+        pass: canUseApprovedAssetRegistryBackfillStagingBypass({
+          method: "POST",
+          route: "/admin/media/approved-asset-registry-backfill-execute",
+          headers: { "x-media-ingest-test": "true" },
+          env: { NODE_ENV: "staging", MEDIA_STAGING_TEST_BYPASS: "true" },
+          body: {
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+          },
+        }) === true,
+        detail: "staging can use narrow approved registry backfill bypass",
       },
       {
         name: "media-asset-ingest-bypass-production-denied",
@@ -1706,7 +1855,7 @@ async function main() {
             && bySource.medium_body.blockedAssetTypes.includes("greeting_or_entry_01")
             && byAsset.sit_or_perch_01.currentStatus === "source_blocked"
             && byAsset.walk_loop_01.currentStatus === "source_blocked"
-            && result.approvedAssetDiscoveryMode === "limited_filesystem_metadata"
+            && ["limited_filesystem_metadata", "approved_registry"].includes(result.approvedAssetDiscoveryMode)
             && result.failedOrRejectedJobs.failedJobDiscoveryMode === "not_persistent_yet"
             && result.sequenceCandidates.some((candidate) => candidate.sequenceId === "conversation_presence_01")
             && result.premiumReadiness.premiumGenerationEnabled === false
@@ -2724,6 +2873,25 @@ async function main() {
         ? "source reference registry plan shows medium_body unblocks gesture_02 and greeting_or_entry_01"
         : "unexpected source reference registry plan",
     });
+    await run("media-approved-asset-registry-backfill-plan", "POST", "/admin/media/approved-asset-registry-backfill-plan", {
+      headers: { "x-media-planning-test": "true" },
+      body: {
+        entityId: "lyra",
+        packId: "lyra-motion-pack-v1",
+        approvedMetadataPaths: [
+          "Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/lyra_motion_pack_v1_idle_01_v1_approved_20260426_missing.metadata.json",
+        ],
+        dryRun: true,
+      },
+      describe: (result) => result?.body?.mediaPlanningBypassUsed === true
+        && result?.body?.approvedAssetRegistryBackfillPlan?.dryRun === true
+        && result?.body?.approvedAssetRegistryBackfillPlan?.noProviderCall === true
+        && result?.body?.approvedAssetRegistryBackfillPlan?.noActiveWritePerformed === true
+        && result?.body?.approvedAssetRegistryBackfillPlan?.noManifestUpdatePerformed === true
+        && result?.body?.noGenerationPerformed === true
+        ? "approved asset registry backfill plan is read-only and safe"
+        : "unexpected approved asset registry backfill plan",
+    });
     await run("media-command-center-catalog", "POST", "/admin/media/command-center-catalog", {
       headers: { "x-media-planning-test": "true" },
       body: {
@@ -2763,7 +2931,7 @@ async function main() {
           && bySource.medium_body?.blockedAssetTypes?.includes("greeting_or_entry_01")
           && byAsset.sit_or_perch_01?.currentStatus === "source_blocked"
           && byAsset.walk_loop_01?.currentStatus === "source_blocked"
-          && catalog.approvedAssetDiscoveryMode === "limited_filesystem_metadata"
+          && ["limited_filesystem_metadata", "approved_registry"].includes(catalog.approvedAssetDiscoveryMode)
           && catalog.sequenceCandidates?.length > 0
           && catalog.premiumReadiness?.premiumGenerationEnabled === false
           ? "command center catalog is read-only and reports source blocks, sequences, and disabled premium generation"

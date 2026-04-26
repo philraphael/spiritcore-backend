@@ -4,6 +4,7 @@ import path from "path";
 import { ValidationError } from "../errors.mjs";
 import { SPIRITGATE_RUNTIME_MEDIA } from "../../spiritkins-app/data/spiritkinRuntimeConfig.js";
 import { getSpiritkinMediaManifest, resolveSpiritkinMediaName } from "../../spiritkins-app/data/spiritkinMediaManifest.js";
+import { loadApprovedMediaAssetRegistry } from "./mediaAssetIngestService.mjs";
 
 export const SPIRITCORE_MEDIA_ASSET_KINDS = Object.freeze([
   "portrait",
@@ -1407,12 +1408,23 @@ export async function createCommandCenterMediaCatalog(input = {}, runtime = {}) 
   const includeSequenceCandidates = input.includeSequenceCandidates !== false;
   const includePremiumReadiness = input.includePremiumReadiness !== false;
   const includeFailures = input.includeFailures !== false;
+  const approvedRegistry = includeApprovedAssets
+    ? await loadApprovedMediaAssetRegistry(runtime)
+    : { records: [], exists: false, registryPath: "Spiritverse_MASTER_ASSETS/APPROVED/_registry/approved_media_assets.registry.json" };
+  const registryApprovedAssets = approvedRegistry.records
+    .filter((record) => record.entityId === entityId)
+    .filter((record) => record.packId === packId)
+    .filter((record) => record.status === "approved");
   const discoveredMetadata = includeApprovedAssets
     ? await discoverApprovedMetadataForEntity(entityId, runtime)
     : [];
-  const approvedAssets = discoveredMetadata
+  const fallbackApprovedAssets = discoveredMetadata
     .filter((record) => record.assetType && !record.metadataPath.includes("/source_stills/"))
     .filter((record) => record.approvalState === "approved");
+  const approvedAssets = registryApprovedAssets.length ? registryApprovedAssets : fallbackApprovedAssets;
+  const approvedAssetDiscoveryMode = !includeApprovedAssets
+    ? "disabled"
+    : (registryApprovedAssets.length ? "approved_registry" : "limited_filesystem_metadata");
   const sourceStillRecords = discoveredMetadata
     .filter((record) => record.sourceCategory && record.metadataPath.includes("/source_stills/"));
   const availableSources = buildAvailableSourcesFromDiscovery(entityId, input, sourceStillRecords);
@@ -1494,10 +1506,13 @@ export async function createCommandCenterMediaCatalog(input = {}, runtime = {}) 
       ratio: asset.ratio || null,
       generationMode: asset.generationMode || null,
       reviewNotes: asset.reviewNotes || "",
-      approvalState: asset.approvalState,
+      approvalState: asset.approvalState || asset.status || "approved",
     })) : [],
-    approvedAssetDiscoveryMode: includeApprovedAssets ? "limited_filesystem_metadata" : "disabled",
-    approvedAssetDiscoveryRecommendation: "Future catalog phases should add a persistent approved asset registry instead of relying on filesystem metadata discovery.",
+    approvedAssetDiscoveryMode,
+    approvedAssetRegistryPath: approvedRegistry.registryPath,
+    approvedAssetDiscoveryRecommendation: approvedAssetDiscoveryMode === "approved_registry"
+      ? "Catalog is using the approved media asset registry."
+      : "Run approved-asset-registry-backfill-execute for historical approved assets so sequence candidates can use the registry.",
     failedOrRejectedJobs: includeFailures ? {
       failedJobDiscoveryMode: "not_persistent_yet",
       knownPolicies: [
@@ -2919,6 +2934,8 @@ export function getMediaCatalogSummary() {
       "POST /admin/media/source-reference-plan",
       "POST /admin/media/source-reference-registry-plan",
       "POST /admin/media/command-center-catalog",
+      "POST /admin/media/approved-asset-registry-backfill-plan",
+      "POST /admin/media/approved-asset-registry-backfill-execute",
       "GET /admin/media/spiritgate-source-summary",
       "POST /admin/media/spiritgate-enhancement-plan-from-current-source",
       "POST /admin/media/spiritgate-segment-plan",
