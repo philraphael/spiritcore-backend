@@ -58,6 +58,15 @@ function categoryForAssetType(assetType = "") {
   return "media";
 }
 
+function filenamePackComponent(entityId = "", packId = "") {
+  const entityPrefix = `${slugPart(entityId, "")}_`;
+  const normalizedPackId = slugPart(packId, "pack");
+  if (entityPrefix !== "_" && normalizedPackId.startsWith(entityPrefix)) {
+    return normalizedPackId.slice(entityPrefix.length) || normalizedPackId;
+  }
+  return normalizedPackId;
+}
+
 function safeJoin(root, relativePath) {
   const absoluteRoot = path.resolve(root);
   const absoluteTarget = path.resolve(absoluteRoot, relativePath);
@@ -99,7 +108,8 @@ async function defaultDownloadAsset(outputUrl, { allowDataUrl = false } = {}) {
 
 export function buildMediaAssetIngestRecord(input = {}, options = {}) {
   const entityId = slugPart(input.entityId, "");
-  const packId = slugPart(input.packId, "");
+  const packId = normalizeText(input.packId, 160);
+  const packSlug = slugPart(input.packId, "");
   const assetType = slugPart(input.assetType, "");
   const variant = slugPart(input.variant || "v1", "v1");
   const status = slugPart(input.status, "");
@@ -109,7 +119,8 @@ export function buildMediaAssetIngestRecord(input = {}, options = {}) {
   const sourceAssetRef = normalizeText(input.sourceAssetRef, 1000);
   const category = categoryForAssetType(assetType);
   const createdAt = options.now ? new Date(options.now) : new Date();
-  const fileName = `${entityId}_${packId}_${assetType}_${variant}_${status}_${yyyymmdd(createdAt)}_${shortJobId(providerJobId)}.mp4`;
+  const packFileComponent = filenamePackComponent(entityId, packSlug);
+  const fileName = `${entityId}_${packFileComponent}_${assetType}_${variant}_${status}_${yyyymmdd(createdAt)}_${shortJobId(providerJobId)}.mp4`;
   const approvedRelativeDir = path.posix.join(DEFAULT_ROOT, "APPROVED", entityId, category);
   const approvedRelativePath = path.posix.join(approvedRelativeDir, fileName);
   const metadataRelativePath = approvedRelativePath.replace(/\.mp4$/i, ".metadata.json");
@@ -124,6 +135,7 @@ export function buildMediaAssetIngestRecord(input = {}, options = {}) {
   return {
     entityId,
     packId,
+    packSlug,
     assetType,
     variant,
     status,
@@ -138,6 +150,7 @@ export function buildMediaAssetIngestRecord(input = {}, options = {}) {
     approvedBy: normalizeText(input.approvedBy, 120),
     category,
     fileName,
+    packFileComponent,
     approvedRelativeDir,
     approvedRelativePath,
     metadataRelativePath,

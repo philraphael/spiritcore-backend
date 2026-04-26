@@ -709,6 +709,46 @@ async function main() {
         detail: "approved media ingest resolves APPROVED path, writes metadata, and avoids ACTIVE writes",
       },
       {
+        name: "media-asset-ingest-filename-deduplicates-entity",
+        pass: await (async () => {
+          const input = {
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            assetType: "speaking_01",
+            variant: "v1",
+            status: "approved",
+            provider: "runway",
+            providerJobId: "6758f00da7-test-job",
+            outputUrl: "https://example.com/lyra-speaking.mp4",
+            sourceAssetRef: "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png",
+            durationSec: 5,
+            ratio: "720:1280",
+            generationMode: "subtle_speaking",
+            reviewNotes: "Diagnostic filename normalization ingest.",
+            approvedBy: "endpoint-diagnostics",
+          };
+          const result = await ingestReviewedMediaAsset(input, {
+            now: "2026-04-26T12:00:00.000Z",
+            workspaceRoot: path.join(process.cwd(), "runtime_data", "diagnostics", "media-ingest-dedupe"),
+            downloadAsset: async () => Buffer.from("diagnostic dedupe mp4 bytes"),
+          });
+          const metadata = JSON.parse(await readFile(
+            path.join(process.cwd(), "runtime_data", "diagnostics", "media-ingest-dedupe", result.metadataPath),
+            "utf8",
+          ));
+          return result.savedPath.endsWith("lyra_motion_pack_v1_speaking_01_v1_approved_20260426_6758f00da7.mp4")
+            && !result.savedPath.includes("lyra_lyra_motion_pack_v1")
+            && metadata.packId === "lyra-motion-pack-v1"
+            && metadata.packSlug === "lyra_motion_pack_v1"
+            && metadata.packFileComponent === "motion_pack_v1"
+            && metadata.activePromotionPerformed === false
+            && metadata.noActiveWritePerformed === true
+            && metadata.noManifestUpdatePerformed === true
+            && metadata.providerGenerationPerformed === false;
+        })(),
+        detail: "ingest filenames avoid duplicate entity prefix while metadata preserves original packId",
+      },
+      {
         name: "media-asset-ingest-bypass-production-denied",
         pass: canUseMediaIngestStagingBypass({
           method: "POST",
