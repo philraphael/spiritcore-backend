@@ -35,6 +35,7 @@ import {
   createSequenceComposeExecutionResult,
   createSequenceComposePlan,
   createSourceReferenceRegistryPlan,
+  createCommandCenterMediaCatalog,
   createSpiritCoreAvatarPackPlan,
   createSpiritCoreDefaultOperatorPlan,
   createSpiritkinMotionPackPlan,
@@ -155,6 +156,7 @@ const MEDIA_PLANNING_BYPASS_ROUTES = Object.freeze([
   "POST /admin/media/spiritgate-enhancement-plan-from-current-source",
   "POST /admin/media/source-reference-plan",
   "POST /admin/media/source-reference-registry-plan",
+  "POST /admin/media/command-center-catalog",
 ]);
 
 function mediaPlanningRouteKey(method = "", route = "") {
@@ -1087,6 +1089,28 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const commandCenterCatalogSchema = {
+    body: {
+      type: "object",
+      required: ["entityId", "packId"],
+      properties: {
+        entityId: { type: "string", minLength: 1 },
+        packId: { type: "string", minLength: 1 },
+        requestedAssetTypes: { type: "array", items: { type: "string" }, nullable: true },
+        availableSources: {
+          type: "object",
+          additionalProperties: true,
+          nullable: true,
+        },
+        includeApprovedAssets: { type: "boolean", nullable: true },
+        includeSourceReadiness: { type: "boolean", nullable: true },
+        includeSequenceCandidates: { type: "boolean", nullable: true },
+        includePremiumReadiness: { type: "boolean", nullable: true },
+        includeFailures: { type: "boolean", nullable: true },
+      },
+    },
+  };
+
   const sourceStillIngestSchema = {
     body: {
       type: "object",
@@ -1975,6 +1999,47 @@ export async function adminRoutes(fastify, opts) {
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     sourceReferenceRegistryPlan: createSourceReferenceRegistryPlan(req.body),
   }), req, reply));
+
+  fastify.post("/admin/media/command-center-catalog", {
+    preHandler: requireMediaPlanningAccess,
+    schema: commandCenterCatalogSchema,
+  }, async (req, reply) => {
+    const route = req.routeOptions?.url || req.url;
+    try {
+      const catalog = await createCommandCenterMediaCatalog(req.body);
+      return {
+        ok: true,
+        route,
+        commandCenterCatalog: catalog,
+        mediaPlanningBypassUsed: Boolean(req.mediaPlanningBypassUsed),
+        externalApiCall: false,
+        noProviderCall: true,
+        noGenerationPerformed: true,
+        noIngestPerformed: true,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+        premiumGenerationEnabled: false,
+      };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({
+        ok: false,
+        route,
+        error: err.code ?? "COMMAND_CENTER_MEDIA_CATALOG_ERROR",
+        message: err.message,
+        details: err.detail || {},
+        externalApiCall: false,
+        noProviderCall: true,
+        noGenerationPerformed: true,
+        noIngestPerformed: true,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+        premiumGenerationEnabled: false,
+      });
+    }
+  });
 
   fastify.get("/admin/media/spiritgate-source-summary", {
     preHandler: requireMediaPlanningAccess,

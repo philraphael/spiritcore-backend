@@ -1,4 +1,6 @@
 import { randomUUID } from "crypto";
+import { readdir, readFile } from "fs/promises";
+import path from "path";
 import { ValidationError } from "../errors.mjs";
 import { SPIRITGATE_RUNTIME_MEDIA } from "../../spiritkins-app/data/spiritkinRuntimeConfig.js";
 import { getSpiritkinMediaManifest, resolveSpiritkinMediaName } from "../../spiritkins-app/data/spiritkinMediaManifest.js";
@@ -1203,6 +1205,338 @@ export function createSourceReferenceRegistryPlan(input = {}) {
     sourceReferencePlan: basePlan,
     noWritesPerformed: true,
     noIngestPerformed: true,
+    ...lifecycleNoWriteFlags(),
+  };
+}
+
+async function findMetadataFiles(root, limit = 120) {
+  const results = [];
+  async function walk(dir) {
+    if (results.length >= limit) return;
+    let entries = [];
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (results.length >= limit) return;
+      const absolute = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(absolute);
+      } else if (/\.metadata\.json$/i.test(entry.name)) {
+        results.push(absolute);
+      }
+    }
+  }
+  await walk(root);
+  return results;
+}
+
+function workspaceRelativePath(absolutePath = "") {
+  return path.relative(process.cwd(), absolutePath).replace(/\\/g, "/");
+}
+
+async function discoverApprovedMetadataForEntity(entityId, { workspaceRoot = process.cwd() } = {}) {
+  const safeEntity = slugify(entityId, "");
+  if (!safeEntity) return [];
+  const approvedRoot = path.join(workspaceRoot, "Spiritverse_MASTER_ASSETS", "APPROVED", safeEntity);
+  const metadataFiles = await findMetadataFiles(approvedRoot);
+  const records = [];
+  for (const metadataFile of metadataFiles) {
+    try {
+      const parsed = JSON.parse(await readFile(metadataFile, "utf8"));
+      records.push({
+        metadataPath: parsed.metadataPath || workspaceRelativePath(metadataFile),
+        savedPath: parsed.savedPath || parsed.approvedRelativePath || workspaceRelativePath(metadataFile).replace(/\.metadata\.json$/i, ".mp4"),
+        assetType: normalizeText(parsed.assetType || "", 80),
+        sourceCategory: normalizeText(parsed.sourceCategory || "", 80),
+        provider: normalizeText(parsed.provider || "", 80),
+        providerJobId: normalizeText(parsed.providerJobId || "", 180),
+        durationSec: Number.isFinite(Number(parsed.durationSec)) ? Number(parsed.durationSec) : null,
+        ratio: normalizeText(parsed.ratio || "", 40),
+        generationMode: normalizeText(parsed.generationMode || "", 80),
+        reviewNotes: normalizeText(parsed.reviewNotes || "", 2000),
+        approvalState: normalizeText(parsed.approvalState || parsed.status || parsed.lifecycleState || "approved", 80),
+        selectedSourceRef: parsed.savedPath || parsed.approvedRelativePath || workspaceRelativePath(metadataFile).replace(/\.metadata\.json$/i, path.extname(metadataFile)),
+      });
+    } catch {
+      // Ignore malformed sidecars in read-only catalog mode.
+    }
+  }
+  return records;
+}
+
+function buildAvailableSourcesFromDiscovery(entityId, input = {}, discoveredMetadata = []) {
+  const explicit = normalizeAvailableMotionSources(input.availableSources || {});
+  const existingSource = resolveExistingSpiritkinSource(entityId, {
+    origin: input.publicOrigin || input.stagingOrigin || "https://spiritcore-backend-copy-production.up.railway.app",
+  });
+  if (!explicit.close_portrait && existingSource.sourceAssetRef) {
+    explicit.close_portrait = existingSource.sourceAssetRef;
+  }
+  for (const record of discoveredMetadata) {
+    if (SPIRITKIN_MOTION_SOURCE_CATEGORIES.includes(record.sourceCategory) && !explicit[record.sourceCategory]) {
+      explicit[record.sourceCategory] = record.savedPath;
+    }
+  }
+  return explicit;
+}
+
+function knownPolicyForAssetType(assetType, sourceReady) {
+  if (["gesture_02", "greeting_or_entry_01"].includes(assetType) && !sourceReady) {
+    return {
+      retryAllowed: false,
+      reason: "Do not retry from the close portrait. Create and ingest medium_body first.",
+      maxRetriesRecommended: 0,
+      knownBadSourcePromptCombination: true,
+    };
+  }
+  if (assetType === "sit_or_perch_01" && !sourceReady) {
+    return {
+      retryAllowed: false,
+      reason: "Create and ingest seated_or_perched source still first.",
+      maxRetriesRecommended: 0,
+      knownBadSourcePromptCombination: false,
+    };
+  }
+  if (assetType === "walk_loop_01" && !sourceReady) {
+    return {
+      retryAllowed: false,
+      reason: "Create and ingest full_body or realm_environment source first.",
+      maxRetriesRecommended: 0,
+      knownBadSourcePromptCombination: false,
+    };
+  }
+  if (assetType === "think_01") {
+    return {
+      retryAllowed: sourceReady,
+      reason: sourceReady
+        ? "Retry only with improved compact prompt or approved_motion_reference; lower priority due known slow/no-thinking attempts."
+        : "Create an approved_motion_reference or improve close source strategy before retry.",
+      maxRetriesRecommended: 1,
+      knownBadSourcePromptCombination: true,
+    };
+  }
+  return {
+    retryAllowed: sourceReady,
+    reason: sourceReady ? "Eligible for one controlled review-required generation attempt." : "Required source category missing.",
+    maxRetriesRecommended: sourceReady ? 1 : 0,
+    knownBadSourcePromptCombination: false,
+  };
+}
+
+function statusForAssetType(assetType, sourceReady, approvedByType = new Map()) {
+  if (approvedByType.has(assetType)) return "approved";
+  if (!sourceReady) return "source_blocked";
+  if (assetType === "think_01") return "rejected_or_failed";
+  return "needs_generation";
+}
+
+function nextActionForStatus(status, assetType) {
+  if (status === "approved") return "use existing approved asset";
+  if (status === "source_blocked") return "create source still first";
+  if (status === "rejected_or_failed") {
+    return assetType === "think_01" ? "retry with improved prompt" : "do not retry from current source";
+  }
+  if (status === "needs_generation") return "generate motion";
+  return "unknown";
+}
+
+function buildSequenceCandidates(approvedByType = new Map()) {
+  const definitions = [
+    {
+      sequenceId: "conversation_presence_01",
+      assetTypes: ["idle_01", "listen_01", "speaking_01"],
+      targetDurationSec: 15,
+    },
+    {
+      sequenceId: "greeting_short_01",
+      assetTypes: ["gesture_01", "idle_01"],
+      targetDurationSec: 10,
+    },
+    {
+      sequenceId: "listening_response_01",
+      assetTypes: ["listen_01", "speaking_01"],
+      targetDurationSec: 10,
+    },
+    {
+      sequenceId: "calm_presence_loop_01",
+      assetTypes: ["idle_01", "listen_01"],
+      targetDurationSec: 10,
+    },
+  ];
+  return definitions.map((definition) => {
+    const missingAssetTypes = definition.assetTypes.filter((assetType) => !approvedByType.has(assetType));
+    return {
+      ...definition,
+      status: missingAssetTypes.length === 0 ? "ready" : (missingAssetTypes.length === definition.assetTypes.length ? "blocked" : "partial"),
+      missingAssetTypes,
+      approvedAssetRefs: definition.assetTypes
+        .filter((assetType) => approvedByType.has(assetType))
+        .map((assetType) => ({
+          assetType,
+          savedPath: approvedByType.get(assetType)?.savedPath || null,
+          metadataPath: approvedByType.get(assetType)?.metadataPath || null,
+        })),
+      compositionRoute: "/admin/media/sequence-compose-plan",
+    };
+  });
+}
+
+export async function createCommandCenterMediaCatalog(input = {}, runtime = {}) {
+  const entityId = normalizeText(input.entityId || input.spiritkinId || "lyra", 120).toLowerCase();
+  const packId = normalizeText(input.packId || `${slugify(entityId)}-motion-pack-v1`, 160);
+  const requestedAssetTypes = Array.isArray(input.requestedAssetTypes) && input.requestedAssetTypes.length
+    ? [...new Set(input.requestedAssetTypes.map((assetType) => normalizeText(assetType, 80)).filter(Boolean))]
+    : ["idle_01", "speaking_01", "listen_01", "think_01", "gesture_01", "gesture_02", "greeting_or_entry_01", "sit_or_perch_01", "walk_loop_01"];
+  const errors = [];
+  if (!entityId) errors.push("entityId is required");
+  if (!packId) errors.push("packId is required");
+  for (const assetType of requestedAssetTypes) {
+    if (!SPIRITKIN_MOTION_PACK_ASSET_TYPES.includes(assetType)) {
+      errors.push(`requestedAssetTypes contains unsupported assetType ${assetType}`);
+    }
+  }
+  if (errors.length) {
+    throw new ValidationError("Invalid command center media catalog request.", errors);
+  }
+
+  const includeApprovedAssets = input.includeApprovedAssets !== false;
+  const includeSourceReadiness = input.includeSourceReadiness !== false;
+  const includeSequenceCandidates = input.includeSequenceCandidates !== false;
+  const includePremiumReadiness = input.includePremiumReadiness !== false;
+  const includeFailures = input.includeFailures !== false;
+  const discoveredMetadata = includeApprovedAssets
+    ? await discoverApprovedMetadataForEntity(entityId, runtime)
+    : [];
+  const approvedAssets = discoveredMetadata
+    .filter((record) => record.assetType && !record.metadataPath.includes("/source_stills/"))
+    .filter((record) => record.approvalState === "approved");
+  const sourceStillRecords = discoveredMetadata
+    .filter((record) => record.sourceCategory && record.metadataPath.includes("/source_stills/"));
+  const availableSources = buildAvailableSourcesFromDiscovery(entityId, input, sourceStillRecords);
+  const sourcePlan = createSpiritkinSourceReferencePlan({
+    entityId,
+    packId,
+    requestedAssetTypes,
+    availableSources,
+  });
+  const registryPlan = createSourceReferenceRegistryPlan({
+    entityId,
+    packId,
+    requestedAssetTypes,
+    availableSources,
+  });
+  const approvedByType = new Map(approvedAssets.map((asset) => [asset.assetType, asset]));
+
+  const sourceReadiness = includeSourceReadiness
+    ? SPIRITKIN_MOTION_SOURCE_CATEGORIES.map((category) => {
+      const blockedAssetTypes = sourcePlan.sourceSelections
+        .filter((selection) => selection.blockedUntilSourceExists && selection.requiredSourceCategories.includes(category))
+        .map((selection) => selection.assetType);
+      return {
+        sourceCategory: category,
+        exists: Boolean(availableSources[category]),
+        selectedSourceRef: availableSources[category] || null,
+        blockedAssetTypes,
+        unlockedAssetTypes: registryPlan.becomesUnblockedBySourceCategory[category] || [],
+        recommendation: recommendedStillForSourceCategory(category, entityId),
+      };
+    })
+    : [];
+
+  const motionPackStatus = sourcePlan.sourceSelections.map((selection) => {
+    const currentStatus = statusForAssetType(selection.assetType, !selection.blockedUntilSourceExists, approvedByType);
+    return {
+      assetType: selection.assetType,
+      requiredSourceCategory: selection.requiredSourceCategory,
+      sourceReady: !selection.blockedUntilSourceExists,
+      generationAllowedBySource: !selection.blockedUntilSourceExists,
+      generationMode: selection.generationMode,
+      assetKind: selection.assetKind,
+      shotProfile: selection.shotProfile,
+      poseVariant: selection.poseVariant,
+      timingIntent: selection.timingIntent,
+      motionCompletionRule: selection.motionCompletionRule?.summary || "",
+      currentStatus,
+      nextRecommendedAction: nextActionForStatus(currentStatus, selection.assetType),
+    };
+  });
+
+  const retryEligibility = sourcePlan.sourceSelections.map((selection) => {
+    const policy = knownPolicyForAssetType(selection.assetType, !selection.blockedUntilSourceExists);
+    return {
+      assetType: selection.assetType,
+      retryAllowed: policy.retryAllowed,
+      reason: policy.reason,
+      maxRetriesRecommended: policy.maxRetriesRecommended,
+      currentRecommendedSourceCategory: selection.selectedSourceCategory || selection.requiredSourceCategory,
+      knownBadSourcePromptCombination: policy.knownBadSourcePromptCombination,
+    };
+  });
+
+  return {
+    ok: true,
+    entityId,
+    packId,
+    generatedAt: new Date().toISOString(),
+    catalogMode: "read_only",
+    sourceReadiness,
+    motionPackStatus,
+    approvedAssets: includeApprovedAssets ? approvedAssets.map((asset) => ({
+      assetType: asset.assetType,
+      savedPath: asset.savedPath,
+      metadataPath: asset.metadataPath,
+      provider: asset.provider || null,
+      providerJobId: asset.providerJobId || null,
+      durationSec: asset.durationSec,
+      ratio: asset.ratio || null,
+      generationMode: asset.generationMode || null,
+      reviewNotes: asset.reviewNotes || "",
+      approvalState: asset.approvalState,
+    })) : [],
+    approvedAssetDiscoveryMode: includeApprovedAssets ? "limited_filesystem_metadata" : "disabled",
+    approvedAssetDiscoveryRecommendation: "Future catalog phases should add a persistent approved asset registry instead of relying on filesystem metadata discovery.",
+    failedOrRejectedJobs: includeFailures ? {
+      failedJobDiscoveryMode: "not_persistent_yet",
+      knownPolicies: [
+        "think_01 has known bad attempts from close portrait: slow motion, blurred background, and weak thinking expression.",
+        "gesture_02 and greeting_or_entry_01 should not continue from close portrait; require medium_body.",
+        "sit_or_perch_01 requires seated_or_perched.",
+        "walk_loop_01 requires full_body or realm_environment.",
+      ],
+      recommendation: "Add a persistent failed-job registry before premium self-generation or large motion batches.",
+    } : null,
+    retryEligibility,
+    sequenceCandidates: includeSequenceCandidates ? buildSequenceCandidates(approvedByType) : [],
+    premiumReadiness: includePremiumReadiness ? {
+      premiumGenerationEnabled: false,
+      blockers: PREMIUM_MEMBER_GENERATION_BOUNDARY.readinessChecklist || [],
+      missingSystems: [
+        "server-side Runway key",
+        "budget tracker",
+        "queue",
+        "auto-review scorer",
+        "failed-job registry",
+        "source still starter pack",
+        "partial activation rules",
+        "admin exception review",
+      ],
+    } : null,
+    commandCenterActions: [
+      "create Lyra medium_body source still",
+      "ingest approved medium_body source still",
+      "rerun source-reference plan",
+      "generate gesture_02 from medium_body",
+      "generate greeting_or_entry_01 from medium_body",
+      "create seated_or_perched still",
+      "create full_body still",
+      "compose approved short sequence from existing approved clips",
+    ],
+    externalApiCall: false,
+    noIngestPerformed: true,
+    premiumGenerationEnabled: false,
     ...lifecycleNoWriteFlags(),
   };
 }
@@ -2584,6 +2918,7 @@ export function getMediaCatalogSummary() {
       "POST /admin/media/source-still-ingest",
       "POST /admin/media/source-reference-plan",
       "POST /admin/media/source-reference-registry-plan",
+      "POST /admin/media/command-center-catalog",
       "GET /admin/media/spiritgate-source-summary",
       "POST /admin/media/spiritgate-enhancement-plan-from-current-source",
       "POST /admin/media/spiritgate-segment-plan",

@@ -32,6 +32,7 @@ import {
   createSequenceComposeExecutionResult,
   createSequenceComposePlan,
   createSourceReferenceRegistryPlan,
+  createCommandCenterMediaCatalog,
   createSpiritCoreAvatarPackPlan,
   createSpiritCoreDefaultOperatorPlan,
   createSpiritkinMotionPackPlan,
@@ -1668,6 +1669,52 @@ async function main() {
         detail: "source reference registry plan shows medium_body unblocks greeting and wider gesture states",
       },
       {
+        name: "media-command-center-catalog-read-only",
+        pass: await (async () => {
+          const result = await createCommandCenterMediaCatalog({
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            requestedAssetTypes: [
+              "idle_01",
+              "speaking_01",
+              "listen_01",
+              "think_01",
+              "gesture_01",
+              "gesture_02",
+              "greeting_or_entry_01",
+              "sit_or_perch_01",
+              "walk_loop_01",
+            ],
+            includeApprovedAssets: true,
+            includeSourceReadiness: true,
+            includeSequenceCandidates: true,
+            includePremiumReadiness: true,
+            includeFailures: true,
+          });
+          const bySource = Object.fromEntries(result.sourceReadiness.map((item) => [item.sourceCategory, item]));
+          const byAsset = Object.fromEntries(result.motionPackStatus.map((item) => [item.assetType, item]));
+          return result.ok === true
+            && result.catalogMode === "read_only"
+            && result.externalApiCall === false
+            && result.noProviderCall === true
+            && result.noGenerationPerformed === true
+            && result.noIngestPerformed === true
+            && result.noPromotionPerformed === true
+            && result.noManifestUpdatePerformed === true
+            && result.noActiveWritePerformed === true
+            && bySource.medium_body.blockedAssetTypes.includes("gesture_02")
+            && bySource.medium_body.blockedAssetTypes.includes("greeting_or_entry_01")
+            && byAsset.sit_or_perch_01.currentStatus === "source_blocked"
+            && byAsset.walk_loop_01.currentStatus === "source_blocked"
+            && result.approvedAssetDiscoveryMode === "limited_filesystem_metadata"
+            && result.failedOrRejectedJobs.failedJobDiscoveryMode === "not_persistent_yet"
+            && result.sequenceCandidates.some((candidate) => candidate.sequenceId === "conversation_presence_01")
+            && result.premiumReadiness.premiumGenerationEnabled === false
+            && result.commandCenterActions.includes("create Lyra medium_body source still");
+        })(),
+        detail: "command center media catalog aggregates source readiness, retry policy, sequences, and premium blockers without writes",
+      },
+      {
         name: "media-sequence-compose-plan-approved-only",
         pass: (() => {
           const result = createSequenceComposePlan({
@@ -2676,6 +2723,52 @@ async function main() {
         && result?.body?.sourceReferenceRegistryPlan?.noManifestUpdatePerformed === true
         ? "source reference registry plan shows medium_body unblocks gesture_02 and greeting_or_entry_01"
         : "unexpected source reference registry plan",
+    });
+    await run("media-command-center-catalog", "POST", "/admin/media/command-center-catalog", {
+      headers: { "x-media-planning-test": "true" },
+      body: {
+        entityId: "lyra",
+        packId: "lyra-motion-pack-v1",
+        requestedAssetTypes: [
+          "idle_01",
+          "speaking_01",
+          "listen_01",
+          "think_01",
+          "gesture_01",
+          "gesture_02",
+          "greeting_or_entry_01",
+          "sit_or_perch_01",
+          "walk_loop_01",
+        ],
+        includeApprovedAssets: true,
+        includeSourceReadiness: true,
+        includeSequenceCandidates: true,
+        includePremiumReadiness: true,
+        includeFailures: true,
+      },
+      describe: (result) => {
+        const catalog = result?.body?.commandCenterCatalog || {};
+        const bySource = Object.fromEntries((catalog.sourceReadiness || []).map((item) => [item.sourceCategory, item]));
+        const byAsset = Object.fromEntries((catalog.motionPackStatus || []).map((item) => [item.assetType, item]));
+        return result?.body?.mediaPlanningBypassUsed === true
+          && catalog.ok === true
+          && catalog.catalogMode === "read_only"
+          && catalog.noProviderCall === true
+          && catalog.noGenerationPerformed === true
+          && catalog.noIngestPerformed === true
+          && catalog.noPromotionPerformed === true
+          && catalog.noManifestUpdatePerformed === true
+          && catalog.noActiveWritePerformed === true
+          && bySource.medium_body?.blockedAssetTypes?.includes("gesture_02")
+          && bySource.medium_body?.blockedAssetTypes?.includes("greeting_or_entry_01")
+          && byAsset.sit_or_perch_01?.currentStatus === "source_blocked"
+          && byAsset.walk_loop_01?.currentStatus === "source_blocked"
+          && catalog.approvedAssetDiscoveryMode === "limited_filesystem_metadata"
+          && catalog.sequenceCandidates?.length > 0
+          && catalog.premiumReadiness?.premiumGenerationEnabled === false
+          ? "command center catalog is read-only and reports source blocks, sequences, and disabled premium generation"
+          : "unexpected command center media catalog result";
+      },
     });
     await run("media-spiritgate-source-summary", "GET", "/admin/media/spiritgate-source-summary", {
       headers: {
