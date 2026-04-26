@@ -149,6 +149,9 @@ function mediaPlanningRouteKey(method = "", route = "") {
   return `${String(method || "").toUpperCase()} ${String(route || "").trim()}`;
 }
 
+const MEDIA_INGEST_BYPASS_ENTITY_IDS = Object.freeze(["lyra", "raien", "kairo", "elaria", "thalassar"]);
+const MEDIA_INGEST_SOURCE_PREFIX = "https://spiritcore-backend-copy-production.up.railway.app/";
+
 export function canUseMediaPlanningStagingBypass({ method = "", route = "", headers = {}, env = process.env } = {}) {
   const headerEnabled = isTrueEnv(headers["x-media-planning-test"]);
   const envEnabled = isTrueEnv(env.RUNWAY_STAGING_TEST_BYPASS) || isTrueEnv(env.MEDIA_STAGING_TEST_BYPASS);
@@ -156,6 +159,31 @@ export function canUseMediaPlanningStagingBypass({ method = "", route = "", head
     && envEnabled
     && headerEnabled
     && MEDIA_PLANNING_BYPASS_ROUTES.includes(mediaPlanningRouteKey(method, route));
+}
+
+export function canUseMediaIngestStagingBypass({
+  method = "",
+  route = "",
+  headers = {},
+  body = {},
+  env = process.env,
+} = {}) {
+  const headerEnabled = isTrueEnv(headers["x-media-ingest-test"]);
+  const envEnabled = isTrueEnv(env.RUNWAY_STAGING_TEST_BYPASS) || isTrueEnv(env.MEDIA_STAGING_TEST_BYPASS);
+  const entityId = String(body?.entityId || "").trim().toLowerCase();
+  const packId = String(body?.packId || "").trim().toLowerCase();
+  const status = String(body?.status || "").trim().toLowerCase();
+  const outputUrl = String(body?.outputUrl || "").trim();
+  const sourceAssetRef = String(body?.sourceAssetRef || "").trim();
+  return env.NODE_ENV === "staging"
+    && envEnabled
+    && headerEnabled
+    && mediaPlanningRouteKey(method, route) === "POST /admin/media/asset-ingest"
+    && status === "approved"
+    && MEDIA_INGEST_BYPASS_ENTITY_IDS.includes(entityId)
+    && packId.endsWith("motion-pack-v1")
+    && outputUrl.startsWith("https://")
+    && sourceAssetRef.startsWith(MEDIA_INGEST_SOURCE_PREFIX);
 }
 
 function readRunwayTransientHeaders(body = {}, headers = {}, env = process.env) {
@@ -264,6 +292,33 @@ export async function adminRoutes(fastify, opts) {
         bypassed: true,
         mode: "staging-media-planning-bypass",
         source: "staging-media-planning-bypass",
+      };
+      return;
+    }
+    return requireAdminAccess(req, reply);
+  }
+
+  async function requireMediaAssetIngestAccess(req, reply) {
+    const route = req.routeOptions?.url || req.routerPath || req.url;
+    const allowed = canUseMediaIngestStagingBypass({
+      method: req.method,
+      route,
+      headers: req.headers || {},
+      body: req.body || {},
+      env: process.env,
+    });
+    req.mediaIngestBypassUsed = Boolean(allowed);
+    fastify.log?.warn?.({
+      mediaIngestBypassUsed: Boolean(allowed),
+      route,
+      method: req.method,
+    }, "[admin] media ingest access");
+    if (allowed) {
+      req.adminAccess = {
+        allowed: true,
+        bypassed: true,
+        mode: "staging-media-ingest-bypass",
+        source: "staging-media-ingest-bypass",
       };
       return;
     }
@@ -1220,7 +1275,7 @@ export async function adminRoutes(fastify, opts) {
   }), req, reply));
 
   fastify.post("/admin/media/asset-ingest", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaAssetIngestAccess,
     schema: mediaAssetIngestSchema,
   }, async (req, reply) => {
     const route = req.routeOptions?.url || req.url;
@@ -1251,6 +1306,7 @@ export async function adminRoutes(fastify, opts) {
           approvalState: ingestResult.approvalState,
           activePromotionPerformed: false,
         },
+        mediaIngestBypassUsed: Boolean(req.mediaIngestBypassUsed),
         activePromotionPerformed: false,
         noActiveWritePerformed: true,
         noManifestUpdatePerformed: true,

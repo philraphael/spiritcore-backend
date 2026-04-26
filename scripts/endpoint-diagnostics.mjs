@@ -7,6 +7,7 @@ import {
   canUseRunwayStagingTestBypass,
   canUseRunwayTransientStagingCredentials,
   canUseMediaPlanningStagingBypass,
+  canUseMediaIngestStagingBypass,
   canUseSpiritkinMotionStateStagingBypass,
   canUseSpiritGateEnhancementStagingBypass,
 } from "../src/routes/admin.mjs";
@@ -706,6 +707,91 @@ async function main() {
             && !result.metadataPath.includes("/ACTIVE/");
         })(),
         detail: "approved media ingest resolves APPROVED path, writes metadata, and avoids ACTIVE writes",
+      },
+      {
+        name: "media-asset-ingest-bypass-production-denied",
+        pass: canUseMediaIngestStagingBypass({
+          method: "POST",
+          route: "/admin/media/asset-ingest",
+          headers: { "x-media-ingest-test": "true" },
+          env: { NODE_ENV: "production", MEDIA_STAGING_TEST_BYPASS: "true" },
+          body: {
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            status: "approved",
+            outputUrl: "https://example.com/lyra.mp4",
+            sourceAssetRef: "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png",
+          },
+        }) === false,
+        detail: "production cannot use media asset ingest bypass",
+      },
+      {
+        name: "media-asset-ingest-bypass-staging-allowed",
+        pass: canUseMediaIngestStagingBypass({
+          method: "POST",
+          route: "/admin/media/asset-ingest",
+          headers: { "x-media-ingest-test": "true" },
+          env: { NODE_ENV: "staging", MEDIA_STAGING_TEST_BYPASS: "true" },
+          body: {
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            status: "approved",
+            outputUrl: "https://example.com/lyra.mp4",
+            sourceAssetRef: "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png",
+          },
+        }) === true,
+        detail: "staging can use narrow reviewed asset ingest bypass for approved Lyra motion pack asset",
+      },
+      {
+        name: "media-asset-ingest-bypass-status-denied",
+        pass: canUseMediaIngestStagingBypass({
+          method: "POST",
+          route: "/admin/media/asset-ingest",
+          headers: { "x-media-ingest-test": "true" },
+          env: { NODE_ENV: "staging", MEDIA_STAGING_TEST_BYPASS: "true" },
+          body: {
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            status: "review_required",
+            outputUrl: "https://example.com/lyra.mp4",
+            sourceAssetRef: "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png",
+          },
+        }) === false,
+        detail: "staging ingest bypass requires status=approved",
+      },
+      {
+        name: "media-asset-ingest-bypass-output-url-denied",
+        pass: canUseMediaIngestStagingBypass({
+          method: "POST",
+          route: "/admin/media/asset-ingest",
+          headers: { "x-media-ingest-test": "true" },
+          env: { NODE_ENV: "staging", MEDIA_STAGING_TEST_BYPASS: "true" },
+          body: {
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            status: "approved",
+            outputUrl: "http://example.com/lyra.mp4",
+            sourceAssetRef: "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png",
+          },
+        }) === false,
+        detail: "staging ingest bypass requires HTTPS outputUrl",
+      },
+      {
+        name: "media-asset-ingest-bypass-source-host-denied",
+        pass: canUseMediaIngestStagingBypass({
+          method: "POST",
+          route: "/admin/media/asset-ingest",
+          headers: { "x-media-ingest-test": "true" },
+          env: { NODE_ENV: "staging", MEDIA_STAGING_TEST_BYPASS: "true" },
+          body: {
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            status: "approved",
+            outputUrl: "https://example.com/lyra.mp4",
+            sourceAssetRef: "https://example.com/portraits/lyra_portrait.png",
+          },
+        }) === false,
+        detail: "staging ingest bypass requires known staging sourceAssetRef host",
       },
       {
         name: "media-asset-kinds-valid",
