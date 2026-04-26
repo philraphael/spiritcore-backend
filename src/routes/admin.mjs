@@ -6,7 +6,12 @@
  * GET /v1/admin/stats                 — global system stats
  */
 import { config } from "../config.mjs";
-import { createDryRunJob, createExecutionSpikeJob, RUNWAY_SUPPORTED_ASSET_KINDS } from "../services/runwayProvider.mjs";
+import {
+  checkRunwayOrganizationAuth,
+  createDryRunJob,
+  createExecutionSpikeJob,
+  RUNWAY_SUPPORTED_ASSET_KINDS,
+} from "../services/runwayProvider.mjs";
 import { createPromotionPlan } from "../services/generatedAssetPipeline.mjs";
 
 function isTrueEnv(value) {
@@ -61,6 +66,10 @@ export function canUseRunwayTransientStagingCredentials(body = {}, headers = {},
   return qualifiesForRunwayStagingTestBody(body, env)
     && canUseRunwayStagingTestBypass(body, env)
     && Boolean(transientKey.apiKey);
+}
+
+export function canUseRunwayStagingAuthCheck(env = process.env) {
+  return env.NODE_ENV === "staging" && isTrueEnv(env.RUNWAY_STAGING_TEST_BYPASS);
 }
 
 function readRunwayTransientHeaders(body = {}, headers = {}, env = process.env) {
@@ -339,6 +348,79 @@ export async function adminRoutes(fastify, opts) {
     preHandler: requireAdminAccess,
     schema: runwayDryRunSchema,
   }, handleRunwayDryRun);
+
+  const runwayAuthCheckSchema = {
+    body: {
+      type: "object",
+      required: ["runwayTransientKey"],
+      properties: {
+        runwayTransientKey: { type: "string", minLength: 1 },
+      },
+    },
+  };
+
+  async function handleRunwayAuthCheck(req, reply) {
+    if (!canUseRunwayStagingAuthCheck(process.env)) {
+      return reply.code(404).send({
+        ok: false,
+        error: "RUNWAY_AUTH_CHECK_UNAVAILABLE",
+        message: "Runway auth check is available only in staging test mode.",
+      });
+    }
+
+    const runwayTransientKey = String(req.body?.runwayTransientKey || "").trim();
+    if (!runwayTransientKey) {
+      return reply.code(400).send({
+        ok: false,
+        error: "RUNWAY_TRANSIENT_KEY_REQUIRED",
+        message: "Transient Runway key was not received.",
+        externalApiCall: false,
+        authOk: false,
+        providerStatus: null,
+        responseKeys: [],
+      });
+    }
+
+    if (isTrueEnv(process.env.RUNWAY_AUTH_CHECK_MOCK)) {
+      return {
+        ok: true,
+        route: req.routeOptions?.url || req.url,
+        externalApiCall: false,
+        authOk: true,
+        providerStatus: 200,
+        responseKeys: ["creditBalance"],
+        creditBalance: 0,
+        mock: true,
+      };
+    }
+
+    try {
+      const result = await checkRunwayOrganizationAuth({
+        apiKey: runwayTransientKey,
+        baseUrl: config.generator?.video?.runway?.baseUrl,
+        version: config.generator?.video?.runway?.version,
+      });
+      return {
+        ok: result.authOk,
+        route: req.routeOptions?.url || req.url,
+        ...result,
+      };
+    } catch {
+      return reply.code(502).send({
+        ok: false,
+        route: req.routeOptions?.url || req.url,
+        externalApiCall: true,
+        authOk: false,
+        providerStatus: null,
+        responseKeys: [],
+        message: "Runway organization auth check failed.",
+      });
+    }
+  }
+
+  fastify.post("/admin/runway/auth-check", {
+    schema: runwayAuthCheckSchema,
+  }, handleRunwayAuthCheck);
 
   async function handleRunwayExecutionSpike(req, reply) {
     const stagingBypassUsed = Boolean(req.runwayStagingBypassUsed);

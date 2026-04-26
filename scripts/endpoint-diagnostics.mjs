@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import process from "node:process";
 import {
+  canUseRunwayStagingAuthCheck,
   canUseRunwayStagingTestBypass,
   canUseRunwayTransientStagingCredentials,
 } from "../src/routes/admin.mjs";
@@ -115,6 +116,7 @@ async function main() {
       ADMIN_AUTH_MODE: "enforce",
       ADMIN_API_KEY: DIAG_ADMIN_KEY,
       RUNWAY_STAGING_TEST_BYPASS: "true",
+      RUNWAY_AUTH_CHECK_MOCK: "true",
       RUNWAY_DRY_RUN_EXECUTE: "false",
       RUNWAY_ALLOW_PROVIDER_EXECUTION: "false",
       RUNWAY_API_KEY: "",
@@ -323,6 +325,14 @@ async function main() {
         }).ok === true,
         detail: "mock body fallback with execution flags would pass gates without provider call",
       },
+      {
+        name: "runway-auth-check-production-denied",
+        pass: canUseRunwayStagingAuthCheck({
+          NODE_ENV: "production",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === false,
+        detail: "production cannot use Runway auth check",
+      },
     ].map((check) => ({
       ...check,
       method: "INTERNAL",
@@ -406,6 +416,21 @@ async function main() {
         durationSec: 8,
       },
       describe: (result) => result?.body?.job?.externalApiCall === false ? "no-cost dry run returned" : "unexpected external call flag",
+    });
+    await run("runway-auth-check-missing-key", "POST", "/admin/runway/auth-check", {
+      body: {},
+      allowStatuses: [400],
+      describe: () => "missing transient Runway key rejected",
+    });
+    await run("runway-auth-check-mock", "POST", "/admin/runway/auth-check", {
+      body: {
+        runwayTransientKey: "mock-runway-key",
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.authOk === true
+        && result?.body?.mock === true
+        ? "staging mock auth check did not call provider"
+        : "unexpected auth check mock result",
     });
     await run("runway-execution-spike-staging-bypass-valid", "POST", "/admin/runway/execution-spike", {
       body: {

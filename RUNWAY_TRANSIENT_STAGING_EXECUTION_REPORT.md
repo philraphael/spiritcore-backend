@@ -9,6 +9,10 @@ The path is limited to:
 - `POST /admin/runway/execution-spike`
 - `POST /v1/admin/runway/execution-spike`
 
+This phase also adds a staging-only non-generation auth check route:
+
+- `POST /admin/runway/auth-check`
+
 ## Temporary Headers
 
 The route recognizes these headers only for a qualifying staging test request:
@@ -89,6 +93,29 @@ Endpoint diagnostics verify:
 - staging valid requests with a mock transient key reach the execution gate without calling the provider
 
 Diagnostics do not require or use a real Runway API key.
+
+## Runway Auth Check
+
+`POST /admin/runway/auth-check` accepts only `body.runwayTransientKey` and is available only when:
+
+- `NODE_ENV=staging`
+- `RUNWAY_STAGING_TEST_BYPASS=true`
+
+The route calls only `GET /v1/organization` with:
+
+- `Authorization: Bearer <transient key>`
+- `X-Runway-Version: 2024-11-06`
+
+It does not call generation endpoints, write assets, update manifests, or promote generated media. Returned fields are sanitized:
+
+- `externalApiCall`
+- `authOk`
+- `providerStatus`
+- `responseKeys`
+- `creditBalance` if returned by Runway
+- `message` for sanitized failures such as `Runway rejected the API key`
+
+The transient key is not logged, stored, or returned.
 
 ## One-Test Operator Procedure
 

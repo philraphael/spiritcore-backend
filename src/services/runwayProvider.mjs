@@ -393,6 +393,52 @@ export async function submitRunwayJob(job = {}) {
   return normalizeRunwayResponse(parsed);
 }
 
+export async function checkRunwayOrganizationAuth({ apiKey, baseUrl, version, fetchImpl = fetch } = {}) {
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl || "https://api.dev.runwayml.com");
+  const key = String(apiKey || "").trim();
+  if (!key) {
+    return {
+      externalApiCall: false,
+      authOk: false,
+      providerStatus: null,
+      responseKeys: [],
+      message: "Transient Runway key was not received.",
+    };
+  }
+
+  const response = await fetchImpl(`${normalizedBaseUrl}/v1/organization`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "X-Runway-Version": version || "2024-11-06",
+    },
+  });
+
+  const text = await response.text();
+  let parsed = {};
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch {
+    parsed = {};
+  }
+
+  const result = {
+    externalApiCall: true,
+    authOk: response.ok,
+    providerStatus: response.status,
+    responseKeys: Object.keys(parsed || {}).slice(0, 20),
+  };
+  if (parsed?.creditBalance !== undefined) {
+    result.creditBalance = parsed.creditBalance;
+  }
+  if (response.status === 401) {
+    result.message = "Runway rejected the API key";
+  } else if (!response.ok) {
+    result.message = "Runway organization auth check failed.";
+  }
+  return result;
+}
+
 export async function pollRunwayJobStatus(providerJobId) {
   return {
     provider: "runway",
