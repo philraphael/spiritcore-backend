@@ -1158,6 +1158,55 @@ export function createSpiritkinSourceReferencePlan(input = {}) {
   };
 }
 
+export function createSourceReferenceRegistryPlan(input = {}) {
+  const entityId = normalizeText(input.entityId || input.spiritkinId, 120).toLowerCase();
+  const packId = normalizeText(input.packId || `${slugify(entityId)}-motion-pack-v1`, 160);
+  const availableSources = normalizeAvailableMotionSources(input.availableSources || {});
+  const requestedAssetTypes = Array.isArray(input.requestedAssetTypes) && input.requestedAssetTypes.length
+    ? input.requestedAssetTypes
+    : SPIRITKIN_MOTION_PACK_ASSET_TYPES;
+  const basePlan = createSpiritkinSourceReferencePlan({
+    entityId,
+    packId,
+    requestedAssetTypes,
+    availableSources,
+  });
+  const becomesUnblockedBySourceCategory = {};
+  for (const category of SPIRITKIN_MOTION_SOURCE_CATEGORIES) {
+    const hypotheticalSources = {
+      ...availableSources,
+      [category]: availableSources[category] || `planned://${entityId}/${category}`,
+    };
+    const hypotheticalPlan = createSpiritkinSourceReferencePlan({
+      entityId,
+      packId,
+      requestedAssetTypes,
+      availableSources: hypotheticalSources,
+    });
+    becomesUnblockedBySourceCategory[category] = basePlan.generationBlockedAssetTypes
+      .filter((assetType) => hypotheticalPlan.readyAssetTypes.includes(assetType));
+  }
+
+  return {
+    ok: true,
+    registryPlanId: `source_registry_${slugify(entityId)}_${slugify(packId)}_${Date.now()}`,
+    entityId,
+    packId,
+    currentSources: availableSources,
+    missingRequiredSourcesByAssetType: Object.fromEntries(basePlan.sourceSelections
+      .filter((selection) => selection.blockedUntilSourceExists)
+      .map((selection) => [selection.assetType, selection.requiredSourceCategories])),
+    readyAssetTypes: basePlan.readyAssetTypes,
+    generationBlockedAssetTypes: basePlan.generationBlockedAssetTypes,
+    becomesUnblockedBySourceCategory,
+    recommendedNextSourceStills: basePlan.recommendedNextSourceStills,
+    sourceReferencePlan: basePlan,
+    noWritesPerformed: true,
+    noIngestPerformed: true,
+    ...lifecycleNoWriteFlags(),
+  };
+}
+
 function normalizeApprovedSequenceAsset(input = {}, index = 0) {
   const sourceRef = normalizeText(input.sourceRef || input.path || input.assetPath || input.approvedPath, 1200);
   const status = canonicalize(input.status || input.reviewStatus || "approved");
@@ -2532,7 +2581,9 @@ export function getMediaCatalogSummary() {
       "POST /admin/media/assemble-video",
       "POST /admin/media/sequence-compose-plan",
       "POST /admin/media/sequence-compose-execute",
+      "POST /admin/media/source-still-ingest",
       "POST /admin/media/source-reference-plan",
+      "POST /admin/media/source-reference-registry-plan",
       "GET /admin/media/spiritgate-source-summary",
       "POST /admin/media/spiritgate-enhancement-plan-from-current-source",
       "POST /admin/media/spiritgate-segment-plan",

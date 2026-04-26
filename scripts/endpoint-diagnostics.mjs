@@ -8,6 +8,7 @@ import {
   canUseRunwayTransientStagingCredentials,
   canUseMediaPlanningStagingBypass,
   canUseMediaIngestStagingBypass,
+  canUseSourceStillIngestStagingBypass,
   canUseSpiritkinMotionStateStagingBypass,
   canUseSpiritGateEnhancementStagingBypass,
 } from "../src/routes/admin.mjs";
@@ -30,6 +31,7 @@ import {
   createSafeVideoAssemblyResult,
   createSequenceComposeExecutionResult,
   createSequenceComposePlan,
+  createSourceReferenceRegistryPlan,
   createSpiritCoreAvatarPackPlan,
   createSpiritCoreDefaultOperatorPlan,
   createSpiritkinMotionPackPlan,
@@ -58,6 +60,11 @@ import {
   ingestReviewedMediaAsset,
   validateMediaAssetIngestRecord,
 } from "../src/services/mediaAssetIngestService.mjs";
+import {
+  buildSourceStillIngestRecord,
+  ingestSourceStill,
+  validateSourceStillIngestRecord,
+} from "../src/services/sourceStillIngestService.mjs";
 
 const PORT = Number(process.env.SPIRITCORE_DIAG_PORT || 3115);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -840,6 +847,126 @@ async function main() {
         detail: "staging ingest bypass requires known staging sourceAssetRef host",
       },
       {
+        name: "media-source-still-ingest-approved-paths-and-metadata",
+        pass: await (async () => {
+          const input = {
+            entityId: "lyra",
+            sourceCategory: "medium_body",
+            sourceUrl: "https://example.com/lyra-medium-body.webp?token=diagnostic",
+            sourceName: "canonical-medium-body-v1",
+            status: "approved",
+            reviewNotes: "Diagnostic approved Lyra medium-body source still.",
+            approvedBy: "endpoint-diagnostics",
+            archiveRawProviderExport: true,
+          };
+          const record = buildSourceStillIngestRecord(input, { now: "2026-04-26T12:00:00.000Z" });
+          const validation = validateSourceStillIngestRecord(record);
+          const result = await ingestSourceStill(input, {
+            now: "2026-04-26T12:00:00.000Z",
+            workspaceRoot: path.join(process.cwd(), "runtime_data", "diagnostics", "source-still-ingest"),
+            downloadSourceStill: async () => Buffer.from("diagnostic source still bytes"),
+          });
+          const metadata = JSON.parse(await readFile(
+            path.join(process.cwd(), "runtime_data", "diagnostics", "source-still-ingest", result.metadataPath),
+            "utf8",
+          ));
+          return validation.ok
+            && record.approvedRelativePath.startsWith("Spiritverse_MASTER_ASSETS/APPROVED/lyra/source_stills/medium_body/")
+            && record.approvedRelativePath.endsWith(".webp")
+            && result.savedPath === record.approvedRelativePath
+            && result.metadataPath.endsWith(".metadata.json")
+            && result.rawArchivePath?.includes("Spiritverse_MASTER_ASSETS/ARCHIVE/raw_provider_exports/lyra/source_stills/medium_body/")
+            && metadata.sourceCategory === "medium_body"
+            && metadata.approvalState === "approved"
+            && metadata.activePromotionPerformed === false
+            && metadata.noActiveWritePerformed === true
+            && metadata.noManifestUpdatePerformed === true
+            && metadata.providerGenerationPerformed === false
+            && !result.savedPath.includes("/ACTIVE/");
+        })(),
+        detail: "approved source still ingest resolves APPROVED source_stills path, writes metadata, and avoids ACTIVE writes",
+      },
+      {
+        name: "media-source-still-ingest-bypass-production-denied",
+        pass: canUseSourceStillIngestStagingBypass({
+          method: "POST",
+          route: "/admin/media/source-still-ingest",
+          headers: { "x-media-ingest-test": "true" },
+          env: { NODE_ENV: "production", MEDIA_STAGING_TEST_BYPASS: "true" },
+          body: {
+            entityId: "lyra",
+            sourceCategory: "medium_body",
+            status: "approved",
+            sourceUrl: "https://example.com/lyra.png",
+          },
+        }) === false,
+        detail: "production cannot use source still ingest bypass",
+      },
+      {
+        name: "media-source-still-ingest-bypass-staging-allowed",
+        pass: canUseSourceStillIngestStagingBypass({
+          method: "POST",
+          route: "/admin/media/source-still-ingest",
+          headers: { "x-media-ingest-test": "true" },
+          env: { NODE_ENV: "staging", MEDIA_STAGING_TEST_BYPASS: "true" },
+          body: {
+            entityId: "lyra",
+            sourceCategory: "medium_body",
+            status: "approved",
+            sourceUrl: "https://example.com/lyra.png",
+          },
+        }) === true,
+        detail: "staging can use narrow approved source still ingest bypass",
+      },
+      {
+        name: "media-source-still-ingest-invalid-category-denied",
+        pass: canUseSourceStillIngestStagingBypass({
+          method: "POST",
+          route: "/admin/media/source-still-ingest",
+          headers: { "x-media-ingest-test": "true" },
+          env: { NODE_ENV: "staging", MEDIA_STAGING_TEST_BYPASS: "true" },
+          body: {
+            entityId: "lyra",
+            sourceCategory: "random_pose",
+            status: "approved",
+            sourceUrl: "https://example.com/lyra.png",
+          },
+        }) === false,
+        detail: "source still ingest bypass rejects invalid sourceCategory",
+      },
+      {
+        name: "media-source-still-ingest-non-https-denied",
+        pass: canUseSourceStillIngestStagingBypass({
+          method: "POST",
+          route: "/admin/media/source-still-ingest",
+          headers: { "x-media-ingest-test": "true" },
+          env: { NODE_ENV: "staging", MEDIA_STAGING_TEST_BYPASS: "true" },
+          body: {
+            entityId: "lyra",
+            sourceCategory: "medium_body",
+            status: "approved",
+            sourceUrl: "http://example.com/lyra.png",
+          },
+        }) === false,
+        detail: "source still ingest bypass rejects non-HTTPS sourceUrl",
+      },
+      {
+        name: "media-source-still-ingest-non-approved-denied",
+        pass: canUseSourceStillIngestStagingBypass({
+          method: "POST",
+          route: "/admin/media/source-still-ingest",
+          headers: { "x-media-ingest-test": "true" },
+          env: { NODE_ENV: "staging", MEDIA_STAGING_TEST_BYPASS: "true" },
+          body: {
+            entityId: "lyra",
+            sourceCategory: "medium_body",
+            status: "review_required",
+            sourceUrl: "https://example.com/lyra.png",
+          },
+        }) === false,
+        detail: "source still ingest bypass requires status=approved",
+      },
+      {
         name: "media-asset-kinds-valid",
         pass: ["portrait", "spiritgate_video", "wake_visual", "trailer_video", "game_piece_set"].every((kind) => SPIRITCORE_MEDIA_ASSET_KINDS.includes(kind)),
         detail: "SpiritCore media asset kinds include production foundation kinds",
@@ -1512,6 +1639,33 @@ async function main() {
             && result.premiumMemberGeneration.enabled === false;
         })(),
         detail: "multi-source Spiritkin motion planning maps larger states to proper source categories without writes",
+      },
+      {
+        name: "media-source-reference-registry-plan-unblocks-medium-body",
+        pass: (() => {
+          const result = createSourceReferenceRegistryPlan({
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            availableSources: {
+              close_portrait: "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png",
+              medium_body: null,
+              full_body: null,
+              seated_or_perched: null,
+              realm_environment: null,
+              approved_motion_reference: null,
+            },
+          });
+          return result.ok === true
+            && result.missingRequiredSourcesByAssetType.gesture_02?.includes("medium_body")
+            && result.missingRequiredSourcesByAssetType.greeting_or_entry_01?.includes("medium_body")
+            && result.becomesUnblockedBySourceCategory.medium_body.includes("gesture_02")
+            && result.becomesUnblockedBySourceCategory.medium_body.includes("greeting_or_entry_01")
+            && result.noProviderCall === true
+            && result.noIngestPerformed === true
+            && result.noActiveWritePerformed === true
+            && result.noManifestUpdatePerformed === true;
+        })(),
+        detail: "source reference registry plan shows medium_body unblocks greeting and wider gesture states",
       },
       {
         name: "media-sequence-compose-plan-approved-only",
@@ -2405,6 +2559,84 @@ async function main() {
         ? "sequence composition execution remains planned-only and write-safe"
         : "unexpected sequence compose execution result",
     });
+    await run("media-source-still-ingest-valid", "POST", "/admin/media/source-still-ingest", {
+      headers: {
+        "x-media-ingest-test": "true",
+        "x-source-still-ingest-mock": "true",
+      },
+      body: {
+        entityId: "lyra",
+        sourceCategory: "medium_body",
+        sourceUrl: "https://example.com/lyra-medium-body.png",
+        sourceName: "canonical-medium-body-v1",
+        status: "approved",
+        reviewNotes: "Diagnostic approved Lyra medium-body source still.",
+        approvedBy: "endpoint-diagnostics",
+        archiveRawProviderExport: true,
+      },
+      describe: (result) => result?.body?.sourceStillIngestBypassUsed === true
+        && result?.body?.sourceStillIngest?.savedPath?.includes("Spiritverse_MASTER_ASSETS/APPROVED/lyra/source_stills/medium_body/")
+        && result?.body?.sourceStillIngest?.metadataPath?.endsWith(".metadata.json")
+        && result?.body?.sourceStillIngest?.rawArchivePath?.includes("Spiritverse_MASTER_ASSETS/ARCHIVE/raw_provider_exports/lyra/source_stills/medium_body/")
+        && result?.body?.sourceStillIngest?.approvalState === "approved"
+        && result?.body?.sourceStillIngest?.activePromotionPerformed === false
+        && result?.body?.providerGenerationPerformed === false
+        && result?.body?.noProviderCall === true
+        && result?.body?.noActiveWritePerformed === true
+        && result?.body?.noManifestUpdatePerformed === true
+        ? "approved Lyra medium_body source still ingested with metadata and no ACTIVE writes"
+        : "unexpected source still ingest result",
+    });
+    await run("media-source-still-ingest-invalid-category", "POST", "/admin/media/source-still-ingest", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        entityId: "lyra",
+        sourceCategory: "bad_category",
+        sourceUrl: "https://example.com/lyra.png",
+        sourceName: "bad-source",
+        status: "approved",
+        approvedBy: "endpoint-diagnostics",
+      },
+      allowStatuses: [422],
+      describe: (result) => result?.body?.error === "VALIDATION_ERROR"
+        && result?.body?.details?.fields?.includes("sourceCategory must be supported")
+        && result?.body?.noActiveWritePerformed === true
+        && result?.body?.noManifestUpdatePerformed === true
+        ? "invalid sourceCategory denied"
+        : "unexpected invalid source still category result",
+    });
+    await run("media-source-still-ingest-non-https", "POST", "/admin/media/source-still-ingest", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        entityId: "lyra",
+        sourceCategory: "medium_body",
+        sourceUrl: "http://example.com/lyra.png",
+        sourceName: "non-https-source",
+        status: "approved",
+        approvedBy: "endpoint-diagnostics",
+      },
+      allowStatuses: [422],
+      describe: (result) => result?.body?.error === "VALIDATION_ERROR"
+        && result?.body?.details?.fields?.includes("sourceUrl must be HTTPS")
+        ? "non-HTTPS sourceUrl denied"
+        : "unexpected non-HTTPS source still result",
+    });
+    await run("media-source-still-ingest-non-approved", "POST", "/admin/media/source-still-ingest", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        entityId: "lyra",
+        sourceCategory: "medium_body",
+        sourceUrl: "https://example.com/lyra.png",
+        sourceName: "review-source",
+        status: "review_required",
+        approvedBy: "endpoint-diagnostics",
+      },
+      allowStatuses: [422],
+      describe: (result) => result?.body?.error === "VALIDATION_ERROR"
+        && result?.body?.details?.fields?.includes("status must be approved")
+        ? "non-approved source still status denied"
+        : "unexpected non-approved source still result",
+    });
     await run("media-source-reference-plan", "POST", "/admin/media/source-reference-plan", {
       headers: { "x-admin-key": DIAG_ADMIN_KEY },
       body: {
@@ -2420,6 +2652,30 @@ async function main() {
         && result?.body?.noActiveWritePerformed === true
         ? "source media reference planned without storage writes"
         : "unexpected source reference result",
+    });
+    await run("media-source-reference-registry-plan", "POST", "/admin/media/source-reference-registry-plan", {
+      headers: { "x-media-planning-test": "true" },
+      body: {
+        entityId: "lyra",
+        packId: "lyra-motion-pack-v1",
+        availableSources: {
+          close_portrait: "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png",
+          medium_body: null,
+          full_body: null,
+          seated_or_perched: null,
+          realm_environment: null,
+          approved_motion_reference: null,
+        },
+      },
+      describe: (result) => result?.body?.mediaPlanningBypassUsed === true
+        && result?.body?.sourceReferenceRegistryPlan?.becomesUnblockedBySourceCategory?.medium_body?.includes("gesture_02")
+        && result?.body?.sourceReferenceRegistryPlan?.becomesUnblockedBySourceCategory?.medium_body?.includes("greeting_or_entry_01")
+        && result?.body?.sourceReferenceRegistryPlan?.noProviderCall === true
+        && result?.body?.sourceReferenceRegistryPlan?.noIngestPerformed === true
+        && result?.body?.sourceReferenceRegistryPlan?.noActiveWritePerformed === true
+        && result?.body?.sourceReferenceRegistryPlan?.noManifestUpdatePerformed === true
+        ? "source reference registry plan shows medium_body unblocks gesture_02 and greeting_or_entry_01"
+        : "unexpected source reference registry plan",
     });
     await run("media-spiritgate-source-summary", "GET", "/admin/media/spiritgate-source-summary", {
       headers: {

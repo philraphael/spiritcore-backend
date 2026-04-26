@@ -20,6 +20,7 @@ import {
 } from "../services/runwayProvider.mjs";
 import { createPromotionPlan } from "../services/generatedAssetPipeline.mjs";
 import { ingestReviewedMediaAsset } from "../services/mediaAssetIngestService.mjs";
+import { ingestSourceStill } from "../services/sourceStillIngestService.mjs";
 import {
   buildGenerationTemplate,
   buildSourceMediaReference,
@@ -33,6 +34,7 @@ import {
   createSafeVideoAssemblyResult,
   createSequenceComposeExecutionResult,
   createSequenceComposePlan,
+  createSourceReferenceRegistryPlan,
   createSpiritCoreAvatarPackPlan,
   createSpiritCoreDefaultOperatorPlan,
   createSpiritkinMotionPackPlan,
@@ -46,6 +48,7 @@ import {
   PREMIUM_MEMBER_GENERATION_BOUNDARY,
   SPIRITCORE_MEDIA_ASSET_KINDS,
   SPIRITCORE_MEDIA_REQUIREMENT_PROFILES,
+  SPIRITKIN_MOTION_SOURCE_CATEGORIES,
   validateSourceMediaReference,
   resolveExistingSpiritGateSource,
   resolveExistingSpiritkinSource,
@@ -151,6 +154,7 @@ const MEDIA_PLANNING_BYPASS_ROUTES = Object.freeze([
   "POST /admin/media/spiritgate-enhancement-plan",
   "POST /admin/media/spiritgate-enhancement-plan-from-current-source",
   "POST /admin/media/source-reference-plan",
+  "POST /admin/media/source-reference-registry-plan",
 ]);
 
 function mediaPlanningRouteKey(method = "", route = "") {
@@ -192,6 +196,29 @@ export function canUseMediaIngestStagingBypass({
     && packId.endsWith("motion-pack-v1")
     && outputUrl.startsWith("https://")
     && sourceAssetRef.startsWith(MEDIA_INGEST_SOURCE_PREFIX);
+}
+
+export function canUseSourceStillIngestStagingBypass({
+  method = "",
+  route = "",
+  headers = {},
+  body = {},
+  env = process.env,
+} = {}) {
+  const headerEnabled = isTrueEnv(headers["x-media-ingest-test"]);
+  const envEnabled = isTrueEnv(env.RUNWAY_STAGING_TEST_BYPASS) || isTrueEnv(env.MEDIA_STAGING_TEST_BYPASS);
+  const entityId = String(body?.entityId || "").trim().toLowerCase();
+  const status = String(body?.status || "").trim().toLowerCase();
+  const sourceCategory = String(body?.sourceCategory || "").trim().toLowerCase();
+  const sourceUrl = String(body?.sourceUrl || "").trim();
+  return env.NODE_ENV === "staging"
+    && envEnabled
+    && headerEnabled
+    && mediaPlanningRouteKey(method, route) === "POST /admin/media/source-still-ingest"
+    && status === "approved"
+    && MEDIA_INGEST_BYPASS_ENTITY_IDS.includes(entityId)
+    && SPIRITKIN_MOTION_SOURCE_CATEGORIES.includes(sourceCategory)
+    && sourceUrl.startsWith("https://");
 }
 
 function readRunwayTransientHeaders(body = {}, headers = {}, env = process.env) {
@@ -364,6 +391,33 @@ export async function adminRoutes(fastify, opts) {
         bypassed: true,
         mode: "staging-media-ingest-bypass",
         source: "staging-media-ingest-bypass",
+      };
+      return;
+    }
+    return requireAdminAccess(req, reply);
+  }
+
+  async function requireSourceStillIngestAccess(req, reply) {
+    const route = req.routeOptions?.url || req.routerPath || req.url;
+    const allowed = canUseSourceStillIngestStagingBypass({
+      method: req.method,
+      route,
+      headers: req.headers || {},
+      body: req.body || {},
+      env: process.env,
+    });
+    req.sourceStillIngestBypassUsed = Boolean(allowed);
+    fastify.log?.warn?.({
+      sourceStillIngestBypassUsed: Boolean(allowed),
+      route,
+      method: req.method,
+    }, "[admin] source still ingest access");
+    if (allowed) {
+      req.adminAccess = {
+        allowed: true,
+        bypassed: true,
+        mode: "staging-source-still-ingest-bypass",
+        source: "staging-source-still-ingest-bypass",
       };
       return;
     }
@@ -1009,6 +1063,47 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const sourceReferenceRegistryPlanSchema = {
+    body: {
+      type: "object",
+      required: ["entityId", "packId", "availableSources"],
+      properties: {
+        entityId: { type: "string", minLength: 1 },
+        packId: { type: "string", minLength: 1 },
+        requestedAssetTypes: { type: "array", items: { type: "string" }, nullable: true },
+        availableSources: {
+          type: "object",
+          additionalProperties: true,
+          properties: {
+            close_portrait: { type: "string", nullable: true },
+            medium_body: { type: "string", nullable: true },
+            full_body: { type: "string", nullable: true },
+            seated_or_perched: { type: "string", nullable: true },
+            realm_environment: { type: "string", nullable: true },
+            approved_motion_reference: { type: "string", nullable: true },
+          },
+        },
+      },
+    },
+  };
+
+  const sourceStillIngestSchema = {
+    body: {
+      type: "object",
+      required: ["entityId", "sourceCategory", "sourceUrl", "sourceName", "status", "approvedBy"],
+      properties: {
+        entityId: { type: "string", minLength: 1 },
+        sourceCategory: { type: "string", minLength: 1 },
+        sourceUrl: { type: "string", minLength: 1 },
+        sourceName: { type: "string", minLength: 1 },
+        status: { type: "string", minLength: 1 },
+        reviewNotes: { type: "string", nullable: true },
+        approvedBy: { type: "string", minLength: 1 },
+        archiveRawProviderExport: { type: "boolean", nullable: true },
+      },
+    },
+  };
+
   const spiritGateEnhancementExecuteSchema = {
     body: {
       type: "object",
@@ -1477,6 +1572,54 @@ export async function adminRoutes(fastify, opts) {
     }
   });
 
+  fastify.post("/admin/media/source-still-ingest", {
+    preHandler: requireSourceStillIngestAccess,
+    schema: sourceStillIngestSchema,
+  }, async (req, reply) => {
+    const route = req.routeOptions?.url || req.url;
+    try {
+      const mockDownload = process.env.NODE_ENV !== "production" && isTrueEnv(req.headers["x-source-still-ingest-mock"])
+        ? async () => Buffer.from("mock-source-still-binary")
+        : null;
+      const ingestResult = await ingestSourceStill(req.body, {
+        downloadSourceStill: mockDownload || undefined,
+        workspaceRoot: mockDownload ? "runtime_data/diagnostics/source-still-route" : undefined,
+      });
+      return {
+        ok: true,
+        route,
+        sourceStillIngest: {
+          savedPath: ingestResult.savedPath,
+          metadataPath: ingestResult.metadataPath,
+          rawArchivePath: ingestResult.rawArchivePath,
+          approvalState: ingestResult.approvalState,
+          sourceCategory: ingestResult.sourceCategory,
+          activePromotionPerformed: false,
+        },
+        sourceStillIngestBypassUsed: Boolean(req.sourceStillIngestBypassUsed),
+        activePromotionPerformed: false,
+        noActiveWritePerformed: true,
+        noManifestUpdatePerformed: true,
+        providerGenerationPerformed: false,
+        noProviderCall: true,
+      };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({
+        ok: false,
+        route,
+        error: err.code ?? "SOURCE_STILL_INGEST_ERROR",
+        message: err.message,
+        details: err.detail || {},
+        activePromotionPerformed: false,
+        noActiveWritePerformed: true,
+        noManifestUpdatePerformed: true,
+        providerGenerationPerformed: false,
+        noProviderCall: true,
+      });
+    }
+  });
+
   async function requireSpiritkinMotionStateAccess(req, reply) {
     if (canUseSpiritkinMotionStateStagingBypass(req.body, process.env)) {
       req.spiritkinMotionStateStagingBypassUsed = true;
@@ -1825,6 +1968,13 @@ export async function adminRoutes(fastify, opts) {
       noUploadStorageImplemented: true,
     };
   }, req, reply));
+
+  fastify.post("/admin/media/source-reference-registry-plan", {
+    preHandler: requireMediaPlanningAccess,
+    schema: sourceReferenceRegistryPlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    sourceReferenceRegistryPlan: createSourceReferenceRegistryPlan(req.body),
+  }), req, reply));
 
   fastify.get("/admin/media/spiritgate-source-summary", {
     preHandler: requireMediaPlanningAccess,
