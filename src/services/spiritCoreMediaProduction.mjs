@@ -641,6 +641,25 @@ function buildMotionGenerationPrompt({ canonicalName, assetType, stateTrigger, p
     ].join(" ");
   }
 
+  if (controls.generationMode === "subtle_speaking") {
+    return [
+      `Animate ${canonicalName} in a silent subtle speaking presence loop.`,
+      "Preserve the exact portrait identity, colors, eyes, face, silhouette, and calm Spiritverse tone.",
+      "Add very subtle natural mouth movement for gentle speech, soft blinking, light breathing, and tiny calm head motion.",
+      "No audio, no subtitles, no text, no logos, no background change, no camera movement, no large gestures.",
+    ].join(" ");
+  }
+
+  if (controls.generationMode === "speaking") {
+    return [
+      `Animate ${canonicalName} in a restrained speaking presence loop for ${assetType}.`,
+      "Preserve the exact portrait identity, colors, eyes, face, silhouette, and calm Spiritverse tone.",
+      "Add natural but controlled mouth movement, soft blinking, light breathing, and small expressive head motion.",
+      "Keep motion stable and premium.",
+      "No audio, no subtitles, no text, no logos, no background change, no camera movement, no large gestures, no identity drift.",
+    ].join(" ");
+  }
+
   const base = [
     promptIntent,
     `Animate ${canonicalName} for ${assetType} with ${controls.motionIntensity} motion intensity.`,

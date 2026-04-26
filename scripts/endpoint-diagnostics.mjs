@@ -1022,6 +1022,80 @@ async function main() {
         detail: "diagnostic idle prompt avoids speaking and mouth movement demands",
       },
       {
+        name: "media-spiritkin-compact-motion-prompts",
+        pass: (() => {
+          const modeExpectations = [
+            {
+              generationMode: "diagnostic_idle",
+              assetType: "idle_01",
+              assetKind: "idle_video",
+              mustInclude: "No speaking, no mouth movement",
+              maxLength: 1000,
+            },
+            {
+              generationMode: "subtle_speaking",
+              assetType: "speaking_01",
+              assetKind: "speaking_video",
+              mustInclude: "silent subtle speaking presence loop",
+              maxLength: 1000,
+            },
+            {
+              generationMode: "speaking",
+              assetType: "speaking_01",
+              assetKind: "speaking_video",
+              mustInclude: "restrained speaking presence loop",
+              maxLength: 1000,
+            },
+          ];
+          return modeExpectations.every((expectation) => {
+            const plan = createSpiritkinMotionStateExecutionPlan({
+              spiritkinId: "lyra",
+              targetId: "lyra-motion-pack-v1",
+              assetType: expectation.assetType,
+              assetKind: expectation.assetKind,
+              sourceAssetRef: "https://example.com/lyra_portrait.png",
+              sourceAssetType: "external_url",
+              promptIntent: "Animate Lyra in a motion diagnostic.",
+              styleProfile: "premium cinematic Spiritverse companion with a deliberately verbose style profile that should not be duplicated in provider prompt text",
+              safetyLevel: "internal_review",
+              durationSec: 5,
+              ratio: "720:1280",
+              motionIntensity: "low",
+              generationMode: expectation.generationMode,
+              allowMouthMovement: expectation.generationMode !== "diagnostic_idle",
+            });
+            const job = createDryRunJob({
+              spiritkinId: plan.spiritkinId,
+              targetId: plan.targetId,
+              assetKind: plan.assetKind,
+              promptIntent: plan.promptIntent,
+              styleProfile: plan.styleProfile,
+              safetyLevel: plan.safetyLevel,
+              sourceAssetRef: plan.sourceAssetRef,
+              sourceAssets: [plan.sourceAssetRef],
+              sourceAssetType: plan.sourceAssetType,
+              durationSec: plan.generationControls.durationSec,
+              aspectRatio: plan.generationControls.aspectRatio,
+            });
+            const payload = buildRunwayApiPayload(job);
+            const payloadKeys = Object.keys(payload).sort().join(",");
+            return payloadKeys === "duration,model,promptImage,promptText,ratio"
+              && payload.promptText.length <= expectation.maxLength
+              && payload.promptText.includes(expectation.mustInclude)
+              && !payload.promptText.includes("Style profile:")
+              && !payload.promptText.includes("Source assets to preserve:")
+              && !payload.promptText.includes("Safety level:")
+              && payload.ratio === "720:1280"
+              && payload.duration === 5
+              && plan.noPromotionPerformed === true
+              && plan.noManifestUpdatePerformed === true
+              && plan.noActiveWritePerformed === true
+              && plan.premiumMemberGeneration.enabled === false;
+          });
+        })(),
+        detail: "Spiritkin motion provider prompts stay compact without duplicated wrapper text",
+      },
+      {
         name: "media-spiritcore-avatar-pack-plan",
         pass: (() => {
           const result = createSpiritCoreAvatarPackPlan({

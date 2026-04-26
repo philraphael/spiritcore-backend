@@ -1290,6 +1290,27 @@ export async function adminRoutes(fastify, opts) {
       if (providerTarget.providerMode === "text_to_image") {
         gateFailures.push("text_to_image is not allowed for Spiritkin motion-state execution");
       }
+      const promptTextLength = String(apiPayloadPreview.promptText || "").length;
+      if (providerTarget.providerMode === "image_to_video" && promptTextLength > 1000) {
+        return reply.code(400).send({
+          ok: false,
+          route,
+          error: "PROMPT_TOO_LONG",
+          message: "Runway image_to_video promptText must be 1000 characters or fewer.",
+          promptTextLength,
+          maxPromptTextLength: 1000,
+          noProviderCall: true,
+          externalApiCall: false,
+          providerTarget,
+          payloadPreview: apiPayloadPreview,
+          generationControls: executionPlan.generationControls,
+          mediaAssetRecord: executionPlan.mediaAssetRecord,
+          premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+          noPromotionPerformed: true,
+          noManifestUpdatePerformed: true,
+          noActiveWritePerformed: true,
+        });
+      }
       const allGates = {
         ok: gateFailures.length === 0 && providerGates.ok,
         missingGates: [...gateFailures, ...providerGates.missingGates],

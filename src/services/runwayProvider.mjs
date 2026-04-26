@@ -172,7 +172,15 @@ function providerErrorCode(parsed = {}) {
 
 function providerPromptText(normalized = {}, promptPackage = {}) {
   const directPrompt = normalizeText(normalized.promptIntent, 1200);
-  if (directPrompt && directPrompt.length < 700 && directPrompt.includes("No speaking, no mouth movement")) {
+  const isCompactSpiritkinMotionPrompt = directPrompt
+    && directPrompt.length <= 1000
+    && directPrompt.includes("Preserve the exact portrait identity")
+    && (
+      directPrompt.includes("No speaking, no mouth movement")
+      || directPrompt.includes("silent subtle speaking presence loop")
+      || directPrompt.includes("restrained speaking presence loop")
+    );
+  if (isCompactSpiritkinMotionPrompt) {
     return directPrompt;
   }
   return promptPackage.prompt;

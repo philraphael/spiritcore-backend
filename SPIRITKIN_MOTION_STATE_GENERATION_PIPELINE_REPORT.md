@@ -183,6 +183,26 @@ The recommended next test is Lyra `idle_01`, not `speaking_01`:
 
 The `diagnostic_idle` provider prompt is now intentionally concise, under 700 characters, and does not append duplicate style/source/safety paragraphs. It asks only for a subtle idle presence loop while preserving portrait identity and explicitly blocks speaking, mouth movement, camera movement, background changes, text, and logos.
 
+## Speaking Prompt Compaction
+
+A later Lyra `speaking_01` request using `generationMode: "subtle_speaking"` failed before task creation because Runway rejected the request body:
+
+- endpoint: `/v1/image_to_video`
+- model: `gen4_turbo`
+- provider status: `400`
+- provider issue path: `["promptText"]`
+- provider issue: prompt text exceeded the `<=1000` character limit
+
+The failure was caused by wrapping the motion prompt with generic Runway prompt-package text, style profile text, source asset references, and safety paragraphs. Spiritkin motion modes now use compact provider prompts directly for:
+
+- `diagnostic_idle`
+- `subtle_speaking`
+- `speaking`
+
+The route also preflights `image_to_video` prompt length before provider execution. If a prompt exceeds 1000 characters, SpiritCore returns `PROMPT_TOO_LONG` with `promptTextLength`, `maxPromptTextLength: 1000`, `noProviderCall: true`, and the standard no-promotion/no-manifest/no-ACTIVE-write flags.
+
+The next recommended paid retry is Lyra `speaking_01` with `generationMode: "subtle_speaking"`, `ratio: "720:1280"`, and `durationSec: 5`.
+
 ## Provider Request 400 Transparency
 
 The first safer Lyra `idle_01` diagnostic attempt reached the SpiritCore execution route but failed before Runway created a task:
