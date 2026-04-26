@@ -550,6 +550,159 @@ export function createSpiritGateEnhancementPlanFromCurrentSource(input = {}) {
   };
 }
 
+function clampNumber(value, fallback, min, max) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function segmentPurpose(index, totalSegments) {
+  if (index === 0) return "Gate awakening / first reveal";
+  if (index === totalSegments - 1) return "Spiritverse reveal / arrival settle";
+  if (index === totalSegments - 2) return "Crossing into Spiritverse";
+  if (index === totalSegments - 3) return "Final approach";
+  if (index === 1) return "Approach / energy build";
+  if (index === 2) return "Threshold formation";
+  return "Deepening portal / dimensional movement";
+}
+
+function segmentPrompt({ purpose, index, totalSegments, styleProfile, endingNeedsTransitionImprovement }) {
+  const common = [
+    `Enhance SpiritGate segment ${index + 1} of ${totalSegments}: ${purpose}.`,
+    "Preserve the existing SpiritGate source identity, gateway silhouette, timing feel, luxury black-and-gold atmosphere, subtle apple red accents, and ivory highlights.",
+    `Style profile: ${styleProfile}.`,
+    "Improve cinematic polish, clarity, lighting, dimensionality, motion fluency, and premium emotional presence without replacing the source concept.",
+    "No text overlays, logos, watermarks, horror shift, generic portal look, noisy UI elements, identity drift, or abrupt visual discontinuity.",
+  ];
+  if (index === 0) {
+    common.push("Open with a clear awakening of the gate: elegant, anticipatory, readable, and faithful to the current entrance.");
+  } else if (index === totalSegments - 1) {
+    common.push("This final arrival segment must improve flow into the Spiritverse, create a smoother threshold crossing, resolve motion gracefully, feel emotionally complete, preserve visual continuity, and avoid an abrupt ending.");
+  } else if (index === totalSegments - 2 || endingNeedsTransitionImprovement) {
+    common.push("Strengthen the crossing transition: make the movement into the Spiritverse more fluent, dimensional, and emotionally satisfying while preserving continuity from the prior segment.");
+  } else {
+    common.push("Maintain continuity from the prior segment and prepare a clean transition into the next segment.");
+  }
+  return common.join(" ");
+}
+
+export function createSpiritGateSegmentPlan(input = {}) {
+  const targetId = normalizeText(input.targetId || "spiritgate", 160);
+  if (!["spiritgate", "test-spiritgate"].includes(targetId)) {
+    throw new ValidationError("Invalid SpiritGate segment target.", ["targetId must be spiritgate or test-spiritgate"]);
+  }
+  const sourceAssetRef = normalizeText(input.sourceAssetRef, 1200);
+  if (!sourceAssetRef) {
+    throw new ValidationError("Invalid SpiritGate segment source.", ["sourceAssetRef is required"]);
+  }
+  const sourceDurationSec = clampNumber(input.sourceDurationSec, 35, 1, 600);
+  const segmentDurationSec = clampNumber(input.segmentDurationSec, 5, 1, 10);
+  const styleProfile = normalizeText(input.styleProfile || "premium cinematic cosmic fantasy, luxury black and gold, subtle apple red accents, ivory highlights, Spiritverse gateway identity", 320);
+  const safetyLevel = normalizeText(input.safetyLevel || "internal_review", 80);
+  const endingNeedsTransitionImprovement = input.endingNeedsTransitionImprovement !== false;
+  const totalSegments = Math.ceil(sourceDurationSec / segmentDurationSec);
+  const segments = Array.from({ length: totalSegments }, (_, index) => {
+    const startTimeSec = Number((index * segmentDurationSec).toFixed(3));
+    const endTimeSec = Number(Math.min(sourceDurationSec, (index + 1) * segmentDurationSec).toFixed(3));
+    const purpose = segmentPurpose(index, totalSegments);
+    const finalSegment = index === totalSegments - 1;
+    const crossingSegment = index >= Math.max(0, totalSegments - 2);
+    return {
+      segmentIndex: index + 1,
+      startTimeSec,
+      endTimeSec,
+      durationSec: Number((endTimeSec - startTimeSec).toFixed(3)),
+      purpose,
+      promptIntent: segmentPrompt({ purpose, index, totalSegments, styleProfile, endingNeedsTransitionImprovement }),
+      continuityRequirements: [
+        "preserve source SpiritGate identity",
+        "match color, lighting direction, gateway shape, and motion energy with adjacent segments",
+        "avoid visible jumps at segment boundaries",
+        "keep mobile and desktop framing readable",
+      ],
+      transitionRequirements: finalSegment
+        ? ["smooth threshold crossing", "emotional arrival settle", "no abrupt ending", "clear Spiritverse arrival cue"]
+        : ["first and last frames should stitch cleanly with neighboring segments", "avoid sudden style or camera changes"],
+      enhancementMode: crossingSegment && endingNeedsTransitionImprovement ? "transition-improvement" : "enhancement-only",
+      estimatedRunwayCost: null,
+      reviewStatus: "not_started",
+      lifecycleState: "review_required",
+    };
+  });
+
+  return {
+    ok: true,
+    segmentPlanId: `spiritgate_segment_plan_${Date.now()}`,
+    targetId,
+    sourceAssetRef,
+    sourceDurationSec,
+    segmentDurationSec,
+    totalSegments,
+    segments,
+    estimatedGenerationCount: totalSegments,
+    estimatedCreditRange: null,
+    continuityRules: [
+      "use the existing SpiritGate video as source of truth",
+      "generate one approved test segment before running the rest",
+      "preserve gateway identity, color palette, camera language, and emotional tone",
+      "review every segment before stitching",
+      "reject segments with identity drift, abrupt endings, watermarks, or broken continuity",
+    ],
+    finalEntranceStrategy: {
+      endingNeedsTransitionImprovement,
+      goal: "make the final entrance smoother, more fluent, more cinematic, and emotionally complete",
+      finalSegments: segments.slice(Math.max(0, totalSegments - 2)).map((segment) => segment.segmentIndex),
+      noAbruptEnding: true,
+    },
+    wasteControlPlan: {
+      firstSegmentOnly: true,
+      firstRecommendedSegmentIndex: 1,
+      firstRecommendedReason: "Validate Aleph style fidelity, source preservation, and clip quality before spending on the remaining segments.",
+      stopConditions: [
+        "source identity drifts",
+        "motion becomes unstable or visibly synthetic",
+        "gateway no longer matches Spiritverse identity",
+        "segment cannot stitch cleanly",
+        "credit use exceeds operator-approved budget",
+      ],
+      continueOnlyAfterReviewApproval: true,
+      trackCreditsPerSegment: true,
+    },
+    reviewChecklist: [
+      "segment preserves original SpiritGate identity",
+      "quality improves without replacement",
+      "first and last frames support stitching",
+      "no text, watermark, logo, or generic portal shift",
+      "final crossing has smooth emotional arrival",
+      "operator approves segment before next generation",
+    ],
+    rejectionCriteria: [
+      "identity drift",
+      "abrupt segment boundary",
+      "weaker ending than source",
+      "generic or off-brand portal",
+      "watermark, subtitle, logo, or visible artifact",
+      "cannot stitch with adjacent reviewed segments",
+    ],
+    stitchPlan: {
+      implementationStatus: "planned_only",
+      requiresFfmpeg: true,
+      enhancedClipsRemainReviewRequired: true,
+      eachSegmentReviewedBeforeStitch: true,
+      approvedSegmentsStitchedInOrder: true,
+      finalFullLengthVideoLifecycleState: "review_required",
+      operatorApprovalRequiredBeforeManifestOrActive: true,
+      noStitchingPerformed: true,
+    },
+    premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+    noGenerationPerformed: true,
+    noProviderCall: true,
+    noPromotionPerformed: true,
+    noManifestUpdatePerformed: true,
+    noActiveWritePerformed: true,
+  };
+}
+
 export function buildMediaAssetRecord(input = {}) {
   const assetKind = normalizeSpiritCoreMediaAssetKind(input.assetKind);
   const targetType = normalizeTargetType(input.targetType, assetKind);
@@ -1206,6 +1359,7 @@ export function getMediaCatalogSummary() {
       "POST /admin/media/source-reference-plan",
       "GET /admin/media/spiritgate-source-summary",
       "POST /admin/media/spiritgate-enhancement-plan-from-current-source",
+      "POST /admin/media/spiritgate-segment-plan",
       "POST /admin/media/spiritgate-enhancement-execute",
       "GET /admin/media/catalog-summary",
     ],

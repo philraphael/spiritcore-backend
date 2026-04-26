@@ -26,6 +26,7 @@ import {
   createMediaPromotionPlan,
   createMediaReviewPlan,
   createProductionSequencePlan,
+  createSpiritGateSegmentPlan,
   createSpiritGateEnhancementPlanFromCurrentSource,
   createSpiritGateEnhancementExecutionPlan,
   createSpiritGateEnhancementPlan,
@@ -807,6 +808,22 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const spiritGateSegmentPlanSchema = {
+    body: {
+      type: "object",
+      required: ["targetId", "sourceAssetRef", "sourceDurationSec", "segmentDurationSec", "styleProfile", "safetyLevel"],
+      properties: {
+        targetId: { type: "string", minLength: 1 },
+        sourceAssetRef: { type: "string", minLength: 1 },
+        sourceDurationSec: { type: "number" },
+        segmentDurationSec: { type: "number" },
+        styleProfile: { type: "string", minLength: 1 },
+        safetyLevel: { type: "string", minLength: 1 },
+        endingNeedsTransitionImprovement: { type: "boolean", nullable: true },
+      },
+    },
+  };
+
   function mediaRouteResult(route, builder, req, reply) {
     try {
       return {
@@ -947,6 +964,13 @@ export async function adminRoutes(fastify, opts) {
       ...req.body,
       origin: requestPublicOrigin(req),
     }),
+  }), req, reply));
+
+  fastify.post("/admin/media/spiritgate-segment-plan", {
+    preHandler: requireAdminAccess,
+    schema: spiritGateSegmentPlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    spiritGateSegmentPlan: createSpiritGateSegmentPlan(req.body),
   }), req, reply));
 
   async function requireSpiritGateEnhancementAccess(req, reply) {

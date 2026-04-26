@@ -18,6 +18,7 @@ import {
   checkMediaRequirements,
   createMediaPromotionPlan,
   createProductionSequencePlan,
+  createSpiritGateSegmentPlan,
   createSpiritGateEnhancementPlanFromCurrentSource,
   createSpiritGateEnhancementExecutionPlan,
   createSpiritGateEnhancementPlan,
@@ -610,6 +611,31 @@ async function main() {
         detail: "SpiritGate enhancement payload can be built from current source without generation",
       },
       {
+        name: "media-spiritgate-segment-plan-calculates-count",
+        pass: (() => {
+          const result = createSpiritGateSegmentPlan({
+            targetId: "spiritgate",
+            sourceAssetRef: "https://example.com/gate_entrance_final.mp4",
+            sourceDurationSec: 43.349,
+            segmentDurationSec: 5,
+            styleProfile: "premium cinematic SpiritGate enhancement",
+            safetyLevel: "internal_review",
+            endingNeedsTransitionImprovement: true,
+          });
+          const finalSegment = result.segments[result.segments.length - 1];
+          return result.totalSegments === 9
+            && result.estimatedGenerationCount === 9
+            && finalSegment.enhancementMode === "transition-improvement"
+            && finalSegment.promptIntent.includes("smooth")
+            && finalSegment.promptIntent.includes("emotional")
+            && result.noGenerationPerformed === true
+            && result.noProviderCall === true
+            && result.noActiveWritePerformed === true
+            && result.premiumMemberGeneration.enabled === false;
+        })(),
+        detail: "SpiritGate segment plan calculates 5-second segments and final transition prompt",
+      },
+      {
         name: "media-assistant-roadmap-documented",
         pass: SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP.some((item) => item.id === "alarms")
           && SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP.some((item) => item.id === "smart_home"),
@@ -1151,6 +1177,30 @@ async function main() {
         && result?.body?.spiritGateEnhancementPlan?.noActiveWritePerformed === true
         ? "enhancement plan built from current SpiritGate source"
         : "unexpected SpiritGate current-source plan",
+    });
+    await run("media-spiritgate-segment-plan", "POST", "/admin/media/spiritgate-segment-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        targetId: "spiritgate",
+        sourceAssetRef: "https://spiritcore-backend-copy-production.up.railway.app/videos/gate_entrance_final.mp4",
+        sourceDurationSec: 43.349,
+        segmentDurationSec: 5,
+        styleProfile: "premium cinematic cosmic fantasy, luxury black and gold, subtle apple red accents, ivory highlights, Spiritverse gateway identity",
+        safetyLevel: "internal_review",
+        endingNeedsTransitionImprovement: true,
+      },
+      describe: (result) => result?.body?.spiritGateSegmentPlan?.totalSegments === 9
+        && result?.body?.spiritGateSegmentPlan?.segments?.[8]?.enhancementMode === "transition-improvement"
+        && result?.body?.spiritGateSegmentPlan?.segments?.[8]?.promptIntent?.includes("abrupt ending")
+        && result?.body?.spiritGateSegmentPlan?.stitchPlan?.noStitchingPerformed === true
+        && result?.body?.spiritGateSegmentPlan?.noGenerationPerformed === true
+        && result?.body?.spiritGateSegmentPlan?.noProviderCall === true
+        && result?.body?.spiritGateSegmentPlan?.noPromotionPerformed === true
+        && result?.body?.spiritGateSegmentPlan?.noManifestUpdatePerformed === true
+        && result?.body?.spiritGateSegmentPlan?.noActiveWritePerformed === true
+        && result?.body?.spiritGateSegmentPlan?.premiumMemberGeneration?.enabled === false
+        ? "SpiritGate segmented plan created without generation or writes"
+        : "unexpected SpiritGate segment plan",
     });
     await run("media-spiritgate-enhancement-execute-missing-source", "POST", "/admin/media/spiritgate-enhancement-execute", {
       headers: { "x-admin-key": DIAG_ADMIN_KEY },
