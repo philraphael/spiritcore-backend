@@ -2260,6 +2260,119 @@ async function main() {
         ? "valid staging diagnostic idle request builds safe image-to-video payload without provider call"
         : "unexpected Spiritkin motion execute preview",
     });
+    const lyraThinkOverridePrompt = "Animate Lyra in a silent reflective thinking loop with visible lifelike motion, not slow motion. Preserve exact portrait identity, colors, eyes, face, silhouette, and calm Spiritverse tone. Keep the background clear and stable, not blurred. Add visible eye movement, thoughtful blink variation, a stronger thinking expression, and actual small head motion as if considering the user's words. No audio, no text, no subtitles, no logos, no camera movement, no background change, no identity drift.";
+    await run("media-spiritkin-motion-state-execute-provider-prompt-override", "POST", "/admin/media/spiritkin-motion-state-execute", {
+      headers: {
+        "x-runway-transient-execute": "true",
+        "x-runway-transient-provider-execution": "true",
+      },
+      body: {
+        spiritkinId: "lyra",
+        targetId: "lyra-motion-pack-v1",
+        assetType: "think_01",
+        assetKind: "idle_video",
+        sourceAssetRef: lyraSourceUrl,
+        sourceAssetType: "external_url",
+        promptIntent: "This built-in prompt should be replaced by providerPromptOverride.",
+        styleProfile: "premium cinematic Spiritverse companion, elegant, emotionally alive",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+        durationSec: 5,
+        ratio: "720:1280",
+        motionIntensity: "low",
+        generationMode: "reflective_thinking",
+        allowMouthMovement: false,
+        runwayTransientKey: "mock-runway-key",
+        providerPromptOverride: lyraThinkOverridePrompt,
+      },
+      describe: (result) => {
+        const payload = result?.body?.apiPayloadPreview || {};
+        const payloadKeys = Object.keys(payload).sort().join(",");
+        return result?.body?.externalApiCall === false
+          && result?.body?.mock === true
+          && result?.body?.providerPromptOverrideUsed === true
+          && result?.body?.providerPromptLength === lyraThinkOverridePrompt.length
+          && payload.promptText === lyraThinkOverridePrompt
+          && payload.promptText.length <= 1000
+          && payloadKeys === "duration,model,promptImage,promptText,ratio"
+          && payload.promptImage === lyraSourceUrl
+          && payload.duration === 5
+          && payload.ratio === "720:1280"
+          && result?.body?.premiumMemberGeneration?.enabled === false
+          && result?.body?.noPromotionPerformed === true
+          && result?.body?.noManifestUpdatePerformed === true
+          && result?.body?.noActiveWritePerformed === true
+          ? "valid operator override used directly in image-to-video payload"
+          : "unexpected provider prompt override result";
+      },
+    });
+    await run("media-spiritkin-motion-state-execute-provider-prompt-override-too-long", "POST", "/admin/media/spiritkin-motion-state-execute", {
+      headers: {
+        "x-runway-transient-execute": "true",
+        "x-runway-transient-provider-execution": "true",
+      },
+      body: {
+        spiritkinId: "lyra",
+        targetId: "lyra-motion-pack-v1",
+        assetType: "think_01",
+        assetKind: "idle_video",
+        sourceAssetRef: lyraSourceUrl,
+        sourceAssetType: "external_url",
+        promptIntent: "Diagnostic too-long override rejection.",
+        styleProfile: "premium cinematic Spiritverse companion, elegant, emotionally alive",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+        durationSec: 5,
+        ratio: "720:1280",
+        motionIntensity: "low",
+        generationMode: "reflective_thinking",
+        allowMouthMovement: false,
+        runwayTransientKey: "mock-runway-key",
+        providerPromptOverride: `${lyraThinkOverridePrompt} ${"visible thinking motion ".repeat(60)}`,
+      },
+      allowStatuses: [400],
+      describe: (result) => result?.body?.error === "PROVIDER_PROMPT_OVERRIDE_INVALID"
+        && result?.body?.details?.fields?.includes("providerPromptOverride must be 1000 characters or fewer")
+        && result?.body?.noProviderCall === true
+        && result?.body?.externalApiCall === false
+        && result?.body?.noPromotionPerformed === true
+        && result?.body?.noManifestUpdatePerformed === true
+        && result?.body?.noActiveWritePerformed === true
+        ? "too-long operator override rejected before provider call"
+        : "unexpected too-long provider prompt override result",
+    });
+    await run("media-spiritkin-motion-state-execute-provider-prompt-override-denied", "POST", "/admin/media/spiritkin-motion-state-execute", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        spiritkinId: "lyra",
+        targetId: "lyra-motion-pack-v1",
+        assetType: "think_01",
+        assetKind: "idle_video",
+        sourceAssetRef: lyraSourceUrl,
+        sourceAssetType: "external_url",
+        promptIntent: "Diagnostic denied override.",
+        styleProfile: "premium cinematic Spiritverse companion, elegant, emotionally alive",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+        durationSec: 5,
+        ratio: "720:1280",
+        motionIntensity: "low",
+        generationMode: "reflective_thinking",
+        allowMouthMovement: false,
+        providerPromptOverride: lyraThinkOverridePrompt,
+      },
+      allowStatuses: [400],
+      describe: (result) => result?.body?.error === "PROVIDER_PROMPT_OVERRIDE_DENIED"
+        && result?.body?.noProviderCall === true
+        && result?.body?.externalApiCall === false
+        && result?.body?.providerPromptOverrideUsed === false
+        && result?.body?.premiumMemberGeneration?.enabled === false
+        && result?.body?.noPromotionPerformed === true
+        && result?.body?.noManifestUpdatePerformed === true
+        && result?.body?.noActiveWritePerformed === true
+        ? "operator override denied without internal transient execution gates"
+        : "unexpected denied provider prompt override result",
+    });
     await run("media-spiritkin-motion-state-execute-provider-400-sanitized", "POST", "/admin/media/spiritkin-motion-state-execute", {
       headers: {
         "x-admin-key": DIAG_ADMIN_KEY,

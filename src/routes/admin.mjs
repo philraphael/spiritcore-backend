@@ -221,6 +221,42 @@ function canUseMediaAssetIngest(env = process.env) {
   return env.NODE_ENV !== "production" || isTrueEnv(env.MEDIA_ASSET_INGEST_ENABLED);
 }
 
+function validateSpiritkinProviderPromptOverride(value = "") {
+  const prompt = String(value || "").replace(/\s+/g, " ").trim();
+  const errors = [];
+  if (!prompt) errors.push("providerPromptOverride must be a non-empty string");
+  if (prompt.length > 1000) errors.push("providerPromptOverride must be 1000 characters or fewer");
+  if (!/Preserve exact portrait identity|Preserve Lyra's exact identity/i.test(prompt)) {
+    errors.push("providerPromptOverride must include identity preservation wording");
+  }
+  if (!/No audio/i.test(prompt)) errors.push("providerPromptOverride must include No audio");
+  if (!/No text|No subtitles/i.test(prompt)) errors.push("providerPromptOverride must include No text or No subtitles");
+  if (!/no camera movement/i.test(prompt)) errors.push("providerPromptOverride must include no camera movement");
+  const forbiddenTerms = ["ACTIVE", "manifest", "promotion", "user generation", "public release"];
+  const lowerPrompt = prompt.toLowerCase();
+  for (const term of forbiddenTerms) {
+    if (lowerPrompt.includes(term.toLowerCase())) {
+      errors.push(`providerPromptOverride must not include ${term}`);
+    }
+  }
+  return {
+    ok: errors.length === 0,
+    errors,
+    prompt,
+    length: prompt.length,
+  };
+}
+
+function canUseSpiritkinProviderPromptOverride({ body = {}, headers = {}, env = process.env } = {}) {
+  return env.NODE_ENV === "staging"
+    && String(body?.safetyLevel || "").trim() === "internal_review"
+    && Boolean(body?.operatorApproval)
+    && isTrueEnv(headers["x-runway-transient-execute"])
+    && isTrueEnv(headers["x-runway-transient-provider-execution"])
+    && Boolean(String(body?.runwayTransientKey || "").trim())
+    && PREMIUM_MEMBER_GENERATION_BOUNDARY.enabled === false;
+}
+
 function createRunwayExecutionContext({ req, baseConfig, baseEnv }) {
   const transient = readRunwayTransientHeaders(req.body || {}, req.headers || {}, baseEnv);
   const useTransient = canUseRunwayTransientStagingCredentials(req.body, req.headers || {}, baseEnv);
@@ -1047,6 +1083,7 @@ export async function adminRoutes(fastify, opts) {
         motionIntensity: { type: "string", nullable: true },
         generationMode: { type: "string", nullable: true },
         allowMouthMovement: { type: "boolean", nullable: true },
+        providerPromptOverride: { type: "string", nullable: true },
         notes: { type: "string", nullable: true },
       },
     },
@@ -1371,6 +1408,51 @@ export async function adminRoutes(fastify, opts) {
     if (!body.operatorApproval) gateFailures.push("operatorApproval=true is required");
     if (body.safetyLevel !== "internal_review") gateFailures.push("safetyLevel must be internal_review");
     if (!String(body.sourceAssetRef || "").trim()) gateFailures.push("sourceAssetRef is required");
+    const providerPromptOverrideRequested = Boolean(String(body.providerPromptOverride || "").trim());
+    const providerPromptOverrideAllowed = providerPromptOverrideRequested && canUseSpiritkinProviderPromptOverride({
+      body,
+      headers: req.headers || {},
+      env: process.env,
+    });
+    const providerPromptOverrideValidation = providerPromptOverrideRequested
+      ? validateSpiritkinProviderPromptOverride(body.providerPromptOverride)
+      : { ok: true, errors: [], prompt: "", length: 0 };
+
+    if (providerPromptOverrideRequested && !providerPromptOverrideAllowed) {
+      return reply.code(400).send({
+        ok: false,
+        route,
+        error: "PROVIDER_PROMPT_OVERRIDE_DENIED",
+        message: "providerPromptOverride is allowed only for staging internal operator execution with transient provider credentials.",
+        providerPromptOverrideUsed: false,
+        providerPromptLength: providerPromptOverrideValidation.length,
+        noProviderCall: true,
+        externalApiCall: false,
+        premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
+
+    if (providerPromptOverrideRequested && !providerPromptOverrideValidation.ok) {
+      return reply.code(400).send({
+        ok: false,
+        route,
+        error: "PROVIDER_PROMPT_OVERRIDE_INVALID",
+        message: "providerPromptOverride failed compact prompt validation.",
+        details: { fields: providerPromptOverrideValidation.errors },
+        providerPromptOverrideUsed: false,
+        providerPromptLength: providerPromptOverrideValidation.length,
+        maxProviderPromptLength: 1000,
+        noProviderCall: true,
+        externalApiCall: false,
+        premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
 
     try {
       const executionPlan = createSpiritkinMotionStateExecutionPlan({
@@ -1431,6 +1513,16 @@ export async function adminRoutes(fastify, opts) {
         aspectRatio: executionPlan.generationControls.aspectRatio,
         requestedBy: req.adminAccess?.source || "admin_media_spiritkin_motion_state_execute",
       });
+      if (providerPromptOverrideRequested) {
+        dryRunJob.normalizedJobRequest = {
+          ...dryRunJob.normalizedJobRequest,
+          providerPromptOverride: providerPromptOverrideValidation.prompt,
+        };
+        dryRunJob.promptPackage = {
+          ...dryRunJob.promptPackage,
+          prompt: providerPromptOverrideValidation.prompt,
+        };
+      }
       const providerTarget = resolveRunwayGenerationTarget(dryRunJob, executionConfig.generator?.video?.runway || {});
       const apiPayloadPreview = buildRunwayApiPayload({
         ...dryRunJob,
@@ -1450,6 +1542,8 @@ export async function adminRoutes(fastify, opts) {
           maxPromptTextLength: 1000,
           noProviderCall: true,
           externalApiCall: false,
+          providerPromptOverrideUsed: providerPromptOverrideRequested,
+          providerPromptLength: promptTextLength,
           providerTarget,
           payloadPreview: apiPayloadPreview,
           generationControls: executionPlan.generationControls,
@@ -1475,6 +1569,8 @@ export async function adminRoutes(fastify, opts) {
         transientExecuteRequested,
         transientProviderExecutionRequested,
         transientKeyProvided,
+        providerPromptOverrideUsed: providerPromptOverrideRequested,
+        providerPromptLength: promptTextLength,
         executionGates: allGates,
         providerTarget,
         apiPayloadPreview,

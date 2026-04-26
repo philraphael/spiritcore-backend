@@ -171,6 +171,9 @@ function providerErrorCode(parsed = {}) {
 }
 
 function providerPromptText(normalized = {}, promptPackage = {}) {
+  const overridePrompt = normalizeText(normalized.providerPromptOverride, 1200);
+  if (overridePrompt) return overridePrompt;
+
   const directPrompt = normalizeText(normalized.promptIntent, 1200);
   const isCompactSpiritkinMotionPrompt = directPrompt
     && directPrompt.length <= 1000

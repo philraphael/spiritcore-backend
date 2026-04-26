@@ -231,6 +231,37 @@ All of these modes use direct compact provider prompts under Runway's 1000-chara
 
 The next recommended paid generation is Lyra `think_01` using `generationMode: "reflective_thinking"`, `ratio: "720:1280"`, and `durationSec: 5`.
 
+## Operator Compact Prompt Override
+
+Two Lyra `think_01` attempts were rejected during operator review:
+
+- first attempt: too slow, blurred background, and did not read as a thinking state
+- second attempt: blinking improved, but motion still felt slow, head motion was minimal, the background remained blurred, and the thinking expression was not strong enough
+
+The route accepted stronger `promptIntent` text, but the provider payload still used the built-in `reflective_thinking` compact prompt. To reduce repeated backend edits and paid-generation waste, `POST /admin/media/spiritkin-motion-state-execute` now supports an internal operator-only `providerPromptOverride`.
+
+The override is allowed only when all staging/internal execution gates are true:
+
+- `NODE_ENV=staging`
+- `safetyLevel=internal_review`
+- `operatorApproval=true`
+- `x-runway-transient-execute=true`
+- `x-runway-transient-provider-execution=true`
+- `runwayTransientKey` is present
+- premium member generation remains disabled
+
+The override must be 1000 characters or fewer, include identity preservation wording, include `No audio`, include `No text` or `No subtitles`, include `no camera movement`, and must not include wrong-route terms such as `ACTIVE`, `manifest`, `promotion`, `user generation`, or `public release`.
+
+When valid, the override is used directly as Runway `promptText`. SpiritCore does not append source URLs, style profile paragraphs, safety wrappers, or duplicate prompt text. The provider payload remains constrained to:
+
+- `model`
+- `promptImage`
+- `promptText`
+- `ratio`
+- `duration`
+
+The next recommended paid retry is Lyra `think_01` with `providerPromptOverride` emphasizing visible lifelike motion, no slow-motion feel, a clear non-blurred background, visible eye movement, a stronger thinking expression, and actual small head motion.
+
 ## Provider Request 400 Transparency
 
 The first safer Lyra `idle_01` diagnostic attempt reached the SpiritCore execution route but failed before Runway created a task:
