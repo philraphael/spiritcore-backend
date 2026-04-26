@@ -153,6 +153,34 @@ Diagnostics verify:
 
 For a failed Runway task such as `INTERNAL.BAD_OUTPUT.CODE01`, SpiritCore returns `ok: false`, keeps output URLs empty, and still confirms no promotion, manifest update, or ACTIVE write occurred.
 
+## Safer B2.1 Motion Controls
+
+The first Lyra `speaking_01` image-to-video job was accepted by Runway but failed during provider output generation:
+
+- provider job id: `5d7764c2-47f4-4653-b69d-5e385e667195`
+- status: `FAILED`
+- failure code: `INTERNAL.BAD_OUTPUT.CODE01`
+- failure message: `An unexpected error occurred.`
+
+The SpiritCore route, source URL, auth, gates, and review lifecycle worked. The failure occurred inside Runway generation. To reduce paid-generation waste, the motion-state execution route now accepts safer controls:
+
+- `durationSec`: `5` or `8`, default `5`
+- `aspectRatio`: default `720:1280`
+- `motionIntensity`: `low` or `medium`, default `low`
+- `generationMode`: `diagnostic_idle`, `subtle_speaking`, or `speaking`, default `diagnostic_idle`
+- `allowMouthMovement`: boolean, default `false`
+
+The recommended next test is Lyra `idle_01`, not `speaking_01`:
+
+- `assetType`: `idle_01`
+- `assetKind`: `idle_video`
+- `durationSec`: `5`
+- `motionIntensity`: `low`
+- `generationMode`: `diagnostic_idle`
+- `allowMouthMovement`: `false`
+
+`diagnostic_idle` prompts only for blinking, breathing, and tiny natural head movement. It explicitly avoids speaking demands and mouth movement. Lyra `speaking_01` should be retried only after the idle diagnostic succeeds.
+
 ## Confirmations
 
 - No generation occurred in tests.

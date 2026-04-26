@@ -92,6 +92,14 @@ export const SPIRITCORE_AVATAR_PACK_ASSET_TYPES = Object.freeze([
   "realm_presence_01",
 ]);
 
+export const SPIRITKIN_MOTION_GENERATION_MODES = Object.freeze([
+  "diagnostic_idle",
+  "subtle_speaking",
+  "speaking",
+]);
+
+export const SPIRITKIN_MOTION_INTENSITIES = Object.freeze(["low", "medium"]);
+
 export const ORIGINAL_SPIRITKIN_IDS = Object.freeze([
   "lyra",
   "raien",
@@ -582,6 +590,57 @@ function stateTriggerForAssetType(assetType) {
   return "idle_presence";
 }
 
+function normalizeMotionGenerationControls(input = {}) {
+  const errors = [];
+  const durationSec = Number(input.durationSec || 5);
+  if (![5, 8].includes(durationSec)) {
+    errors.push("durationSec must be 5 or 8");
+  }
+  const motionIntensity = canonicalize(input.motionIntensity || "low");
+  if (!SPIRITKIN_MOTION_INTENSITIES.includes(motionIntensity)) {
+    errors.push(`motionIntensity must be one of ${SPIRITKIN_MOTION_INTENSITIES.join(", ")}`);
+  }
+  const generationMode = canonicalize(input.generationMode || "diagnostic_idle");
+  if (!SPIRITKIN_MOTION_GENERATION_MODES.includes(generationMode)) {
+    errors.push(`generationMode must be one of ${SPIRITKIN_MOTION_GENERATION_MODES.join(", ")}`);
+  }
+  const allowMouthMovement = Boolean(input.allowMouthMovement);
+  return {
+    ok: errors.length === 0,
+    errors,
+    controls: {
+      durationSec,
+      aspectRatio: normalizeText(input.aspectRatio || "720:1280", 20),
+      motionIntensity,
+      generationMode,
+      allowMouthMovement,
+    },
+  };
+}
+
+function buildMotionGenerationPrompt({ canonicalName, assetType, stateTrigger, promptIntent, styleProfile, controls }) {
+  const base = [
+    promptIntent,
+    `Animate ${canonicalName} for ${assetType} with ${controls.motionIntensity} motion intensity.`,
+    `Style profile: ${styleProfile}.`,
+    "Preserve canonical portrait identity, facial structure, palette, gentle Spiritverse presence, and premium screen-present realism.",
+    "Keep the shot stable and suitable for an internal review motion-state loop.",
+  ];
+  if (controls.generationMode === "diagnostic_idle") {
+    base.push("Diagnostic idle mode only: add blinking, breathing, and tiny natural head movement. Do not create speaking behavior. Do not animate mouth movement. Keep lips closed and calm.");
+  } else if (controls.generationMode === "subtle_speaking") {
+    base.push("Subtle speaking mode: allow only very subtle natural mouth movement with restrained facial animation, no exaggerated lip sync, no broad gestures.");
+  } else {
+    base.push("Speaking mode: allow clearer speaking motion while preserving identity and avoiding exaggerated mouth movement or unstable facial changes.");
+  }
+  if (!controls.allowMouthMovement) {
+    base.push("Mouth movement is not allowed for this generation attempt.");
+  }
+  base.push(`State trigger: ${stateTrigger}. Duration target: ${controls.durationSec}s. Aspect ratio: ${controls.aspectRatio}.`);
+  base.push("Avoid identity drift, distorted face, warped anatomy, text overlays, subtitles, logos, watermarks, camera shake, or busy background changes.");
+  return base.join(" ");
+}
+
 function buildMotionAssetPlan({ assetType, targetId, subjectType, subjectId, styleProfile, safetyLevel, sourceRefs = [] }) {
   const assetKind = motionAssetKindForType(assetType);
   return {
@@ -675,10 +734,23 @@ export function createSpiritkinMotionStateExecutionPlan(input = {}) {
     throw new ValidationError("Invalid Spiritkin motion source.", ["sourceAssetRef is required"]);
   }
   const sourceAssetType = normalizeSourceMediaType(input.sourceAssetType || input.sourceType) || "external_url";
+  const controlsResult = normalizeMotionGenerationControls(input);
+  if (!controlsResult.ok) {
+    throw new ValidationError("Invalid Spiritkin motion generation controls.", controlsResult.errors);
+  }
+  const generationControls = controlsResult.controls;
   const promptIntent = normalizeText(input.promptIntent || `Animate ${canonicalName} into a premium ${assetType} loop for SpiritCore conversation responses.`, 1000);
   const styleProfile = normalizeText(input.styleProfile || "premium cinematic Spiritverse companion, elegant, emotionally alive, screen-present avatar realism", 360);
   const safetyLevel = normalizeText(input.safetyLevel || "internal_review", 80);
   const stateTrigger = stateTriggerForAssetType(assetType);
+  const finalPromptIntent = buildMotionGenerationPrompt({
+    canonicalName,
+    assetType,
+    stateTrigger,
+    promptIntent,
+    styleProfile,
+    controls: generationControls,
+  });
   const mediaAssetRecord = buildMediaAssetRecord({
     spiritkinId,
     targetId,
@@ -691,7 +763,7 @@ export function createSpiritkinMotionStateExecutionPlan(input = {}) {
     provider: "runway",
     providerJobId: input.providerJobId,
     sourceAssetRefs: [sourceAssetRef],
-    promptIntent,
+    promptIntent: finalPromptIntent,
     styleProfile,
     safetyLevel,
     versionTag: input.versionTag || `${slugify(spiritkinId)}-${slugify(assetType)}-${Date.now()}`,
@@ -711,9 +783,10 @@ export function createSpiritkinMotionStateExecutionPlan(input = {}) {
     assetType,
     assetKind,
     stateTrigger,
+    generationControls,
     sourceAssetRef,
     sourceAssetType,
-    promptIntent,
+    promptIntent: finalPromptIntent,
     styleProfile,
     safetyLevel,
     mediaAssetRecord,

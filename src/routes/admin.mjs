@@ -982,6 +982,10 @@ export async function adminRoutes(fastify, opts) {
         runwayTransientKey: { type: "string", minLength: 1, nullable: true },
         operatorApproval: { type: "boolean" },
         durationSec: { type: "number", nullable: true },
+        aspectRatio: { type: "string", nullable: true },
+        motionIntensity: { type: "string", nullable: true },
+        generationMode: { type: "string", nullable: true },
+        allowMouthMovement: { type: "boolean", nullable: true },
         notes: { type: "string", nullable: true },
       },
     },
@@ -1273,7 +1277,8 @@ export async function adminRoutes(fastify, opts) {
         sourceAssetRef: executionPlan.sourceAssetRef,
         sourceAssets: [executionPlan.sourceAssetRef],
         sourceAssetType: executionPlan.sourceAssetType,
-        durationSec: Number(body.durationSec || 8),
+        durationSec: executionPlan.generationControls.durationSec,
+        aspectRatio: executionPlan.generationControls.aspectRatio,
         requestedBy: req.adminAccess?.source || "admin_media_spiritkin_motion_state_execute",
       });
       const providerTarget = resolveRunwayGenerationTarget(dryRunJob, executionConfig.generator?.video?.runway || {});
@@ -1302,6 +1307,7 @@ export async function adminRoutes(fastify, opts) {
         executionGates: allGates,
         providerTarget,
         apiPayloadPreview,
+        generationControls: executionPlan.generationControls,
         mediaAssetRecord: executionPlan.mediaAssetRecord,
         outputLifecycleState: "review_required",
         commandCenterMetadata: executionPlan.commandCenterMetadata,
@@ -1314,18 +1320,19 @@ export async function adminRoutes(fastify, opts) {
       if (!allGates.ok) return baseResponse;
 
       if (isTrueEnv(process.env.RUNWAY_SPIRITKIN_MOTION_EXECUTE_MOCK)) {
+        const mockProviderJobId = `mock-${executionPlan.spiritkinId}-${String(executionPlan.assetType || "motion").replace(/_/g, "-")}-task`;
         return {
           ...baseResponse,
           mock: true,
           providerResult: {
             provider: "runway",
-            providerJobId: "mock-lyra-speaking-01-task",
+            providerJobId: mockProviderJobId,
             status: "queued",
             rawStatus: "mock_submitted",
           },
           mediaAssetRecord: {
             ...executionPlan.mediaAssetRecord,
-            providerJobId: "mock-lyra-speaking-01-task",
+            providerJobId: mockProviderJobId,
             lifecycleState: "review_required",
             reviewStatus: "pending",
             outputUrls: [],

@@ -808,6 +808,12 @@ async function main() {
           return result.assetType === "speaking_01"
             && result.assetKind === "speaking_video"
             && result.providerTarget.providerMode === "image_to_video"
+            && result.generationControls.durationSec === 5
+            && result.generationControls.generationMode === "diagnostic_idle"
+            && result.generationControls.motionIntensity === "low"
+            && result.generationControls.allowMouthMovement === false
+            && result.promptIntent.includes("Do not create speaking behavior")
+            && result.promptIntent.includes("Mouth movement is not allowed")
             && result.mediaAssetRecord.lifecycleState === "review_required"
             && result.mediaAssetRecord.reviewStatus === "pending"
             && result.mediaAssetRecord.outputUrls.length === 0
@@ -817,6 +823,61 @@ async function main() {
             && result.noActiveWritePerformed === true;
         })(),
         detail: "Spiritkin motion-state execution plan remains review_required and image-to-video",
+      },
+      {
+        name: "media-spiritkin-motion-controls-invalid-duration",
+        pass: (() => {
+          try {
+            createSpiritkinMotionStateExecutionPlan({
+              spiritkinId: "lyra",
+              targetId: "lyra-motion-pack-v1",
+              assetType: "idle_01",
+              assetKind: "idle_video",
+              sourceAssetRef: "https://example.com/lyra_portrait.png",
+              sourceAssetType: "external_url",
+              promptIntent: "Diagnostic invalid duration.",
+              styleProfile: "premium cinematic Spiritverse companion",
+              safetyLevel: "internal_review",
+              durationSec: 6,
+            });
+            return false;
+          } catch (error) {
+            return String(error?.message || "").includes("Invalid Spiritkin motion generation controls")
+              && (error?.detail?.fields || []).includes("durationSec must be 5 or 8");
+          }
+        })(),
+        detail: "invalid motion duration is rejected before provider execution",
+      },
+      {
+        name: "media-spiritkin-diagnostic-idle-prompt-safe",
+        pass: (() => {
+          const result = createSpiritkinMotionStateExecutionPlan({
+            spiritkinId: "lyra",
+            targetId: "lyra-motion-pack-v1",
+            assetType: "idle_01",
+            assetKind: "idle_video",
+            sourceAssetRef: "https://example.com/lyra_portrait.png",
+            sourceAssetType: "external_url",
+            promptIntent: "Animate Lyra in a diagnostic idle loop.",
+            styleProfile: "premium cinematic Spiritverse companion",
+            safetyLevel: "internal_review",
+            durationSec: 5,
+            motionIntensity: "low",
+            generationMode: "diagnostic_idle",
+            allowMouthMovement: false,
+          });
+          return result.assetType === "idle_01"
+            && result.assetKind === "idle_video"
+            && result.generationControls.durationSec === 5
+            && result.generationControls.generationMode === "diagnostic_idle"
+            && result.promptIntent.includes("blinking, breathing, and tiny natural head movement")
+            && result.promptIntent.includes("Do not create speaking behavior")
+            && result.promptIntent.includes("Do not animate mouth movement")
+            && result.noPromotionPerformed === true
+            && result.noManifestUpdatePerformed === true
+            && result.noActiveWritePerformed === true;
+        })(),
+        detail: "diagnostic idle prompt avoids speaking and mouth movement demands",
       },
       {
         name: "media-spiritcore-avatar-pack-plan",
@@ -1029,7 +1090,7 @@ async function main() {
     });
     await run("runway-auth-check-missing-key", "POST", "/admin/runway/auth-check", {
       body: {},
-      allowStatuses: [400],
+      allowStatuses: [400, 422],
       describe: () => "missing transient Runway key rejected",
     });
     await run("runway-auth-check-mock", "POST", "/admin/runway/auth-check", {
@@ -1046,7 +1107,7 @@ async function main() {
       body: {
         runwayTransientKey: "mock-runway-key",
       },
-      allowStatuses: [400],
+      allowStatuses: [400, 422],
       describe: () => "missing providerJobId rejected",
     });
     await run("runway-status-check-missing-key", "POST", "/admin/runway/status-check", {
@@ -1644,7 +1705,7 @@ async function main() {
         ? "missing operator approval cannot execute Spiritkin motion provider"
         : "unexpected missing approval result",
     });
-    await run("media-spiritkin-motion-state-execute-valid-preview", "POST", "/admin/media/spiritkin-motion-state-execute", {
+    await run("media-spiritkin-motion-state-execute-invalid-duration", "POST", "/admin/media/spiritkin-motion-state-execute", {
       headers: { "x-admin-key": DIAG_ADMIN_KEY },
       body: {
         spiritkinId: "lyra",
@@ -1657,11 +1718,44 @@ async function main() {
         styleProfile: "premium cinematic Spiritverse companion, elegant, emotionally alive",
         safetyLevel: "internal_review",
         operatorApproval: true,
+        durationSec: 6,
+      },
+      allowStatuses: [400, 422],
+      describe: (result) => result?.body?.error === "VALIDATION_ERROR"
+        && result?.body?.message === "Invalid Spiritkin motion generation controls."
+        ? "invalid duration rejected before provider execution"
+        : "unexpected invalid duration result",
+    });
+    await run("media-spiritkin-motion-state-execute-diagnostic-idle-preview", "POST", "/admin/media/spiritkin-motion-state-execute", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        spiritkinId: "lyra",
+        targetId: "lyra-motion-pack-v1",
+        assetType: "idle_01",
+        assetKind: "idle_video",
+        sourceAssetRef: lyraSourceUrl,
+        sourceAssetType: "external_url",
+        promptIntent: "Animate Lyra in a diagnostic idle loop for first motion validation.",
+        styleProfile: "premium cinematic Spiritverse companion, elegant, emotionally alive",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+        durationSec: 5,
+        aspectRatio: "720:1280",
+        motionIntensity: "low",
+        generationMode: "diagnostic_idle",
+        allowMouthMovement: false,
       },
       describe: (result) => result?.body?.externalApiCall === false
         && result?.body?.providerTarget?.providerMode === "image_to_video"
         && result?.body?.apiPayloadPreview?.model === "gen4_turbo"
         && result?.body?.apiPayloadPreview?.promptImage === lyraSourceUrl
+        && result?.body?.apiPayloadPreview?.duration === 5
+        && result?.body?.apiPayloadPreview?.ratio === "720:1280"
+        && result?.body?.generationControls?.generationMode === "diagnostic_idle"
+        && result?.body?.generationControls?.motionIntensity === "low"
+        && result?.body?.generationControls?.allowMouthMovement === false
+        && result?.body?.apiPayloadPreview?.promptText?.includes("Do not create speaking behavior")
+        && result?.body?.apiPayloadPreview?.promptText?.includes("Mouth movement is not allowed")
         && result?.body?.mediaAssetRecord?.lifecycleState === "review_required"
         && result?.body?.mediaAssetRecord?.reviewStatus === "pending"
         && Array.isArray(result?.body?.mediaAssetRecord?.outputUrls)
@@ -1670,7 +1764,7 @@ async function main() {
         && result?.body?.noPromotionPerformed === true
         && result?.body?.noManifestUpdatePerformed === true
         && result?.body?.noActiveWritePerformed === true
-        ? "valid staging request builds image-to-video payload without provider call"
+        ? "valid staging diagnostic idle request builds safe image-to-video payload without provider call"
         : "unexpected Spiritkin motion execute preview",
     });
     await run("media-spiritkin-motion-state-execute-transient-flags-mock", "POST", "/admin/media/spiritkin-motion-state-execute", {
@@ -1681,14 +1775,19 @@ async function main() {
       body: {
         spiritkinId: "lyra",
         targetId: "lyra-motion-pack-v1",
-        assetType: "speaking_01",
-        assetKind: "speaking_video",
+        assetType: "idle_01",
+        assetKind: "idle_video",
         sourceAssetRef: lyraSourceUrl,
         sourceAssetType: "external_url",
-        promptIntent: "Animate Lyra into a premium speaking loop for SpiritCore responses.",
+        promptIntent: "Animate Lyra in a diagnostic idle loop for first motion validation.",
         styleProfile: "premium cinematic Spiritverse companion, elegant, emotionally alive",
         safetyLevel: "internal_review",
         operatorApproval: true,
+        durationSec: 5,
+        aspectRatio: "720:1280",
+        motionIntensity: "low",
+        generationMode: "diagnostic_idle",
+        allowMouthMovement: false,
         runwayTransientKey: "mock-runway-key",
       },
       describe: (result) => result?.body?.externalApiCall === false
@@ -1697,7 +1796,9 @@ async function main() {
         && result?.body?.transientExecuteRequested === true
         && result?.body?.transientProviderExecutionRequested === true
         && result?.body?.executionGates?.ok === true
-        && result?.body?.mediaAssetRecord?.providerJobId === "mock-lyra-speaking-01-task"
+        && result?.body?.generationControls?.durationSec === 5
+        && result?.body?.generationControls?.generationMode === "diagnostic_idle"
+        && result?.body?.mediaAssetRecord?.providerJobId === "mock-lyra-idle-01-task"
         && result?.body?.mediaAssetRecord?.lifecycleState === "review_required"
         && result?.body?.premiumMemberGeneration?.enabled === false
         && result?.body?.noPromotionPerformed === true
