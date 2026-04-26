@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { ValidationError } from "../errors.mjs";
+import { SPIRITGATE_RUNTIME_MEDIA } from "../../spiritkins-app/data/spiritkinRuntimeConfig.js";
 
 export const SPIRITCORE_MEDIA_ASSET_KINDS = Object.freeze([
   "portrait",
@@ -214,6 +215,34 @@ export const PREMIUM_MEMBER_GENERATION_BOUNDARY = Object.freeze({
   ],
 });
 
+export const COMMAND_CENTER_GENERATOR_READINESS = Object.freeze({
+  exists: true,
+  route: "/command-center",
+  generatorTab: true,
+  imageGeneratorControls: true,
+  videoGeneratorControls: true,
+  generationJobUi: true,
+  providerModelSelection: false,
+  promptBox: true,
+  statusPolling: false,
+  outputReview: true,
+  assetPromotionControls: false,
+  spiritGateSpecificControls: false,
+  reusableForA14: [
+    "generator provider status display",
+    "video job form pattern",
+    "generation history list",
+    "review queue controls",
+  ],
+  connectLater: [
+    "SpiritGate source summary",
+    "SpiritGate enhancement payload preview",
+    "operator approval checkbox",
+    "status-check polling for providerJobId",
+    "media review plan creation",
+  ],
+});
+
 const GENERATION_TEMPLATES = Object.freeze({
   spiritgate_enhancement: {
     id: "spiritgate_enhancement",
@@ -399,6 +428,126 @@ export function validateSourceMediaReference(record = {}) {
   if (!record.sourceType || !SOURCE_MEDIA_TYPES.includes(record.sourceType)) errors.push("sourceType must be uploaded_video, uploaded_image, existing_asset, or external_url");
   if (!record.sourceUrl && !record.storagePath) errors.push("sourceUrl or storagePath is required");
   return { ok: errors.length === 0, errors };
+}
+
+function normalizeOrigin(value) {
+  return String(value || "").trim().replace(/\/+$/g, "");
+}
+
+export function resolveExistingSpiritGateSource(input = {}) {
+  const gate = SPIRITGATE_RUNTIME_MEDIA.gate || {};
+  const currentPath = normalizeText(gate.path || "/videos/gate_entrance_final.mp4", 600);
+  const fileName = normalizeText(gate.fileName || "gate_entrance_final.mp4", 200);
+  const sourceAssetId = "existing-pika-spiritgate-video";
+  const origin = normalizeOrigin(input.origin || input.publicOrigin || input.stagingOrigin);
+  const publicUrl = origin && currentPath.startsWith("/")
+    ? `${origin}${currentPath}`
+    : "";
+  const sourceAssetRef = publicUrl || currentPath;
+  const sourceAssetType = publicUrl && publicUrl.startsWith("https://")
+    ? "external_url"
+    : "existing_asset";
+  const canUseForRunwayVideoToVideo = /^https:\/\/.+/i.test(sourceAssetRef)
+    || /^runway:\/\/.+/i.test(sourceAssetRef)
+    || /^data:video\//i.test(sourceAssetRef);
+  const missingRequirements = [];
+  if (!currentPath) missingRequirements.push("SpiritGate runtime media path is missing");
+  if (!canUseForRunwayVideoToVideo) {
+    missingRequirements.push("Runway video-to-video requires an HTTPS, Runway, or data video URI; current source is local/public path only");
+  }
+
+  return {
+    ok: Boolean(currentPath),
+    sourceAssetId,
+    targetId: "spiritgate",
+    targetType: "spiritgate",
+    assetKind: "spiritgate_video",
+    sourceAssetRef,
+    sourceAssetType,
+    currentPath,
+    fileName,
+    localFilePath: `spiritkins-app/public/videos/${fileName}`,
+    frontendPath: currentPath,
+    publicUrl: publicUrl || null,
+    providerCompatibility: providerCompatibilityForSource(sourceAssetType, "spiritgate_video"),
+    canUseForRunwayVideoToVideo,
+    missingRequirements,
+    frontendUsage: {
+      runtimeConfig: "SPIRITGATE_RUNTIME_MEDIA.gate.path",
+      appVideoSource: "<source src=\"/videos/gate_entrance_final.mp4\" type=\"video/mp4\">",
+      serverRoute: "GET /videos/:filename",
+    },
+    commandCenterGeneratorReadiness: COMMAND_CENTER_GENERATOR_READINESS,
+    notes: canUseForRunwayVideoToVideo
+      ? "Current SpiritGate source can be passed to Runway as a video-to-video source when this HTTPS URL is reachable from Runway."
+      : "Use the existing /videos/gate_entrance_final.mp4 asset through the current staging HTTPS static route; do not create a new storage system first.",
+    noFileWrites: true,
+    noManifestUpdates: true,
+    noActiveWrites: true,
+  };
+}
+
+export function createSpiritGateEnhancementPlanFromCurrentSource(input = {}) {
+  const source = resolveExistingSpiritGateSource(input);
+  const promptIntent = normalizeText(input.promptIntent || [
+    "Enhance the existing SpiritGate entrance video without replacing its identity.",
+    "Preserve the recognizable source concept, gateway silhouette, threshold feeling, and Spiritverse arrival energy.",
+    "Improve quality, cinematic polish, lighting, clarity, dimensionality, atmosphere, and premium feel.",
+  ].join(" "), 1000);
+  const styleProfile = normalizeText(input.styleProfile || "premium cinematic cosmic fantasy, luxury black and gold, subtle apple red accents, ivory highlights, Spiritverse gateway identity", 320);
+  const safetyLevel = normalizeText(input.safetyLevel || "internal_review", 80);
+  const readyToRunPayload = {
+    targetId: "spiritgate",
+    sourceAssetRef: source.sourceAssetRef,
+    sourceAssetType: source.sourceAssetType,
+    promptIntent,
+    styleProfile,
+    safetyLevel,
+    operatorApproval: true,
+  };
+  const executionPlan = createSpiritGateEnhancementExecutionPlan({
+    ...readyToRunPayload,
+    sourceAssetId: source.sourceAssetId,
+  });
+  return {
+    ok: true,
+    source,
+    readyToRunPayload,
+    finalOptimizedPrompt: [
+      "Enhance the existing SpiritGate entrance video without replacing its identity.",
+      "Preserve the recognizable source concept, timing, gateway silhouette, threshold feeling, and Spiritverse arrival energy from the current in-app SpiritGate video.",
+      "Improve quality, cinematic polish, lighting, clarity, dimensionality, atmosphere, and premium feel.",
+      "Create a luxury black-and-gold cosmic fantasy gateway with subtle apple red accents and ivory highlights.",
+      "Keep the scene elegant and readable on mobile and desktop.",
+      "No text overlays, logos, watermarks, gore, sexualized framing, distorted geometry, identity drift, noisy UI elements, cheap stock aesthetic, or replacement of the current SpiritGate identity.",
+    ].join(" "),
+    modelToolRecommendation: "Runway video_to_video with gen4_aleph",
+    reviewChecklist: [
+      "existing SpiritGate source remains recognizable",
+      "quality, lighting, dimensionality, clarity, and atmosphere improve without replacement",
+      "gateway scene compatibility is preserved",
+      "mobile and desktop framing remain readable",
+      "provider job id, source reference, prompt, and output URL are captured before review",
+      "operator review passes before any promotion plan",
+    ],
+    rejectionCriteria: [
+      "source SpiritGate concept is no longer recognizable",
+      "output behaves like replacement rather than enhancement",
+      "gateway scene compatibility is broken",
+      "watermarks, logos, subtitles, or text overlays",
+      "generic portal, horror, sci-fi machinery, or stock-footage aesthetic",
+      "missing source reference or provider metadata",
+    ],
+    operatorApprovalRequired: true,
+    canUseForRunwayVideoToVideo: source.canUseForRunwayVideoToVideo,
+    missingRequirements: source.missingRequirements,
+    executionPlan,
+    noGenerationPerformed: true,
+    noProviderCall: true,
+    noPromotionPerformed: true,
+    noManifestUpdatePerformed: true,
+    noActiveWritePerformed: true,
+  };
 }
 
 export function buildMediaAssetRecord(input = {}) {
@@ -1055,6 +1204,8 @@ export function getMediaCatalogSummary() {
       "POST /admin/media/promotion-plan",
       "POST /admin/media/production-sequence-plan",
       "POST /admin/media/source-reference-plan",
+      "GET /admin/media/spiritgate-source-summary",
+      "POST /admin/media/spiritgate-enhancement-plan-from-current-source",
       "POST /admin/media/spiritgate-enhancement-execute",
       "GET /admin/media/catalog-summary",
     ],

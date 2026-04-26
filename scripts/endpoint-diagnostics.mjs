@@ -18,12 +18,14 @@ import {
   checkMediaRequirements,
   createMediaPromotionPlan,
   createProductionSequencePlan,
+  createSpiritGateEnhancementPlanFromCurrentSource,
   createSpiritGateEnhancementExecutionPlan,
   createSpiritGateEnhancementPlan,
   getMediaCatalogSummary,
   ORIGINAL_MOTION_PACK_ASSET_KINDS,
   PREMIUM_MEMBER_GENERATION_BOUNDARY,
   PREMIUM_SPIRITKIN_STARTER_PACK_ASSET_KINDS,
+  resolveExistingSpiritGateSource,
   SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP,
   SPIRITCORE_MEDIA_ASSET_KINDS,
   SPIRITCORE_MEDIA_REQUIREMENT_PROFILES,
@@ -579,6 +581,35 @@ async function main() {
         detail: "SpiritGate execution plan remains review_required and write-safe",
       },
       {
+        name: "media-existing-spiritgate-source-discovery",
+        pass: (() => {
+          const result = resolveExistingSpiritGateSource({
+            origin: "https://spiritcore-backend-copy-production.up.railway.app",
+          });
+          return result.currentPath === "/videos/gate_entrance_final.mp4"
+            && result.localFilePath === "spiritkins-app/public/videos/gate_entrance_final.mp4"
+            && result.publicUrl === "https://spiritcore-backend-copy-production.up.railway.app/videos/gate_entrance_final.mp4"
+            && result.canUseForRunwayVideoToVideo === true
+            && result.noFileWrites === true;
+        })(),
+        detail: "existing SpiritGate source resolves to the current app video path",
+      },
+      {
+        name: "media-spiritgate-plan-from-current-source",
+        pass: (() => {
+          const result = createSpiritGateEnhancementPlanFromCurrentSource({
+            origin: "https://spiritcore-backend-copy-production.up.railway.app",
+          });
+          return result.readyToRunPayload.sourceAssetRef.endsWith("/videos/gate_entrance_final.mp4")
+            && result.readyToRunPayload.sourceAssetType === "external_url"
+            && result.modelToolRecommendation.includes("gen4_aleph")
+            && result.noGenerationPerformed === true
+            && result.noProviderCall === true
+            && result.noActiveWritePerformed === true;
+        })(),
+        detail: "SpiritGate enhancement payload can be built from current source without generation",
+      },
+      {
         name: "media-assistant-roadmap-documented",
         pass: SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP.some((item) => item.id === "alarms")
           && SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP.some((item) => item.id === "smart_home"),
@@ -1087,6 +1118,39 @@ async function main() {
         && result?.body?.noActiveWritePerformed === true
         ? "source media reference planned without storage writes"
         : "unexpected source reference result",
+    });
+    await run("media-spiritgate-source-summary", "GET", "/admin/media/spiritgate-source-summary", {
+      headers: {
+        "x-admin-key": DIAG_ADMIN_KEY,
+        "x-forwarded-proto": "https",
+        "x-forwarded-host": "spiritcore-backend-copy-production.up.railway.app",
+      },
+      describe: (result) => result?.body?.spiritGateSource?.currentPath === "/videos/gate_entrance_final.mp4"
+        && result?.body?.spiritGateSource?.canUseForRunwayVideoToVideo === true
+        && result?.body?.spiritGateSource?.commandCenterGeneratorReadiness?.videoGeneratorControls === true
+        && result?.body?.noGenerationPerformed === true
+        && result?.body?.noProviderCall === true
+        ? "existing SpiritGate source summary returned without generation"
+        : "unexpected SpiritGate source summary",
+    });
+    await run("media-spiritgate-plan-from-current-source", "POST", "/admin/media/spiritgate-enhancement-plan-from-current-source", {
+      headers: {
+        "x-admin-key": DIAG_ADMIN_KEY,
+        "x-forwarded-proto": "https",
+        "x-forwarded-host": "spiritcore-backend-copy-production.up.railway.app",
+      },
+      body: {
+        styleProfile: "premium cinematic SpiritGate enhancement",
+        safetyLevel: "internal_review",
+      },
+      describe: (result) => result?.body?.spiritGateEnhancementPlan?.readyToRunPayload?.sourceAssetRef === "https://spiritcore-backend-copy-production.up.railway.app/videos/gate_entrance_final.mp4"
+        && result?.body?.spiritGateEnhancementPlan?.operatorApprovalRequired === true
+        && result?.body?.spiritGateEnhancementPlan?.noGenerationPerformed === true
+        && result?.body?.spiritGateEnhancementPlan?.noProviderCall === true
+        && result?.body?.spiritGateEnhancementPlan?.noManifestUpdatePerformed === true
+        && result?.body?.spiritGateEnhancementPlan?.noActiveWritePerformed === true
+        ? "enhancement plan built from current SpiritGate source"
+        : "unexpected SpiritGate current-source plan",
     });
     await run("media-spiritgate-enhancement-execute-missing-source", "POST", "/admin/media/spiritgate-enhancement-execute", {
       headers: { "x-admin-key": DIAG_ADMIN_KEY },

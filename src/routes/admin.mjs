@@ -26,6 +26,7 @@ import {
   createMediaPromotionPlan,
   createMediaReviewPlan,
   createProductionSequencePlan,
+  createSpiritGateEnhancementPlanFromCurrentSource,
   createSpiritGateEnhancementExecutionPlan,
   createSpiritGateEnhancementPlan,
   getMediaCatalogSummary,
@@ -33,6 +34,7 @@ import {
   SPIRITCORE_MEDIA_ASSET_KINDS,
   SPIRITCORE_MEDIA_REQUIREMENT_PROFILES,
   validateSourceMediaReference,
+  resolveExistingSpiritGateSource,
 } from "../services/spiritCoreMediaProduction.mjs";
 
 function isTrueEnv(value) {
@@ -110,6 +112,13 @@ function readRunwayTransientHeaders(body = {}, headers = {}, env = process.env) 
     executeRequested: isTrueEnv(headers["x-runway-transient-execute"]),
     providerExecutionRequested: isTrueEnv(headers["x-runway-transient-provider-execution"]),
   };
+}
+
+function requestPublicOrigin(req) {
+  const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "").split(",")[0].trim();
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+  if (!host) return "";
+  return `${proto || "https"}://${host}`;
 }
 
 function createRunwayExecutionContext({ req, baseConfig, baseEnv }) {
@@ -911,6 +920,34 @@ export async function adminRoutes(fastify, opts) {
       noUploadStorageImplemented: true,
     };
   }, req, reply));
+
+  fastify.get("/admin/media/spiritgate-source-summary", {
+    preHandler: requireAdminAccess,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    spiritGateSource: resolveExistingSpiritGateSource({
+      origin: requestPublicOrigin(req),
+    }),
+    noGenerationPerformed: true,
+  }), req, reply));
+
+  fastify.post("/admin/media/spiritgate-enhancement-plan-from-current-source", {
+    preHandler: requireAdminAccess,
+    schema: {
+      body: {
+        type: "object",
+        properties: {
+          promptIntent: { type: "string", nullable: true },
+          styleProfile: { type: "string", nullable: true },
+          safetyLevel: { type: "string", nullable: true },
+        },
+      },
+    },
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    spiritGateEnhancementPlan: createSpiritGateEnhancementPlanFromCurrentSource({
+      ...req.body,
+      origin: requestPublicOrigin(req),
+    }),
+  }), req, reply));
 
   async function requireSpiritGateEnhancementAccess(req, reply) {
     if (canUseSpiritGateEnhancementStagingBypass(req.body, process.env)) {
