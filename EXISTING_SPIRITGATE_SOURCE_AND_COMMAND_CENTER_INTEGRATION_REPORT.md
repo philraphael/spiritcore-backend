@@ -147,6 +147,10 @@ try {
   Invoke-RestMethod `
     -Uri "https://spiritcore-backend-copy-production.up.railway.app/admin/media/spiritgate-enhancement-execute" `
     -Method Post `
+    -Headers @{
+      "x-runway-transient-execute" = "true"
+      "x-runway-transient-provider-execution" = "true"
+    } `
     -ContentType "application/json" `
     -Body $body
 }
@@ -162,6 +166,8 @@ Required staging gates:
 - `RUNWAY_STAGING_TEST_BYPASS=true`
 - `RUNWAY_DRY_RUN_EXECUTE=true`
 - `RUNWAY_ALLOW_PROVIDER_EXECUTION=true`
+
+For the one controlled staging test, the route can also satisfy those two execution flags request-scoped through the transient headers shown above when `runwayTransientKey` is present in the body. The route does not modify global environment variables.
 
 ## Confirmation
 

@@ -991,14 +991,30 @@ export async function adminRoutes(fastify, opts) {
     if (!String(body.sourceAssetRef || "").trim()) gateFailures.push("sourceAssetRef is required");
 
     try {
+      const transientExecuteRequested = isTrueEnv(req.headers["x-runway-transient-execute"]);
+      const transientProviderExecutionRequested = isTrueEnv(req.headers["x-runway-transient-provider-execution"]);
       const executionPlan = createSpiritGateEnhancementExecutionPlan({
         ...body,
         requestedBy: req.adminAccess?.source || "admin_media_spiritgate_execute",
       });
       const runwayApiKey = String(body.runwayTransientKey || config.generator?.video?.runway?.apiKey || process.env.RUNWAY_API_KEY || "").trim();
+      const transientKeyProvided = Boolean(String(body.runwayTransientKey || "").trim());
+      const requestCanUseTransientExecution = process.env.NODE_ENV === "staging"
+        && isTrueEnv(process.env.RUNWAY_STAGING_TEST_BYPASS)
+        && transientKeyProvided
+        && Boolean(body.operatorApproval)
+        && ["spiritgate", "test-spiritgate"].includes(String(body.targetId || "").trim())
+        && body.safetyLevel === "internal_review"
+        && Boolean(String(body.sourceAssetRef || "").trim());
       const executionEnv = {
         ...process.env,
         RUNWAY_API_KEY: runwayApiKey,
+        RUNWAY_DRY_RUN_EXECUTE: requestCanUseTransientExecution && transientExecuteRequested
+          ? "true"
+          : process.env.RUNWAY_DRY_RUN_EXECUTE,
+        RUNWAY_ALLOW_PROVIDER_EXECUTION: requestCanUseTransientExecution && transientProviderExecutionRequested
+          ? "true"
+          : process.env.RUNWAY_ALLOW_PROVIDER_EXECUTION,
       };
       const executionConfig = {
         ...config,
@@ -1052,6 +1068,9 @@ export async function adminRoutes(fastify, opts) {
         enhancementOnly: true,
         externalApiCall: false,
         executed: false,
+        transientExecuteRequested,
+        transientProviderExecutionRequested,
+        transientKeyProvided,
         executionGates: allGates,
         providerTarget,
         apiPayloadPreview,

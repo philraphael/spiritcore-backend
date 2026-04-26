@@ -1205,6 +1205,60 @@ async function main() {
         ? "valid staging request builds video-to-video payload without provider call"
         : "unexpected SpiritGate enhancement execute preview",
     });
+    await run("media-spiritgate-enhancement-execute-transient-flags-missing", "POST", "/admin/media/spiritgate-enhancement-execute", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        targetId: "spiritgate",
+        sourceAssetRef: "https://example.com/spiritgate.mp4",
+        sourceAssetType: "external_url",
+        promptIntent: "Diagnostic SpiritGate transient key without execution flags.",
+        styleProfile: "premium cinematic SpiritGate enhancement",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+        runwayTransientKey: "mock-runway-key",
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.transientKeyProvided === true
+        && result?.body?.transientExecuteRequested === false
+        && result?.body?.transientProviderExecutionRequested === false
+        && result?.body?.executionGates?.missingGates?.includes("RUNWAY_DRY_RUN_EXECUTE=true is required")
+        && result?.body?.executionGates?.missingGates?.includes("RUNWAY_ALLOW_PROVIDER_EXECUTION=true is required")
+        && result?.body?.noPromotionPerformed === true
+        && result?.body?.noManifestUpdatePerformed === true
+        && result?.body?.noActiveWritePerformed === true
+        ? "transient key without execution flags remains blocked"
+        : "unexpected missing transient flags result",
+    });
+    await run("media-spiritgate-enhancement-execute-transient-flags-mock", "POST", "/admin/media/spiritgate-enhancement-execute", {
+      headers: {
+        "x-admin-key": DIAG_ADMIN_KEY,
+        "x-runway-transient-execute": "true",
+        "x-runway-transient-provider-execution": "true",
+      },
+      body: {
+        targetId: "spiritgate",
+        sourceAssetRef: "https://example.com/spiritgate.mp4",
+        sourceAssetType: "external_url",
+        promptIntent: "Diagnostic SpiritGate transient execution flags mock path.",
+        styleProfile: "premium cinematic SpiritGate enhancement",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+        runwayTransientKey: "mock-runway-key",
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.mock === true
+        && result?.body?.transientKeyProvided === true
+        && result?.body?.transientExecuteRequested === true
+        && result?.body?.transientProviderExecutionRequested === true
+        && result?.body?.executionGates?.ok === true
+        && result?.body?.mediaAssetRecord?.lifecycleState === "review_required"
+        && result?.body?.premiumMemberGeneration?.enabled === false
+        && result?.body?.noPromotionPerformed === true
+        && result?.body?.noManifestUpdatePerformed === true
+        && result?.body?.noActiveWritePerformed === true
+        ? "transient execution flags pass gates in mock path"
+        : "unexpected transient flags mock result",
+    });
 
     const conversation = await run("conversation-bootstrap", "POST", "/v1/conversations", {
       body: {

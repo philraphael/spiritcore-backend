@@ -86,6 +86,13 @@ Required execution gates:
 - no manifest update
 - no ACTIVE write
 
+The route also supports request-scoped transient execution flags for the controlled staging test:
+
+- `x-runway-transient-execute: true`
+- `x-runway-transient-provider-execution: true`
+
+These headers are honored only when the request is a valid staging SpiritGate enhancement request and a transient Runway key is provided in the body. They do not modify global `process.env`.
+
 The route returns a media asset record in `review_required` state. Provider execution occurs only when the staging/operator gates and existing Runway execution gates pass.
 
 ## Command Center Readiness
