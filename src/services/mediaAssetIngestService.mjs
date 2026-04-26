@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ValidationError } from "../errors.mjs";
+import { getMediaStorageRoot, resolveMediaPath } from "./mediaStorageRoot.mjs";
 
 const DEFAULT_ROOT = "Spiritverse_MASTER_ASSETS";
 const APPROVED_REGISTRY_RELATIVE_PATH = path.posix.join(
@@ -72,15 +73,6 @@ function filenamePackComponent(entityId = "", packId = "") {
     return normalizedPackId.slice(entityPrefix.length) || normalizedPackId;
   }
   return normalizedPackId;
-}
-
-function safeJoin(root, relativePath) {
-  const absoluteRoot = path.resolve(root);
-  const absoluteTarget = path.resolve(absoluteRoot, relativePath);
-  if (absoluteTarget !== absoluteRoot && !absoluteTarget.startsWith(`${absoluteRoot}${path.sep}`)) {
-    throw new ValidationError("Resolved media ingest path escaped the configured asset root.", ["path"]);
-  }
-  return absoluteTarget;
 }
 
 function normalizeRelativePath(value = "") {
@@ -233,10 +225,9 @@ export function getApprovedMediaAssetRegistryPath() {
 }
 
 export async function loadApprovedMediaAssetRegistry(options = {}) {
-  const workspaceRoot = path.resolve(options.workspaceRoot || process.cwd());
-  const registryPath = safeJoin(workspaceRoot, APPROVED_REGISTRY_RELATIVE_PATH);
+  const registryPath = resolveMediaPath(APPROVED_REGISTRY_RELATIVE_PATH, options);
   try {
-    const parsed = JSON.parse(await readFile(registryPath, "utf8"));
+    const parsed = JSON.parse(await readFile(registryPath.resolvedPath, "utf8"));
     const records = Array.isArray(parsed.records) ? parsed.records : [];
     return {
       ok: true,
@@ -270,8 +261,7 @@ export async function upsertApprovedMediaAssetRegistryRecords(records = [], opti
     throw new ValidationError("Invalid approved media asset registry record.", invalid.flatMap((item) => item.errors));
   }
 
-  const workspaceRoot = path.resolve(options.workspaceRoot || process.cwd());
-  const existing = await loadApprovedMediaAssetRegistry({ workspaceRoot });
+  const existing = await loadApprovedMediaAssetRegistry(options);
   const byKey = new Map(existing.records.map((record) => [registryKey(record), record]));
   let inserted = 0;
   let updated = 0;
@@ -293,9 +283,9 @@ export async function upsertApprovedMediaAssetRegistryRecords(records = [], opti
     noManifestUpdatePerformed: true,
     providerGenerationPerformed: false,
   };
-  const absoluteRegistryPath = safeJoin(workspaceRoot, APPROVED_REGISTRY_RELATIVE_PATH);
-  await mkdir(path.dirname(absoluteRegistryPath), { recursive: true });
-  await writeFile(absoluteRegistryPath, JSON.stringify(payload, null, 2), "utf8");
+  const registryPath = resolveMediaPath(APPROVED_REGISTRY_RELATIVE_PATH, options);
+  await mkdir(path.dirname(registryPath.resolvedPath), { recursive: true });
+  await writeFile(registryPath.resolvedPath, JSON.stringify(payload, null, 2), "utf8");
 
   return {
     ok: true,
@@ -321,7 +311,9 @@ export function buildApprovedRegistryRecordFromMetadata(metadata = {}, metadataP
 }
 
 async function findApprovedMetadataPaths(root, entityId) {
-  const approvedRoot = safeJoin(root, path.posix.join(DEFAULT_ROOT, "APPROVED", slugPart(entityId, "")));
+  const approvedRoot = resolveMediaPath(path.posix.join(DEFAULT_ROOT, "APPROVED", slugPart(entityId, "")), {
+    workspaceRoot: root,
+  }).resolvedPath;
   const results = [];
   async function walk(dir) {
     let entries = [];
@@ -337,7 +329,8 @@ async function findApprovedMetadataPaths(root, entityId) {
         if (entry.name === "source_stills") continue;
         await walk(absolute);
       } else if (/\.metadata\.json$/i.test(entry.name)) {
-        results.push(path.relative(root, absolute).replace(/\\/g, "/"));
+        const storageRoot = getMediaStorageRoot({ workspaceRoot: root }).storageRoot;
+        results.push(path.posix.join(DEFAULT_ROOT, path.relative(storageRoot, absolute).replace(/\\/g, "/")));
       }
     }
   }
@@ -369,14 +362,23 @@ export async function createApprovedAssetRegistryBackfillPlan(input = {}, option
       registryRecord: null,
     };
     try {
-      const metadata = JSON.parse(await readFile(safeJoin(workspaceRoot, metadataPath), "utf8"));
+      const resolvedMetadata = resolveMediaPath(metadataPath, options);
+      const metadata = JSON.parse(await readFile(resolvedMetadata.resolvedPath, "utf8"));
       const record = buildApprovedRegistryRecordFromMetadata(metadata, metadataPath);
       candidate.registryRecord = record;
       candidate.missingFields = validateApprovedRegistryRecord(record);
       candidate.duplicate = existingKeys.has(registryKey(record));
       candidate.valid = candidate.missingFields.length === 0;
     } catch (err) {
-      candidate.missingFields = [`metadata could not be read: ${err.message}`];
+      if (err.code === "ENOENT") {
+        candidate.missingFields = ["file_missing"];
+      } else if (err.code === "VALIDATION_ERROR") {
+        candidate.missingFields = err.detail?.fields || ["path_outside_storage_root"];
+      } else if (err instanceof SyntaxError) {
+        candidate.missingFields = ["metadata_invalid_json"];
+      } else {
+        candidate.missingFields = [`metadata could not be read: ${err.message}`];
+      }
     }
     candidates.push(candidate);
   }
@@ -386,6 +388,7 @@ export async function createApprovedAssetRegistryBackfillPlan(input = {}, option
     entityId,
     packId,
     registryPath: APPROVED_REGISTRY_RELATIVE_PATH,
+    storageRoot: getMediaStorageRoot(options).storageRoot,
     dryRun: input.dryRun !== false,
     discoveredApprovedMetadataCandidates: metadataPaths,
     proposedRegistryRecords: candidates.filter((candidate) => candidate.valid).map((candidate) => candidate.registryRecord),
@@ -453,10 +456,9 @@ export async function ingestReviewedMediaAsset(input = {}, options = {}) {
     throw new ValidationError("Invalid reviewed media asset ingest request.", validation.errors);
   }
 
-  const workspaceRoot = path.resolve(options.workspaceRoot || process.cwd());
-  const assetPath = safeJoin(workspaceRoot, record.approvedRelativePath);
-  const metadataPath = safeJoin(workspaceRoot, record.metadataRelativePath);
-  const rawArchivePath = safeJoin(workspaceRoot, record.rawArchiveRelativePath);
+  const assetPath = resolveMediaPath(record.approvedRelativePath, options);
+  const metadataPath = resolveMediaPath(record.metadataRelativePath, options);
+  const rawArchivePath = resolveMediaPath(record.rawArchiveRelativePath, options);
   const downloadAsset = options.downloadAsset || defaultDownloadAsset;
   const binary = await downloadAsset(record.outputUrl, {
     allowDataUrl: Boolean(options.allowDataUrl),
@@ -484,18 +486,18 @@ export async function ingestReviewedMediaAsset(input = {}, options = {}) {
     noManifestUpdatePerformed: true,
   };
 
-  await mkdir(path.dirname(assetPath), { recursive: true });
-  await writeFile(assetPath, binary);
-  await writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
+  await mkdir(path.dirname(assetPath.resolvedPath), { recursive: true });
+  await writeFile(assetPath.resolvedPath, binary);
+  await writeFile(metadataPath.resolvedPath, JSON.stringify(metadata, null, 2), "utf8");
 
   if (record.archiveRawProviderExport) {
-    await mkdir(path.dirname(rawArchivePath), { recursive: true });
-    await writeFile(rawArchivePath, binary);
+    await mkdir(path.dirname(rawArchivePath.resolvedPath), { recursive: true });
+    await writeFile(rawArchivePath.resolvedPath, binary);
   }
 
   const registryRecord = buildApprovedRegistryRecordFromMetadata(metadata, record.metadataRelativePath);
   const registryResult = await upsertApprovedMediaAssetRegistryRecords([registryRecord], {
-    workspaceRoot,
+    ...options,
   });
 
   return {
@@ -505,6 +507,10 @@ export async function ingestReviewedMediaAsset(input = {}, options = {}) {
     rawArchivePath: record.archiveRawProviderExport ? record.rawArchiveRelativePath : null,
     registryPath: registryResult.registryPath,
     registryUpdated: registryResult.registryUpdated,
+    storageRoot: assetPath.storageRoot,
+    resolvedPath: assetPath.resolvedPath,
+    resolvedMetadataPath: metadataPath.resolvedPath,
+    resolvedRawArchivePath: record.archiveRawProviderExport ? rawArchivePath.resolvedPath : null,
     approvalState: "approved",
     activePromotionPerformed: false,
     noActiveWritePerformed: true,

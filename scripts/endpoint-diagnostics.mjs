@@ -72,6 +72,11 @@ import {
   ingestSourceStill,
   validateSourceStillIngestRecord,
 } from "../src/services/sourceStillIngestService.mjs";
+import {
+  getMediaStorageRoot,
+  getStoragePrecheck,
+  resolveMediaPath,
+} from "../src/services/mediaStorageRoot.mjs";
 
 const PORT = Number(process.env.SPIRITCORE_DIAG_PORT || 3115);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -685,6 +690,60 @@ async function main() {
         detail: "execution route cannot use media planning bypass",
       },
       {
+        name: "media-storage-root-helper-resolves-logical-paths",
+        pass: (() => {
+          const workspaceRoot = path.join(process.cwd(), "runtime_data", "diagnostics", "storage-root-helper");
+          const root = getMediaStorageRoot({ workspaceRoot });
+          const resolved = resolveMediaPath("Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/demo.mp4", { workspaceRoot });
+          const absoluteDenied = (() => {
+            try {
+              resolveMediaPath(path.resolve(process.cwd(), "outside-storage-demo.mp4"), { workspaceRoot });
+              return false;
+            } catch (err) {
+              return err.code === "VALIDATION_ERROR";
+            }
+          })();
+          return root.storageRoot.endsWith("runtime_data\\diagnostics\\storage-root-helper\\Spiritverse_MASTER_ASSETS")
+            && resolved.resolvedPath.endsWith("Spiritverse_MASTER_ASSETS\\APPROVED\\lyra\\video\\demo.mp4")
+            && resolved.logicalPath === "Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/demo.mp4"
+            && absoluteDenied;
+        })(),
+        detail: "storage root helper resolves logical media paths and rejects paths outside storage root",
+      },
+      {
+        name: "media-storage-precheck-read-only",
+        pass: await (async () => {
+          const workspaceRoot = path.join(process.cwd(), "runtime_data", "diagnostics", "storage-precheck");
+          const result = await getStoragePrecheck({
+            workspaceRoot,
+            env: {
+              SPIRITCORE_MEDIA_STORAGE_ROOT: "Spiritverse_MASTER_ASSETS",
+              RAILWAY_VOLUME_MOUNT_PATH: "",
+              RAILWAY_VOLUME_NAME: "",
+            },
+          });
+          return result.ok === true
+            && result.writeCheck === null
+            && result.externalApiCall === false
+            && result.noProviderCall === true
+            && result.noGenerationPerformed === true
+            && result.noActiveWritePerformed === true
+            && result.noManifestUpdatePerformed === true
+            && Array.isArray(result.warnings);
+        })(),
+        detail: "storage precheck reports storage readiness without writing by default",
+      },
+      {
+        name: "media-storage-precheck-production-bypass-denied",
+        pass: canUseMediaPlanningStagingBypass({
+          method: "POST",
+          route: "/admin/media/storage-precheck",
+          headers: { "x-media-planning-test": "true" },
+          env: { NODE_ENV: "production", MEDIA_STAGING_TEST_BYPASS: "true" },
+        }) === false,
+        detail: "production cannot use staging media planning bypass for storage precheck writes",
+      },
+      {
         name: "media-asset-ingest-approved-paths-and-metadata",
         pass: await (async () => {
           const input = {
@@ -723,6 +782,8 @@ async function main() {
             && result.metadataPath.endsWith(".metadata.json")
             && result.registryPath === getApprovedMediaAssetRegistryPath()
             && result.registryUpdated === true
+            && result.storageRoot.endsWith("runtime_data\\diagnostics\\media-ingest\\Spiritverse_MASTER_ASSETS")
+            && result.resolvedPath.endsWith("Spiritverse_MASTER_ASSETS\\APPROVED\\lyra\\video\\lyra_motion_pack_v1_speaking_01_diag_approved_20260426_5d7764c247.mp4")
             && registry.records.some((item) => item.entityId === "lyra" && item.assetType === "speaking_01")
             && metadata.providerJobId === input.providerJobId
             && metadata.approvalState === "approved"
@@ -884,6 +945,25 @@ async function main() {
         detail: "approved registry backfill plans read-only, execute writes only registry, and catalog reads registry",
       },
       {
+        name: "media-approved-registry-backfill-missing-file-clear-error",
+        pass: await (async () => {
+          const workspaceRoot = path.join(process.cwd(), "runtime_data", "diagnostics", "approved-registry-missing-file");
+          const plan = await createApprovedAssetRegistryBackfillPlan({
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            approvedMetadataPaths: [
+              "Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/missing.metadata.json",
+            ],
+            dryRun: true,
+          }, { workspaceRoot });
+          return plan.missingFields.some((item) => item.metadataPath.endsWith("missing.metadata.json") && item.missingFields.includes("file_missing"))
+            && plan.noActiveWritePerformed === true
+            && plan.noManifestUpdatePerformed === true
+            && plan.noProviderCall === true;
+        })(),
+        detail: "approved registry backfill reports missing metadata files clearly without writes",
+      },
+      {
         name: "media-approved-registry-backfill-bypass-production-denied",
         pass: canUseApprovedAssetRegistryBackfillStagingBypass({
           method: "POST",
@@ -1026,6 +1106,8 @@ async function main() {
             && result.savedPath === record.approvedRelativePath
             && result.metadataPath.endsWith(".metadata.json")
             && result.rawArchivePath?.includes("Spiritverse_MASTER_ASSETS/ARCHIVE/raw_provider_exports/lyra/source_stills/medium_body/")
+            && result.storageRoot.endsWith("runtime_data\\diagnostics\\source-still-ingest\\Spiritverse_MASTER_ASSETS")
+            && result.resolvedPath.includes("Spiritverse_MASTER_ASSETS\\APPROVED\\lyra\\source_stills\\medium_body")
             && metadata.sourceCategory === "medium_body"
             && metadata.approvalState === "approved"
             && metadata.activePromotionPerformed === false
@@ -1859,6 +1941,7 @@ async function main() {
             && result.failedOrRejectedJobs.failedJobDiscoveryMode === "not_persistent_yet"
             && result.sequenceCandidates.some((candidate) => candidate.sequenceId === "conversation_presence_01")
             && result.premiumReadiness.premiumGenerationEnabled === false
+            && result.storageReadiness?.storageRoot
             && result.commandCenterActions.includes("create Lyra medium_body source still");
         })(),
         detail: "command center media catalog aggregates source readiness, retry policy, sequences, and premium blockers without writes",
@@ -2872,6 +2955,22 @@ async function main() {
         && result?.body?.sourceReferenceRegistryPlan?.noManifestUpdatePerformed === true
         ? "source reference registry plan shows medium_body unblocks gesture_02 and greeting_or_entry_01"
         : "unexpected source reference registry plan",
+    });
+    await run("media-storage-precheck", "POST", "/admin/media/storage-precheck", {
+      headers: { "x-media-planning-test": "true" },
+      body: {
+        testWrite: false,
+        testPathName: "endpoint_diagnostics",
+      },
+      describe: (result) => result?.body?.mediaPlanningBypassUsed === true
+        && result?.body?.storagePrecheck?.ok === true
+        && result?.body?.storagePrecheck?.noProviderCall === true
+        && result?.body?.storagePrecheck?.noGenerationPerformed === true
+        && result?.body?.storagePrecheck?.noActiveWritePerformed === true
+        && result?.body?.storagePrecheck?.noManifestUpdatePerformed === true
+        && result?.body?.storagePrecheck?.writeCheck === null
+        ? "storage precheck returned read-only readiness without provider/generation/ACTIVE writes"
+        : "unexpected storage precheck result",
     });
     await run("media-approved-asset-registry-backfill-plan", "POST", "/admin/media/approved-asset-registry-backfill-plan", {
       headers: { "x-media-planning-test": "true" },

@@ -5,6 +5,7 @@ import { ValidationError } from "../errors.mjs";
 import { SPIRITGATE_RUNTIME_MEDIA } from "../../spiritkins-app/data/spiritkinRuntimeConfig.js";
 import { getSpiritkinMediaManifest, resolveSpiritkinMediaName } from "../../spiritkins-app/data/spiritkinMediaManifest.js";
 import { loadApprovedMediaAssetRegistry } from "./mediaAssetIngestService.mjs";
+import { getStoragePrecheck, resolveMediaPath } from "./mediaStorageRoot.mjs";
 
 export const SPIRITCORE_MEDIA_ASSET_KINDS = Object.freeze([
   "portrait",
@@ -1234,22 +1235,24 @@ async function findMetadataFiles(root, limit = 120) {
   return results;
 }
 
-function workspaceRelativePath(absolutePath = "") {
-  return path.relative(process.cwd(), absolutePath).replace(/\\/g, "/");
+function storageLogicalPath(absolutePath = "", options = {}) {
+  const storageRoot = resolveMediaPath("Spiritverse_MASTER_ASSETS/APPROVED", options).storageRoot;
+  return `Spiritverse_MASTER_ASSETS/${path.relative(storageRoot, absolutePath).replace(/\\/g, "/")}`;
 }
 
-async function discoverApprovedMetadataForEntity(entityId, { workspaceRoot = process.cwd() } = {}) {
+async function discoverApprovedMetadataForEntity(entityId, options = {}) {
   const safeEntity = slugify(entityId, "");
   if (!safeEntity) return [];
-  const approvedRoot = path.join(workspaceRoot, "Spiritverse_MASTER_ASSETS", "APPROVED", safeEntity);
+  const approvedRoot = resolveMediaPath(`Spiritverse_MASTER_ASSETS/APPROVED/${safeEntity}`, options).resolvedPath;
   const metadataFiles = await findMetadataFiles(approvedRoot);
   const records = [];
   for (const metadataFile of metadataFiles) {
     try {
       const parsed = JSON.parse(await readFile(metadataFile, "utf8"));
+      const metadataLogicalPath = storageLogicalPath(metadataFile, options);
       records.push({
-        metadataPath: parsed.metadataPath || workspaceRelativePath(metadataFile),
-        savedPath: parsed.savedPath || parsed.approvedRelativePath || workspaceRelativePath(metadataFile).replace(/\.metadata\.json$/i, ".mp4"),
+        metadataPath: parsed.metadataPath || metadataLogicalPath,
+        savedPath: parsed.savedPath || parsed.approvedRelativePath || metadataLogicalPath.replace(/\.metadata\.json$/i, ".mp4"),
         assetType: normalizeText(parsed.assetType || "", 80),
         sourceCategory: normalizeText(parsed.sourceCategory || "", 80),
         provider: normalizeText(parsed.provider || "", 80),
@@ -1408,6 +1411,7 @@ export async function createCommandCenterMediaCatalog(input = {}, runtime = {}) 
   const includeSequenceCandidates = input.includeSequenceCandidates !== false;
   const includePremiumReadiness = input.includePremiumReadiness !== false;
   const includeFailures = input.includeFailures !== false;
+  const storageReadiness = await getStoragePrecheck(runtime);
   const approvedRegistry = includeApprovedAssets
     ? await loadApprovedMediaAssetRegistry(runtime)
     : { records: [], exists: false, registryPath: "Spiritverse_MASTER_ASSETS/APPROVED/_registry/approved_media_assets.registry.json" };
@@ -1494,6 +1498,13 @@ export async function createCommandCenterMediaCatalog(input = {}, runtime = {}) 
     packId,
     generatedAt: new Date().toISOString(),
     catalogMode: "read_only",
+    storageReadiness: {
+      storageRoot: storageReadiness.storageRoot,
+      storageRootExists: storageReadiness.storageRootExists,
+      railwayVolumeDetected: storageReadiness.railwayVolumeDetected,
+      likelyPersistent: storageReadiness.likelyPersistent,
+      warnings: storageReadiness.warnings,
+    },
     sourceReadiness,
     motionPackStatus,
     approvedAssets: includeApprovedAssets ? approvedAssets.map((asset) => ({
@@ -2933,6 +2944,7 @@ export function getMediaCatalogSummary() {
       "POST /admin/media/source-still-ingest",
       "POST /admin/media/source-reference-plan",
       "POST /admin/media/source-reference-registry-plan",
+      "POST /admin/media/storage-precheck",
       "POST /admin/media/command-center-catalog",
       "POST /admin/media/approved-asset-registry-backfill-plan",
       "POST /admin/media/approved-asset-registry-backfill-execute",

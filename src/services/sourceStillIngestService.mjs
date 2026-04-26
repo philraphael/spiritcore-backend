@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ValidationError } from "../errors.mjs";
+import { resolveMediaPath } from "./mediaStorageRoot.mjs";
 import { SPIRITKIN_MOTION_SOURCE_CATEGORIES } from "./spiritCoreMediaProduction.mjs";
 
 const DEFAULT_ROOT = "Spiritverse_MASTER_ASSETS";
@@ -42,15 +43,6 @@ function extensionFromUrl(value = "") {
   } catch {
     return "png";
   }
-}
-
-function safeJoin(root, relativePath) {
-  const absoluteRoot = path.resolve(root);
-  const absoluteTarget = path.resolve(absoluteRoot, relativePath);
-  if (absoluteTarget !== absoluteRoot && !absoluteTarget.startsWith(`${absoluteRoot}${path.sep}`)) {
-    throw new ValidationError("Resolved source still ingest path escaped the configured asset root.", ["path"]);
-  }
-  return absoluteTarget;
 }
 
 async function defaultDownloadSourceStill(sourceUrl) {
@@ -133,10 +125,9 @@ export async function ingestSourceStill(input = {}, options = {}) {
     throw new ValidationError("Invalid source still ingest request.", validation.errors);
   }
 
-  const workspaceRoot = path.resolve(options.workspaceRoot || process.cwd());
-  const assetPath = safeJoin(workspaceRoot, record.approvedRelativePath);
-  const metadataPath = safeJoin(workspaceRoot, record.metadataRelativePath);
-  const rawArchivePath = safeJoin(workspaceRoot, record.rawArchiveRelativePath);
+  const assetPath = resolveMediaPath(record.approvedRelativePath, options);
+  const metadataPath = resolveMediaPath(record.metadataRelativePath, options);
+  const rawArchivePath = resolveMediaPath(record.rawArchiveRelativePath, options);
   const downloadSourceStill = options.downloadSourceStill || defaultDownloadSourceStill;
   const binary = await downloadSourceStill(record.sourceUrl);
 
@@ -163,13 +154,13 @@ export async function ingestSourceStill(input = {}, options = {}) {
     providerGenerationPerformed: false,
   };
 
-  await mkdir(path.dirname(assetPath), { recursive: true });
-  await writeFile(assetPath, binary);
-  await writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
+  await mkdir(path.dirname(assetPath.resolvedPath), { recursive: true });
+  await writeFile(assetPath.resolvedPath, binary);
+  await writeFile(metadataPath.resolvedPath, JSON.stringify(metadata, null, 2), "utf8");
 
   if (record.archiveRawProviderExport) {
-    await mkdir(path.dirname(rawArchivePath), { recursive: true });
-    await writeFile(rawArchivePath, binary);
+    await mkdir(path.dirname(rawArchivePath.resolvedPath), { recursive: true });
+    await writeFile(rawArchivePath.resolvedPath, binary);
   }
 
   return {
@@ -177,6 +168,10 @@ export async function ingestSourceStill(input = {}, options = {}) {
     savedPath: record.approvedRelativePath,
     metadataPath: record.metadataRelativePath,
     rawArchivePath: record.archiveRawProviderExport ? record.rawArchiveRelativePath : null,
+    storageRoot: assetPath.storageRoot,
+    resolvedPath: assetPath.resolvedPath,
+    resolvedMetadataPath: metadataPath.resolvedPath,
+    resolvedRawArchivePath: record.archiveRawProviderExport ? rawArchivePath.resolvedPath : null,
     approvalState: "approved",
     sourceCategory: record.sourceCategory,
     activePromotionPerformed: false,

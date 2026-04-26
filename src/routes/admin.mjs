@@ -58,6 +58,7 @@ import {
   resolveExistingSpiritGateSource,
   resolveExistingSpiritkinSource,
 } from "../services/spiritCoreMediaProduction.mjs";
+import { getStoragePrecheck } from "../services/mediaStorageRoot.mjs";
 
 function isTrueEnv(value) {
   return String(value || "").trim().toLowerCase() === "true";
@@ -162,6 +163,7 @@ const MEDIA_PLANNING_BYPASS_ROUTES = Object.freeze([
   "POST /admin/media/source-reference-registry-plan",
   "POST /admin/media/command-center-catalog",
   "POST /admin/media/approved-asset-registry-backfill-plan",
+  "POST /admin/media/storage-precheck",
 ]);
 
 function mediaPlanningRouteKey(method = "", route = "") {
@@ -1435,6 +1437,16 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const mediaStoragePrecheckSchema = {
+    body: {
+      type: "object",
+      properties: {
+        testWrite: { type: "boolean", nullable: true },
+        testPathName: { type: "string", nullable: true },
+      },
+    },
+  };
+
   function mediaRouteResult(route, builder, req, reply) {
     try {
       return {
@@ -1641,6 +1653,9 @@ export async function adminRoutes(fastify, opts) {
           rawArchivePath: ingestResult.rawArchivePath,
           registryPath: ingestResult.registryPath,
           registryUpdated: ingestResult.registryUpdated,
+          storageRoot: ingestResult.storageRoot,
+          resolvedPath: ingestResult.resolvedPath,
+          resolvedMetadataPath: ingestResult.resolvedMetadataPath,
           approvalState: ingestResult.approvalState,
           activePromotionPerformed: false,
         },
@@ -1750,6 +1765,61 @@ export async function adminRoutes(fastify, opts) {
     }
   });
 
+  fastify.post("/admin/media/storage-precheck", {
+    preHandler: requireMediaPlanningAccess,
+    schema: mediaStoragePrecheckSchema,
+  }, async (req, reply) => {
+    const route = req.routeOptions?.url || req.url;
+    const testWrite = Boolean(req.body?.testWrite);
+    if (testWrite && process.env.NODE_ENV === "production") {
+      return reply.code(403).send({
+        ok: false,
+        route,
+        error: "STORAGE_PRECHECK_WRITE_DENIED",
+        message: "Storage precheck testWrite is denied in production.",
+        externalApiCall: false,
+        noProviderCall: true,
+        noGenerationPerformed: true,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
+    try {
+      const storagePrecheck = await getStoragePrecheck({
+        testWrite,
+        testPathName: req.body?.testPathName || "storage_precheck",
+      });
+      return {
+        ok: true,
+        route,
+        storagePrecheck,
+        mediaPlanningBypassUsed: Boolean(req.mediaPlanningBypassUsed),
+        externalApiCall: false,
+        noProviderCall: true,
+        noGenerationPerformed: true,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({
+        ok: false,
+        route,
+        error: err.code ?? "MEDIA_STORAGE_PRECHECK_ERROR",
+        message: err.message,
+        details: err.detail || {},
+        externalApiCall: false,
+        noProviderCall: true,
+        noGenerationPerformed: true,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
+  });
+
   fastify.post("/admin/media/source-still-ingest", {
     preHandler: requireSourceStillIngestAccess,
     schema: sourceStillIngestSchema,
@@ -1770,6 +1840,9 @@ export async function adminRoutes(fastify, opts) {
           savedPath: ingestResult.savedPath,
           metadataPath: ingestResult.metadataPath,
           rawArchivePath: ingestResult.rawArchivePath,
+          storageRoot: ingestResult.storageRoot,
+          resolvedPath: ingestResult.resolvedPath,
+          resolvedMetadataPath: ingestResult.resolvedMetadataPath,
           approvalState: ingestResult.approvalState,
           sourceCategory: ingestResult.sourceCategory,
           activePromotionPerformed: false,
