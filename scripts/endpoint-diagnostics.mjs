@@ -11,6 +11,7 @@ import {
 import {
   buildRunwayApiPayload,
   canExecuteRunwayProvider,
+  checkRunwayTaskStatus,
   createDryRunJob,
   resolveRunwayGenerationTarget,
 } from "../src/services/runwayProvider.mjs";
@@ -445,6 +446,33 @@ async function main() {
             && payload.promptImage === undefined;
         })(),
         detail: "SpiritGate video maps to video_to_video gen4_aleph payload",
+      },
+      {
+        name: "runway-status-failure-details-sanitized",
+        pass: await (async () => {
+          const result = await checkRunwayTaskStatus("5d7764c2-47f4-4653-b69d-5e385e667195", {
+            apiKey: "mock-runway-key",
+            fetchImpl: async () => new Response(JSON.stringify({
+              id: "5d7764c2-47f4-4653-b69d-5e385e667195",
+              status: "FAILED",
+              failure: "An unexpected error occurred.",
+              failureCode: "INTERNAL.BAD_OUTPUT.CODE01",
+              output: null,
+            }), { status: 200, headers: { "content-type": "application/json" } }),
+          });
+          const serialized = JSON.stringify(result);
+          return result.providerStatus === "FAILED"
+            && result.providerHttpStatus === 200
+            && result.failure === true
+            && result.failureCode === "INTERNAL.BAD_OUTPUT.CODE01"
+            && result.failureMessage === "An unexpected error occurred."
+            && result.error === "An unexpected error occurred."
+            && result.outputUrls.length === 0
+            && result.responseKeys.includes("failure")
+            && result.responseKeys.includes("failureCode")
+            && !serialized.includes("mock-runway-key");
+        })(),
+        detail: "mocked failed Runway task returns sanitized failure code and message without secrets",
       },
       {
         name: "spiritgate-enhancement-production-denied",
@@ -1045,6 +1073,26 @@ async function main() {
         && result?.body?.noActiveWritePerformed === true
         ? "staging mock status check returned sanitized result without provider call"
         : "unexpected status-check mock result",
+    });
+    await run("runway-status-check-mock-failed", "POST", "/admin/runway/status-check", {
+      body: {
+        providerJobId: "mock-failed-runway-task",
+        runwayTransientKey: "mock-runway-key",
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.ok === false
+        && result?.body?.provider === "runway"
+        && result?.body?.providerStatus === "FAILED"
+        && result?.body?.failure === true
+        && result?.body?.failureCode === "INTERNAL.BAD_OUTPUT.CODE01"
+        && result?.body?.failureMessage === "An unexpected error occurred."
+        && result?.body?.error === "An unexpected error occurred."
+        && result?.body?.noPromotionPerformed === true
+        && result?.body?.noManifestUpdatePerformed === true
+        && result?.body?.noActiveWritePerformed === true
+        && !JSON.stringify(result?.body || {}).includes("mock-runway-key")
+        ? "staging mock failed status check returned sanitized failure details without writes"
+        : "unexpected failed status-check mock result",
     });
     await run("runway-execution-spike-staging-bypass-valid", "POST", "/admin/runway/execution-spike", {
       body: {

@@ -126,6 +126,7 @@ Diagnostics verify:
 
 - Lyra source resolver finds the canonical portrait source
 - source summary route returns safe no-write flags
+- Runway failed task status parsing returns sanitized `failureCode` and `failureMessage`
 - motion-state execution route exists
 - missing source is rejected
 - missing operator approval is blocked
@@ -137,6 +138,20 @@ Diagnostics verify:
 - no auto-promotion
 - no manifest update
 - no ACTIVE write
+
+## Status Check Failure Details
+
+`POST /admin/runway/status-check` now preserves sanitized Runway task failure details for operator review:
+
+- `providerStatus`
+- `providerHttpStatus`
+- `failure`
+- `failureCode`
+- `failureMessage`
+- `error`
+- `responseKeys`
+
+For a failed Runway task such as `INTERNAL.BAD_OUTPUT.CODE01`, SpiritCore returns `ok: false`, keeps output URLs empty, and still confirms no promotion, manifest update, or ACTIVE write occurred.
 
 ## Confirmations
 

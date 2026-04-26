@@ -654,15 +654,23 @@ export async function checkRunwayTaskStatus(providerJobId, { apiKey, baseUrl, ve
   const output = Array.isArray(parsed?.output)
     ? parsed.output
     : (Array.isArray(parsed?.outputs) ? parsed.outputs : []);
+  const providerStatus = parsed?.status || parsed?.state || parsed?.taskStatus || null;
+  const failureCode = normalizeText(parsed?.failureCode || parsed?.error?.code, 160) || null;
+  const parsedError = parsed?.error?.message || parsed?.error || null;
+  const failureMessage = normalizeText(parsed?.failure || parsedError || parsed?.message, 600) || null;
+  const failedStatus = ["FAILED", "CANCELED", "CANCELLED", "failed", "canceled", "cancelled"].includes(String(providerStatus || ""));
+  const failure = !response.ok || failedStatus || Boolean(parsed?.failure || parsed?.failureCode);
   const result = {
     provider: "runway",
     providerJobId: normalizeText(parsed?.id || parsed?.taskId || normalizedProviderJobId, 160),
     externalApiCall: true,
-    providerStatus: parsed?.status || parsed?.state || parsed?.taskStatus || null,
+    providerStatus,
     providerHttpStatus: response.status,
     outputUrls: output.map((item) => normalizeText(item, 1200)).filter(Boolean),
-    error: parsed?.error?.message || parsed?.error || parsed?.message || null,
-    failure: !response.ok || ["FAILED", "CANCELED", "CANCELLED", "failed", "canceled", "cancelled"].includes(String(parsed?.status || parsed?.state || "")),
+    error: failure ? (failureMessage || "Runway task failed.") : (normalizeText(parsedError || parsed?.message, 600) || null),
+    failure,
+    failureCode,
+    failureMessage,
     responseKeys: Object.keys(parsed || {}).slice(0, 20),
     checkedAt: nowIso(),
   };

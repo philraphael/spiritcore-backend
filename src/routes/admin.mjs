@@ -607,6 +607,28 @@ export async function adminRoutes(fastify, opts) {
     }
 
     if (isTrueEnv(process.env.RUNWAY_STATUS_CHECK_MOCK)) {
+      if (/mock-failed/i.test(providerJobId)) {
+        return {
+          ok: false,
+          route: req.routeOptions?.url || req.url,
+          externalApiCall: false,
+          provider: "runway",
+          providerJobId,
+          providerStatus: "FAILED",
+          providerHttpStatus: 200,
+          outputUrls: [],
+          error: "An unexpected error occurred.",
+          failure: true,
+          failureCode: "INTERNAL.BAD_OUTPUT.CODE01",
+          failureMessage: "An unexpected error occurred.",
+          responseKeys: ["id", "status", "failure", "failureCode", "output"],
+          mock: true,
+          checkedAt: new Date().toISOString(),
+          noPromotionPerformed: true,
+          noManifestUpdatePerformed: true,
+          noActiveWritePerformed: true,
+        };
+      }
       return {
         ok: true,
         route: req.routeOptions?.url || req.url,
