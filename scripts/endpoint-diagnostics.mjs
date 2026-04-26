@@ -4,6 +4,7 @@ import {
   canUseRunwayStagingTestBypass,
   canUseRunwayTransientStagingCredentials,
 } from "../src/routes/admin.mjs";
+import { canExecuteRunwayProvider } from "../src/services/runwayProvider.mjs";
 
 const PORT = Number(process.env.SPIRITCORE_DIAG_PORT || 3115);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -266,6 +267,62 @@ async function main() {
         }) === true,
         detail: "alternate transient key header accepted in staging",
       },
+      {
+        name: "runway-transient-body-production-denied",
+        pass: canUseRunwayTransientStagingCredentials({
+          ...validStagingBypassBody,
+          runwayTransientKey: "mock-runway-key",
+        }, {
+          "x-runway-transient-execute": "true",
+          "x-runway-transient-provider-execution": "true",
+        }, {
+          NODE_ENV: "production",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === false,
+        detail: "production cannot use body fallback",
+      },
+      {
+        name: "runway-transient-body-malformed-denied",
+        pass: canUseRunwayTransientStagingCredentials({
+          ...validStagingBypassBody,
+          targetId: "real-realm",
+          runwayTransientKey: "mock-runway-key",
+        }, {
+          "x-runway-transient-execute": "true",
+          "x-runway-transient-provider-execution": "true",
+        }, {
+          NODE_ENV: "staging",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === false,
+        detail: "malformed target cannot use body fallback",
+      },
+      {
+        name: "runway-transient-body-gates-pass-with-flags",
+        pass: canUseRunwayTransientStagingCredentials({
+          ...validStagingBypassBody,
+          runwayTransientKey: "mock-runway-key",
+        }, {
+          "x-runway-transient-execute": "true",
+          "x-runway-transient-provider-execution": "true",
+        }, {
+          NODE_ENV: "staging",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === true && canExecuteRunwayProvider({
+          env: "staging",
+          adminAuth: { mode: "enforce" },
+          generator: { video: { runway: { apiKey: "mock-runway-key" } } },
+        }, {
+          NODE_ENV: "staging",
+          RUNWAY_API_KEY: "mock-runway-key",
+          RUNWAY_DRY_RUN_EXECUTE: "true",
+          RUNWAY_ALLOW_PROVIDER_EXECUTION: "true",
+        }, {
+          allowed: true,
+          bypassed: true,
+          source: "staging-test-bypass",
+        }).ok === true,
+        detail: "mock body fallback with execution flags would pass gates without provider call",
+      },
     ].map((check) => ({
       ...check,
       method: "INTERNAL",
@@ -397,10 +454,30 @@ async function main() {
       },
       describe: (result) => result?.body?.externalApiCall === false
         && result?.body?.transientKeyProvided === true
-        && result?.body?.transientKeyHeaderSource === "x-spiritcore-runway-token"
+        && result?.body?.transientKeySource === "header"
         && result?.body?.job?.executionGates?.missingGates?.includes("RUNWAY_DRY_RUN_EXECUTE=true is required")
         ? "alternate transient key header reached execution gate without provider call"
         : "unexpected alternate transient credential result",
+    });
+    await run("runway-execution-spike-transient-body-no-exec", "POST", "/admin/runway/execution-spike", {
+      headers: {
+        "x-runway-transient-execute": "false",
+        "x-runway-transient-provider-execution": "false",
+      },
+      body: {
+        targetId: "test-realm",
+        assetKind: "realm_background",
+        promptIntent: "Diagnostic body transient credential fallback request shaping only.",
+        styleProfile: "spiritverse_internal_test",
+        safetyLevel: "internal_review",
+        runwayTransientKey: "mock-runway-key",
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.transientKeyProvided === true
+        && result?.body?.transientKeySource === "body"
+        && result?.body?.job?.executionGates?.missingGates?.includes("RUNWAY_DRY_RUN_EXECUTE=true is required")
+        ? "body transient key fallback reached execution gate without provider call"
+        : "unexpected body transient credential result",
     });
     await run("runway-execution-spike-staging-bypass-malformed", "POST", "/admin/runway/execution-spike", {
       body: {

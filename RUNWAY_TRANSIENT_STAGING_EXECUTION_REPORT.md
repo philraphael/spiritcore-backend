@@ -21,6 +21,8 @@ The route recognizes these headers only for a qualifying staging test request:
 
 The key is read from the first non-empty value in that order.
 
+If staging infrastructure strips custom key headers, the route also accepts `body.runwayTransientKey` after the same staging/test gates pass. This body fallback is not accepted in production or for non-test targets.
+
 The transient key is not logged, stored, persisted, written to files, or copied into global process state. It is used only to build the per-request Runway provider config and env context passed to `createExecutionSpikeJob`.
 
 ## Required Gates
@@ -32,15 +34,15 @@ The transient path is honored only when all of the following are true:
 - `targetId` starts with `test-`
 - `assetKind` is `realm_background` or `portrait`
 - `safetyLevel` is `internal_review`
-- one allowed transient key header is present
+- one allowed transient key header or `body.runwayTransientKey` is present
 
 Real provider execution still requires:
 
 - `NODE_ENV=staging`
-- a Runway API key, either staging env or transient request header
+- a Runway API key, either staging env, transient request header, or `body.runwayTransientKey`
 - `RUNWAY_DRY_RUN_EXECUTE=true` or `x-runway-transient-execute=true`
 - `RUNWAY_ALLOW_PROVIDER_EXECUTION=true` or `x-runway-transient-provider-execution=true`
-- `ADMIN_AUTH_MODE=enforce` or an active real admin guard
+- `ADMIN_AUTH_MODE=enforce` or the request-scoped staging transient config override
 - execution-spike target and safety restrictions
 
 ## Safe Logging
@@ -49,7 +51,7 @@ The route logs only:
 
 - `stagingBypassUsed`
 - `transientKeyProvided`
-- `transientKeyHeaderSource`
+- `transientKeySource`
 - `transientExecuteRequested`
 - `transientProviderExecutionRequested`
 - `targetId`
@@ -77,6 +79,9 @@ Endpoint diagnostics verify:
 - production cannot use the transient header path
 - malformed requests cannot use the transient header path
 - the alternate transient key header is accepted in the staging mock path
+- production cannot use the body fallback
+- malformed targets cannot use the body fallback
+- a mock body fallback with execution flags would pass gates without calling the provider
 - staging valid requests without transient credentials remain dry-run
 - staging valid requests with a mock transient key reach the execution gate without calling the provider
 

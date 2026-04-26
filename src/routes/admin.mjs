@@ -38,46 +38,63 @@ function readRunwayTransientKey(headers = {}) {
   for (const header of RUNWAY_TRANSIENT_KEY_HEADERS) {
     const value = String(headers[header] || "").trim();
     if (value) {
-      return { apiKey: value, keyHeaderSource: header };
+      return { apiKey: value, keySource: "header" };
     }
   }
-  return { apiKey: "", keyHeaderSource: null };
+  return { apiKey: "", keySource: null };
+}
+
+function readRunwayTransientCredential(body = {}, headers = {}, env = process.env) {
+  const headerKey = readRunwayTransientKey(headers);
+  if (headerKey.apiKey) return headerKey;
+
+  if (canUseRunwayStagingTestBypass(body, env)) {
+    const bodyKey = String(body?.runwayTransientKey || "").trim();
+    if (bodyKey) return { apiKey: bodyKey, keySource: "body" };
+  }
+
+  return { apiKey: "", keySource: null };
 }
 
 export function canUseRunwayTransientStagingCredentials(body = {}, headers = {}, env = process.env) {
-  const transientKey = readRunwayTransientKey(headers);
+  const transientKey = readRunwayTransientCredential(body, headers, env);
   return qualifiesForRunwayStagingTestBody(body, env)
     && canUseRunwayStagingTestBypass(body, env)
     && Boolean(transientKey.apiKey);
 }
 
-function readRunwayTransientHeaders(headers = {}) {
-  const transientKey = readRunwayTransientKey(headers);
+function readRunwayTransientHeaders(body = {}, headers = {}, env = process.env) {
+  const transientKey = readRunwayTransientCredential(body, headers, env);
   return {
     apiKey: transientKey.apiKey,
-    keyHeaderSource: transientKey.keyHeaderSource,
+    keySource: transientKey.keySource,
     executeRequested: isTrueEnv(headers["x-runway-transient-execute"]),
     providerExecutionRequested: isTrueEnv(headers["x-runway-transient-provider-execution"]),
   };
 }
 
 function createRunwayExecutionContext({ req, baseConfig, baseEnv }) {
-  const transient = readRunwayTransientHeaders(req.headers || {});
+  const transient = readRunwayTransientHeaders(req.body || {}, req.headers || {}, baseEnv);
   const useTransient = canUseRunwayTransientStagingCredentials(req.body, req.headers || {}, baseEnv);
   if (!useTransient) {
     return {
       config: baseConfig,
       env: baseEnv,
       transientKeyProvided: Boolean(transient.apiKey),
-      transientKeyHeaderSource: transient.keyHeaderSource,
+      transientKeySource: transient.keySource,
       transientExecuteRequested: transient.executeRequested,
       transientProviderExecutionRequested: transient.providerExecutionRequested,
+      transientCredentialNote: transient.apiKey ? null : "Transient Runway key was not received.",
     };
   }
 
   return {
     config: {
       ...baseConfig,
+      adminAuth: {
+        ...baseConfig.adminAuth,
+        mode: "enforce",
+      },
       generator: {
         ...baseConfig.generator,
         video: {
@@ -96,9 +113,10 @@ function createRunwayExecutionContext({ req, baseConfig, baseEnv }) {
       RUNWAY_ALLOW_PROVIDER_EXECUTION: transient.providerExecutionRequested ? "true" : baseEnv.RUNWAY_ALLOW_PROVIDER_EXECUTION,
     },
     transientKeyProvided: true,
-    transientKeyHeaderSource: transient.keyHeaderSource,
+    transientKeySource: transient.keySource,
     transientExecuteRequested: transient.executeRequested,
     transientProviderExecutionRequested: transient.providerExecutionRequested,
+    transientCredentialNote: null,
   };
 }
 
@@ -332,7 +350,7 @@ export async function adminRoutes(fastify, opts) {
         route: req.routeOptions?.url || req.url,
         stagingBypassUsed,
         transientKeyProvided: executionContext.transientKeyProvided,
-        transientKeyHeaderSource: executionContext.transientKeyHeaderSource,
+        transientKeySource: executionContext.transientKeySource,
         transientExecuteRequested: executionContext.transientExecuteRequested,
         transientProviderExecutionRequested: executionContext.transientProviderExecutionRequested,
         targetId: req.body?.targetId || null,
@@ -347,9 +365,10 @@ export async function adminRoutes(fastify, opts) {
           externalApiCall: result.externalApiCall,
           stagingBypassUsed,
           transientKeyProvided: executionContext.transientKeyProvided,
-          transientKeyHeaderSource: executionContext.transientKeyHeaderSource,
+          transientKeySource: executionContext.transientKeySource,
           transientExecuteRequested: executionContext.transientExecuteRequested,
           transientProviderExecutionRequested: executionContext.transientProviderExecutionRequested,
+          transientCredentialNote: executionContext.transientCredentialNote,
           error: result.error,
           job: result.job,
         });
@@ -362,9 +381,10 @@ export async function adminRoutes(fastify, opts) {
         externalApiCall: result.externalApiCall,
         stagingBypassUsed,
         transientKeyProvided: executionContext.transientKeyProvided,
-        transientKeyHeaderSource: executionContext.transientKeyHeaderSource,
+        transientKeySource: executionContext.transientKeySource,
         transientExecuteRequested: executionContext.transientExecuteRequested,
         transientProviderExecutionRequested: executionContext.transientProviderExecutionRequested,
+        transientCredentialNote: executionContext.transientCredentialNote,
         job: result.job,
       };
     } catch (err) {
