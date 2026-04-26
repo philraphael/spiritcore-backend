@@ -111,6 +111,36 @@ export function canUseSpiritGateEnhancementStagingBypass(body = {}, env = proces
     && Boolean(String(body?.sourceAssetRef || "").trim());
 }
 
+const MEDIA_PLANNING_BYPASS_ROUTES = Object.freeze([
+  "GET /admin/media/catalog-summary",
+  "GET /admin/media/spiritgate-source-summary",
+  "POST /admin/media/operator-experience-plan",
+  "POST /admin/media/spiritkin-motion-pack-plan",
+  "POST /admin/media/spiritcore-avatar-pack-plan",
+  "POST /admin/media/assembly-plan",
+  "POST /admin/media/assemble-video",
+  "POST /admin/media/production-sequence-plan",
+  "POST /admin/media/generation-template",
+  "POST /admin/media/review-plan",
+  "POST /admin/media/promotion-plan",
+  "POST /admin/media/spiritgate-enhancement-plan",
+  "POST /admin/media/spiritgate-enhancement-plan-from-current-source",
+  "POST /admin/media/source-reference-plan",
+]);
+
+function mediaPlanningRouteKey(method = "", route = "") {
+  return `${String(method || "").toUpperCase()} ${String(route || "").trim()}`;
+}
+
+export function canUseMediaPlanningStagingBypass({ method = "", route = "", headers = {}, env = process.env } = {}) {
+  const headerEnabled = isTrueEnv(headers["x-media-planning-test"]);
+  const envEnabled = isTrueEnv(env.RUNWAY_STAGING_TEST_BYPASS) || isTrueEnv(env.MEDIA_STAGING_TEST_BYPASS);
+  return env.NODE_ENV === "staging"
+    && envEnabled
+    && headerEnabled
+    && MEDIA_PLANNING_BYPASS_ROUTES.includes(mediaPlanningRouteKey(method, route));
+}
+
 function readRunwayTransientHeaders(body = {}, headers = {}, env = process.env) {
   const transientKey = readRunwayTransientCredential(body, headers, env);
   return {
@@ -192,6 +222,32 @@ function createRunwayExecutionContext({ req, baseConfig, baseEnv }) {
 export async function adminRoutes(fastify, opts) {
   const { supabase, messageService, registry, issueReportService, spiritkinGeneratorService } = opts;
   const requireAdminAccess = fastify.requireAdminAccess;
+
+  async function requireMediaPlanningAccess(req, reply) {
+    const route = req.routeOptions?.url || req.routerPath || req.url;
+    const allowed = canUseMediaPlanningStagingBypass({
+      method: req.method,
+      route,
+      headers: req.headers || {},
+      env: process.env,
+    });
+    req.mediaPlanningBypassUsed = Boolean(allowed);
+    fastify.log?.warn?.({
+      mediaPlanningBypassUsed: Boolean(allowed),
+      route,
+      method: req.method,
+    }, "[admin] media planning access");
+    if (allowed) {
+      req.adminAccess = {
+        allowed: true,
+        bypassed: true,
+        mode: "staging-media-planning-bypass",
+        source: "staging-media-planning-bypass",
+      };
+      return;
+    }
+    return requireAdminAccess(req, reply);
+  }
 
   // ── GET /v1/admin/conversations/recent ──────────────────────────────────────
   fastify.get("/v1/admin/conversations/recent", { preHandler: requireAdminAccess }, async (req, reply) => {
@@ -921,6 +977,7 @@ export async function adminRoutes(fastify, opts) {
         noPromotionPerformed: true,
         noManifestUpdatePerformed: true,
         noActiveWritePerformed: true,
+        mediaPlanningBypassUsed: Boolean(req?.mediaPlanningBypassUsed),
         ...builder(),
       };
     } catch (err) {
@@ -955,28 +1012,28 @@ export async function adminRoutes(fastify, opts) {
   }), req, reply));
 
   fastify.post("/admin/media/generation-template", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
     schema: mediaGenerationTemplateSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     generationTemplate: buildGenerationTemplate(req.body),
   }), req, reply));
 
   fastify.post("/admin/media/review-plan", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
     schema: mediaAssetPlanSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     reviewPlan: createMediaReviewPlan(req.body),
   }), req, reply));
 
   fastify.post("/admin/media/promotion-plan", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
     schema: mediaAssetPlanSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     promotionPlan: createMediaPromotionPlan(req.body),
   }), req, reply));
 
   fastify.post("/admin/media/spiritgate-enhancement-plan", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
     schema: {
       body: {
         type: "object",
@@ -999,49 +1056,49 @@ export async function adminRoutes(fastify, opts) {
   }), req, reply));
 
   fastify.post("/admin/media/production-sequence-plan", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
     schema: mediaProductionSequencePlanSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     productionSequencePlan: createProductionSequencePlan(req.body),
   }), req, reply));
 
   fastify.post("/admin/media/operator-experience-plan", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
     schema: operatorExperiencePlanSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     operatorExperiencePlan: createSpiritCoreDefaultOperatorPlan(req.body),
   }), req, reply));
 
   fastify.post("/admin/media/spiritkin-motion-pack-plan", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
     schema: motionPackPlanSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     spiritkinMotionPackPlan: createSpiritkinMotionPackPlan(req.body),
   }), req, reply));
 
   fastify.post("/admin/media/spiritcore-avatar-pack-plan", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
     schema: avatarPackPlanSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     spiritcoreAvatarPackPlan: createSpiritCoreAvatarPackPlan(req.body),
   }), req, reply));
 
   fastify.post("/admin/media/assembly-plan", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
     schema: assemblyPlanSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     assemblyPlan: createMediaAssemblyPlan(req.body, localFfmpegRuntime()),
   }), req, reply));
 
   fastify.post("/admin/media/assemble-video", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
     schema: assemblyPlanSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     assemblyResult: createSafeVideoAssemblyResult(req.body, localFfmpegRuntime()),
   }), req, reply));
 
   fastify.post("/admin/media/source-reference-plan", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
     schema: sourceReferencePlanSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => {
     const sourceReference = buildSourceMediaReference(req.body);
@@ -1061,7 +1118,7 @@ export async function adminRoutes(fastify, opts) {
   }, req, reply));
 
   fastify.get("/admin/media/spiritgate-source-summary", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     spiritGateSource: resolveExistingSpiritGateSource({
       origin: requestPublicOrigin(req),
@@ -1070,7 +1127,7 @@ export async function adminRoutes(fastify, opts) {
   }), req, reply));
 
   fastify.post("/admin/media/spiritgate-enhancement-plan-from-current-source", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
     schema: {
       body: {
         type: "object",
@@ -1301,7 +1358,7 @@ export async function adminRoutes(fastify, opts) {
   });
 
   fastify.get("/admin/media/catalog-summary", {
-    preHandler: requireAdminAccess,
+    preHandler: requireMediaPlanningAccess,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     catalogSummary: getMediaCatalogSummary(),
   }), req, reply));

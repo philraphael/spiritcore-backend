@@ -21,6 +21,8 @@ Route:
 
 - `POST /admin/media/operator-experience-plan`
 
+For staging route verification only, approved planning-only media routes may use the `x-media-planning-test: true` header when `NODE_ENV=staging` and either `RUNWAY_STAGING_TEST_BYPASS=true` or `MEDIA_STAGING_TEST_BYPASS=true`. This bypass is limited to planning routes and does not apply to Runway or SpiritGate execution routes.
+
 ## Optional Spiritkin Companion Model
 
 Spiritkin profiles can be included as optional companion profiles under the SpiritCore default operator plan. This preserves current Spiritkins behavior while allowing a user to use SpiritCore without choosing or activating a Spiritkin.
@@ -122,6 +124,9 @@ Premium member self-generation remains disabled. Required future systems before 
 Diagnostics were extended to verify:
 
 - SpiritCore default operator planning
+- staging media planning bypass for planning-only routes
+- production denial for the media planning bypass
+- execution route denial for the media planning bypass
 - SpiritCore premium and Spiritkin premium entitlement separation
 - Spiritkin motion pack planning
 - SpiritCore avatar pack planning

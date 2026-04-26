@@ -4,6 +4,7 @@ import {
   canUseRunwayStagingAuthCheck,
   canUseRunwayStagingTestBypass,
   canUseRunwayTransientStagingCredentials,
+  canUseMediaPlanningStagingBypass,
   canUseSpiritGateEnhancementStagingBypass,
 } from "../src/routes/admin.mjs";
 import {
@@ -468,6 +469,36 @@ async function main() {
           RUNWAY_STAGING_TEST_BYPASS: "true",
         }) === true,
         detail: "valid SpiritGate enhancement request can use staging operator bypass",
+      },
+      {
+        name: "media-planning-bypass-production-denied",
+        pass: canUseMediaPlanningStagingBypass({
+          method: "POST",
+          route: "/admin/media/operator-experience-plan",
+          headers: { "x-media-planning-test": "true" },
+          env: { NODE_ENV: "production", RUNWAY_STAGING_TEST_BYPASS: "true" },
+        }) === false,
+        detail: "production cannot use media planning bypass",
+      },
+      {
+        name: "media-planning-bypass-staging-allowed",
+        pass: canUseMediaPlanningStagingBypass({
+          method: "POST",
+          route: "/admin/media/operator-experience-plan",
+          headers: { "x-media-planning-test": "true" },
+          env: { NODE_ENV: "staging", RUNWAY_STAGING_TEST_BYPASS: "true" },
+        }) === true,
+        detail: "staging planning route can use media planning bypass",
+      },
+      {
+        name: "media-planning-bypass-execution-denied",
+        pass: canUseMediaPlanningStagingBypass({
+          method: "POST",
+          route: "/admin/media/spiritgate-enhancement-execute",
+          headers: { "x-media-planning-test": "true" },
+          env: { NODE_ENV: "staging", RUNWAY_STAGING_TEST_BYPASS: "true" },
+        }) === false,
+        detail: "execution route cannot use media planning bypass",
       },
       {
         name: "media-asset-kinds-valid",
@@ -1231,6 +1262,40 @@ async function main() {
         && result?.body?.productionSequencePlan?.noProviderCall === true
         ? "premium starter pack sequence detects incomplete paid readiness"
         : "unexpected premium starter sequence result",
+    });
+    await run("media-planning-bypass-operator-experience", "POST", "/admin/media/operator-experience-plan", {
+      headers: { "x-media-planning-test": "true" },
+      body: {
+        defaultOperatorType: "spiritcore",
+        spiritkinsEnabled: true,
+        entitlements: {
+          spiritcorePremium: true,
+          spiritkinPremium: false,
+        },
+      },
+      describe: (result) => result?.body?.mediaPlanningBypassUsed === true
+        && result?.body?.operatorExperiencePlan?.defaultOperatorType === "spiritcore"
+        && result?.body?.operatorExperiencePlan?.noGenerationPerformed === true
+        && result?.body?.operatorExperiencePlan?.noProviderCall === true
+        && result?.body?.operatorExperiencePlan?.noPromotionPerformed === true
+        && result?.body?.operatorExperiencePlan?.noManifestUpdatePerformed === true
+        && result?.body?.operatorExperiencePlan?.noActiveWritePerformed === true
+        ? "staging media planning bypass allowed planning-only route"
+        : "unexpected media planning bypass result",
+    });
+    await run("media-planning-bypass-execution-blocked", "POST", "/admin/media/spiritgate-enhancement-execute", {
+      headers: { "x-media-planning-test": "true" },
+      body: {
+        targetId: "spiritgate",
+        sourceAssetRef: "https://example.com/spiritgate.mp4",
+        sourceAssetType: "external_url",
+        promptIntent: "Diagnostic media planning bypass must not reach execution route.",
+        styleProfile: "premium cinematic SpiritGate enhancement",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+      },
+      allowStatuses: [401, 403],
+      describe: () => "media planning bypass does not allow execution route",
     });
     await run("media-operator-experience-plan", "POST", "/admin/media/operator-experience-plan", {
       headers: { "x-admin-key": DIAG_ADMIN_KEY },
