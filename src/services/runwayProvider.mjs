@@ -127,7 +127,7 @@ function compactPayload(value = {}) {
 function sanitizeProviderBody(parsed = {}) {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
   const sanitized = {};
-  for (const key of ["error", "message", "code", "failure", "failureCode", "detail", "details", "status"]) {
+  for (const key of ["error", "message", "code", "failure", "failureCode", "detail", "details", "status", "docUrl"]) {
     if (parsed[key] === undefined) continue;
     if (typeof parsed[key] === "string" || typeof parsed[key] === "number" || typeof parsed[key] === "boolean") {
       sanitized[key] = normalizeText(parsed[key], 1000);
@@ -136,6 +136,25 @@ function sanitizeProviderBody(parsed = {}) {
     }
   }
   return sanitized;
+}
+
+function sanitizeProviderIssues(issues = []) {
+  if (!Array.isArray(issues)) return [];
+  return issues.slice(0, 12).map((issue) => {
+    if (typeof issue === "string") return normalizeText(issue, 1000);
+    if (!issue || typeof issue !== "object") return normalizeText(issue, 1000);
+    const sanitized = {};
+    for (const [key, value] of Object.entries(issue).slice(0, 12)) {
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        sanitized[normalizeText(key, 80)] = normalizeText(value, 1000);
+      } else if (Array.isArray(value)) {
+        sanitized[normalizeText(key, 80)] = value.slice(0, 12).map((entry) => normalizeText(entry, 300));
+      } else if (value && typeof value === "object") {
+        sanitized[normalizeText(key, 80)] = sanitizeProviderBody(value);
+      }
+    }
+    return sanitized;
+  });
 }
 
 function providerErrorMessage(parsed = {}) {
@@ -149,6 +168,14 @@ function providerErrorCode(parsed = {}) {
   const error = parsed?.error;
   if (error?.code) return normalizeText(error.code, 160);
   return normalizeText(parsed?.code || parsed?.failureCode, 160) || null;
+}
+
+function providerPromptText(normalized = {}, promptPackage = {}) {
+  const directPrompt = normalizeText(normalized.promptIntent, 1200);
+  if (directPrompt && directPrompt.length < 700 && directPrompt.includes("No speaking, no mouth movement")) {
+    return directPrompt;
+  }
+  return promptPackage.prompt;
 }
 
 function slugify(value, fallback = "target") {
@@ -192,8 +219,10 @@ function runwayImageRatioForKind(assetKind, requestedRatio) {
 
 function runwayVideoRatioForKind(assetKind, requestedRatio) {
   const requested = normalizeText(requestedRatio, 20);
+  if (requested === "720:1280") return "768:1280";
+  if (requested === "1280:720") return "1280:768";
   if (/^\d+:\d+$/.test(requested)) return requested;
-  return assetKind === "speaking_video" ? "720:1280" : "1280:720";
+  return assetKind === "speaking_video" ? "768:1280" : "1280:768";
 }
 
 function resolveProviderMode(normalized = {}) {
@@ -482,6 +511,7 @@ function envValue(name) {
 export function buildRunwayApiPayload(job = {}) {
   const normalized = job.normalizedJobRequest || {};
   const promptPackage = job.promptPackage || buildRunwayPrompt(normalized);
+  const promptText = providerPromptText(normalized, promptPackage);
   const target = resolveRunwayGenerationTarget(job, job._runwayConfig || {});
 
   if (target.providerMode === "video_to_video") {
@@ -489,7 +519,7 @@ export function buildRunwayApiPayload(job = {}) {
     return compactPayload({
       model: job.providerModel || target.model,
       videoUri: videoUri || undefined,
-      promptText: promptPackage.prompt,
+      promptText,
       ratio: runwayVideoRatioForKind(normalized.assetKind, normalized.aspectRatio),
       seed: job.seed || undefined,
     });
@@ -498,7 +528,7 @@ export function buildRunwayApiPayload(job = {}) {
   if (target.mediaType === "image") {
     return compactPayload({
       model: job.providerModel || target.model,
-      promptText: promptPackage.prompt,
+      promptText,
       ratio: runwayImageRatioForKind(normalized.assetKind, normalized.aspectRatio),
       seed: job.seed || undefined,
       referenceImages: Array.isArray(normalized.sourceAssets) && normalized.sourceAssets.length
@@ -510,7 +540,7 @@ export function buildRunwayApiPayload(job = {}) {
   const sourceImage = Array.isArray(normalized.sourceAssets) ? normalized.sourceAssets[0] : null;
   return compactPayload({
     model: job.providerModel || target.model,
-    promptText: promptPackage.prompt,
+    promptText,
     promptImage: sourceImage || undefined,
     ratio: runwayVideoRatioForKind(normalized.assetKind, normalized.aspectRatio),
     duration: normalized.durationSec || 8,
@@ -571,6 +601,8 @@ export async function submitRunwayJob(job = {}) {
     error.httpCode = 502;
     error.providerHttpStatus = response.status;
     error.providerBody = sanitizeProviderBody(parsed);
+    error.providerBodyIssues = sanitizeProviderIssues(parsed?.issues);
+    error.providerDocUrl = normalizeText(parsed?.docUrl, 1000) || null;
     error.providerBodyKeys = Object.keys(parsed || {}).slice(0, 20);
     error.providerError = parsed?.error !== undefined ? sanitizeProviderBody({ error: parsed.error }).error : null;
     error.providerErrorMessage = providerErrorMessage(parsed);
@@ -582,6 +614,8 @@ export async function submitRunwayJob(job = {}) {
     error.detail = {
       providerHttpStatus: error.providerHttpStatus,
       providerBody: error.providerBody,
+      providerBodyIssues: error.providerBodyIssues,
+      providerDocUrl: error.providerDocUrl,
       providerBodyKeys: error.providerBodyKeys,
       providerError: error.providerError,
       providerErrorMessage: error.providerErrorMessage,

@@ -451,7 +451,7 @@ async function main() {
             && payload.promptImage === "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png"
             && typeof payload.promptText === "string"
             && payload.promptText.length > 0
-            && ["720:1280", "832:1104", "960:960", "1280:720", "1584:672", "1104:832"].includes(payload.ratio)
+            && payload.ratio === "768:1280"
             && [5, 8].includes(payload.duration)
             && payloadKeys.join(",") === "duration,model,promptImage,promptText,ratio"
             && unsupportedFields.every((field) => payload[field] === undefined);
@@ -481,8 +481,15 @@ async function main() {
                 videoModel: "gen4_turbo",
               },
               fetchImpl: async () => new Response(JSON.stringify({
-                error: "Invalid request",
-                message: "ratio must be one of 720:1280, 832:1104, 960:960",
+                error: "Validation of body failed",
+                issues: [
+                  {
+                    path: ["ratio"],
+                    message: "Invalid enum value. Expected 768:1280 or 1280:768.",
+                    code: "invalid_enum_value",
+                  },
+                ],
+                docUrl: "https://docs.dev.runwayml.com/api",
                 code: "INVALID_ARGUMENT",
               }), { status: 400, headers: { "content-type": "application/json" } }),
             });
@@ -491,9 +498,12 @@ async function main() {
             const serialized = JSON.stringify(error.detail || {});
             return error.code === "RUNWAY_PROVIDER_REQUEST_FAILED"
               && error.providerHttpStatus === 400
-              && error.providerErrorMessage === "Invalid request"
+              && error.providerErrorMessage === "Validation of body failed"
               && error.providerErrorCode === "INVALID_ARGUMENT"
-              && error.providerBodyKeys.includes("message")
+              && error.providerBodyKeys.includes("issues")
+              && Array.isArray(error.providerBodyIssues)
+              && error.providerBodyIssues[0]?.message === "Invalid enum value. Expected 768:1280 or 1280:768."
+              && error.providerDocUrl === "https://docs.dev.runwayml.com/api"
               && error.endpointPath === "/v1/image_to_video"
               && error.model === "gen4_turbo"
               && error.providerMode === "image_to_video"
@@ -892,8 +902,8 @@ async function main() {
             && result.generationControls.generationMode === "diagnostic_idle"
             && result.generationControls.motionIntensity === "low"
             && result.generationControls.allowMouthMovement === false
-            && result.promptIntent.includes("Do not create speaking behavior")
-            && result.promptIntent.includes("Mouth movement is not allowed")
+            && result.promptIntent.includes("No speaking, no mouth movement")
+            && result.promptIntent.length < 700
             && result.mediaAssetRecord.lifecycleState === "review_required"
             && result.mediaAssetRecord.reviewStatus === "pending"
             && result.mediaAssetRecord.outputUrls.length === 0
@@ -929,6 +939,38 @@ async function main() {
         detail: "invalid motion duration is rejected before provider execution",
       },
       {
+        name: "media-spiritkin-motion-ratio-normalization",
+        pass: (() => {
+          const vertical = createSpiritkinMotionStateExecutionPlan({
+            spiritkinId: "lyra",
+            targetId: "lyra-motion-pack-v1",
+            assetType: "idle_01",
+            assetKind: "idle_video",
+            sourceAssetRef: "https://example.com/lyra_portrait.png",
+            sourceAssetType: "external_url",
+            promptIntent: "Diagnostic vertical ratio normalization.",
+            styleProfile: "premium cinematic Spiritverse companion",
+            safetyLevel: "internal_review",
+            ratio: "720:1280",
+          });
+          const horizontal = createSpiritkinMotionStateExecutionPlan({
+            spiritkinId: "lyra",
+            targetId: "lyra-motion-pack-v1",
+            assetType: "idle_01",
+            assetKind: "idle_video",
+            sourceAssetRef: "https://example.com/lyra_portrait.png",
+            sourceAssetType: "external_url",
+            promptIntent: "Diagnostic horizontal ratio normalization.",
+            styleProfile: "premium cinematic Spiritverse companion",
+            safetyLevel: "internal_review",
+            ratio: "1280:720",
+          });
+          return vertical.generationControls.aspectRatio === "768:1280"
+            && horizontal.generationControls.aspectRatio === "1280:768";
+        })(),
+        detail: "legacy image-to-video ratios normalize to Gen-4 Turbo API ratios",
+      },
+      {
         name: "media-spiritkin-diagnostic-idle-prompt-safe",
         pass: (() => {
           const result = createSpiritkinMotionStateExecutionPlan({
@@ -950,9 +992,10 @@ async function main() {
             && result.assetKind === "idle_video"
             && result.generationControls.durationSec === 5
             && result.generationControls.generationMode === "diagnostic_idle"
-            && result.promptIntent.includes("blinking, breathing, and tiny natural head movement")
-            && result.promptIntent.includes("Do not create speaking behavior")
-            && result.promptIntent.includes("Do not animate mouth movement")
+            && result.promptIntent.includes("gentle blinking, soft breathing, and tiny natural head movement")
+            && result.promptIntent.includes("No speaking, no mouth movement")
+            && !result.promptIntent.includes("Style profile:")
+            && result.promptIntent.length < 700
             && result.noPromotionPerformed === true
             && result.noManifestUpdatePerformed === true
             && result.noActiveWritePerformed === true;
@@ -1830,12 +1873,14 @@ async function main() {
         && result?.body?.apiPayloadPreview?.model === "gen4_turbo"
         && result?.body?.apiPayloadPreview?.promptImage === lyraSourceUrl
         && result?.body?.apiPayloadPreview?.duration === 5
-        && result?.body?.apiPayloadPreview?.ratio === "720:1280"
+        && result?.body?.apiPayloadPreview?.ratio === "768:1280"
+        && result?.body?.generationControls?.aspectRatio === "768:1280"
         && result?.body?.generationControls?.generationMode === "diagnostic_idle"
         && result?.body?.generationControls?.motionIntensity === "low"
         && result?.body?.generationControls?.allowMouthMovement === false
-        && result?.body?.apiPayloadPreview?.promptText?.includes("Do not create speaking behavior")
-        && result?.body?.apiPayloadPreview?.promptText?.includes("Mouth movement is not allowed")
+        && result?.body?.apiPayloadPreview?.promptText?.includes("No speaking, no mouth movement")
+        && !result?.body?.apiPayloadPreview?.promptText?.includes("Style profile:")
+        && result?.body?.apiPayloadPreview?.promptText?.length < 700
         && result?.body?.mediaAssetRecord?.lifecycleState === "review_required"
         && result?.body?.mediaAssetRecord?.reviewStatus === "pending"
         && Array.isArray(result?.body?.mediaAssetRecord?.outputUrls)
@@ -1879,15 +1924,18 @@ async function main() {
         const payloadKeys = Object.keys(payload).sort().join(",");
         return result?.body?.externalApiCall === true
           && result?.body?.providerHttpStatus === 400
-          && result?.body?.providerErrorMessage === "Invalid request"
+          && result?.body?.providerErrorMessage === "Validation of body failed"
           && result?.body?.providerErrorCode === "INVALID_ARGUMENT"
-          && result?.body?.providerBodyKeys?.includes("message")
+          && result?.body?.providerBodyKeys?.includes("issues")
+          && Array.isArray(result?.body?.providerBodyIssues)
+          && result?.body?.providerBodyIssues[0]?.message === "Invalid enum value. Expected 768:1280 or 1280:768."
+          && result?.body?.providerDocUrl === "https://docs.dev.runwayml.com/api"
           && result?.body?.endpointPath === "/v1/image_to_video"
           && result?.body?.model === "gen4_turbo"
           && result?.body?.providerMode === "image_to_video"
           && payload.promptImage === lyraSourceUrl
           && payload.duration === 5
-          && payload.ratio === "720:1280"
+          && payload.ratio === "768:1280"
           && payloadKeys === "duration,model,promptImage,promptText,ratio"
           && result?.body?.noPromotionPerformed === true
           && result?.body?.noManifestUpdatePerformed === true
@@ -1927,6 +1975,7 @@ async function main() {
         && result?.body?.transientProviderExecutionRequested === true
         && result?.body?.executionGates?.ok === true
         && result?.body?.generationControls?.durationSec === 5
+        && result?.body?.generationControls?.aspectRatio === "768:1280"
         && result?.body?.generationControls?.generationMode === "diagnostic_idle"
         && result?.body?.mediaAssetRecord?.providerJobId === "mock-lyra-idle-01-task"
         && result?.body?.mediaAssetRecord?.lifecycleState === "review_required"

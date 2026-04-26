@@ -1322,8 +1322,15 @@ export async function adminRoutes(fastify, opts) {
 
       if (isTrueEnv(process.env.RUNWAY_SPIRITKIN_MOTION_EXECUTE_MOCK) && String(req.headers["x-runway-mock-provider-400"] || "").toLowerCase() === "true") {
         const mockResponseBody = {
-          error: "Invalid request",
-          message: "ratio must be one of 720:1280, 832:1104, 960:960, 1280:720, 1584:672, 1104:832",
+          error: "Validation of body failed",
+          issues: [
+            {
+              path: ["ratio"],
+              message: "Invalid enum value. Expected 768:1280 or 1280:768.",
+              code: "invalid_enum_value",
+            },
+          ],
+          docUrl: "https://docs.dev.runwayml.com/api",
           code: "INVALID_ARGUMENT",
         };
         await submitRunwayJob({
@@ -1395,6 +1402,8 @@ export async function adminRoutes(fastify, opts) {
       const code = err.httpCode ?? 500;
       const providerDetails = {
         providerHttpStatus: err.providerHttpStatus ?? err.detail?.providerHttpStatus ?? null,
+        providerBodyIssues: err.providerBodyIssues ?? err.detail?.providerBodyIssues ?? [],
+        providerDocUrl: err.providerDocUrl ?? err.detail?.providerDocUrl ?? null,
         providerBodyKeys: err.providerBodyKeys ?? err.detail?.providerBodyKeys ?? [],
         providerErrorMessage: err.providerErrorMessage ?? err.detail?.providerErrorMessage ?? null,
         providerErrorCode: err.providerErrorCode ?? err.detail?.providerErrorCode ?? null,

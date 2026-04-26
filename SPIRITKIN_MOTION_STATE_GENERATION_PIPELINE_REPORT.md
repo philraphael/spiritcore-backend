@@ -165,7 +165,7 @@ The first Lyra `speaking_01` image-to-video job was accepted by Runway but faile
 The SpiritCore route, source URL, auth, gates, and review lifecycle worked. The failure occurred inside Runway generation. To reduce paid-generation waste, the motion-state execution route now accepts safer controls:
 
 - `durationSec`: `5` or `8`, default `5`
-- `ratio` / `aspectRatio`: default `720:1280`; diagnostic overrides allow `832:1104` and `960:960`
+- `ratio` / `aspectRatio`: default `768:1280`; horizontal override `1280:768`
 - `motionIntensity`: `low` or `medium`, default `low`
 - `generationMode`: `diagnostic_idle`, `subtle_speaking`, or `speaking`, default `diagnostic_idle`
 - `allowMouthMovement`: boolean, default `false`
@@ -180,6 +180,8 @@ The recommended next test is Lyra `idle_01`, not `speaking_01`:
 - `allowMouthMovement`: `false`
 
 `diagnostic_idle` prompts only for blinking, breathing, and tiny natural head movement. It explicitly avoids speaking demands and mouth movement. Lyra `speaking_01` should be retried only after the idle diagnostic succeeds.
+
+The `diagnostic_idle` provider prompt is now intentionally concise, under 700 characters, and does not append duplicate style/source/safety paragraphs. It asks only for a subtle idle presence loop while preserving portrait identity and explicitly blocks speaking, mouth movement, camera movement, background changes, text, and logos.
 
 ## Provider Request 400 Transparency
 
@@ -200,6 +202,8 @@ Provider request errors now return sanitized diagnostic fields:
 - `model`
 - `providerMode`
 - `payloadPreview`
+- `providerBodyIssues`
+- `providerDocUrl`
 
 The payload preview intentionally excludes secrets and internal control fields. For Lyra `idle_01`, the provider payload is constrained to Runway `image_to_video` fields only:
 
@@ -210,6 +214,14 @@ The payload preview intentionally excludes secrets and internal control fields. 
 - `duration`
 
 The next paid retry should happen only after inspecting the sanitized provider 400 body from staging and confirming whether Runway rejected ratio, source image access, prompt shape, or another request field.
+
+After the sanitized response showed Runway body validation with hidden `issues`, the Spiritkin image-to-video ratio handling was corrected for the current `gen4_turbo` `/v1/image_to_video` API shape:
+
+- `720:1280` normalizes to `768:1280`
+- `1280:720` normalizes to `1280:768`
+- `832:1104` and `960:960` are no longer accepted for this Spiritkin motion route until confirmed valid for this endpoint/model/version
+
+The next Lyra `idle_01` retry should use `ratio: "768:1280"`.
 
 ## Confirmations
 

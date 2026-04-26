@@ -100,9 +100,8 @@ export const SPIRITKIN_MOTION_GENERATION_MODES = Object.freeze([
 
 export const SPIRITKIN_MOTION_INTENSITIES = Object.freeze(["low", "medium"]);
 export const SPIRITKIN_IMAGE_TO_VIDEO_RATIOS = Object.freeze([
-  "720:1280",
-  "832:1104",
-  "960:960",
+  "768:1280",
+  "1280:768",
 ]);
 
 export const ORIGINAL_SPIRITKIN_IDS = Object.freeze([
@@ -610,9 +609,12 @@ function normalizeMotionGenerationControls(input = {}) {
     errors.push(`generationMode must be one of ${SPIRITKIN_MOTION_GENERATION_MODES.join(", ")}`);
   }
   const allowMouthMovement = Boolean(input.allowMouthMovement);
-  const aspectRatio = normalizeText(input.ratio || input.aspectRatio || "720:1280", 20);
+  const requestedRatio = normalizeText(input.ratio || input.aspectRatio || "768:1280", 20);
+  const aspectRatio = requestedRatio === "720:1280"
+    ? "768:1280"
+    : (requestedRatio === "1280:720" ? "1280:768" : requestedRatio);
   if (!SPIRITKIN_IMAGE_TO_VIDEO_RATIOS.includes(aspectRatio)) {
-    errors.push(`ratio must be one of ${SPIRITKIN_IMAGE_TO_VIDEO_RATIOS.join(", ")}`);
+    errors.push(`ratio must be one of ${SPIRITKIN_IMAGE_TO_VIDEO_RATIOS.join(", ")}; use 768:1280 instead of 720:1280 for vertical Gen-4 Turbo image_to_video`);
   }
   return {
     ok: errors.length === 0,
@@ -628,6 +630,16 @@ function normalizeMotionGenerationControls(input = {}) {
 }
 
 function buildMotionGenerationPrompt({ canonicalName, assetType, stateTrigger, promptIntent, styleProfile, controls }) {
+  if (controls.generationMode === "diagnostic_idle") {
+    return [
+      `Animate ${canonicalName} in a subtle idle presence loop.`,
+      "Preserve the exact portrait identity, colors, eyes, face, silhouette, and calm Spiritverse tone.",
+      "Add only gentle blinking, soft breathing, and tiny natural head movement.",
+      "Keep lips closed.",
+      "No speaking, no mouth movement, no large gestures, no camera movement, no background change, no text, no logos.",
+    ].join(" ");
+  }
+
   const base = [
     promptIntent,
     `Animate ${canonicalName} for ${assetType} with ${controls.motionIntensity} motion intensity.`,
