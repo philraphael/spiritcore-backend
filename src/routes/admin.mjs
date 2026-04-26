@@ -19,6 +19,7 @@ import {
   submitRunwayJob,
 } from "../services/runwayProvider.mjs";
 import { createPromotionPlan } from "../services/generatedAssetPipeline.mjs";
+import { ingestReviewedMediaAsset } from "../services/mediaAssetIngestService.mjs";
 import {
   buildGenerationTemplate,
   buildSourceMediaReference,
@@ -186,6 +187,10 @@ function localFfmpegRuntime() {
     ffmpegExecutionEnabled: isTrueEnv(process.env.ENABLE_LOCAL_FFMPEG_ASSEMBLY),
     ffmpegCommand: command,
   };
+}
+
+function canUseMediaAssetIngest(env = process.env) {
+  return env.NODE_ENV !== "production" || isTrueEnv(env.MEDIA_ASSET_INGEST_ENABLED);
 }
 
 function createRunwayExecutionContext({ req, baseConfig, baseEnv }) {
@@ -1032,6 +1037,41 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const mediaAssetIngestSchema = {
+    body: {
+      type: "object",
+      required: [
+        "entityId",
+        "packId",
+        "assetType",
+        "variant",
+        "status",
+        "provider",
+        "providerJobId",
+        "outputUrl",
+        "sourceAssetRef",
+        "approvedBy",
+      ],
+      properties: {
+        entityId: { type: "string", minLength: 1 },
+        packId: { type: "string", minLength: 1 },
+        assetType: { type: "string", minLength: 1 },
+        variant: { type: "string", minLength: 1 },
+        status: { type: "string", minLength: 1 },
+        provider: { type: "string", minLength: 1 },
+        providerJobId: { type: "string", minLength: 1 },
+        outputUrl: { type: "string", minLength: 1 },
+        sourceAssetRef: { type: "string", minLength: 1 },
+        durationSec: { type: "number", nullable: true },
+        ratio: { type: "string", nullable: true },
+        generationMode: { type: "string", nullable: true },
+        reviewNotes: { type: "string", nullable: true },
+        approvedBy: { type: "string", minLength: 1 },
+        archiveRawProviderExport: { type: "boolean", nullable: true },
+      },
+    },
+  };
+
   function mediaRouteResult(route, builder, req, reply) {
     try {
       return {
@@ -1178,6 +1218,59 @@ export async function adminRoutes(fastify, opts) {
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     assemblyResult: createSafeVideoAssemblyResult(req.body, localFfmpegRuntime()),
   }), req, reply));
+
+  fastify.post("/admin/media/asset-ingest", {
+    preHandler: requireAdminAccess,
+    schema: mediaAssetIngestSchema,
+  }, async (req, reply) => {
+    const route = req.routeOptions?.url || req.url;
+    if (!canUseMediaAssetIngest(process.env)) {
+      return reply.code(404).send({
+        ok: false,
+        route,
+        error: "MEDIA_ASSET_INGEST_UNAVAILABLE",
+        message: "Media asset ingest is disabled in production unless MEDIA_ASSET_INGEST_ENABLED=true.",
+        activePromotionPerformed: false,
+        noActiveWritePerformed: true,
+        noManifestUpdatePerformed: true,
+        providerGenerationPerformed: false,
+      });
+    }
+
+    try {
+      const ingestResult = await ingestReviewedMediaAsset(req.body, {
+        allowDataUrl: process.env.NODE_ENV !== "production",
+      });
+      return {
+        ok: true,
+        route,
+        mediaAssetIngest: {
+          savedPath: ingestResult.savedPath,
+          metadataPath: ingestResult.metadataPath,
+          rawArchivePath: ingestResult.rawArchivePath,
+          approvalState: ingestResult.approvalState,
+          activePromotionPerformed: false,
+        },
+        activePromotionPerformed: false,
+        noActiveWritePerformed: true,
+        noManifestUpdatePerformed: true,
+        providerGenerationPerformed: false,
+      };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({
+        ok: false,
+        route,
+        error: err.code ?? "MEDIA_ASSET_INGEST_ERROR",
+        message: err.message,
+        details: err.detail || {},
+        activePromotionPerformed: false,
+        noActiveWritePerformed: true,
+        noManifestUpdatePerformed: true,
+        providerGenerationPerformed: false,
+      });
+    }
+  });
 
   async function requireSpiritkinMotionStateAccess(req, reply) {
     if (canUseSpiritkinMotionStateStagingBypass(req.body, process.env)) {

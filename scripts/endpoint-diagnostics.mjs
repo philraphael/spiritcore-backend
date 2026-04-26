@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import process from "node:process";
 import {
   canUseRunwayStagingAuthCheck,
@@ -44,6 +46,11 @@ import {
   SPIRITCORE_MEDIA_ASSET_KINDS,
   SPIRITCORE_MEDIA_REQUIREMENT_PROFILES,
 } from "../src/services/spiritCoreMediaProduction.mjs";
+import {
+  buildMediaAssetIngestRecord,
+  ingestReviewedMediaAsset,
+  validateMediaAssetIngestRecord,
+} from "../src/services/mediaAssetIngestService.mjs";
 
 const PORT = Number(process.env.SPIRITCORE_DIAG_PORT || 3115);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -655,6 +662,50 @@ async function main() {
           env: { NODE_ENV: "staging", RUNWAY_STAGING_TEST_BYPASS: "true" },
         }) === false,
         detail: "execution route cannot use media planning bypass",
+      },
+      {
+        name: "media-asset-ingest-approved-paths-and-metadata",
+        pass: await (async () => {
+          const input = {
+            entityId: "Lyra",
+            packId: "motion-pack-v1",
+            assetType: "speaking_01",
+            variant: "diag",
+            status: "approved",
+            provider: "runway",
+            providerJobId: "5d7764c2-47f4-4653-b69d-5e385e667195",
+            outputUrl: "https://example.com/lyra-speaking.mp4",
+            sourceAssetRef: "https://example.com/lyra-source.png",
+            durationSec: 5,
+            ratio: "720:1280",
+            generationMode: "subtle_speaking",
+            reviewNotes: "Diagnostic reviewed asset ingest.",
+            approvedBy: "endpoint-diagnostics",
+          };
+          const record = buildMediaAssetIngestRecord(input, { now: "2026-04-26T12:00:00.000Z" });
+          const validation = validateMediaAssetIngestRecord(record);
+          const result = await ingestReviewedMediaAsset(input, {
+            now: "2026-04-26T12:00:00.000Z",
+            workspaceRoot: path.join(process.cwd(), "runtime_data", "diagnostics", "media-ingest"),
+            downloadAsset: async () => Buffer.from("diagnostic mp4 bytes"),
+          });
+          const metadata = JSON.parse(await readFile(
+            path.join(process.cwd(), "runtime_data", "diagnostics", "media-ingest", result.metadataPath),
+            "utf8",
+          ));
+          return validation.ok
+            && record.approvedRelativePath === "Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/lyra_motion_pack_v1_speaking_01_diag_approved_20260426_5d7764c247.mp4"
+            && result.savedPath === record.approvedRelativePath
+            && result.metadataPath.endsWith(".metadata.json")
+            && metadata.providerJobId === input.providerJobId
+            && metadata.approvalState === "approved"
+            && metadata.activePromotionPerformed === false
+            && metadata.noActiveWritePerformed === true
+            && metadata.noManifestUpdatePerformed === true
+            && !result.savedPath.includes("/ACTIVE/")
+            && !result.metadataPath.includes("/ACTIVE/");
+        })(),
+        detail: "approved media ingest resolves APPROVED path, writes metadata, and avoids ACTIVE writes",
       },
       {
         name: "media-asset-kinds-valid",
