@@ -153,6 +153,43 @@ export const SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP = Object.freeze([
   { id: "emotional_checkins", label: "Emotional Check-Ins", scope: "companion_pack", mediaDependency: "presence_indicator" },
 ]);
 
+export const SPIRITCORE_PRODUCTION_SEQUENCE_TYPES = Object.freeze([
+  "spiritgate_enhancement",
+  "original_motion_pack",
+  "premium_spiritkin_starter_pack",
+]);
+
+export const ORIGINAL_SPIRITKIN_MOTION_PACK_TARGETS = Object.freeze([
+  "Lyra",
+  "Raien",
+  "Kairo",
+  "Elaria",
+  "Thalassar",
+]);
+
+export const ORIGINAL_MOTION_PACK_ASSET_KINDS = Object.freeze([
+  "idle_video",
+  "speaking_video",
+  "listening_video",
+  "greeting_video",
+  "wake_visual",
+  "trailer_video",
+  "presence_indicator",
+]);
+
+export const PREMIUM_SPIRITKIN_STARTER_PACK_ASSET_KINDS = Object.freeze([
+  "portrait",
+  "hero",
+  "full_body",
+  "icon",
+  "presence_indicator",
+  "room_background",
+  "idle_video",
+  "speaking_video",
+  "greeting_video",
+  "wake_visual",
+]);
+
 const GENERATION_TEMPLATES = Object.freeze({
   spiritgate_enhancement: {
     id: "spiritgate_enhancement",
@@ -240,6 +277,11 @@ function slugify(value, fallback = "media") {
 
 function canonicalize(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function normalizeSequenceType(value) {
+  const normalized = canonicalize(value);
+  return SPIRITCORE_PRODUCTION_SEQUENCE_TYPES.includes(normalized) ? normalized : "";
 }
 
 export function normalizeSpiritCoreMediaAssetKind(kind) {
@@ -580,6 +622,237 @@ export function createSpiritGateEnhancementPlan(input = {}) {
   };
 }
 
+function templateInputForSequence(input = {}, assetKind = "") {
+  return {
+    ...input,
+    assetKind,
+    spiritkinName: input.spiritkinName || input.targetId,
+    spiritkinRole: input.spiritkinRole || (input.sequenceType === "spiritgate_enhancement" ? "SpiritGate threshold" : "Spiritverse companion"),
+    visualIdentity: input.visualIdentity || "original Spiritverse identity, premium cinematic presence, emotionally intelligent companion atmosphere",
+    loreSummary: input.loreSummary || "A Spiritverse production asset that must preserve canon, continuity, and reviewed source references.",
+    colorPalette: input.colorPalette || "black, gold, ivory, subtle apple red accents, source-faithful companion palette when applicable",
+    emotionalTone: input.emotionalTone || "premium, magical, calm, memorable, emotionally intelligent",
+    styleProfile: input.styleProfile || "premium cinematic Spiritverse, original, polished, not derivative",
+    safetyLevel: input.safetyLevel || "internal_review",
+    referenceAssets: input.sourceAssetRefs || [],
+  };
+}
+
+function assetKindsForSequence(sequenceType, input = {}) {
+  const requested = Array.isArray(input.assetKinds)
+    ? input.assetKinds.map(normalizeSpiritCoreMediaAssetKind).filter(Boolean)
+    : [];
+  if (requested.length) return requested;
+  if (sequenceType === "spiritgate_enhancement") return ["spiritgate_video", "gateway_background"];
+  if (sequenceType === "original_motion_pack") return [...ORIGINAL_MOTION_PACK_ASSET_KINDS];
+  return [...PREMIUM_SPIRITKIN_STARTER_PACK_ASSET_KINDS];
+}
+
+function reviewChecklistForSequence(sequenceType) {
+  const common = [
+    "operator confirms target id, source references, and asset kinds",
+    "source concept and approved references are available",
+    "identity continuity review passes",
+    "lore consistency review passes",
+    "safety review passes",
+    "mobile and desktop framing review passes",
+    "no existing active asset is overwritten",
+    "promotion plan remains operator-controlled",
+  ];
+  if (sequenceType === "spiritgate_enhancement") {
+    return [
+      "original Pika Labs SpiritGate concept remains recognizable",
+      "quality, lighting, dimensionality, clarity, and atmosphere improve without replacement",
+      "gateway scene compatibility is preserved",
+      ...common,
+      "rollback path is prepared before any future promotion",
+    ];
+  }
+  if (sequenceType === "original_motion_pack") {
+    return [
+      "canonical Spiritkin identity is preserved across every motion state",
+      "idle, speaking, listening, greeting, wake, trailer, and presence assets share continuity",
+      ...common,
+    ];
+  }
+  return [
+    "premium starter pack has reviewed portrait, hero or full body, icon, presence, room, motion, wake, profile metadata, review status, and promotion status",
+    "paid-ready status is false until required assets are reviewed and approved",
+    ...common,
+  ];
+}
+
+function rejectionCriteriaForSequence(sequenceType) {
+  const common = [
+    "identity drift",
+    "unsafe framing",
+    "watermarks or text overlays",
+    "off-brand stock-like composition",
+    "unclear mobile framing",
+    "missing provider job or prompt metadata",
+    "asset does not match requested kind",
+  ];
+  if (sequenceType === "spiritgate_enhancement") {
+    return [
+      "source SpiritGate concept is no longer recognizable",
+      "enhancement behaves like a replacement instead of a quality upgrade",
+      "gateway scene compatibility is broken",
+      ...common,
+    ];
+  }
+  if (sequenceType === "original_motion_pack") {
+    return [
+      "motion pack breaks canonical personality or visual identity",
+      "state loops feel intrusive or distracting",
+      ...common,
+    ];
+  }
+  return [
+    "premium Spiritkin lacks required paid-ready starter assets",
+    "profile metadata, review status, or promotion status is missing",
+    ...common,
+  ];
+}
+
+function continuityRequirementsForSequence(sequenceType, input = {}) {
+  const sourceAssetRefs = Array.isArray(input.sourceAssetRefs) ? input.sourceAssetRefs.map((item) => normalizeText(item, 600)).filter(Boolean) : [];
+  return {
+    primarySourceRefs: sourceAssetRefs,
+    requireApprovedIdentityReferences: sequenceType !== "spiritgate_enhancement",
+    requireSourceConceptPreservation: sequenceType === "spiritgate_enhancement",
+    excludedStatuses: ["rejected", "archived", "failed"],
+    sourceConceptMustBePreserved: sequenceType === "spiritgate_enhancement",
+    gatewaySceneCompatibility: sequenceType === "spiritgate_enhancement",
+  };
+}
+
+function estimatedProviderNeedsForSequence(sequenceType, assetKinds) {
+  return {
+    provider: "runway",
+    imageJobs: assetKinds.filter((kind) => mediaTypeForAssetKind(kind) === "image").length,
+    videoJobs: assetKinds.filter((kind) => mediaTypeForAssetKind(kind) === "video").length,
+    executionAllowedInThisPhase: false,
+    providerCallRequiredNow: false,
+    notes: sequenceType === "spiritgate_enhancement"
+      ? "Future execution should use the existing SpiritGate source concept as reference input."
+      : "Future execution should run one reviewed asset at a time after references are approved.",
+  };
+}
+
+function premiumReadinessFor(input = {}, generationPlans = []) {
+  if (normalizeSequenceType(input.sequenceType) !== "premium_spiritkin_starter_pack") return null;
+  const reviewedApproved = generationPlans.filter((plan) => plan.record.reviewStatus === "approved").map((plan) => plan.record.assetKind);
+  const hasHeroOrFullBody = reviewedApproved.includes("hero") || reviewedApproved.includes("full_body");
+  const required = ["portrait", "icon", "presence_indicator", "room_background", "idle_video", "speaking_video", "greeting_video", "wake_visual"];
+  const missingReviewedApproved = required.filter((kind) => !reviewedApproved.includes(kind));
+  if (!hasHeroOrFullBody) missingReviewedApproved.push("hero_or_full_body");
+  return {
+    paidReady: missingReviewedApproved.length === 0,
+    missingReviewedApproved,
+    profileMetadataRequired: true,
+    reviewStatusRequired: true,
+    promotionStatusRequired: true,
+    rule: "premium Spiritkins are not paid-ready until required assets are reviewed and approved",
+  };
+}
+
+export function createProductionSequencePlan(input = {}) {
+  const sequenceType = normalizeSequenceType(input.sequenceType);
+  if (!sequenceType) {
+    throw new ValidationError("Invalid media production sequence type.", [`sequenceType must be one of ${SPIRITCORE_PRODUCTION_SEQUENCE_TYPES.join(", ")}`]);
+  }
+  const targetId = normalizeText(input.targetId || (sequenceType === "spiritgate_enhancement" ? "spiritgate" : ""), 160);
+  if (!targetId) {
+    throw new ValidationError("Invalid media production sequence target.", ["targetId is required"]);
+  }
+  const sourceAssetRefs = Array.isArray(input.sourceAssetRefs) ? input.sourceAssetRefs.map((item) => normalizeText(item, 600)).filter(Boolean) : [];
+  const assetKinds = assetKindsForSequence(sequenceType, input);
+  const sequenceId = `seq_${slugify(sequenceType)}_${slugify(targetId)}_${Date.now()}`;
+  const targetType = sequenceType === "spiritgate_enhancement"
+    ? "spiritgate"
+    : (sequenceType === "premium_spiritkin_starter_pack" ? "premium_spiritkin" : "spiritkin");
+
+  const generationPlans = assetKinds.map((assetKind) => createMediaAssetPlan({
+    ...input,
+    targetId,
+    targetType,
+    assetKind,
+    sourceAssetRefs,
+    referenceAssets: sourceAssetRefs,
+    lifecycleState: "draft",
+    reviewStatus: "not_started",
+    promotionStatus: "not_requested",
+    activeStatus: "inactive",
+    promptIntent: input.promptIntent || `Plan ${assetKind} for ${targetId} ${sequenceType}.`,
+    styleProfile: input.styleProfile || "premium cinematic Spiritverse production sequence",
+    safetyLevel: input.safetyLevel || "internal_review",
+    versionTag: `${slugify(sequenceType)}-${slugify(targetId)}-${slugify(assetKind)}`,
+  }));
+
+  const promptTemplates = assetKinds.map((assetKind) => buildGenerationTemplate(templateInputForSequence({
+    ...input,
+    sequenceType,
+    targetId,
+    sourceAssetRefs,
+  }, assetKind)));
+
+  const promotionPlanPlaceholders = generationPlans.map((plan) => createMediaPromotionPlan({
+    ...plan.record,
+    lifecycleState: "approved",
+    reviewStatus: "approved",
+    promotionStatus: "planned",
+  }));
+
+  return {
+    sequenceId,
+    sequenceType,
+    targetId,
+    sourceAssetRefs,
+    assetKinds,
+    generationPlans,
+    promptTemplates,
+    reviewChecklist: reviewChecklistForSequence(sequenceType),
+    rejectionCriteria: rejectionCriteriaForSequence(sequenceType),
+    promotionPlanPlaceholders,
+    continuityRequirements: continuityRequirementsForSequence(sequenceType, input),
+    estimatedProviderNeeds: estimatedProviderNeedsForSequence(sequenceType, assetKinds),
+    spiritGateEnhancementProfile: sequenceType === "spiritgate_enhancement" ? {
+      originalReplacementAllowed: false,
+      sourceConceptMustBePreserved: true,
+      enhancementOnly: true,
+      reviewRequiredBeforePromotion: true,
+      rollbackRequired: true,
+      improvementTargets: ["quality", "cinematic polish", "lighting", "clarity", "dimensionality", "atmosphere", "premium feel", "Spiritverse identity"],
+    } : null,
+    originalMotionPackProfile: sequenceType === "original_motion_pack" ? {
+      supportedTargets: [...ORIGINAL_SPIRITKIN_MOTION_PACK_TARGETS],
+      requestedTargetSupported: ORIGINAL_SPIRITKIN_MOTION_PACK_TARGETS.map((name) => name.toLowerCase()).includes(targetId.toLowerCase()),
+      requiredAssetKinds: [...ORIGINAL_MOTION_PACK_ASSET_KINDS],
+    } : null,
+    premiumStarterPackProfile: sequenceType === "premium_spiritkin_starter_pack" ? {
+      minimumPaidReadyAssetKinds: [...PREMIUM_SPIRITKIN_STARTER_PACK_ASSET_KINDS],
+      heroOrFullBodyRequired: true,
+      profileMetadataRequired: true,
+      reviewStatusRequired: true,
+      promotionStatusRequired: true,
+    } : null,
+    premiumReadiness: premiumReadinessFor({ ...input, sequenceType }, generationPlans),
+    assistantCapabilityAlignment: {
+      principle: "assistant-like features belong in separate Spiritverse-native capability packs, not inside the media system",
+      capabilityPacks: [...SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP],
+      competitiveBaseline: "meet expected utility without copying assistant, companion, entertainment, or theme-park brands",
+    },
+    operatorApprovalRequired: true,
+    noGenerationPerformed: true,
+    noProviderCall: true,
+    noPromotionPerformed: true,
+    noManifestUpdatePerformed: true,
+    noActiveWritePerformed: true,
+    notes: normalizeText(input.notes, 1200),
+    createdAt: nowIso(),
+  };
+}
+
 export function getMediaCatalogSummary() {
   return {
     ok: true,
@@ -600,8 +873,10 @@ export function getMediaCatalogSummary() {
       "POST /admin/media/generation-template",
       "POST /admin/media/review-plan",
       "POST /admin/media/promotion-plan",
+      "POST /admin/media/production-sequence-plan",
       "GET /admin/media/catalog-summary",
     ],
+    productionSequenceTypes: [...SPIRITCORE_PRODUCTION_SEQUENCE_TYPES],
     noProviderCall: true,
     noManifestUpdates: true,
     noActiveWrites: true,

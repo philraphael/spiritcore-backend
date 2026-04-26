@@ -15,8 +15,11 @@ import {
   buildGenerationTemplate,
   checkMediaRequirements,
   createMediaPromotionPlan,
+  createProductionSequencePlan,
   createSpiritGateEnhancementPlan,
   getMediaCatalogSummary,
+  ORIGINAL_MOTION_PACK_ASSET_KINDS,
+  PREMIUM_SPIRITKIN_STARTER_PACK_ASSET_KINDS,
   SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP,
   SPIRITCORE_MEDIA_ASSET_KINDS,
   SPIRITCORE_MEDIA_REQUIREMENT_PROFILES,
@@ -491,6 +494,51 @@ async function main() {
         pass: getMediaCatalogSummary().noProviderCall === true,
         detail: "media catalog summary performs no Runway generation",
       },
+      {
+        name: "media-production-sequence-spiritgate-preserves-source",
+        pass: (() => {
+          const result = createProductionSequencePlan({
+            sequenceType: "spiritgate_enhancement",
+            targetId: "spiritgate",
+            sourceAssetRefs: ["SpiritGate/PikaLabs/original-spiritgate.mp4"],
+            safetyLevel: "internal_review",
+          });
+          return result.spiritGateEnhancementProfile?.originalReplacementAllowed === false
+            && result.spiritGateEnhancementProfile?.sourceConceptMustBePreserved === true
+            && result.spiritGateEnhancementProfile?.enhancementOnly === true
+            && result.operatorApprovalRequired === true
+            && result.noProviderCall === true;
+        })(),
+        detail: "SpiritGate production sequence preserves original source concept",
+      },
+      {
+        name: "media-production-sequence-original-motion-pack",
+        pass: (() => {
+          const result = createProductionSequencePlan({
+            sequenceType: "original_motion_pack",
+            targetId: "Lyra",
+            safetyLevel: "internal_review",
+          });
+          return ORIGINAL_MOTION_PACK_ASSET_KINDS.every((kind) => result.assetKinds.includes(kind))
+            && result.generationPlans.length === ORIGINAL_MOTION_PACK_ASSET_KINDS.length
+            && result.noGenerationPerformed === true;
+        })(),
+        detail: "original motion pack plan includes required asset kinds",
+      },
+      {
+        name: "media-production-sequence-premium-starter",
+        pass: (() => {
+          const result = createProductionSequencePlan({
+            sequenceType: "premium_spiritkin_starter_pack",
+            targetId: "premium-test",
+            safetyLevel: "internal_review",
+          });
+          return PREMIUM_SPIRITKIN_STARTER_PACK_ASSET_KINDS.every((kind) => result.assetKinds.includes(kind))
+            && result.premiumReadiness?.paidReady === false
+            && result.premiumStarterPackProfile?.profileMetadataRequired === true;
+        })(),
+        detail: "premium starter pack profile exists and detects incomplete paid readiness",
+      },
     ].map((check) => ({
       ...check,
       method: "INTERNAL",
@@ -872,6 +920,53 @@ async function main() {
         && result?.body?.spiritGateEnhancementPlan?.noProviderCall === true
         ? "SpiritGate enhancement plan preserves original without provider call"
         : "unexpected SpiritGate enhancement plan",
+    });
+    await run("media-production-sequence-spiritgate", "POST", "/admin/media/production-sequence-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        sequenceType: "spiritgate_enhancement",
+        targetId: "spiritgate",
+        sourceAssetRefs: ["SpiritGate/PikaLabs/original-spiritgate.mp4"],
+        assetKinds: ["spiritgate_video", "gateway_background"],
+        styleProfile: "premium cinematic SpiritGate enhancement",
+        safetyLevel: "internal_review",
+        notes: "Diagnostic sequence plan only.",
+      },
+      describe: (result) => result?.body?.productionSequencePlan?.spiritGateEnhancementProfile?.originalReplacementAllowed === false
+        && result?.body?.productionSequencePlan?.noGenerationPerformed === true
+        && result?.body?.productionSequencePlan?.noProviderCall === true
+        && result?.body?.productionSequencePlan?.noPromotionPerformed === true
+        && result?.body?.productionSequencePlan?.noManifestUpdatePerformed === true
+        && result?.body?.productionSequencePlan?.noActiveWritePerformed === true
+        ? "SpiritGate production sequence planned without generation or promotion"
+        : "unexpected SpiritGate production sequence result",
+    });
+    await run("media-production-sequence-motion-pack", "POST", "/admin/media/production-sequence-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        sequenceType: "original_motion_pack",
+        targetId: "Lyra",
+        styleProfile: "premium cinematic Spiritkin motion pack",
+        safetyLevel: "internal_review",
+      },
+      describe: (result) => ORIGINAL_MOTION_PACK_ASSET_KINDS.every((kind) => result?.body?.productionSequencePlan?.assetKinds?.includes(kind))
+        && result?.body?.productionSequencePlan?.operatorApprovalRequired === true
+        ? "original motion pack sequence includes required assets and requires operator approval"
+        : "unexpected original motion pack sequence result",
+    });
+    await run("media-production-sequence-premium-starter", "POST", "/admin/media/production-sequence-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        sequenceType: "premium_spiritkin_starter_pack",
+        targetId: "premium-test-spiritkin",
+        styleProfile: "premium cinematic user-created Spiritkin starter pack",
+        safetyLevel: "internal_review",
+      },
+      describe: (result) => result?.body?.productionSequencePlan?.premiumReadiness?.paidReady === false
+        && result?.body?.productionSequencePlan?.premiumStarterPackProfile?.profileMetadataRequired === true
+        && result?.body?.productionSequencePlan?.noProviderCall === true
+        ? "premium starter pack sequence detects incomplete paid readiness"
+        : "unexpected premium starter sequence result",
     });
 
     const conversation = await run("conversation-bootstrap", "POST", "/v1/conversations", {

@@ -20,6 +20,7 @@ import {
   createMediaAssetPlan,
   createMediaPromotionPlan,
   createMediaReviewPlan,
+  createProductionSequencePlan,
   createSpiritGateEnhancementPlan,
   getMediaCatalogSummary,
   SPIRITCORE_MEDIA_ASSET_KINDS,
@@ -717,6 +718,29 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const mediaProductionSequencePlanSchema = {
+    body: {
+      type: "object",
+      required: ["sequenceType", "targetId"],
+      properties: {
+        sequenceType: { type: "string", minLength: 1 },
+        targetId: { type: "string", minLength: 1 },
+        sourceAssetRefs: { type: "array", items: { type: "string" }, nullable: true },
+        assetKinds: { type: "array", items: { type: "string" }, nullable: true },
+        styleProfile: { type: "string", nullable: true },
+        safetyLevel: { type: "string", nullable: true },
+        notes: { type: "string", nullable: true },
+        promptIntent: { type: "string", nullable: true },
+        spiritkinName: { type: "string", nullable: true },
+        spiritkinRole: { type: "string", nullable: true },
+        visualIdentity: { type: "string", nullable: true },
+        loreSummary: { type: "string", nullable: true },
+        colorPalette: { type: "string", nullable: true },
+        emotionalTone: { type: "string", nullable: true },
+      },
+    },
+  };
+
   function mediaRouteResult(route, builder, req, reply) {
     try {
       return {
@@ -802,6 +826,13 @@ export async function adminRoutes(fastify, opts) {
     },
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     spiritGateEnhancementPlan: createSpiritGateEnhancementPlan(req.body),
+  }), req, reply));
+
+  fastify.post("/admin/media/production-sequence-plan", {
+    preHandler: requireAdminAccess,
+    schema: mediaProductionSequencePlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    productionSequencePlan: createProductionSequencePlan(req.body),
   }), req, reply));
 
   fastify.get("/admin/media/catalog-summary", {
