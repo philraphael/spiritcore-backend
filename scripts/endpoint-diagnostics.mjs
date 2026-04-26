@@ -16,8 +16,13 @@ import {
   buildGenerationTemplate,
   buildSourceMediaReference,
   checkMediaRequirements,
+  createMediaAssemblyPlan,
   createMediaPromotionPlan,
   createProductionSequencePlan,
+  createSafeVideoAssemblyResult,
+  createSpiritCoreAvatarPackPlan,
+  createSpiritCoreDefaultOperatorPlan,
+  createSpiritkinMotionPackPlan,
   createSpiritGateSegmentPlan,
   createSpiritGateEnhancementPlanFromCurrentSource,
   createSpiritGateEnhancementExecutionPlan,
@@ -27,7 +32,9 @@ import {
   PREMIUM_MEMBER_GENERATION_BOUNDARY,
   PREMIUM_SPIRITKIN_STARTER_PACK_ASSET_KINDS,
   resolveExistingSpiritGateSource,
+  SPIRITCORE_AVATAR_PACK_ASSET_TYPES,
   SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP,
+  SPIRITKIN_MOTION_PACK_ASSET_TYPES,
   SPIRITCORE_MEDIA_ASSET_KINDS,
   SPIRITCORE_MEDIA_REQUIREMENT_PROFILES,
 } from "../src/services/spiritCoreMediaProduction.mjs";
@@ -636,6 +643,102 @@ async function main() {
         detail: "SpiritGate segment plan calculates 5-second segments and final transition prompt",
       },
       {
+        name: "media-spiritcore-default-operator-plan",
+        pass: (() => {
+          const result = createSpiritCoreDefaultOperatorPlan({
+            defaultOperatorType: "spiritcore",
+            spiritkinsEnabled: true,
+            entitlements: { spiritcorePremium: true, spiritkinPremium: false },
+          });
+          return result.defaultOperatorType === "spiritcore"
+            && result.spiritcoreIsUniversalDefault === true
+            && result.spiritkinsAreOptionalCompanions === true
+            && result.entitlementSeparation.spiritcorePremium === true
+            && result.entitlementSeparation.spiritkinPremium === false
+            && result.noProviderCall === true
+            && result.noActiveWritePerformed === true;
+        })(),
+        detail: "SpiritCore default operator planning works with separated entitlements",
+      },
+      {
+        name: "media-spiritkin-motion-pack-plan",
+        pass: (() => {
+          const result = createSpiritkinMotionPackPlan({
+            spiritkinId: "lyra",
+            targetId: "lyra-motion-pack-v1",
+            styleProfile: "premium cinematic Spiritverse companion",
+            safetyLevel: "internal_review",
+          });
+          return SPIRITKIN_MOTION_PACK_ASSET_TYPES.every((assetType) => result.plannedAssets.some((asset) => asset.assetType === assetType))
+            && result.plannedAssets.every((asset) => asset.lifecycleState === "review_required")
+            && result.noGenerationPerformed === true
+            && result.noProviderCall === true
+            && result.noPromotionPerformed === true
+            && result.premiumMemberGeneration.enabled === false;
+        })(),
+        detail: "Spiritkin motion pack plan includes every required motion asset without generation",
+      },
+      {
+        name: "media-spiritcore-avatar-pack-plan",
+        pass: (() => {
+          const result = createSpiritCoreAvatarPackPlan({
+            targetId: "spiritcore-avatar-pack-v1",
+            avatarType: "human_agent",
+            styleProfile: "ultra-premium cinematic human AI operator",
+            safetyLevel: "internal_review",
+          });
+          return result.avatarType === "human_agent"
+            && SPIRITCORE_AVATAR_PACK_ASSET_TYPES.every((assetType) => result.plannedAssets.some((asset) => asset.assetType === assetType))
+            && result.mediaPackReadiness.readyForGeneration === false
+            && result.lifecycleState === "planning_only"
+            && result.noProviderCall === true
+            && result.noActiveWritePerformed === true;
+        })(),
+        detail: "SpiritCore avatar pack plan is planning-only and review-gated",
+      },
+      {
+        name: "media-assembly-plan-safe",
+        pass: (() => {
+          const result = createMediaAssemblyPlan({
+            assemblyType: "sequence_video",
+            targetId: "spiritkin_motion_pack_demo",
+            segments: [
+              { sourceRef: "https://example.com/clip1.mp4", startSec: 0, endSec: 5, role: "intro" },
+              { sourceRef: "https://example.com/clip2.mp4", startSec: 0, endSec: 5, role: "main" },
+            ],
+            outputLabel: "review-demo-sequence",
+            safetyLevel: "internal_review",
+          }, { ffmpegAvailable: false, ffmpegExecutionEnabled: false });
+          return result.estimatedOutputDuration === 10
+            && result.executionReady === false
+            && result.ffmpegAvailable === false
+            && result.lifecycleState === "review_required"
+            && result.noAssemblyPerformed === true
+            && result.noProviderCall === true
+            && result.noActiveWritePerformed === true;
+        })(),
+        detail: "assembly plan validates segments without provider call or writes",
+      },
+      {
+        name: "media-assemble-video-planned-only",
+        pass: (() => {
+          const result = createSafeVideoAssemblyResult({
+            assemblyType: "sequence_video",
+            targetId: "spiritkin_motion_pack_demo",
+            segments: [{ sourceRef: "https://example.com/clip1.mp4", startSec: 0, endSec: 5, role: "intro" }],
+            outputLabel: "review-demo-sequence",
+            safetyLevel: "internal_review",
+          }, { ffmpegAvailable: false, ffmpegExecutionEnabled: false });
+          return result.ok === false
+            && result.plannedOnly === true
+            && result.lifecycleState === "review_required"
+            && result.noPromotionPerformed === true
+            && result.noManifestUpdatePerformed === true
+            && result.noActiveWritePerformed === true;
+        })(),
+        detail: "assemble-video remains planned-only when ffmpeg is unavailable",
+      },
+      {
         name: "media-assistant-roadmap-documented",
         pass: SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP.some((item) => item.id === "alarms")
           && SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP.some((item) => item.id === "smart_home"),
@@ -1128,6 +1231,97 @@ async function main() {
         && result?.body?.productionSequencePlan?.noProviderCall === true
         ? "premium starter pack sequence detects incomplete paid readiness"
         : "unexpected premium starter sequence result",
+    });
+    await run("media-operator-experience-plan", "POST", "/admin/media/operator-experience-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        defaultOperatorType: "spiritcore",
+        spiritkinsEnabled: true,
+        entitlements: {
+          spiritcorePremium: true,
+          spiritkinPremium: false,
+        },
+      },
+      describe: (result) => result?.body?.operatorExperiencePlan?.defaultOperatorType === "spiritcore"
+        && result?.body?.operatorExperiencePlan?.spiritcoreIsUniversalDefault === true
+        && result?.body?.operatorExperiencePlan?.spiritkinsAreOptionalCompanions === true
+        && result?.body?.operatorExperiencePlan?.entitlementSeparation?.compatibleButSeparable === true
+        && result?.body?.operatorExperiencePlan?.noProviderCall === true
+        && result?.body?.operatorExperiencePlan?.noActiveWritePerformed === true
+        ? "SpiritCore default operator plan returned without writes"
+        : "unexpected operator experience plan",
+    });
+    await run("media-spiritkin-motion-pack-plan", "POST", "/admin/media/spiritkin-motion-pack-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        spiritkinId: "lyra",
+        targetId: "lyra-motion-pack-v1",
+        styleProfile: "premium cinematic spiritverse companion, elegant, emotionally alive",
+        safetyLevel: "internal_review",
+      },
+      describe: (result) => SPIRITKIN_MOTION_PACK_ASSET_TYPES.every((assetType) => result?.body?.spiritkinMotionPackPlan?.plannedAssets?.some((asset) => asset.assetType === assetType))
+        && result?.body?.spiritkinMotionPackPlan?.plannedAssets?.every((asset) => asset.lifecycleState === "review_required")
+        && result?.body?.spiritkinMotionPackPlan?.noGenerationPerformed === true
+        && result?.body?.spiritkinMotionPackPlan?.noProviderCall === true
+        && result?.body?.spiritkinMotionPackPlan?.noActiveWritePerformed === true
+        ? "Spiritkin motion pack planned without generation"
+        : "unexpected Spiritkin motion pack plan",
+    });
+    await run("media-spiritcore-avatar-pack-plan", "POST", "/admin/media/spiritcore-avatar-pack-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        targetId: "spiritcore-avatar-pack-v1",
+        avatarType: "human_agent",
+        styleProfile: "ultra-premium cinematic human AI operator, serious, elegant, futuristic",
+        safetyLevel: "internal_review",
+      },
+      describe: (result) => result?.body?.spiritcoreAvatarPackPlan?.avatarType === "human_agent"
+        && result?.body?.spiritcoreAvatarPackPlan?.mediaPackReadiness?.readyForGeneration === false
+        && result?.body?.spiritcoreAvatarPackPlan?.plannedAssets?.some((asset) => asset.assetType === "realm_presence_01")
+        && result?.body?.spiritcoreAvatarPackPlan?.noProviderCall === true
+        && result?.body?.spiritcoreAvatarPackPlan?.noActiveWritePerformed === true
+        ? "SpiritCore avatar pack planned without generation"
+        : "unexpected SpiritCore avatar pack plan",
+    });
+    await run("media-assembly-plan", "POST", "/admin/media/assembly-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        assemblyType: "sequence_video",
+        targetId: "spiritkin_motion_pack_demo",
+        segments: [
+          { sourceRef: "https://example.com/clip1.mp4", startSec: 0, endSec: 5, role: "intro" },
+          { sourceRef: "https://example.com/clip2.mp4", startSec: 0, endSec: 5, role: "main" },
+        ],
+        outputLabel: "review-demo-sequence",
+        safetyLevel: "internal_review",
+      },
+      describe: (result) => result?.body?.assemblyPlan?.estimatedOutputDuration === 10
+        && result?.body?.assemblyPlan?.lifecycleState === "review_required"
+        && result?.body?.assemblyPlan?.noAssemblyPerformed === true
+        && result?.body?.assemblyPlan?.noProviderCall === true
+        && result?.body?.assemblyPlan?.noActiveWritePerformed === true
+        ? "assembly plan returned review-required no-write result"
+        : "unexpected assembly plan",
+    });
+    await run("media-assemble-video-safe", "POST", "/admin/media/assemble-video", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        assemblyType: "sequence_video",
+        targetId: "spiritkin_motion_pack_demo",
+        segments: [
+          { sourceRef: "https://example.com/clip1.mp4", startSec: 0, endSec: 5, role: "intro" },
+          { sourceRef: "https://example.com/clip2.mp4", startSec: 0, endSec: 5, role: "main" },
+        ],
+        outputLabel: "review-demo-sequence",
+        safetyLevel: "internal_review",
+      },
+      describe: (result) => result?.body?.assemblyResult?.plannedOnly === true
+        && result?.body?.assemblyResult?.lifecycleState === "review_required"
+        && result?.body?.assemblyResult?.noPromotionPerformed === true
+        && result?.body?.assemblyResult?.noManifestUpdatePerformed === true
+        && result?.body?.assemblyResult?.noActiveWritePerformed === true
+        ? "assemble-video safely returns planned-only review result"
+        : "unexpected assemble-video safe result",
     });
     await run("media-source-reference-plan", "POST", "/admin/media/source-reference-plan", {
       headers: { "x-admin-key": DIAG_ADMIN_KEY },

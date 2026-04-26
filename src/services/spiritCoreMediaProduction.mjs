@@ -60,7 +60,36 @@ const VIDEO_KINDS = new Set([
   "trailer_video",
 ]);
 
-const TARGET_TYPES = new Set(["spiritkin", "premium_spiritkin", "realm", "spiritgate", "game", "wake_presence"]);
+const TARGET_TYPES = new Set(["spiritcore", "spiritkin", "premium_spiritkin", "realm", "spiritgate", "game", "wake_presence"]);
+
+export const SPIRITCORE_DEFAULT_OPERATOR_TYPES = Object.freeze(["spiritcore", "spiritkin"]);
+
+export const SPIRITKIN_MOTION_PACK_ASSET_TYPES = Object.freeze([
+  "idle_01",
+  "idle_02",
+  "speaking_01",
+  "speaking_02",
+  "listen_01",
+  "think_01",
+  "gesture_01",
+  "gesture_02",
+  "walk_loop_01",
+  "sit_or_perch_01",
+  "greeting_or_entry_01",
+]);
+
+export const SPIRITCORE_AVATAR_PACK_ASSET_TYPES = Object.freeze([
+  "idle_01",
+  "idle_02",
+  "speaking_01",
+  "speaking_02",
+  "gesture_01",
+  "gesture_02",
+  "entrance_01",
+  "seated_listening_01",
+  "thinking_01",
+  "realm_presence_01",
+]);
 
 const ASSET_KIND_ALIASES = Object.freeze({
   hero_image: "hero",
@@ -360,6 +389,7 @@ function normalizeTargetType(value, assetKind = "") {
 
 function familyPathFor(record = {}) {
   const targetSlug = slugify(record.targetId || record.spiritkinId, "target");
+  if (record.targetType === "spiritcore") return `spiritcore/${targetSlug}`;
   if (record.targetType === "realm") return `realms/${targetSlug}`;
   if (record.targetType === "spiritgate") return `spiritgate/${targetSlug}`;
   if (record.targetType === "game") return `games/${targetSlug}`;
@@ -391,6 +421,307 @@ function providerCompatibilityForSource(sourceType, assetKind = "") {
       recommendedMode: assetKind === "spiritgate_video" ? "video_to_video" : (mediaType === "video" ? "image_to_video" : "text_to_image"),
       recommendedModel: assetKind === "spiritgate_video" ? "gen4_aleph" : (mediaType === "video" ? "gen4_turbo" : "gen4_image"),
     },
+  };
+}
+
+function lifecycleNoWriteFlags(extra = {}) {
+  return {
+    noGenerationPerformed: true,
+    noProviderCall: true,
+    noPromotionPerformed: true,
+    noManifestUpdatePerformed: true,
+    noActiveWritePerformed: true,
+    ...extra,
+  };
+}
+
+function normalizeDefaultOperatorType(value) {
+  const normalized = canonicalize(value || "spiritcore");
+  return SPIRITCORE_DEFAULT_OPERATOR_TYPES.includes(normalized) ? normalized : "spiritcore";
+}
+
+export function createSpiritCoreDefaultOperatorPlan(input = {}) {
+  const defaultOperatorType = normalizeDefaultOperatorType(input.defaultOperatorType);
+  const spiritkinsEnabled = input.spiritkinsEnabled !== false;
+  const spiritkinProfiles = Array.isArray(input.spiritkinProfiles)
+    ? input.spiritkinProfiles.map((profile) => ({
+      spiritkinId: normalizeText(profile?.spiritkinId || profile?.id, 160),
+      displayName: normalizeText(profile?.displayName || profile?.name, 160),
+      enabled: profile?.enabled !== false,
+      companionMode: normalizeText(profile?.companionMode || "optional_under_spiritcore", 120),
+    })).filter((profile) => profile.spiritkinId)
+    : [];
+
+  return {
+    ok: true,
+    defaultOperatorType,
+    defaultOperatorMode: defaultOperatorType === "spiritcore" ? "universal_spiritcore_operator" : "legacy_spiritkin_first",
+    spiritcoreIsUniversalDefault: true,
+    spiritkinsAreOptionalCompanions: true,
+    spiritkinsEnabled,
+    spiritcoreProfile: {
+      profileId: normalizeText(input.spiritcoreProfile?.profileId || "spiritcore-default-operator", 160),
+      displayName: normalizeText(input.spiritcoreProfile?.displayName || "SpiritCore", 160),
+      role: "default_operator",
+      governsSpiritkins: true,
+      usableWithoutSpiritkins: true,
+      lifecycleState: "planning_only",
+    },
+    spiritkinProfiles,
+    entitlementSeparation: {
+      spiritcorePremium: Boolean(input.entitlements?.spiritcorePremium),
+      spiritkinPremium: Boolean(input.entitlements?.spiritkinPremium),
+      compatibleButSeparable: true,
+      note: "SpiritCore premium capabilities and Spiritkin premium companion capabilities should be granted independently.",
+    },
+    compatibility: {
+      currentSpiritkinFlowsPreserved: true,
+      currentSpiritGateFlowsPreserved: true,
+      noBehaviorBlock: true,
+    },
+    ...lifecycleNoWriteFlags(),
+  };
+}
+
+function motionAssetKindForType(assetType) {
+  if (assetType.startsWith("speaking")) return "speaking_video";
+  if (assetType.startsWith("listen")) return "listening_video";
+  if (assetType.startsWith("greeting") || assetType.startsWith("entrance")) return "greeting_video";
+  if (assetType.startsWith("idle") || assetType.startsWith("think") || assetType.startsWith("gesture") || assetType.startsWith("walk") || assetType.startsWith("sit")) return "idle_video";
+  return "presence_indicator";
+}
+
+function stateTriggerForAssetType(assetType) {
+  if (assetType.startsWith("speaking")) return "assistant_or_companion_speaking";
+  if (assetType.startsWith("listen")) return "user_speaking_or_mic_active";
+  if (assetType.startsWith("think")) return "processing_or_reflection";
+  if (assetType.startsWith("gesture")) return "emphasis_or_emotional_response";
+  if (assetType.startsWith("walk")) return "ambient_realm_movement";
+  if (assetType.startsWith("sit")) return "resting_or_perched_presence";
+  if (assetType.startsWith("greeting") || assetType.startsWith("entrance")) return "session_entry_or_return";
+  if (assetType.startsWith("seated")) return "attentive_listening";
+  if (assetType.startsWith("realm")) return "background_operator_presence";
+  return "idle_presence";
+}
+
+function buildMotionAssetPlan({ assetType, targetId, subjectType, subjectId, styleProfile, safetyLevel, sourceRefs = [] }) {
+  const assetKind = motionAssetKindForType(assetType);
+  return {
+    assetType,
+    assetKind,
+    targetId,
+    subjectType,
+    subjectId,
+    purpose: `${assetType} ${subjectType} media state`,
+    sourceRefs,
+    promptIntent: [
+      `Plan ${assetType} for ${subjectId}.`,
+      `The motion should support ${stateTriggerForAssetType(assetType)} without feeling distracting or user-facing generation driven.`,
+      "Preserve identity, continuity, and Spiritverse premium tone.",
+    ].join(" "),
+    styleProfile,
+    motionCategory: assetType.split("_")[0],
+    stateTrigger: stateTriggerForAssetType(assetType),
+    reviewStatus: "not_started",
+    lifecycleState: "review_required",
+  };
+}
+
+export function createSpiritkinMotionPackPlan(input = {}) {
+  const spiritkinId = normalizeText(input.spiritkinId || input.subjectId || "lyra", 160);
+  const targetId = normalizeText(input.targetId || `${slugify(spiritkinId)}-motion-pack-v1`, 160);
+  const styleProfile = normalizeText(input.styleProfile || "premium cinematic Spiritverse companion motion pack", 320);
+  const safetyLevel = normalizeText(input.safetyLevel || "internal_review", 80);
+  const sourceRefs = Array.isArray(input.sourceRefs) ? input.sourceRefs.map((ref) => normalizeText(ref, 600)).filter(Boolean) : [];
+  const assets = SPIRITKIN_MOTION_PACK_ASSET_TYPES.map((assetType) => buildMotionAssetPlan({
+    assetType,
+    targetId,
+    subjectType: "spiritkin",
+    subjectId: spiritkinId,
+    styleProfile,
+    safetyLevel,
+    sourceRefs,
+  }));
+
+  return {
+    ok: true,
+    targetId,
+    spiritkinId,
+    subjectType: "spiritkin",
+    safetyLevel,
+    motionPackState: "planning_only",
+    plannedAssets: assets,
+    continuityRules: [
+      "preserve canonical Spiritkin identity across every motion state",
+      "reuse approved portrait, hero, and room references when available",
+      "keep movement loops subtle enough for repeated assistant and companion use",
+      "all generated outputs remain review_required until operator review",
+    ],
+    visualConsistencyRequirements: [
+      "same character identity",
+      "same palette family",
+      "compatible lighting and camera language",
+      "mobile and desktop framing remains readable",
+    ],
+    reviewChecklist: [
+      "state trigger matches intended UX moment",
+      "motion loop is not distracting",
+      "identity and emotional tone are consistent",
+      "source references and prompt metadata are recorded",
+      "operator approval required before any promotion",
+    ],
+    premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+    ...lifecycleNoWriteFlags(),
+  };
+}
+
+export function createSpiritCoreAvatarPackPlan(input = {}) {
+  const targetId = normalizeText(input.targetId || "spiritcore-avatar-pack-v1", 160);
+  const avatarType = normalizeText(input.avatarType || "human_agent", 120);
+  const styleProfile = normalizeText(input.styleProfile || "ultra-premium cinematic human AI operator, serious, elegant, futuristic, emotionally intelligent", 420);
+  const safetyLevel = normalizeText(input.safetyLevel || "internal_review", 80);
+  const plannedAssets = SPIRITCORE_AVATAR_PACK_ASSET_TYPES.map((assetType) => buildMotionAssetPlan({
+    assetType,
+    targetId,
+    subjectType: "spiritcore",
+    subjectId: "spiritcore",
+    styleProfile,
+    safetyLevel,
+    sourceRefs: [],
+  }));
+
+  return {
+    ok: true,
+    targetId,
+    subjectType: "spiritcore",
+    avatarType,
+    tone: ["serious", "premium", "cinematic", "elegant"],
+    lifecycleState: "planning_only",
+    safetyLevel,
+    mediaPackReadiness: {
+      idle: "planned",
+      speaking: "planned",
+      gesture: "planned",
+      entrance: "planned",
+      seatedListening: "planned",
+      thinking: "planned",
+      realmPresence: "planned",
+      readyForGeneration: false,
+      reviewRequiredBeforePromotion: true,
+    },
+    plannedAssets,
+    continuityRules: [
+      "SpiritCore avatar is the default operator presence, not a replacement for optional Spiritkins",
+      "visual tone should be serious, premium, cinematic, elegant, and emotionally intelligent",
+      "states must support assistant-like utility without copying any competitor experience",
+      "all outputs remain review_required before promotion",
+    ],
+    reviewChecklist: [
+      "operator authority presence is clear",
+      "avatar remains suitable for users without Spiritkins",
+      "motion states are non-intrusive",
+      "visual quality meets premium default operator expectations",
+      "operator approval required before any promotion",
+    ],
+    ...lifecycleNoWriteFlags(),
+  };
+}
+
+function normalizeSegment(input = {}, index = 0) {
+  const sourceRef = normalizeText(input.sourceRef, 1200);
+  const startSec = clampNumber(input.startSec, 0, 0, 3600);
+  const requestedEnd = Number(input.endSec);
+  const endSec = Number.isFinite(requestedEnd) && requestedEnd > startSec
+    ? Math.min(requestedEnd, 3600)
+    : Math.min(startSec + 5, 3600);
+  return {
+    index: index + 1,
+    sourceRef,
+    startSec: Number(startSec.toFixed(3)),
+    endSec: Number(endSec.toFixed(3)),
+    durationSec: Number((endSec - startSec).toFixed(3)),
+    role: normalizeText(input.role || `segment_${index + 1}`, 120),
+    sourceType: /^https?:\/\//i.test(sourceRef) ? "remote_url" : "local_or_storage_ref",
+    valid: Boolean(sourceRef) && endSec > startSec,
+    validationErrors: [
+      ...(!sourceRef ? ["sourceRef is required"] : []),
+      ...(endSec <= startSec ? ["endSec must be greater than startSec"] : []),
+    ],
+  };
+}
+
+export function createMediaAssemblyPlan(input = {}, runtime = {}) {
+  const assemblyType = normalizeText(input.assemblyType || "sequence_video", 120);
+  const targetId = normalizeText(input.targetId || "media-assembly", 160);
+  const outputLabel = slugify(input.outputLabel || `${targetId}-review-sequence`, "review-sequence");
+  const safetyLevel = normalizeText(input.safetyLevel || "internal_review", 80);
+  const segments = Array.isArray(input.segments) ? input.segments : [];
+  const validatedSegments = segments.map(normalizeSegment);
+  const errors = [];
+  if (assemblyType !== "sequence_video") errors.push("assemblyType must be sequence_video");
+  if (!targetId) errors.push("targetId is required");
+  if (!validatedSegments.length) errors.push("segments are required");
+  for (const segment of validatedSegments) {
+    errors.push(...segment.validationErrors.map((error) => `segment ${segment.index}: ${error}`));
+  }
+  const ffmpegAvailable = Boolean(runtime.ffmpegAvailable);
+  const ffmpegExecutionEnabled = Boolean(runtime.ffmpegExecutionEnabled);
+  const executionReady = errors.length === 0 && ffmpegAvailable && ffmpegExecutionEnabled;
+  const estimatedOutputDuration = Number(validatedSegments.reduce((sum, segment) => sum + (segment.valid ? segment.durationSec : 0), 0).toFixed(3));
+
+  return {
+    ok: errors.length === 0,
+    planId: `assembly_plan_${slugify(targetId)}_${Date.now()}`,
+    assemblyType,
+    targetId,
+    outputLabel,
+    safetyLevel,
+    validatedSegments,
+    estimatedOutputDuration,
+    executionReady,
+    ffmpegAvailable,
+    ffmpegExecutionEnabled,
+    stitchMethod: executionReady ? "local_ffmpeg_trim_concat" : "planned_adapter_only",
+    lifecycleState: "review_required",
+    outputCandidate: {
+      provider: "local_ffmpeg",
+      reviewPath: `Spiritverse_MASTER_ASSETS/REVIEW/assembled/${slugify(targetId)}/${outputLabel}.mp4`,
+      activePath: null,
+      publicPath: null,
+    },
+    validationErrors: errors,
+    executionBlockReason: executionReady
+      ? null
+      : (errors.length ? "assembly input validation failed" : "ffmpeg execution is unavailable or not explicitly enabled"),
+    ...lifecycleNoWriteFlags({ noAssemblyPerformed: true }),
+  };
+}
+
+export function createSafeVideoAssemblyResult(input = {}, runtime = {}) {
+  const plan = createMediaAssemblyPlan(input, runtime);
+  if (!plan.executionReady) {
+    return {
+      ok: false,
+      provider: "local_ffmpeg",
+      plannedOnly: true,
+      reason: plan.executionBlockReason,
+      assemblyPlan: plan,
+      lifecycleState: "review_required",
+      noPromotionPerformed: true,
+      noManifestUpdatePerformed: true,
+      noActiveWritePerformed: true,
+    };
+  }
+  return {
+    ok: false,
+    provider: "local_ffmpeg",
+    plannedOnly: true,
+    reason: "ffmpeg execution adapter is intentionally not enabled in this phase; use assembly-plan until the review-space writer is implemented.",
+    assemblyPlan: plan,
+    lifecycleState: "review_required",
+    noPromotionPerformed: true,
+    noManifestUpdatePerformed: true,
+    noActiveWritePerformed: true,
   };
 }
 
@@ -1349,6 +1680,9 @@ export function getMediaCatalogSummary() {
     assistantCapabilityRoadmap: [...SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP],
     sourceMediaTypes: [...SOURCE_MEDIA_TYPES],
     premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+    defaultOperatorTypes: [...SPIRITCORE_DEFAULT_OPERATOR_TYPES],
+    spiritkinMotionPackAssetTypes: [...SPIRITKIN_MOTION_PACK_ASSET_TYPES],
+    spiritcoreAvatarPackAssetTypes: [...SPIRITCORE_AVATAR_PACK_ASSET_TYPES],
     routes: [
       "POST /admin/media/asset-plan",
       "POST /admin/media/requirements-check",
@@ -1356,6 +1690,11 @@ export function getMediaCatalogSummary() {
       "POST /admin/media/review-plan",
       "POST /admin/media/promotion-plan",
       "POST /admin/media/production-sequence-plan",
+      "POST /admin/media/operator-experience-plan",
+      "POST /admin/media/spiritkin-motion-pack-plan",
+      "POST /admin/media/spiritcore-avatar-pack-plan",
+      "POST /admin/media/assembly-plan",
+      "POST /admin/media/assemble-video",
       "POST /admin/media/source-reference-plan",
       "GET /admin/media/spiritgate-source-summary",
       "POST /admin/media/spiritgate-enhancement-plan-from-current-source",

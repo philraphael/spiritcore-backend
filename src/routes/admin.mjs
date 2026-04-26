@@ -5,6 +5,7 @@
  * GET /v1/admin/messages/:conversationId — fetch transcript for a conversation
  * GET /v1/admin/stats                 — global system stats
  */
+import { spawnSync } from "node:child_process";
 import { config } from "../config.mjs";
 import {
   checkRunwayOrganizationAuth,
@@ -22,10 +23,15 @@ import {
   buildGenerationTemplate,
   buildSourceMediaReference,
   checkMediaRequirements,
+  createMediaAssemblyPlan,
   createMediaAssetPlan,
   createMediaPromotionPlan,
   createMediaReviewPlan,
   createProductionSequencePlan,
+  createSafeVideoAssemblyResult,
+  createSpiritCoreAvatarPackPlan,
+  createSpiritCoreDefaultOperatorPlan,
+  createSpiritkinMotionPackPlan,
   createSpiritGateSegmentPlan,
   createSpiritGateEnhancementPlanFromCurrentSource,
   createSpiritGateEnhancementExecutionPlan,
@@ -120,6 +126,20 @@ function requestPublicOrigin(req) {
   const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
   if (!host) return "";
   return `${proto || "https"}://${host}`;
+}
+
+function localFfmpegRuntime() {
+  const command = String(process.env.FFMPEG_PATH || "ffmpeg").trim();
+  const result = spawnSync(command, ["-version"], {
+    encoding: "utf8",
+    windowsHide: true,
+    timeout: 3000,
+  });
+  return {
+    ffmpegAvailable: result.status === 0,
+    ffmpegExecutionEnabled: isTrueEnv(process.env.ENABLE_LOCAL_FFMPEG_ASSEMBLY),
+    ffmpegCommand: command,
+  };
 }
 
 function createRunwayExecutionContext({ req, baseConfig, baseEnv }) {
@@ -824,6 +844,73 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const operatorExperiencePlanSchema = {
+    body: {
+      type: "object",
+      properties: {
+        defaultOperatorType: { type: "string", nullable: true },
+        spiritkinsEnabled: { type: "boolean", nullable: true },
+        spiritcoreProfile: { type: "object", nullable: true },
+        spiritkinProfiles: { type: "array", items: { type: "object" }, nullable: true },
+        entitlements: { type: "object", nullable: true },
+      },
+    },
+  };
+
+  const motionPackPlanSchema = {
+    body: {
+      type: "object",
+      required: ["spiritkinId", "targetId", "styleProfile", "safetyLevel"],
+      properties: {
+        spiritkinId: { type: "string", minLength: 1 },
+        targetId: { type: "string", minLength: 1 },
+        styleProfile: { type: "string", minLength: 1 },
+        safetyLevel: { type: "string", minLength: 1 },
+        sourceRefs: { type: "array", items: { type: "string" }, nullable: true },
+      },
+    },
+  };
+
+  const avatarPackPlanSchema = {
+    body: {
+      type: "object",
+      required: ["targetId", "avatarType", "styleProfile", "safetyLevel"],
+      properties: {
+        targetId: { type: "string", minLength: 1 },
+        avatarType: { type: "string", minLength: 1 },
+        styleProfile: { type: "string", minLength: 1 },
+        safetyLevel: { type: "string", minLength: 1 },
+      },
+    },
+  };
+
+  const assemblyPlanSchema = {
+    body: {
+      type: "object",
+      required: ["assemblyType", "targetId", "segments", "outputLabel", "safetyLevel"],
+      properties: {
+        assemblyType: { type: "string", minLength: 1 },
+        targetId: { type: "string", minLength: 1 },
+        segments: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "object",
+            required: ["sourceRef"],
+            properties: {
+              sourceRef: { type: "string", minLength: 1 },
+              startSec: { type: "number", nullable: true },
+              endSec: { type: "number", nullable: true },
+              role: { type: "string", nullable: true },
+            },
+          },
+        },
+        outputLabel: { type: "string", minLength: 1 },
+        safetyLevel: { type: "string", minLength: 1 },
+      },
+    },
+  };
+
   function mediaRouteResult(route, builder, req, reply) {
     try {
       return {
@@ -916,6 +1003,41 @@ export async function adminRoutes(fastify, opts) {
     schema: mediaProductionSequencePlanSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     productionSequencePlan: createProductionSequencePlan(req.body),
+  }), req, reply));
+
+  fastify.post("/admin/media/operator-experience-plan", {
+    preHandler: requireAdminAccess,
+    schema: operatorExperiencePlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    operatorExperiencePlan: createSpiritCoreDefaultOperatorPlan(req.body),
+  }), req, reply));
+
+  fastify.post("/admin/media/spiritkin-motion-pack-plan", {
+    preHandler: requireAdminAccess,
+    schema: motionPackPlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    spiritkinMotionPackPlan: createSpiritkinMotionPackPlan(req.body),
+  }), req, reply));
+
+  fastify.post("/admin/media/spiritcore-avatar-pack-plan", {
+    preHandler: requireAdminAccess,
+    schema: avatarPackPlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    spiritcoreAvatarPackPlan: createSpiritCoreAvatarPackPlan(req.body),
+  }), req, reply));
+
+  fastify.post("/admin/media/assembly-plan", {
+    preHandler: requireAdminAccess,
+    schema: assemblyPlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    assemblyPlan: createMediaAssemblyPlan(req.body, localFfmpegRuntime()),
+  }), req, reply));
+
+  fastify.post("/admin/media/assemble-video", {
+    preHandler: requireAdminAccess,
+    schema: assemblyPlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    assemblyResult: createSafeVideoAssemblyResult(req.body, localFfmpegRuntime()),
   }), req, reply));
 
   fastify.post("/admin/media/source-reference-plan", {
