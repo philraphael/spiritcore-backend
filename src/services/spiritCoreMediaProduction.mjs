@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { ValidationError } from "../errors.mjs";
 import { SPIRITGATE_RUNTIME_MEDIA } from "../../spiritkins-app/data/spiritkinRuntimeConfig.js";
+import { getSpiritkinMediaManifest, resolveSpiritkinMediaName } from "../../spiritkins-app/data/spiritkinMediaManifest.js";
 
 export const SPIRITCORE_MEDIA_ASSET_KINDS = Object.freeze([
   "portrait",
@@ -89,6 +90,16 @@ export const SPIRITCORE_AVATAR_PACK_ASSET_TYPES = Object.freeze([
   "seated_listening_01",
   "thinking_01",
   "realm_presence_01",
+]);
+
+export const ORIGINAL_SPIRITKIN_IDS = Object.freeze([
+  "lyra",
+  "raien",
+  "kairo",
+  "solis",
+  "neris",
+  "elaria",
+  "thalassar",
 ]);
 
 const ASSET_KIND_ALIASES = Object.freeze({
@@ -424,6 +435,73 @@ function providerCompatibilityForSource(sourceType, assetKind = "") {
   };
 }
 
+function sourceRefLooksRunwayAccessibleImage(sourceAssetRef = "") {
+  return /^https:\/\/.+\.(png|jpe?g|webp)(\?.*)?$/i.test(String(sourceAssetRef || ""))
+    || /^data:image\//i.test(String(sourceAssetRef || ""))
+    || /^runway:\/\/.+/i.test(String(sourceAssetRef || ""));
+}
+
+function canonicalSpiritkinName(spiritkinId = "") {
+  const normalized = normalizeText(spiritkinId, 120);
+  const resolved = resolveSpiritkinMediaName(normalized);
+  if (getSpiritkinMediaManifest(resolved)) return resolved;
+  const match = Object.keys({
+    Lyra: true,
+    Raien: true,
+    Kairo: true,
+    Solis: true,
+    Neris: true,
+  }).find((name) => name.toLowerCase() === normalized.toLowerCase());
+  return match || resolved || normalized;
+}
+
+export function resolveExistingSpiritkinSource(spiritkinId, input = {}) {
+  const canonicalName = canonicalSpiritkinName(spiritkinId);
+  const manifest = getSpiritkinMediaManifest(canonicalName);
+  const slot = manifest?.portrait?.status === "ready"
+    ? manifest.portrait
+    : (manifest?.heroImage?.status === "ready" ? manifest.heroImage : manifest?.fallbackImage);
+  const currentPath = normalizeText(slot?.path, 800);
+  const origin = normalizeOrigin(input.origin || input.publicOrigin || input.stagingOrigin);
+  const publicUrl = origin && currentPath.startsWith("/")
+    ? `${origin}${currentPath}`
+    : "";
+  const sourceAssetRef = publicUrl || currentPath;
+  const sourceAssetType = publicUrl && publicUrl.startsWith("https://")
+    ? "external_url"
+    : (currentPath ? "existing_asset" : "");
+  const canUseForRunwayImageToVideo = sourceRefLooksRunwayAccessibleImage(sourceAssetRef);
+  const missingRequirements = [];
+  if (!manifest) missingRequirements.push(`No media manifest entry found for ${spiritkinId}`);
+  if (!currentPath) missingRequirements.push("No ready portrait, hero, or fallback image found");
+  if (!canUseForRunwayImageToVideo) {
+    missingRequirements.push("Runway image-to-video requires an HTTPS image, data image URI, or provider asset URI");
+  }
+
+  return {
+    ok: Boolean(manifest && currentPath),
+    spiritkinId: normalizeText(spiritkinId, 120),
+    canonicalName,
+    sourceAssetId: `existing-${slugify(canonicalName)}-portrait-source`,
+    sourceAssetRef,
+    sourceAssetType,
+    currentPath,
+    publicUrl: publicUrl || null,
+    providerCompatibility: providerCompatibilityForSource(sourceAssetType, "speaking_video"),
+    canUseForRunwayImageToVideo,
+    approvedForReference: Boolean(manifest && currentPath),
+    missingRequirements,
+    notes: canUseForRunwayImageToVideo
+      ? `${canonicalName} has an existing canonical still suitable for a first image-to-video motion-state test.`
+      : `Expose ${canonicalName}'s canonical still through the staging HTTPS asset route before motion-state execution.`,
+    noGenerationPerformed: true,
+    noProviderCall: true,
+    noPromotionPerformed: true,
+    noManifestUpdatePerformed: true,
+    noActiveWritePerformed: true,
+  };
+}
+
 function lifecycleNoWriteFlags(extra = {}) {
   return {
     noGenerationPerformed: true,
@@ -572,6 +650,96 @@ export function createSpiritkinMotionPackPlan(input = {}) {
     ],
     premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
     ...lifecycleNoWriteFlags(),
+  };
+}
+
+export function createSpiritkinMotionStateExecutionPlan(input = {}) {
+  const spiritkinId = normalizeText(input.spiritkinId, 120).toLowerCase();
+  const canonicalName = canonicalSpiritkinName(spiritkinId);
+  const manifest = getSpiritkinMediaManifest(canonicalName);
+  if (!manifest) {
+    throw new ValidationError("Invalid Spiritkin motion state target.", [`spiritkinId ${input.spiritkinId || ""} is not an existing allowed Spiritkin`]);
+  }
+  const targetId = normalizeText(input.targetId || `${spiritkinId}-motion-pack-v1`, 160);
+  const assetType = normalizeText(input.assetType || "speaking_01", 80);
+  if (!SPIRITKIN_MOTION_PACK_ASSET_TYPES.includes(assetType)) {
+    throw new ValidationError("Invalid Spiritkin motion asset type.", [`assetType must be one of ${SPIRITKIN_MOTION_PACK_ASSET_TYPES.join(", ")}`]);
+  }
+  const expectedAssetKind = motionAssetKindForType(assetType);
+  const assetKind = normalizeSpiritCoreMediaAssetKind(input.assetKind || expectedAssetKind);
+  if (assetKind !== expectedAssetKind) {
+    throw new ValidationError("Invalid Spiritkin motion asset kind.", [`assetKind must be ${expectedAssetKind} for assetType ${assetType}`]);
+  }
+  const sourceAssetRef = normalizeText(input.sourceAssetRef, 1200);
+  if (!sourceAssetRef) {
+    throw new ValidationError("Invalid Spiritkin motion source.", ["sourceAssetRef is required"]);
+  }
+  const sourceAssetType = normalizeSourceMediaType(input.sourceAssetType || input.sourceType) || "external_url";
+  const promptIntent = normalizeText(input.promptIntent || `Animate ${canonicalName} into a premium ${assetType} loop for SpiritCore conversation responses.`, 1000);
+  const styleProfile = normalizeText(input.styleProfile || "premium cinematic Spiritverse companion, elegant, emotionally alive, screen-present avatar realism", 360);
+  const safetyLevel = normalizeText(input.safetyLevel || "internal_review", 80);
+  const stateTrigger = stateTriggerForAssetType(assetType);
+  const mediaAssetRecord = buildMediaAssetRecord({
+    spiritkinId,
+    targetId,
+    targetType: "spiritkin",
+    assetKind,
+    lifecycleState: "review_required",
+    reviewStatus: "pending",
+    promotionStatus: "not_requested",
+    activeStatus: "inactive",
+    provider: "runway",
+    providerJobId: input.providerJobId,
+    sourceAssetRefs: [sourceAssetRef],
+    promptIntent,
+    styleProfile,
+    safetyLevel,
+    versionTag: input.versionTag || `${slugify(spiritkinId)}-${slugify(assetType)}-${Date.now()}`,
+    artifactFileName: `${slugify(assetType)}.mp4`,
+    notes: `${canonicalName} ${assetType} generated output must remain review_required until operator approval.`,
+  });
+  const validation = validateMediaAssetRecord(mediaAssetRecord);
+  if (!validation.ok) {
+    throw new ValidationError("Invalid Spiritkin motion media asset record.", validation.errors);
+  }
+
+  return {
+    ok: true,
+    spiritkinId,
+    canonicalName,
+    targetId,
+    assetType,
+    assetKind,
+    stateTrigger,
+    sourceAssetRef,
+    sourceAssetType,
+    promptIntent,
+    styleProfile,
+    safetyLevel,
+    mediaAssetRecord,
+    providerTarget: {
+      provider: "runway",
+      providerMode: sourceAssetType.includes("video") ? "video_to_video" : "image_to_video",
+      recommendedModel: sourceAssetType.includes("video") ? "gen4_aleph" : "gen4_turbo",
+      endpointPath: sourceAssetType.includes("video") ? "/v1/video_to_video" : "/v1/image_to_video",
+      textToImageAllowed: false,
+    },
+    commandCenterMetadata: {
+      sourceAssetRequired: true,
+      modelToolRecommendation: sourceAssetType.includes("video")
+        ? "Runway video_to_video with gen4_aleph"
+        : "Runway image_to_video with gen4_turbo",
+      operatorApprovalRequired: true,
+      estimatedProviderTarget: sourceAssetType.includes("video") ? "video_to_video" : "image_to_video",
+      generationStatus: input.providerJobId ? "submitted" : "not_submitted",
+      reviewStatus: "pending",
+      promotionDisabledUntilApproval: true,
+      statusCheckRoute: "POST /admin/runway/status-check",
+    },
+    premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+    noPromotionPerformed: true,
+    noManifestUpdatePerformed: true,
+    noActiveWritePerformed: true,
   };
 }
 
@@ -1692,6 +1860,8 @@ export function getMediaCatalogSummary() {
       "POST /admin/media/production-sequence-plan",
       "POST /admin/media/operator-experience-plan",
       "POST /admin/media/spiritkin-motion-pack-plan",
+      "GET /admin/media/spiritkin-source-summary/:spiritkinId",
+      "POST /admin/media/spiritkin-motion-state-execute",
       "POST /admin/media/spiritcore-avatar-pack-plan",
       "POST /admin/media/assembly-plan",
       "POST /admin/media/assemble-video",

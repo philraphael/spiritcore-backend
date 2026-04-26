@@ -1,0 +1,147 @@
+# Spiritkin Motion State Generation Pipeline Report
+
+## Phase B2 Summary
+
+Phase B2 adds a controlled backend pipeline for one operator-reviewed Spiritkin motion-state generation. The first intended target is Lyra `speaking_01`, generated as a `speaking_video` from an existing approved still reference.
+
+No generation was run during tests. No provider calls were made during tests. No media was promoted. No manifests were updated. No ACTIVE assets were written.
+
+## Existing Lyra Source Discovery
+
+Current canonical Lyra still source:
+
+- local file: `spiritkins-app/public/portraits/lyra_portrait.png`
+- runtime path: `/portraits/lyra_portrait.png`
+- staging URL: `https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png`
+- source type: `external_url` when called from staging with forwarded HTTPS origin
+- source asset id: `existing-lyra-portrait-source`
+- approved for reference: `true`
+- Runway suitability: usable for image-to-video if the staging URL is publicly reachable
+
+The source comes from the existing Spiritkin media manifest and is canonical enough for the first Lyra speaking-state motion test.
+
+## Routes Added
+
+- `GET /admin/media/spiritkin-source-summary/:spiritkinId`
+- `POST /admin/media/spiritkin-motion-state-execute`
+
+The source summary route performs no generation and no writes. The execution route is staging-only and review-first.
+
+## Provider Mapping
+
+For the first Lyra target:
+
+- `assetType`: `speaking_01`
+- `assetKind`: `speaking_video`
+- source: still image
+- provider mode: `image_to_video`
+- recommended model: `gen4_turbo`
+- endpoint: `/v1/image_to_video`
+- status check: existing `POST /admin/runway/status-check`
+
+The route rejects text-to-image usage for Spiritkin motion-state execution. Video-to-video is reserved only for future video sources.
+
+## Safety Gates
+
+Execution requires:
+
+- `NODE_ENV=staging`
+- `RUNWAY_STAGING_TEST_BYPASS=true` or `MEDIA_STAGING_TEST_BYPASS=true`
+- `operatorApproval=true`
+- existing allowed `spiritkinId`
+- valid motion-pack `assetType`
+- matching `assetKind`
+- `sourceAssetRef`
+- `safetyLevel=internal_review`
+- provider execution gates for any real call
+- transient key plus transient execution headers for request-scoped test execution
+
+The route never auto-promotes, never updates manifests, and never writes ACTIVE assets.
+
+## Command Center Readiness
+
+The execution response includes:
+
+- provider target
+- API payload preview
+- media asset record
+- review path / approved path / active path / rollback path
+- status-check route reference
+- generation status
+- review status
+- `premiumMemberGeneration.enabled=false`
+
+This gives a future command center enough data to show source, model, job state, review status, and promotion lockout.
+
+## Premium Member Generation Boundary
+
+Premium member self-generation remains disabled. The route is operator/staging controlled and does not expose generation to normal users.
+
+## Exact Next Staging Command
+
+Use this only after staging has redeployed this commit and the Lyra portrait URL is reachable:
+
+```powershell
+$runwayKey = Read-Host "Runway API key"
+
+$body = @{
+  spiritkinId = "lyra"
+  targetId = "lyra-motion-pack-v1"
+  assetType = "speaking_01"
+  assetKind = "speaking_video"
+  sourceAssetRef = "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png"
+  sourceAssetType = "external_url"
+  promptIntent = "Animate Lyra into a premium speaking loop for SpiritCore responses. Preserve her canonical portrait identity, gentle luminous presence, calm emotional precision, and elegant Spiritverse companion tone. Subtle natural face and upper-body motion only, suitable for repeated assistant speaking state."
+  styleProfile = "premium cinematic Spiritverse companion, elegant, emotionally alive, luxury fantasy, not childish, screen-present avatar realism"
+  safetyLevel = "internal_review"
+  operatorApproval = $true
+  runwayTransientKey = $runwayKey
+} | ConvertTo-Json -Depth 8
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "https://spiritcore-backend-copy-production.up.railway.app/admin/media/spiritkin-motion-state-execute" `
+  -Headers @{
+    "x-runway-transient-execute" = "true"
+    "x-runway-transient-provider-execution" = "true"
+  } `
+  -ContentType "application/json" `
+  -Body $body
+```
+
+Do not run this until the operator confirms staging variables and source URL accessibility.
+
+## Fallback If Source Is Not Usable
+
+If the source summary reports a missing requirement:
+
+1. Confirm `GET /portraits/lyra_portrait.png` returns 200 on staging.
+2. Confirm the staging URL is HTTPS and externally reachable.
+3. Use the existing portrait route rather than creating a new storage system.
+4. Re-run `GET /admin/media/spiritkin-source-summary/lyra` with the staging host headers or through deployed staging.
+
+## Diagnostics
+
+Diagnostics verify:
+
+- Lyra source resolver finds the canonical portrait source
+- source summary route returns safe no-write flags
+- motion-state execution route exists
+- missing source is rejected
+- missing operator approval is blocked
+- production bypass is denied
+- valid staging preview builds image-to-video payload
+- transient execution flags work in mock path
+- generated output remains `review_required`
+- premium member generation remains disabled
+- no auto-promotion
+- no manifest update
+- no ACTIVE write
+
+## Confirmations
+
+- No generation occurred in tests.
+- No provider call occurred in tests.
+- No promotion occurred.
+- No manifest update occurred.
+- No ACTIVE write occurred.

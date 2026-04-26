@@ -5,6 +5,7 @@ import {
   canUseRunwayStagingTestBypass,
   canUseRunwayTransientStagingCredentials,
   canUseMediaPlanningStagingBypass,
+  canUseSpiritkinMotionStateStagingBypass,
   canUseSpiritGateEnhancementStagingBypass,
 } from "../src/routes/admin.mjs";
 import {
@@ -24,6 +25,7 @@ import {
   createSpiritCoreAvatarPackPlan,
   createSpiritCoreDefaultOperatorPlan,
   createSpiritkinMotionPackPlan,
+  createSpiritkinMotionStateExecutionPlan,
   createSpiritGateSegmentPlan,
   createSpiritGateEnhancementPlanFromCurrentSource,
   createSpiritGateEnhancementExecutionPlan,
@@ -33,6 +35,7 @@ import {
   PREMIUM_MEMBER_GENERATION_BOUNDARY,
   PREMIUM_SPIRITKIN_STARTER_PACK_ASSET_KINDS,
   resolveExistingSpiritGateSource,
+  resolveExistingSpiritkinSource,
   SPIRITCORE_AVATAR_PACK_ASSET_TYPES,
   SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP,
   SPIRITKIN_MOTION_PACK_ASSET_TYPES,
@@ -152,6 +155,7 @@ async function main() {
       RUNWAY_AUTH_CHECK_MOCK: "true",
       RUNWAY_STATUS_CHECK_MOCK: "true",
       RUNWAY_SPIRITGATE_EXECUTE_MOCK: "true",
+      RUNWAY_SPIRITKIN_MOTION_EXECUTE_MOCK: "true",
       RUNWAY_DRY_RUN_EXECUTE: "false",
       RUNWAY_ALLOW_PROVIDER_EXECUTION: "false",
       RUNWAY_API_KEY: "",
@@ -471,6 +475,40 @@ async function main() {
         detail: "valid SpiritGate enhancement request can use staging operator bypass",
       },
       {
+        name: "spiritkin-motion-state-production-denied",
+        pass: canUseSpiritkinMotionStateStagingBypass({
+          spiritkinId: "lyra",
+          targetId: "lyra-motion-pack-v1",
+          assetType: "speaking_01",
+          assetKind: "speaking_video",
+          sourceAssetRef: "https://example.com/lyra.png",
+          sourceAssetType: "external_url",
+          safetyLevel: "internal_review",
+          operatorApproval: true,
+        }, {
+          NODE_ENV: "production",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === false,
+        detail: "production cannot use Spiritkin motion-state staging bypass",
+      },
+      {
+        name: "spiritkin-motion-state-valid-staging-bypass",
+        pass: canUseSpiritkinMotionStateStagingBypass({
+          spiritkinId: "lyra",
+          targetId: "lyra-motion-pack-v1",
+          assetType: "speaking_01",
+          assetKind: "speaking_video",
+          sourceAssetRef: "https://example.com/lyra.png",
+          sourceAssetType: "external_url",
+          safetyLevel: "internal_review",
+          operatorApproval: true,
+        }, {
+          NODE_ENV: "staging",
+          MEDIA_STAGING_TEST_BYPASS: "true",
+        }) === true,
+        detail: "valid Spiritkin motion-state request can use staging operator bypass",
+      },
+      {
         name: "media-planning-bypass-production-denied",
         pass: canUseMediaPlanningStagingBypass({
           method: "POST",
@@ -708,6 +746,49 @@ async function main() {
             && result.premiumMemberGeneration.enabled === false;
         })(),
         detail: "Spiritkin motion pack plan includes every required motion asset without generation",
+      },
+      {
+        name: "media-lyra-source-resolver",
+        pass: (() => {
+          const result = resolveExistingSpiritkinSource("lyra", {
+            origin: "https://spiritcore-backend-copy-production.up.railway.app",
+          });
+          return result.canonicalName === "Lyra"
+            && result.currentPath === "/portraits/lyra_portrait.png"
+            && result.publicUrl === "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png"
+            && result.canUseForRunwayImageToVideo === true
+            && result.approvedForReference === true
+            && result.noProviderCall === true
+            && result.noActiveWritePerformed === true;
+        })(),
+        detail: "Lyra source resolver finds canonical portrait for image-to-video",
+      },
+      {
+        name: "media-spiritkin-motion-state-execution-plan",
+        pass: (() => {
+          const result = createSpiritkinMotionStateExecutionPlan({
+            spiritkinId: "lyra",
+            targetId: "lyra-motion-pack-v1",
+            assetType: "speaking_01",
+            assetKind: "speaking_video",
+            sourceAssetRef: "https://example.com/lyra_portrait.png",
+            sourceAssetType: "external_url",
+            promptIntent: "Animate Lyra into a premium speaking loop.",
+            styleProfile: "premium cinematic Spiritverse companion",
+            safetyLevel: "internal_review",
+          });
+          return result.assetType === "speaking_01"
+            && result.assetKind === "speaking_video"
+            && result.providerTarget.providerMode === "image_to_video"
+            && result.mediaAssetRecord.lifecycleState === "review_required"
+            && result.mediaAssetRecord.reviewStatus === "pending"
+            && result.mediaAssetRecord.outputUrls.length === 0
+            && result.premiumMemberGeneration.enabled === false
+            && result.noPromotionPerformed === true
+            && result.noManifestUpdatePerformed === true
+            && result.noActiveWritePerformed === true;
+        })(),
+        detail: "Spiritkin motion-state execution plan remains review_required and image-to-video",
       },
       {
         name: "media-spiritcore-avatar-pack-plan",
@@ -1332,6 +1413,21 @@ async function main() {
         ? "Spiritkin motion pack planned without generation"
         : "unexpected Spiritkin motion pack plan",
     });
+    await run("media-spiritkin-source-summary-lyra", "GET", "/admin/media/spiritkin-source-summary/lyra", {
+      headers: {
+        "x-admin-key": DIAG_ADMIN_KEY,
+        "x-forwarded-proto": "https",
+        "x-forwarded-host": "spiritcore-backend-copy-production.up.railway.app",
+      },
+      describe: (result) => result?.body?.spiritkinSource?.canonicalName === "Lyra"
+        && result?.body?.spiritkinSource?.currentPath === "/portraits/lyra_portrait.png"
+        && result?.body?.spiritkinSource?.canUseForRunwayImageToVideo === true
+        && result?.body?.spiritkinSource?.noGenerationPerformed === true
+        && result?.body?.spiritkinSource?.noProviderCall === true
+        && result?.body?.spiritkinSource?.noActiveWritePerformed === true
+        ? "Lyra source summary returned canonical HTTPS portrait source"
+        : "unexpected Lyra source summary",
+    });
     await run("media-spiritcore-avatar-pack-plan", "POST", "/admin/media/spiritcore-avatar-pack-plan", {
       headers: { "x-admin-key": DIAG_ADMIN_KEY },
       body: {
@@ -1460,6 +1556,107 @@ async function main() {
         && result?.body?.spiritGateSegmentPlan?.premiumMemberGeneration?.enabled === false
         ? "SpiritGate segmented plan created without generation or writes"
         : "unexpected SpiritGate segment plan",
+    });
+    const lyraSourceUrl = "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png";
+    await run("media-spiritkin-motion-state-execute-missing-source", "POST", "/admin/media/spiritkin-motion-state-execute", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        spiritkinId: "lyra",
+        targetId: "lyra-motion-pack-v1",
+        assetType: "speaking_01",
+        assetKind: "speaking_video",
+        sourceAssetType: "external_url",
+        promptIntent: "Diagnostic missing source reference rejection.",
+        styleProfile: "premium cinematic Spiritverse companion",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+      },
+      allowStatuses: [400, 422],
+      describe: () => "missing sourceAssetRef rejected",
+    });
+    await run("media-spiritkin-motion-state-execute-missing-approval", "POST", "/admin/media/spiritkin-motion-state-execute", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        spiritkinId: "lyra",
+        targetId: "lyra-motion-pack-v1",
+        assetType: "speaking_01",
+        assetKind: "speaking_video",
+        sourceAssetRef: lyraSourceUrl,
+        sourceAssetType: "external_url",
+        promptIntent: "Diagnostic missing operator approval rejection.",
+        styleProfile: "premium cinematic Spiritverse companion",
+        safetyLevel: "internal_review",
+        operatorApproval: false,
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.executionGates?.missingGates?.includes("operatorApproval=true is required")
+        && result?.body?.noPromotionPerformed === true
+        && result?.body?.noManifestUpdatePerformed === true
+        && result?.body?.noActiveWritePerformed === true
+        ? "missing operator approval cannot execute Spiritkin motion provider"
+        : "unexpected missing approval result",
+    });
+    await run("media-spiritkin-motion-state-execute-valid-preview", "POST", "/admin/media/spiritkin-motion-state-execute", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        spiritkinId: "lyra",
+        targetId: "lyra-motion-pack-v1",
+        assetType: "speaking_01",
+        assetKind: "speaking_video",
+        sourceAssetRef: lyraSourceUrl,
+        sourceAssetType: "external_url",
+        promptIntent: "Animate Lyra into a premium speaking loop for SpiritCore responses.",
+        styleProfile: "premium cinematic Spiritverse companion, elegant, emotionally alive",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.providerTarget?.providerMode === "image_to_video"
+        && result?.body?.apiPayloadPreview?.model === "gen4_turbo"
+        && result?.body?.apiPayloadPreview?.promptImage === lyraSourceUrl
+        && result?.body?.mediaAssetRecord?.lifecycleState === "review_required"
+        && result?.body?.mediaAssetRecord?.reviewStatus === "pending"
+        && Array.isArray(result?.body?.mediaAssetRecord?.outputUrls)
+        && result?.body?.mediaAssetRecord?.outputUrls.length === 0
+        && result?.body?.premiumMemberGeneration?.enabled === false
+        && result?.body?.noPromotionPerformed === true
+        && result?.body?.noManifestUpdatePerformed === true
+        && result?.body?.noActiveWritePerformed === true
+        ? "valid staging request builds image-to-video payload without provider call"
+        : "unexpected Spiritkin motion execute preview",
+    });
+    await run("media-spiritkin-motion-state-execute-transient-flags-mock", "POST", "/admin/media/spiritkin-motion-state-execute", {
+      headers: {
+        "x-runway-transient-execute": "true",
+        "x-runway-transient-provider-execution": "true",
+      },
+      body: {
+        spiritkinId: "lyra",
+        targetId: "lyra-motion-pack-v1",
+        assetType: "speaking_01",
+        assetKind: "speaking_video",
+        sourceAssetRef: lyraSourceUrl,
+        sourceAssetType: "external_url",
+        promptIntent: "Animate Lyra into a premium speaking loop for SpiritCore responses.",
+        styleProfile: "premium cinematic Spiritverse companion, elegant, emotionally alive",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+        runwayTransientKey: "mock-runway-key",
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.mock === true
+        && result?.body?.transientKeyProvided === true
+        && result?.body?.transientExecuteRequested === true
+        && result?.body?.transientProviderExecutionRequested === true
+        && result?.body?.executionGates?.ok === true
+        && result?.body?.mediaAssetRecord?.providerJobId === "mock-lyra-speaking-01-task"
+        && result?.body?.mediaAssetRecord?.lifecycleState === "review_required"
+        && result?.body?.premiumMemberGeneration?.enabled === false
+        && result?.body?.noPromotionPerformed === true
+        && result?.body?.noManifestUpdatePerformed === true
+        && result?.body?.noActiveWritePerformed === true
+        ? "transient execution flags pass gates for Spiritkin motion mock path"
+        : "unexpected Spiritkin motion transient flags result",
     });
     await run("media-spiritgate-enhancement-execute-missing-source", "POST", "/admin/media/spiritgate-enhancement-execute", {
       headers: { "x-admin-key": DIAG_ADMIN_KEY },

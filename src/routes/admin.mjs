@@ -32,6 +32,7 @@ import {
   createSpiritCoreAvatarPackPlan,
   createSpiritCoreDefaultOperatorPlan,
   createSpiritkinMotionPackPlan,
+  createSpiritkinMotionStateExecutionPlan,
   createSpiritGateSegmentPlan,
   createSpiritGateEnhancementPlanFromCurrentSource,
   createSpiritGateEnhancementExecutionPlan,
@@ -42,6 +43,7 @@ import {
   SPIRITCORE_MEDIA_REQUIREMENT_PROFILES,
   validateSourceMediaReference,
   resolveExistingSpiritGateSource,
+  resolveExistingSpiritkinSource,
 } from "../services/spiritCoreMediaProduction.mjs";
 
 function isTrueEnv(value) {
@@ -111,11 +113,25 @@ export function canUseSpiritGateEnhancementStagingBypass(body = {}, env = proces
     && Boolean(String(body?.sourceAssetRef || "").trim());
 }
 
+export function canUseSpiritkinMotionStateStagingBypass(body = {}, env = process.env) {
+  const envEnabled = isTrueEnv(env.RUNWAY_STAGING_TEST_BYPASS) || isTrueEnv(env.MEDIA_STAGING_TEST_BYPASS);
+  return env.NODE_ENV === "staging"
+    && envEnabled
+    && Boolean(body?.operatorApproval)
+    && String(body?.safetyLevel || "").trim() === "internal_review"
+    && Boolean(String(body?.spiritkinId || "").trim())
+    && Boolean(String(body?.targetId || "").trim())
+    && Boolean(String(body?.assetType || "").trim())
+    && Boolean(String(body?.assetKind || "").trim())
+    && Boolean(String(body?.sourceAssetRef || "").trim());
+}
+
 const MEDIA_PLANNING_BYPASS_ROUTES = Object.freeze([
   "GET /admin/media/catalog-summary",
   "GET /admin/media/spiritgate-source-summary",
   "POST /admin/media/operator-experience-plan",
   "POST /admin/media/spiritkin-motion-pack-plan",
+  "GET /admin/media/spiritkin-source-summary/:spiritkinId",
   "POST /admin/media/spiritcore-avatar-pack-plan",
   "POST /admin/media/assembly-plan",
   "POST /admin/media/assemble-video",
@@ -927,6 +943,28 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const motionStateExecuteSchema = {
+    body: {
+      type: "object",
+      required: ["spiritkinId", "targetId", "assetType", "assetKind", "sourceAssetRef", "sourceAssetType", "promptIntent", "styleProfile", "safetyLevel", "operatorApproval"],
+      properties: {
+        spiritkinId: { type: "string", minLength: 1 },
+        targetId: { type: "string", minLength: 1 },
+        assetType: { type: "string", minLength: 1 },
+        assetKind: { type: "string", minLength: 1 },
+        sourceAssetRef: { type: "string", minLength: 1 },
+        sourceAssetType: { type: "string", minLength: 1 },
+        promptIntent: { type: "string", minLength: 1 },
+        styleProfile: { type: "string", minLength: 1 },
+        safetyLevel: { type: "string", minLength: 1 },
+        runwayTransientKey: { type: "string", minLength: 1, nullable: true },
+        operatorApproval: { type: "boolean" },
+        durationSec: { type: "number", nullable: true },
+        notes: { type: "string", nullable: true },
+      },
+    },
+  };
+
   const avatarPackPlanSchema = {
     body: {
       type: "object",
@@ -1076,6 +1114,23 @@ export async function adminRoutes(fastify, opts) {
     spiritkinMotionPackPlan: createSpiritkinMotionPackPlan(req.body),
   }), req, reply));
 
+  fastify.get("/admin/media/spiritkin-source-summary/:spiritkinId", {
+    preHandler: requireMediaPlanningAccess,
+    schema: {
+      params: {
+        type: "object",
+        required: ["spiritkinId"],
+        properties: {
+          spiritkinId: { type: "string", minLength: 1 },
+        },
+      },
+    },
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    spiritkinSource: resolveExistingSpiritkinSource(req.params.spiritkinId, {
+      origin: requestPublicOrigin(req),
+    }),
+  }), req, reply));
+
   fastify.post("/admin/media/spiritcore-avatar-pack-plan", {
     preHandler: requireMediaPlanningAccess,
     schema: avatarPackPlanSchema,
@@ -1096,6 +1151,213 @@ export async function adminRoutes(fastify, opts) {
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     assemblyResult: createSafeVideoAssemblyResult(req.body, localFfmpegRuntime()),
   }), req, reply));
+
+  async function requireSpiritkinMotionStateAccess(req, reply) {
+    if (canUseSpiritkinMotionStateStagingBypass(req.body, process.env)) {
+      req.spiritkinMotionStateStagingBypassUsed = true;
+      req.adminAccess = {
+        allowed: true,
+        bypassed: true,
+        mode: "staging-spiritkin-motion-state-bypass",
+        source: "staging-spiritkin-motion-state-bypass",
+      };
+      return;
+    }
+    req.spiritkinMotionStateStagingBypassUsed = false;
+    return requireAdminAccess(req, reply);
+  }
+
+  fastify.post("/admin/media/spiritkin-motion-state-execute", {
+    preHandler: requireSpiritkinMotionStateAccess,
+    schema: motionStateExecuteSchema,
+  }, async (req, reply) => {
+    const route = req.routeOptions?.url || req.url;
+    const body = req.body || {};
+    if (process.env.NODE_ENV !== "staging") {
+      return reply.code(404).send({
+        ok: false,
+        route,
+        error: "SPIRITKIN_MOTION_STATE_EXECUTE_UNAVAILABLE",
+        message: "Spiritkin motion state execution is available only in staging operator mode.",
+        externalApiCall: false,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
+
+    const transientExecuteRequested = isTrueEnv(req.headers["x-runway-transient-execute"]);
+    const transientProviderExecutionRequested = isTrueEnv(req.headers["x-runway-transient-provider-execution"]);
+    const transientKeyProvided = Boolean(String(body.runwayTransientKey || "").trim());
+    const envEnabled = isTrueEnv(process.env.RUNWAY_STAGING_TEST_BYPASS) || isTrueEnv(process.env.MEDIA_STAGING_TEST_BYPASS);
+    const gateFailures = [];
+    if (!envEnabled) gateFailures.push("RUNWAY_STAGING_TEST_BYPASS=true or MEDIA_STAGING_TEST_BYPASS=true is required");
+    if (!body.operatorApproval) gateFailures.push("operatorApproval=true is required");
+    if (body.safetyLevel !== "internal_review") gateFailures.push("safetyLevel must be internal_review");
+    if (!String(body.sourceAssetRef || "").trim()) gateFailures.push("sourceAssetRef is required");
+
+    try {
+      const executionPlan = createSpiritkinMotionStateExecutionPlan({
+        ...body,
+        requestedBy: req.adminAccess?.source || "admin_media_spiritkin_motion_state_execute",
+      });
+      if (body.assetKind !== executionPlan.assetKind) {
+        gateFailures.push(`assetKind must be ${executionPlan.assetKind} for assetType ${executionPlan.assetType}`);
+      }
+      const runwayApiKey = String(body.runwayTransientKey || config.generator?.video?.runway?.apiKey || process.env.RUNWAY_API_KEY || "").trim();
+      const requestCanUseTransientExecution = process.env.NODE_ENV === "staging"
+        && envEnabled
+        && transientKeyProvided
+        && Boolean(body.operatorApproval)
+        && body.safetyLevel === "internal_review"
+        && Boolean(String(body.sourceAssetRef || "").trim());
+      const executionEnv = {
+        ...process.env,
+        RUNWAY_API_KEY: runwayApiKey,
+        RUNWAY_DRY_RUN_EXECUTE: requestCanUseTransientExecution && transientExecuteRequested
+          ? "true"
+          : process.env.RUNWAY_DRY_RUN_EXECUTE,
+        RUNWAY_ALLOW_PROVIDER_EXECUTION: requestCanUseTransientExecution && transientProviderExecutionRequested
+          ? "true"
+          : process.env.RUNWAY_ALLOW_PROVIDER_EXECUTION,
+      };
+      const executionConfig = {
+        ...config,
+        adminAuth: {
+          ...config.adminAuth,
+          mode: "enforce",
+        },
+        generator: {
+          ...config.generator,
+          video: {
+            ...config.generator?.video,
+            runway: {
+              ...config.generator?.video?.runway,
+              apiKey: runwayApiKey,
+              videoModel: config.generator?.video?.runway?.videoModel || "gen4_turbo",
+              videoGeneratePath: config.generator?.video?.runway?.videoGeneratePath || "/v1/image_to_video",
+            },
+          },
+        },
+      };
+      const providerGates = canExecuteRunwayProvider(executionConfig, executionEnv, req.adminAccess || {});
+      const dryRunJob = createDryRunJob({
+        spiritkinId: executionPlan.spiritkinId,
+        targetId: executionPlan.targetId,
+        assetKind: executionPlan.assetKind,
+        promptIntent: executionPlan.promptIntent,
+        styleProfile: executionPlan.styleProfile,
+        safetyLevel: executionPlan.safetyLevel,
+        sourceAssetRef: executionPlan.sourceAssetRef,
+        sourceAssets: [executionPlan.sourceAssetRef],
+        sourceAssetType: executionPlan.sourceAssetType,
+        durationSec: Number(body.durationSec || 8),
+        requestedBy: req.adminAccess?.source || "admin_media_spiritkin_motion_state_execute",
+      });
+      const providerTarget = resolveRunwayGenerationTarget(dryRunJob, executionConfig.generator?.video?.runway || {});
+      const apiPayloadPreview = buildRunwayApiPayload({
+        ...dryRunJob,
+        _runwayConfig: executionConfig.generator?.video?.runway || {},
+      });
+      if (providerTarget.providerMode === "text_to_image") {
+        gateFailures.push("text_to_image is not allowed for Spiritkin motion-state execution");
+      }
+      const allGates = {
+        ok: gateFailures.length === 0 && providerGates.ok,
+        missingGates: [...gateFailures, ...providerGates.missingGates],
+      };
+      const baseResponse = {
+        ok: true,
+        route,
+        stagingBypassUsed: Boolean(req.spiritkinMotionStateStagingBypassUsed),
+        operatorApprovalRequired: true,
+        operatorApprovalReceived: Boolean(body.operatorApproval),
+        externalApiCall: false,
+        executed: false,
+        transientExecuteRequested,
+        transientProviderExecutionRequested,
+        transientKeyProvided,
+        executionGates: allGates,
+        providerTarget,
+        apiPayloadPreview,
+        mediaAssetRecord: executionPlan.mediaAssetRecord,
+        outputLifecycleState: "review_required",
+        commandCenterMetadata: executionPlan.commandCenterMetadata,
+        premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      };
+
+      if (!allGates.ok) return baseResponse;
+
+      if (isTrueEnv(process.env.RUNWAY_SPIRITKIN_MOTION_EXECUTE_MOCK)) {
+        return {
+          ...baseResponse,
+          mock: true,
+          providerResult: {
+            provider: "runway",
+            providerJobId: "mock-lyra-speaking-01-task",
+            status: "queued",
+            rawStatus: "mock_submitted",
+          },
+          mediaAssetRecord: {
+            ...executionPlan.mediaAssetRecord,
+            providerJobId: "mock-lyra-speaking-01-task",
+            lifecycleState: "review_required",
+            reviewStatus: "pending",
+            outputUrls: [],
+          },
+        };
+      }
+
+      const providerResult = await submitRunwayJob({
+        ...dryRunJob,
+        lifecycleState: "queued",
+        _runwayConfig: executionConfig.generator?.video?.runway || {},
+      });
+      fastify.log?.warn?.({
+        route,
+        stagingBypassUsed: Boolean(req.spiritkinMotionStateStagingBypassUsed),
+        spiritkinId: executionPlan.spiritkinId,
+        assetType: executionPlan.assetType,
+        assetKind: executionPlan.assetKind,
+        safetyLevel: body.safetyLevel,
+        externalApiCall: true,
+      }, "[runway] Spiritkin motion state execution");
+      return {
+        ...baseResponse,
+        externalApiCall: true,
+        executed: true,
+        providerResult,
+        mediaAssetRecord: {
+          ...executionPlan.mediaAssetRecord,
+          providerJobId: providerResult.providerJobId,
+          lifecycleState: "review_required",
+          reviewStatus: "pending",
+          outputUrls: [],
+        },
+        commandCenterMetadata: {
+          ...executionPlan.commandCenterMetadata,
+          generationStatus: providerResult.status || "queued",
+          reviewStatus: "pending",
+        },
+      };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({
+        ok: false,
+        route,
+        error: err.code ?? "SPIRITKIN_MOTION_STATE_EXECUTE_ERROR",
+        message: err.message,
+        details: err.detail || {},
+        externalApiCall: false,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
+  });
 
   fastify.post("/admin/media/source-reference-plan", {
     preHandler: requireMediaPlanningAccess,
