@@ -28,8 +28,11 @@ import {
   createMediaAssetPlan,
   createMediaPromotionPlan,
   createMediaReviewPlan,
+  createMotionPackBatchPlan,
   createProductionSequencePlan,
   createSafeVideoAssemblyResult,
+  createSequenceComposeExecutionResult,
+  createSequenceComposePlan,
   createSpiritCoreAvatarPackPlan,
   createSpiritCoreDefaultOperatorPlan,
   createSpiritkinMotionPackPlan,
@@ -131,11 +134,14 @@ const MEDIA_PLANNING_BYPASS_ROUTES = Object.freeze([
   "GET /admin/media/catalog-summary",
   "GET /admin/media/spiritgate-source-summary",
   "POST /admin/media/operator-experience-plan",
+  "POST /admin/media/motion-pack-plan",
   "POST /admin/media/spiritkin-motion-pack-plan",
   "GET /admin/media/spiritkin-source-summary/:spiritkinId",
   "POST /admin/media/spiritcore-avatar-pack-plan",
   "POST /admin/media/assembly-plan",
   "POST /admin/media/assemble-video",
+  "POST /admin/media/sequence-compose-plan",
+  "POST /admin/media/sequence-compose-execute",
   "POST /admin/media/production-sequence-plan",
   "POST /admin/media/generation-template",
   "POST /admin/media/review-plan",
@@ -213,6 +219,7 @@ function localFfmpegRuntime() {
   return {
     ffmpegAvailable: result.status === 0,
     ffmpegExecutionEnabled: isTrueEnv(process.env.ENABLE_LOCAL_FFMPEG_ASSEMBLY),
+    sequenceCompositionEnabled: isTrueEnv(process.env.ENABLE_LOCAL_SEQUENCE_COMPOSITION),
     ffmpegCommand: command,
   };
 }
@@ -1061,6 +1068,57 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const motionPackBatchPlanSchema = {
+    body: {
+      type: "object",
+      required: ["entityId", "packId", "requestedAssetTypes"],
+      properties: {
+        entityId: { type: "string", minLength: 1 },
+        packId: { type: "string", minLength: 1 },
+        requestedAssetTypes: { type: "array", minItems: 1, items: { type: "string" } },
+        framingProfiles: { type: "array", items: { type: "string" }, nullable: true },
+        generationPriorities: { type: "object", additionalProperties: true, nullable: true },
+      },
+    },
+  };
+
+  const sequenceComposePlanSchema = {
+    body: {
+      type: "object",
+      required: ["entityId", "packId", "sequenceId", "approvedAssets", "targetDurationSec", "transitionStyle"],
+      properties: {
+        entityId: { type: "string", minLength: 1 },
+        packId: { type: "string", minLength: 1 },
+        sequenceId: { type: "string", minLength: 1 },
+        approvedAssets: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "object",
+            required: ["sourceRef"],
+            properties: {
+              assetId: { type: "string", nullable: true },
+              entityId: { type: "string", nullable: true },
+              packId: { type: "string", nullable: true },
+              assetType: { type: "string", nullable: true },
+              variant: { type: "string", nullable: true },
+              status: { type: "string", nullable: true },
+              reviewStatus: { type: "string", nullable: true },
+              sourceRef: { type: "string", minLength: 1 },
+              path: { type: "string", nullable: true },
+              assetPath: { type: "string", nullable: true },
+              approvedPath: { type: "string", nullable: true },
+              durationSec: { type: "number", nullable: true },
+              role: { type: "string", nullable: true },
+            },
+          },
+        },
+        targetDurationSec: { type: "number" },
+        transitionStyle: { type: "string", minLength: 1 },
+      },
+    },
+  };
+
   const motionStateExecuteSchema = {
     body: {
       type: "object",
@@ -1273,6 +1331,13 @@ export async function adminRoutes(fastify, opts) {
     spiritkinMotionPackPlan: createSpiritkinMotionPackPlan(req.body),
   }), req, reply));
 
+  fastify.post("/admin/media/motion-pack-plan", {
+    preHandler: requireMediaPlanningAccess,
+    schema: motionPackBatchPlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    motionPackPlan: createMotionPackBatchPlan(req.body),
+  }), req, reply));
+
   fastify.get("/admin/media/spiritkin-source-summary/:spiritkinId", {
     preHandler: requireMediaPlanningAccess,
     schema: {
@@ -1309,6 +1374,20 @@ export async function adminRoutes(fastify, opts) {
     schema: assemblyPlanSchema,
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     assemblyResult: createSafeVideoAssemblyResult(req.body, localFfmpegRuntime()),
+  }), req, reply));
+
+  fastify.post("/admin/media/sequence-compose-plan", {
+    preHandler: requireMediaPlanningAccess,
+    schema: sequenceComposePlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    sequenceComposePlan: createSequenceComposePlan(req.body, localFfmpegRuntime()),
+  }), req, reply));
+
+  fastify.post("/admin/media/sequence-compose-execute", {
+    preHandler: requireMediaPlanningAccess,
+    schema: sequenceComposePlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    sequenceComposeResult: createSequenceComposeExecutionResult(req.body, localFfmpegRuntime()),
   }), req, reply));
 
   fastify.post("/admin/media/asset-ingest", {

@@ -104,6 +104,12 @@ export const SPIRITKIN_MOTION_GENERATION_MODES = Object.freeze([
   "ambient_walk",
 ]);
 
+export const SPIRITKIN_MOTION_SHOT_PROFILES = Object.freeze([
+  "close_portrait",
+  "medium_shot",
+  "wider_body",
+]);
+
 export const SPIRITKIN_MOTION_INTENSITIES = Object.freeze(["low", "medium"]);
 export const SPIRITKIN_IMAGE_TO_VIDEO_RATIOS = Object.freeze([
   "1280:720",
@@ -650,6 +656,58 @@ export const SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES = Object.freeze({
   walk_loop_01: "ambient_walk",
 });
 
+function normalizeShotProfile(value, fallback = "close_portrait") {
+  const normalized = canonicalize(value || fallback);
+  return SPIRITKIN_MOTION_SHOT_PROFILES.includes(normalized) ? normalized : fallback;
+}
+
+function poseVariantForAssetType(assetType) {
+  if (assetType.startsWith("speaking")) return "front_facing_companion_expression";
+  if (assetType.startsWith("listen")) return "attentive_head_tilt";
+  if (assetType.startsWith("think")) return "reflective_eye_and_head_motion";
+  if (assetType.startsWith("gesture")) return "small_upper_body_emotional_gesture";
+  if (assetType.startsWith("walk")) return "subtle_realm_movement";
+  if (assetType.startsWith("sit")) return "settled_resting_presence";
+  if (assetType.startsWith("greeting")) return "warm_return_greeting";
+  return "calm_idle_presence";
+}
+
+function motionCompletionRuleForAssetType(assetType) {
+  return {
+    ruleId: "readable_motion_completion",
+    summary: "Action begins early, readable main action occurs mid-clip, and motion resolves before clip end.",
+    requiredBehaviors: [
+      "action begins within the first second",
+      "main motion reads clearly by the middle of the clip",
+      "motion settles before the clip ends",
+      "loop can repeat without feeling cut off",
+    ],
+    rejectedBehaviors: [
+      "slow-motion unfinished gestures",
+      "motion that starts too late",
+      "blurred or smeared background",
+      "identity drift during the main action",
+    ],
+    assetType,
+  };
+}
+
+function timingIntentForAssetType(assetType) {
+  if (assetType.startsWith("speaking")) return "responsive_speaking_loop_with_early_face_motion";
+  if (assetType.startsWith("listen")) return "attentive_listening_readable_by_mid_clip";
+  if (assetType.startsWith("think")) return "visible_thinking_expression_with_mid_clip_head_motion";
+  if (assetType.startsWith("gesture")) return "gesture_starts_early_and_resolves_cleanly";
+  if (assetType.startsWith("walk")) return "ambient_motion_stays_smooth_and_loopable";
+  if (assetType.startsWith("sit")) return "settled_presence_with_subtle_posture_resolution";
+  if (assetType.startsWith("greeting")) return "warm_greeting_motion_arrives_before_clip_end";
+  return "stable_idle_loop_with_subtle_life";
+}
+
+function backgroundClarityModeForAssetType(assetType) {
+  if (assetType.startsWith("walk")) return "stable_readable_realm_background";
+  return "clear_stable_background_no_extra_blur";
+}
+
 function buildMotionGenerationPrompt({ canonicalName, assetType, stateTrigger, promptIntent, styleProfile, controls }) {
   if (controls.generationMode === "diagnostic_idle") {
     return [
@@ -758,6 +816,7 @@ function buildMotionGenerationPrompt({ canonicalName, assetType, stateTrigger, p
 
 function buildMotionAssetPlan({ assetType, targetId, subjectType, subjectId, styleProfile, safetyLevel, sourceRefs = [] }) {
   const assetKind = motionAssetKindForType(assetType);
+  const recommendedGenerationMode = SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES[assetType] || "diagnostic_idle";
   return {
     assetType,
     assetKind,
@@ -774,6 +833,12 @@ function buildMotionAssetPlan({ assetType, targetId, subjectType, subjectId, sty
     styleProfile,
     motionCategory: assetType.split("_")[0],
     stateTrigger: stateTriggerForAssetType(assetType),
+    generationMode: recommendedGenerationMode,
+    shotProfile: normalizeShotProfile(assetType.startsWith("walk") ? "wider_body" : (assetType.startsWith("gesture") || assetType.startsWith("sit") ? "medium_shot" : "close_portrait")),
+    poseVariant: poseVariantForAssetType(assetType),
+    motionCompletionRule: motionCompletionRuleForAssetType(assetType),
+    backgroundClarityMode: backgroundClarityModeForAssetType(assetType),
+    timingIntent: timingIntentForAssetType(assetType),
     reviewStatus: "not_started",
     lifecycleState: "review_required",
   };
@@ -823,6 +888,274 @@ export function createSpiritkinMotionPackPlan(input = {}) {
       "operator approval required before any promotion",
     ],
     premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+    ...lifecycleNoWriteFlags(),
+  };
+}
+
+function normalizeFramingProfiles(value) {
+  const requested = Array.isArray(value) ? value : [];
+  const profiles = requested
+    .map((profile) => canonicalize(profile))
+    .filter((profile) => SPIRITKIN_MOTION_SHOT_PROFILES.includes(profile));
+  return profiles.length ? [...new Set(profiles)] : ["close_portrait"];
+}
+
+function priorityForAssetType(assetType, generationPriorities = {}) {
+  if (Array.isArray(generationPriorities)) {
+    const index = generationPriorities.map((item) => normalizeText(item, 80)).indexOf(assetType);
+    return index >= 0 ? index + 1 : generationPriorities.length + 1;
+  }
+  const explicit = Number(generationPriorities?.[assetType]);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  if (assetType.startsWith("idle")) return 1;
+  if (assetType.startsWith("speaking")) return 2;
+  if (assetType.startsWith("listen") || assetType.startsWith("think")) return 3;
+  return 4;
+}
+
+function settingsForMotionAsset(assetType, framingProfiles = ["close_portrait"], generationPriorities = {}) {
+  const shotProfile = normalizeShotProfile(
+    framingProfiles.includes("medium_shot") && (assetType.startsWith("gesture") || assetType.startsWith("sit"))
+      ? "medium_shot"
+      : (framingProfiles.includes("wider_body") && assetType.startsWith("walk") ? "wider_body" : framingProfiles[0]),
+  );
+  return {
+    assetType,
+    assetKind: motionAssetKindForType(assetType),
+    generationMode: SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES[assetType] || "diagnostic_idle",
+    durationSec: 5,
+    ratio: shotProfile === "wider_body" ? "1280:720" : "720:1280",
+    motionIntensity: "low",
+    allowMouthMovement: assetType.startsWith("speaking"),
+    shotProfile,
+    poseVariant: poseVariantForAssetType(assetType),
+    motionCompletionRule: motionCompletionRuleForAssetType(assetType),
+    backgroundClarityMode: backgroundClarityModeForAssetType(assetType),
+    timingIntent: timingIntentForAssetType(assetType),
+    priority: priorityForAssetType(assetType, generationPriorities),
+  };
+}
+
+export function createMotionPackBatchPlan(input = {}) {
+  const entityId = normalizeText(input.entityId || input.spiritkinId, 120).toLowerCase();
+  const packId = normalizeText(input.packId || `${slugify(entityId)}-motion-pack-v1`, 160);
+  const requestedAssetTypes = Array.isArray(input.requestedAssetTypes)
+    ? input.requestedAssetTypes.map((assetType) => normalizeText(assetType, 80)).filter(Boolean)
+    : [];
+  const framingProfiles = normalizeFramingProfiles(input.framingProfiles);
+  const generationPriorities = input.generationPriorities || {};
+  const errors = [];
+  if (!entityId) errors.push("entityId is required");
+  if (!packId) errors.push("packId is required");
+  if (!requestedAssetTypes.length) errors.push("requestedAssetTypes are required");
+  for (const assetType of requestedAssetTypes) {
+    if (!SPIRITKIN_MOTION_PACK_ASSET_TYPES.includes(assetType)) {
+      errors.push(`requestedAssetTypes contains unsupported assetType ${assetType}`);
+    }
+  }
+  if (errors.length) {
+    throw new ValidationError("Invalid motion pack batch plan request.", errors);
+  }
+
+  const uniqueAssetTypes = [...new Set(requestedAssetTypes)];
+  const generationPlan = uniqueAssetTypes
+    .map((assetType) => {
+      const settings = settingsForMotionAsset(assetType, framingProfiles, generationPriorities);
+      return {
+        ...settings,
+        entityId,
+        packId,
+        targetId: packId,
+        sourceRequirement: "approved canonical still or approved prior motion reference",
+        promptIntent: [
+          `Generate ${entityId} ${assetType} as a review-required ${settings.assetKind}.`,
+          `Use ${settings.generationMode} with ${settings.shotProfile} framing.`,
+          settings.motionCompletionRule.summary,
+          `Background mode: ${settings.backgroundClarityMode}. Timing: ${settings.timingIntent}.`,
+        ].join(" "),
+        providerSettings: {
+          provider: "runway",
+          mode: "image_to_video",
+          model: "gen4_turbo",
+          endpointPath: "/v1/image_to_video",
+          payloadKeys: ["model", "promptImage", "promptText", "ratio", "duration"],
+        },
+        lifecycleState: "review_required",
+        reviewStatus: "not_started",
+      };
+    })
+    .sort((a, b) => a.priority - b.priority || a.assetType.localeCompare(b.assetType));
+
+  return {
+    ok: true,
+    planId: `motion_pack_batch_${slugify(entityId)}_${slugify(packId)}_${Date.now()}`,
+    entityId,
+    packId,
+    requestedAssetTypes: uniqueAssetTypes,
+    framingProfiles,
+    generationPlan,
+    requiredPromptsAndSettings: generationPlan.map((plan) => ({
+      assetType: plan.assetType,
+      promptIntent: plan.promptIntent,
+      providerSettings: plan.providerSettings,
+      shotProfile: plan.shotProfile,
+      poseVariant: plan.poseVariant,
+      motionCompletionRule: plan.motionCompletionRule,
+      backgroundClarityMode: plan.backgroundClarityMode,
+      timingIntent: plan.timingIntent,
+    })),
+    completionRuleNotes: [
+      "generate and review one high-priority diagnostic clip before spending credits on the rest of the wave",
+      "each clip must begin its action early, show readable motion mid-clip, and resolve before the end",
+      "reject clips that feel like unfinished slow motion or blur the background beyond review readability",
+      "approved clips can later be composed into longer review-required sequences",
+    ],
+    operatorApprovalRequired: true,
+    premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+    noIngestPerformed: true,
+    noActiveWritePerformed: true,
+    ...lifecycleNoWriteFlags(),
+  };
+}
+
+function normalizeApprovedSequenceAsset(input = {}, index = 0) {
+  const sourceRef = normalizeText(input.sourceRef || input.path || input.assetPath || input.approvedPath, 1200);
+  const status = canonicalize(input.status || input.reviewStatus || "approved");
+  const assetType = normalizeText(input.assetType || `clip_${index + 1}`, 80);
+  const durationSec = Number(input.durationSec || 5);
+  const validationErrors = [];
+  const isApprovedPath = sourceRef.startsWith("Spiritverse_MASTER_ASSETS/APPROVED/")
+    || sourceRef.startsWith("Spiritverse_MASTER_ASSETS\\APPROVED\\");
+  if (!sourceRef) validationErrors.push("sourceRef is required");
+  if (status !== "approved") validationErrors.push("status must be approved");
+  if (!isApprovedPath) validationErrors.push("sourceRef must point to Spiritverse_MASTER_ASSETS/APPROVED");
+  if (sourceRef.includes("/ACTIVE/") || sourceRef.includes("\\ACTIVE\\")) validationErrors.push("sourceRef must not point to ACTIVE");
+  if (!/\.mp4$/i.test(sourceRef)) validationErrors.push("approved asset sourceRef must be an mp4");
+  if (!Number.isFinite(durationSec) || durationSec <= 0) validationErrors.push("durationSec must be positive");
+  return {
+    index: index + 1,
+    assetId: normalizeText(input.assetId || `${assetType}_${index + 1}`, 160),
+    entityId: normalizeText(input.entityId, 120),
+    packId: normalizeText(input.packId, 160),
+    assetType,
+    variant: normalizeText(input.variant || "v1", 80),
+    status,
+    sourceRef,
+    durationSec: Number((Number.isFinite(durationSec) ? durationSec : 0).toFixed(3)),
+    role: normalizeText(input.role || assetType, 120),
+    valid: validationErrors.length === 0,
+    validationErrors,
+  };
+}
+
+export function createSequenceComposePlan(input = {}, runtime = {}) {
+  const entityId = normalizeText(input.entityId, 120).toLowerCase();
+  const packId = normalizeText(input.packId, 160);
+  const sequenceId = slugify(input.sequenceId, "");
+  const targetDurationSec = Number(input.targetDurationSec || 0);
+  const transitionStyle = canonicalize(input.transitionStyle || "soft_cut");
+  const approvedAssets = Array.isArray(input.approvedAssets)
+    ? input.approvedAssets.map(normalizeApprovedSequenceAsset)
+    : [];
+  const errors = [];
+  if (!entityId) errors.push("entityId is required");
+  if (!packId) errors.push("packId is required");
+  if (!sequenceId) errors.push("sequenceId is required");
+  if (!approvedAssets.length) errors.push("approvedAssets are required");
+  if (!Number.isFinite(targetDurationSec) || targetDurationSec <= 0) errors.push("targetDurationSec must be positive");
+  for (const asset of approvedAssets) {
+    errors.push(...asset.validationErrors.map((error) => `approvedAssets[${asset.index - 1}]: ${error}`));
+  }
+  if (errors.length) {
+    throw new ValidationError("Invalid sequence composition plan request.", errors);
+  }
+
+  const orderedApprovedClips = approvedAssets.map((asset, index) => ({
+    ...asset,
+    order: index + 1,
+    sequenceRole: index === 0 ? "opening" : (index === approvedAssets.length - 1 ? "resolution" : "middle"),
+    transitionIn: index === 0 ? "none" : transitionStyle,
+    transitionOut: index === approvedAssets.length - 1 ? "resolve_to_loop_or_hold" : transitionStyle,
+  }));
+  const totalDuration = Number(orderedApprovedClips.reduce((sum, clip) => sum + clip.durationSec, 0).toFixed(3));
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const fileName = `${slugify(entityId)}_${slugify(packId)}_${sequenceId}_sequence_review_${date}.mp4`;
+  const reviewPath = `Spiritverse_MASTER_ASSETS/REVIEW/${entityId}/sequence/${fileName}`;
+  const metadataPath = reviewPath.replace(/\.mp4$/i, ".metadata.json");
+
+  return {
+    ok: true,
+    planId: `sequence_compose_${slugify(entityId)}_${sequenceId}_${Date.now()}`,
+    entityId,
+    packId,
+    sequenceId,
+    targetDurationSec,
+    transitionStyle,
+    orderedApprovedClips,
+    totalDuration,
+    durationDeltaSec: Number((totalDuration - targetDurationSec).toFixed(3)),
+    transitionInstructions: [
+      `Use ${transitionStyle} between approved clips only.`,
+      "Preserve clip order and do not interpolate new generated content.",
+      "Keep the composed sequence review_required until operator approval.",
+    ],
+    outputNamingPlan: {
+      fileName,
+      reviewPath,
+      metadataPath,
+      activePath: null,
+      publicPath: null,
+    },
+    compositionTooling: {
+      ffmpegAvailable: Boolean(runtime.ffmpegAvailable),
+      executionEnabled: Boolean(runtime.ffmpegExecutionEnabled),
+      stitchMethod: "local_ffmpeg_concat_when_enabled",
+    },
+    lifecycleState: "review_required",
+    reviewStatus: "pending",
+    operatorApprovalRequired: true,
+    noCompositionPerformed: true,
+    noIngestPerformed: true,
+    ...lifecycleNoWriteFlags(),
+  };
+}
+
+export function createSequenceComposeExecutionResult(input = {}, runtime = {}) {
+  const plan = createSequenceComposePlan(input, runtime);
+  const executionEnabled = Boolean(runtime.ffmpegAvailable && runtime.ffmpegExecutionEnabled && runtime.sequenceCompositionEnabled);
+  if (!executionEnabled) {
+    return {
+      ok: false,
+      plannedOnly: true,
+      provider: "local_ffmpeg",
+      reason: "sequence composition execution is disabled; validated approved clips and returned a review-space composition plan only",
+      compositionPlan: plan,
+      lifecycleState: "review_required",
+      outputAsset: {
+        savedPath: null,
+        metadataPath: null,
+        plannedReviewPath: plan.outputNamingPlan.reviewPath,
+        plannedMetadataPath: plan.outputNamingPlan.metadataPath,
+      },
+      noCompositionPerformed: true,
+      ...lifecycleNoWriteFlags(),
+    };
+  }
+
+  return {
+    ok: false,
+    plannedOnly: true,
+    provider: "local_ffmpeg",
+    reason: "review-space video writer is not implemented in this phase; execution remains disabled even when ffmpeg is present",
+    compositionPlan: plan,
+    lifecycleState: "review_required",
+    outputAsset: {
+      savedPath: null,
+      metadataPath: null,
+      plannedReviewPath: plan.outputNamingPlan.reviewPath,
+      plannedMetadataPath: plan.outputNamingPlan.metadataPath,
+    },
+    noCompositionPerformed: true,
     ...lifecycleNoWriteFlags(),
   };
 }

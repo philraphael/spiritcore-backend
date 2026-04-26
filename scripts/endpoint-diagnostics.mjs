@@ -25,8 +25,11 @@ import {
   checkMediaRequirements,
   createMediaAssemblyPlan,
   createMediaPromotionPlan,
+  createMotionPackBatchPlan,
   createProductionSequencePlan,
   createSafeVideoAssemblyResult,
+  createSequenceComposeExecutionResult,
+  createSequenceComposePlan,
   createSpiritCoreAvatarPackPlan,
   createSpiritCoreDefaultOperatorPlan,
   createSpiritkinMotionPackPlan,
@@ -1431,6 +1434,123 @@ async function main() {
         detail: "assemble-video remains planned-only when ffmpeg is unavailable",
       },
       {
+        name: "media-motion-pack-batch-plan-wave",
+        pass: (() => {
+          const result = createMotionPackBatchPlan({
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            requestedAssetTypes: ["think_01", "gesture_01", "walk_loop_01"],
+            framingProfiles: ["close_portrait", "medium_shot", "wider_body"],
+            generationPriorities: { think_01: 1, gesture_01: 2, walk_loop_01: 3 },
+          });
+          const think = result.generationPlan.find((asset) => asset.assetType === "think_01");
+          const walk = result.generationPlan.find((asset) => asset.assetType === "walk_loop_01");
+          return result.ok === true
+            && result.noProviderCall === true
+            && result.noIngestPerformed === true
+            && result.noActiveWritePerformed === true
+            && result.noManifestUpdatePerformed === true
+            && think?.shotProfile === "close_portrait"
+            && think?.motionCompletionRule?.requiredBehaviors?.includes("action begins within the first second")
+            && think?.timingIntent === "visible_thinking_expression_with_mid_clip_head_motion"
+            && walk?.shotProfile === "wider_body"
+            && result.premiumMemberGeneration.enabled === false;
+        })(),
+        detail: "motion pack wave planning returns structured no-generation settings",
+      },
+      {
+        name: "media-sequence-compose-plan-approved-only",
+        pass: (() => {
+          const result = createSequenceComposePlan({
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            sequenceId: "lyra-thinking-response-v1",
+            approvedAssets: [
+              {
+                assetType: "idle_01",
+                status: "approved",
+                sourceRef: "Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/lyra_motion_pack_v1_idle_01_v1_approved_20260426_2a8cb3b449.mp4",
+                durationSec: 5,
+              },
+              {
+                assetType: "think_01",
+                status: "approved",
+                sourceRef: "Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/lyra_motion_pack_v1_think_01_v1_approved_20260426_1111111111.mp4",
+                durationSec: 5,
+              },
+            ],
+            targetDurationSec: 10,
+            transitionStyle: "soft_cut",
+          }, { ffmpegAvailable: false, ffmpegExecutionEnabled: false });
+          return result.ok === true
+            && result.orderedApprovedClips.length === 2
+            && result.totalDuration === 10
+            && result.outputNamingPlan.reviewPath.includes("Spiritverse_MASTER_ASSETS/REVIEW/lyra/sequence/")
+            && result.outputNamingPlan.activePath === null
+            && result.noCompositionPerformed === true
+            && result.noProviderCall === true
+            && result.noActiveWritePerformed === true
+            && result.noManifestUpdatePerformed === true;
+        })(),
+        detail: "sequence composition plan uses approved clips only and avoids ACTIVE writes",
+      },
+      {
+        name: "media-sequence-compose-invalid-assets-denied",
+        pass: (() => {
+          try {
+            createSequenceComposePlan({
+              entityId: "lyra",
+              packId: "lyra-motion-pack-v1",
+              sequenceId: "bad-sequence",
+              approvedAssets: [
+                {
+                  assetType: "think_01",
+                  status: "draft",
+                  sourceRef: "Spiritverse_MASTER_ASSETS/ACTIVE/lyra/video/bad.mp4",
+                  durationSec: 5,
+                },
+              ],
+              targetDurationSec: 5,
+              transitionStyle: "soft_cut",
+            });
+            return false;
+          } catch (err) {
+            return err.code === "VALIDATION_ERROR"
+              && err.detail?.fields?.some((field) => field.includes("status must be approved"))
+              && err.detail?.fields?.some((field) => field.includes("sourceRef must point to Spiritverse_MASTER_ASSETS/APPROVED"));
+          }
+        })(),
+        detail: "invalid sequence inputs and non-approved references are denied",
+      },
+      {
+        name: "media-sequence-compose-execute-planned-only",
+        pass: (() => {
+          const result = createSequenceComposeExecutionResult({
+            entityId: "lyra",
+            packId: "lyra-motion-pack-v1",
+            sequenceId: "lyra-thinking-response-v1",
+            approvedAssets: [
+              {
+                assetType: "idle_01",
+                status: "approved",
+                sourceRef: "Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/lyra_motion_pack_v1_idle_01_v1_approved_20260426_2a8cb3b449.mp4",
+                durationSec: 5,
+              },
+            ],
+            targetDurationSec: 5,
+            transitionStyle: "soft_cut",
+          }, { ffmpegAvailable: false, ffmpegExecutionEnabled: false, sequenceCompositionEnabled: false });
+          return result.ok === false
+            && result.plannedOnly === true
+            && result.compositionPlan.lifecycleState === "review_required"
+            && result.noCompositionPerformed === true
+            && result.noProviderCall === true
+            && result.noActiveWritePerformed === true
+            && result.noManifestUpdatePerformed === true;
+        })(),
+        detail: "sequence compose execution remains safe planned-only without ffmpeg writer",
+      },
+      {
         name: "media-assistant-roadmap-documented",
         pass: SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP.some((item) => item.id === "alarms")
           && SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP.some((item) => item.id === "smart_home"),
@@ -2013,6 +2133,26 @@ async function main() {
         ? "Spiritkin motion pack planned without generation"
         : "unexpected Spiritkin motion pack plan",
     });
+    await run("media-motion-pack-batch-plan", "POST", "/admin/media/motion-pack-plan", {
+      headers: { "x-media-planning-test": "true" },
+      body: {
+        entityId: "lyra",
+        packId: "lyra-motion-pack-v1",
+        requestedAssetTypes: ["think_01", "gesture_01", "walk_loop_01"],
+        framingProfiles: ["close_portrait", "medium_shot", "wider_body"],
+        generationPriorities: { think_01: 1, gesture_01: 2, walk_loop_01: 3 },
+      },
+      describe: (result) => result?.body?.mediaPlanningBypassUsed === true
+        && result?.body?.motionPackPlan?.generationPlan?.length === 3
+        && result?.body?.motionPackPlan?.generationPlan?.some((asset) => asset.assetType === "think_01" && asset.motionCompletionRule?.summary?.includes("Action begins early"))
+        && result?.body?.motionPackPlan?.generationPlan?.some((asset) => asset.assetType === "walk_loop_01" && asset.shotProfile === "wider_body")
+        && result?.body?.motionPackPlan?.noProviderCall === true
+        && result?.body?.motionPackPlan?.noIngestPerformed === true
+        && result?.body?.motionPackPlan?.noActiveWritePerformed === true
+        && result?.body?.motionPackPlan?.noManifestUpdatePerformed === true
+        ? "motion pack generation wave planned without provider, ingest, manifest, or ACTIVE writes"
+        : "unexpected motion pack batch plan",
+    });
     await run("media-spiritkin-source-summary-lyra", "GET", "/admin/media/spiritkin-source-summary/lyra", {
       headers: {
         "x-admin-key": DIAG_ADMIN_KEY,
@@ -2083,6 +2223,85 @@ async function main() {
         && result?.body?.assemblyResult?.noActiveWritePerformed === true
         ? "assemble-video safely returns planned-only review result"
         : "unexpected assemble-video safe result",
+    });
+    const approvedSequenceAssets = [
+      {
+        assetType: "idle_01",
+        status: "approved",
+        sourceRef: "Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/lyra_motion_pack_v1_idle_01_v1_approved_20260426_2a8cb3b449.mp4",
+        durationSec: 5,
+      },
+      {
+        assetType: "speaking_01",
+        status: "approved",
+        sourceRef: "Spiritverse_MASTER_ASSETS/APPROVED/lyra/video/lyra_motion_pack_v1_speaking_01_v1_approved_20260426_6758f00da7.mp4",
+        durationSec: 5,
+      },
+    ];
+    await run("media-sequence-compose-plan", "POST", "/admin/media/sequence-compose-plan", {
+      headers: { "x-media-planning-test": "true" },
+      body: {
+        entityId: "lyra",
+        packId: "lyra-motion-pack-v1",
+        sequenceId: "lyra-response-sequence-v1",
+        approvedAssets: approvedSequenceAssets,
+        targetDurationSec: 10,
+        transitionStyle: "soft_cut",
+      },
+      describe: (result) => result?.body?.mediaPlanningBypassUsed === true
+        && result?.body?.sequenceComposePlan?.orderedApprovedClips?.length === 2
+        && result?.body?.sequenceComposePlan?.totalDuration === 10
+        && result?.body?.sequenceComposePlan?.outputNamingPlan?.reviewPath?.includes("Spiritverse_MASTER_ASSETS/REVIEW/lyra/sequence/")
+        && result?.body?.sequenceComposePlan?.outputNamingPlan?.activePath === null
+        && result?.body?.sequenceComposePlan?.noProviderCall === true
+        && result?.body?.sequenceComposePlan?.noActiveWritePerformed === true
+        && result?.body?.sequenceComposePlan?.noManifestUpdatePerformed === true
+        ? "sequence composition planned from approved clips without provider or ACTIVE writes"
+        : "unexpected sequence compose plan",
+    });
+    await run("media-sequence-compose-plan-invalid", "POST", "/admin/media/sequence-compose-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        entityId: "lyra",
+        packId: "lyra-motion-pack-v1",
+        sequenceId: "bad-sequence",
+        approvedAssets: [
+          {
+            assetType: "think_01",
+            status: "draft",
+            sourceRef: "Spiritverse_MASTER_ASSETS/ACTIVE/lyra/video/bad.mp4",
+            durationSec: 5,
+          },
+        ],
+        targetDurationSec: 5,
+        transitionStyle: "soft_cut",
+      },
+      allowStatuses: [422],
+      describe: (result) => result?.body?.error === "VALIDATION_ERROR"
+        && result?.body?.details?.fields?.some((field) => field.includes("status must be approved"))
+        && result?.body?.details?.fields?.some((field) => field.includes("sourceRef must point to Spiritverse_MASTER_ASSETS/APPROVED"))
+        ? "invalid sequence composition input denied"
+        : "unexpected invalid sequence compose result",
+    });
+    await run("media-sequence-compose-execute-safe", "POST", "/admin/media/sequence-compose-execute", {
+      headers: { "x-media-planning-test": "true" },
+      body: {
+        entityId: "lyra",
+        packId: "lyra-motion-pack-v1",
+        sequenceId: "lyra-response-sequence-v1",
+        approvedAssets: approvedSequenceAssets,
+        targetDurationSec: 10,
+        transitionStyle: "soft_cut",
+      },
+      describe: (result) => result?.body?.mediaPlanningBypassUsed === true
+        && result?.body?.sequenceComposeResult?.plannedOnly === true
+        && result?.body?.sequenceComposeResult?.compositionPlan?.lifecycleState === "review_required"
+        && result?.body?.sequenceComposeResult?.noCompositionPerformed === true
+        && result?.body?.sequenceComposeResult?.noProviderCall === true
+        && result?.body?.sequenceComposeResult?.noActiveWritePerformed === true
+        && result?.body?.sequenceComposeResult?.noManifestUpdatePerformed === true
+        ? "sequence composition execution remains planned-only and write-safe"
+        : "unexpected sequence compose execution result",
     });
     await run("media-source-reference-plan", "POST", "/admin/media/source-reference-plan", {
       headers: { "x-admin-key": DIAG_ADMIN_KEY },
