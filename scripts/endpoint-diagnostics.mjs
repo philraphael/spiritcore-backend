@@ -122,6 +122,7 @@ async function main() {
       ADMIN_API_KEY: DIAG_ADMIN_KEY,
       RUNWAY_STAGING_TEST_BYPASS: "true",
       RUNWAY_AUTH_CHECK_MOCK: "true",
+      RUNWAY_STATUS_CHECK_MOCK: "true",
       RUNWAY_DRY_RUN_EXECUTE: "false",
       RUNWAY_ALLOW_PROVIDER_EXECUTION: "false",
       RUNWAY_API_KEY: "",
@@ -339,6 +340,14 @@ async function main() {
         detail: "production cannot use Runway auth check",
       },
       {
+        name: "runway-status-check-production-denied",
+        pass: canUseRunwayStagingAuthCheck({
+          NODE_ENV: "production",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === false,
+        detail: "production cannot use Runway status check",
+      },
+      {
         name: "runway-image-provider-target",
         pass: (() => {
           const job = createDryRunJob({
@@ -478,6 +487,38 @@ async function main() {
         && result?.body?.mock === true
         ? "staging mock auth check did not call provider"
         : "unexpected auth check mock result",
+    });
+    await run("runway-status-check-missing-provider-job-id", "POST", "/admin/runway/status-check", {
+      body: {
+        runwayTransientKey: "mock-runway-key",
+      },
+      allowStatuses: [400],
+      describe: () => "missing providerJobId rejected",
+    });
+    await run("runway-status-check-missing-key", "POST", "/admin/runway/status-check", {
+      body: {
+        providerJobId: "316edfbf-e63a-4fe0-9f4b-dbf2af874f09",
+      },
+      allowStatuses: [400],
+      describe: (result) => result?.body?.error === "RUNWAY_KEY_REQUIRED"
+        && result?.body?.externalApiCall === false
+        ? "missing Runway key rejected before provider call"
+        : "unexpected missing key status-check result",
+    });
+    await run("runway-status-check-mock", "POST", "/admin/runway/status-check", {
+      body: {
+        providerJobId: "316edfbf-e63a-4fe0-9f4b-dbf2af874f09",
+        runwayTransientKey: "mock-runway-key",
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.provider === "runway"
+        && result?.body?.providerStatus === "SUCCEEDED"
+        && Array.isArray(result?.body?.outputUrls)
+        && result?.body?.noPromotionPerformed === true
+        && result?.body?.noManifestUpdatePerformed === true
+        && result?.body?.noActiveWritePerformed === true
+        ? "staging mock status check returned sanitized result without provider call"
+        : "unexpected status-check mock result",
     });
     await run("runway-execution-spike-staging-bypass-valid", "POST", "/admin/runway/execution-spike", {
       body: {

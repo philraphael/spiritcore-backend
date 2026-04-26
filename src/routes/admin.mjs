@@ -8,6 +8,7 @@
 import { config } from "../config.mjs";
 import {
   checkRunwayOrganizationAuth,
+  checkRunwayTaskStatus,
   createDryRunJob,
   createExecutionSpikeJob,
   RUNWAY_SUPPORTED_ASSET_KINDS,
@@ -421,6 +422,118 @@ export async function adminRoutes(fastify, opts) {
   fastify.post("/admin/runway/auth-check", {
     schema: runwayAuthCheckSchema,
   }, handleRunwayAuthCheck);
+
+  const runwayStatusCheckSchema = {
+    body: {
+      type: "object",
+      required: ["providerJobId"],
+      properties: {
+        providerJobId: { type: "string", minLength: 1 },
+        runwayTransientKey: { type: "string", minLength: 1, nullable: true },
+      },
+    },
+  };
+
+  async function handleRunwayStatusCheck(req, reply) {
+    if (!canUseRunwayStagingAuthCheck(process.env)) {
+      return reply.code(404).send({
+        ok: false,
+        error: "RUNWAY_STATUS_CHECK_UNAVAILABLE",
+        message: "Runway status check is available only in staging test mode.",
+        externalApiCall: false,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
+
+    const providerJobId = String(req.body?.providerJobId || "").trim();
+    if (!providerJobId) {
+      return reply.code(400).send({
+        ok: false,
+        error: "RUNWAY_PROVIDER_JOB_ID_REQUIRED",
+        message: "providerJobId is required.",
+        externalApiCall: false,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
+
+    const runwayTransientKey = String(req.body?.runwayTransientKey || "").trim();
+    const configuredKey = String(config.generator?.video?.runway?.apiKey || process.env.RUNWAY_API_KEY || "").trim();
+    const apiKey = runwayTransientKey || configuredKey;
+    if (!apiKey) {
+      return reply.code(400).send({
+        ok: false,
+        error: "RUNWAY_KEY_REQUIRED",
+        message: "Runway API key is required for task status checks.",
+        externalApiCall: false,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
+
+    if (isTrueEnv(process.env.RUNWAY_STATUS_CHECK_MOCK)) {
+      return {
+        ok: true,
+        route: req.routeOptions?.url || req.url,
+        externalApiCall: false,
+        provider: "runway",
+        providerJobId,
+        providerStatus: "SUCCEEDED",
+        providerHttpStatus: 200,
+        outputUrls: ["https://example.invalid/runway-output.png"],
+        error: null,
+        failure: false,
+        responseKeys: ["id", "status", "output", "createdAt"],
+        mock: true,
+        checkedAt: new Date().toISOString(),
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      };
+    }
+
+    try {
+      const result = await checkRunwayTaskStatus(providerJobId, {
+        apiKey,
+        baseUrl: config.generator?.video?.runway?.baseUrl,
+        version: config.generator?.video?.runway?.version,
+        statusPath: config.generator?.video?.runway?.statusPath,
+      });
+      return {
+        ok: !result.failure,
+        route: req.routeOptions?.url || req.url,
+        ...result,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      };
+    } catch {
+      return reply.code(502).send({
+        ok: false,
+        route: req.routeOptions?.url || req.url,
+        externalApiCall: true,
+        provider: "runway",
+        providerJobId,
+        providerStatus: null,
+        providerHttpStatus: null,
+        outputUrls: [],
+        error: "Runway task status check failed.",
+        failure: true,
+        responseKeys: [],
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
+  }
+
+  fastify.post("/admin/runway/status-check", {
+    schema: runwayStatusCheckSchema,
+  }, handleRunwayStatusCheck);
 
   async function handleRunwayExecutionSpike(req, reply) {
     const stagingBypassUsed = Boolean(req.runwayStagingBypassUsed);

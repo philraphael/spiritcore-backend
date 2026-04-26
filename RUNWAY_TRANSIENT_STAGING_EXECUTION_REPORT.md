@@ -9,9 +9,10 @@ The path is limited to:
 - `POST /admin/runway/execution-spike`
 - `POST /v1/admin/runway/execution-spike`
 
-This phase also adds a staging-only non-generation auth check route:
+This phase also adds staging-only non-generation operator routes:
 
 - `POST /admin/runway/auth-check`
+- `POST /admin/runway/status-check`
 
 ## Temporary Headers
 
@@ -88,6 +89,10 @@ Endpoint diagnostics verify:
 - production cannot use the body fallback
 - malformed targets cannot use the body fallback
 - `body.runwayTransientKey` is preserved by the execution-spike route schema long enough to reach the execution gate
+- production cannot use the status-check route
+- missing status-check provider job ids are rejected
+- missing status-check Runway keys are rejected before any provider call
+- staging mock status checks return sanitized output without calling Runway
 - a mock body fallback with execution flags would pass gates without calling the provider
 - staging valid requests without transient credentials remain dry-run
 - staging valid requests with a mock transient key reach the execution gate without calling the provider
@@ -116,6 +121,40 @@ It does not call generation endpoints, write assets, update manifests, or promot
 - `message` for sanitized failures such as `Runway rejected the API key`
 
 The transient key is not logged, stored, or returned.
+
+## Runway Status Check
+
+`POST /admin/runway/status-check` accepts:
+
+- `providerJobId`
+- optional `runwayTransientKey`
+
+The route is available only when:
+
+- `NODE_ENV=staging`
+- `RUNWAY_STAGING_TEST_BYPASS=true`
+
+The route calls only `GET /v1/tasks/{providerJobId}`. It does not call generation endpoints, write assets, update manifests, expose output URLs to users, or promote generated media.
+
+The route returns sanitized operator-review fields:
+
+- `externalApiCall`
+- `provider`
+- `providerJobId`
+- `providerStatus`
+- `providerHttpStatus`
+- `outputUrls`
+- `error`
+- `failure`
+- `responseKeys`
+- `creditUsage` if returned by Runway
+- `usage` if returned by Runway
+- `checkedAt`
+- `noPromotionPerformed`
+- `noManifestUpdatePerformed`
+- `noActiveWritePerformed`
+
+If an output URL is returned, the next step is operator review only. Use the generated asset promotion plan route to propose review and active paths after manual inspection; do not promote, update manifests, or write to `ACTIVE` from the status-check response.
 
 ## Provider Payload Mapping
 

@@ -493,6 +493,97 @@ export async function checkRunwayOrganizationAuth({ apiKey, baseUrl, version, fe
   return result;
 }
 
+export async function checkRunwayTaskStatus(providerJobId, { apiKey, baseUrl, version, statusPath, fetchImpl = fetch } = {}) {
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl || "https://api.dev.runwayml.com");
+  const normalizedStatusPath = normalizePathPart(statusPath, "/v1/tasks");
+  const normalizedProviderJobId = normalizeText(providerJobId, 160);
+  const key = String(apiKey || "").trim();
+
+  if (!normalizedProviderJobId) {
+    return {
+      provider: "runway",
+      providerJobId: "",
+      externalApiCall: false,
+      providerStatus: null,
+      providerHttpStatus: null,
+      outputUrls: [],
+      error: "providerJobId is required.",
+      failure: true,
+      responseKeys: [],
+      checkedAt: nowIso(),
+    };
+  }
+
+  if (!/^[a-zA-Z0-9_-]{8,200}$/.test(normalizedProviderJobId)) {
+    return {
+      provider: "runway",
+      providerJobId: normalizedProviderJobId,
+      externalApiCall: false,
+      providerStatus: null,
+      providerHttpStatus: null,
+      outputUrls: [],
+      error: "providerJobId has an invalid format.",
+      failure: true,
+      responseKeys: [],
+      checkedAt: nowIso(),
+    };
+  }
+
+  if (!key) {
+    return {
+      provider: "runway",
+      providerJobId: normalizedProviderJobId,
+      externalApiCall: false,
+      providerStatus: null,
+      providerHttpStatus: null,
+      outputUrls: [],
+      error: "Runway API key is required.",
+      failure: true,
+      responseKeys: [],
+      checkedAt: nowIso(),
+    };
+  }
+
+  const response = await fetchImpl(`${normalizedBaseUrl}${normalizedStatusPath}/${encodeURIComponent(normalizedProviderJobId)}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "X-Runway-Version": version || "2024-11-06",
+    },
+  });
+
+  const text = await response.text();
+  let parsed = {};
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch {
+    parsed = { message: "Provider returned a non-JSON response." };
+  }
+
+  const output = Array.isArray(parsed?.output)
+    ? parsed.output
+    : (Array.isArray(parsed?.outputs) ? parsed.outputs : []);
+  const result = {
+    provider: "runway",
+    providerJobId: normalizeText(parsed?.id || parsed?.taskId || normalizedProviderJobId, 160),
+    externalApiCall: true,
+    providerStatus: parsed?.status || parsed?.state || parsed?.taskStatus || null,
+    providerHttpStatus: response.status,
+    outputUrls: output.map((item) => normalizeText(item, 1200)).filter(Boolean),
+    error: parsed?.error?.message || parsed?.error || parsed?.message || null,
+    failure: !response.ok || ["FAILED", "CANCELED", "CANCELLED", "failed", "canceled", "cancelled"].includes(String(parsed?.status || parsed?.state || "")),
+    responseKeys: Object.keys(parsed || {}).slice(0, 20),
+    checkedAt: nowIso(),
+  };
+  if (parsed?.creditUsage !== undefined) {
+    result.creditUsage = parsed.creditUsage;
+  }
+  if (parsed?.usage !== undefined) {
+    result.usage = parsed.usage;
+  }
+  return result;
+}
+
 export async function pollRunwayJobStatus(providerJobId) {
   return {
     provider: "runway",
