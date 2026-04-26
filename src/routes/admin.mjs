@@ -320,6 +320,16 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const runwayExecutionSpikeSchema = {
+    body: {
+      ...runwayDryRunSchema.body,
+      properties: {
+        ...runwayDryRunSchema.body.properties,
+        runwayTransientKey: { type: "string", minLength: 1 },
+      },
+    },
+  };
+
   fastify.post("/admin/runway/dry-run", {
     preHandler: requireAdminAccess,
     schema: runwayDryRunSchema,
@@ -417,12 +427,12 @@ export async function adminRoutes(fastify, opts) {
 
   fastify.post("/admin/runway/execution-spike", {
     preHandler: requireRunwayExecutionSpikeAccess,
-    schema: runwayDryRunSchema,
+    schema: runwayExecutionSpikeSchema,
   }, handleRunwayExecutionSpike);
 
   fastify.post("/v1/admin/runway/execution-spike", {
     preHandler: requireRunwayExecutionSpikeAccess,
-    schema: runwayDryRunSchema,
+    schema: runwayExecutionSpikeSchema,
   }, handleRunwayExecutionSpike);
 
   async function handleGeneratedAssetPromotionPlan(req, reply) {

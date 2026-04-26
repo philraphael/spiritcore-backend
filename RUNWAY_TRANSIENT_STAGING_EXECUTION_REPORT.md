@@ -23,6 +23,8 @@ The key is read from the first non-empty value in that order.
 
 If staging infrastructure strips custom key headers, the route also accepts `body.runwayTransientKey` after the same staging/test gates pass. This body fallback is not accepted in production or for non-test targets.
 
+`body.runwayTransientKey` is included only in the execution-spike route schema. It is not part of the dry-run schema or other admin route schemas.
+
 The transient key is not logged, stored, persisted, written to files, or copied into global process state. It is used only to build the per-request Runway provider config and env context passed to `createExecutionSpikeJob`.
 
 ## Required Gates
@@ -81,6 +83,7 @@ Endpoint diagnostics verify:
 - the alternate transient key header is accepted in the staging mock path
 - production cannot use the body fallback
 - malformed targets cannot use the body fallback
+- `body.runwayTransientKey` is preserved by the execution-spike route schema long enough to reach the execution gate
 - a mock body fallback with execution flags would pass gates without calling the provider
 - staging valid requests without transient credentials remain dry-run
 - staging valid requests with a mock transient key reach the execution gate without calling the provider
