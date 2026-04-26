@@ -59,6 +59,10 @@ const ASSET_KIND_ALIASES = Object.freeze({
 const VIDEO_KINDS = new Set(["idle_video", "speaking_video", "calm_video", "trailer"]);
 const IMAGE_KINDS = new Set(["portrait", "hero", "realm_background", "game_board_theme", "game_piece_set"]);
 const SAFETY_LEVELS = new Set(["standard", "strict", "internal_review"]);
+const DEFAULT_IMAGE_MODEL = "gen4_image";
+const DEFAULT_VIDEO_MODEL = "gen4_turbo";
+const DEFAULT_IMAGE_GENERATE_PATH = "/v1/text_to_image";
+const DEFAULT_VIDEO_GENERATE_PATH = "/v1/image_to_video";
 
 function nowIso() {
   return new Date().toISOString();
@@ -111,6 +115,20 @@ function assetMediaType(assetKind) {
 
 function extensionForKind(assetKind) {
   return VIDEO_KINDS.has(assetKind) ? "mp4" : "png";
+}
+
+function runwayImageRatioForKind(assetKind, requestedRatio) {
+  const requested = normalizeText(requestedRatio, 20);
+  if (/^\d+:\d+$/.test(requested)) return requested;
+  if (assetKind === "portrait" || assetKind === "game_piece_set") return "1024:1024";
+  if (assetKind === "hero" || assetKind === "realm_background" || assetKind === "game_board_theme") return "1920:1080";
+  return "1024:1024";
+}
+
+function runwayVideoRatioForKind(assetKind, requestedRatio) {
+  const requested = normalizeText(requestedRatio, 20);
+  if (/^\d+:\d+$/.test(requested)) return requested;
+  return assetKind === "speaking_video" ? "720:1280" : "1280:720";
 }
 
 function buildTarget(input = {}, assetKind) {
@@ -188,7 +206,12 @@ export function validateRunwayJobRequest(input = {}) {
     errors.push("durationSec must be a number for video asset kinds");
   }
 
-  const aspectRatio = normalizeText(input.aspectRatio || (VIDEO_KINDS.has(assetKind) ? "16:9" : "1:1"), 20);
+  const aspectRatio = normalizeText(
+    input.aspectRatio || (VIDEO_KINDS.has(assetKind)
+      ? runwayVideoRatioForKind(assetKind)
+      : runwayImageRatioForKind(assetKind)),
+    20
+  );
   const sourceAssets = Array.isArray(input.sourceAssets)
     ? input.sourceAssets.map((item) => normalizeText(item, 240)).filter(Boolean).slice(0, 16)
     : [];
@@ -322,24 +345,54 @@ export function canExecuteRunwayProvider(config = {}, env = process.env, authCon
   };
 }
 
+export function resolveRunwayGenerationTarget(job = {}, runwayConfig = {}) {
+  const normalized = job.normalizedJobRequest || job;
+  const assetKind = normalizeRunwayAssetKind(normalized.assetKind);
+  const mediaType = normalized.mediaType || assetMediaType(assetKind);
+  if (mediaType === "image") {
+    return {
+      mediaType: "image",
+      endpointPath: runwayConfig.imageGeneratePath || envValue("RUNWAY_IMAGE_GENERATE_PATH") || DEFAULT_IMAGE_GENERATE_PATH,
+      model: runwayConfig.imageModel || envValue("RUNWAY_IMAGE_MODEL") || DEFAULT_IMAGE_MODEL,
+    };
+  }
+
+  return {
+    mediaType: "video",
+    endpointPath: runwayConfig.videoGeneratePath || runwayConfig.generatePath || envValue("RUNWAY_VIDEO_GENERATE_PATH") || DEFAULT_VIDEO_GENERATE_PATH,
+    model: runwayConfig.videoModel || runwayConfig.model || envValue("RUNWAY_VIDEO_MODEL") || DEFAULT_VIDEO_MODEL,
+  };
+}
+
+function envValue(name) {
+  return process.env[name] || "";
+}
+
 export function buildRunwayApiPayload(job = {}) {
   const normalized = job.normalizedJobRequest || {};
   const promptPackage = job.promptPackage || buildRunwayPrompt(normalized);
+  const target = resolveRunwayGenerationTarget(job, job._runwayConfig || {});
+
+  if (target.mediaType === "image") {
+    return {
+      model: job.providerModel || target.model,
+      promptText: promptPackage.prompt,
+      ratio: runwayImageRatioForKind(normalized.assetKind, normalized.aspectRatio),
+      seed: job.seed || undefined,
+      referenceImages: Array.isArray(normalized.sourceAssets) && normalized.sourceAssets.length
+        ? normalized.sourceAssets.slice(0, 3).map((uri, index) => ({ uri, tag: `ref${index + 1}` }))
+        : undefined,
+    };
+  }
+
+  const sourceImage = Array.isArray(normalized.sourceAssets) ? normalized.sourceAssets[0] : null;
   return {
-    model: job.providerModel || "gen3a_turbo",
+    model: job.providerModel || target.model,
     promptText: promptPackage.prompt,
-    negativePromptText: promptPackage.negativePrompt,
-    ratio: normalized.aspectRatio || "16:9",
-    duration: normalized.durationSec || (normalized.mediaType === "video" ? 8 : undefined),
+    promptImage: sourceImage || undefined,
+    ratio: runwayVideoRatioForKind(normalized.assetKind, normalized.aspectRatio),
+    duration: normalized.durationSec || 8,
     seed: job.seed || undefined,
-    metadata: {
-      spike: true,
-      targetType: normalized.targetType,
-      targetId: normalized.targetId,
-      assetKind: normalized.assetKind,
-      safetyLevel: normalized.safetyLevel,
-      requestedBy: normalized.requestedBy,
-    },
   };
 }
 
@@ -370,7 +423,8 @@ export async function submitRunwayJob(job = {}) {
   }
 
   const payload = buildRunwayApiPayload(job);
-  const response = await fetch(`${baseUrl}${normalizePathPart(runway.generatePath, "/v1/video/generate")}`, {
+  const target = resolveRunwayGenerationTarget(job, runway);
+  const response = await fetch(`${baseUrl}${normalizePathPart(target.endpointPath, DEFAULT_VIDEO_GENERATE_PATH)}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -479,10 +533,10 @@ export async function createExecutionSpikeJob(input = {}, { config = {}, env = p
     executionSpike: true,
     externalApiCall: false,
     executionGates: gates,
-    providerModel: runway.model || "gen3a_turbo",
+    providerTarget: resolveRunwayGenerationTarget(dryRunJob, runway),
     apiPayloadPreview: buildRunwayApiPayload({
       ...dryRunJob,
-      providerModel: runway.model || "gen3a_turbo",
+      _runwayConfig: runway,
     }),
   };
 

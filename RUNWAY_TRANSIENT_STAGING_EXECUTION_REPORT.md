@@ -117,6 +117,26 @@ It does not call generation endpoints, write assets, update manifests, or promot
 
 The transient key is not logged, stored, or returned.
 
+## Provider Payload Mapping
+
+SpiritCore now maps Runway generation payloads by media type before any paid execution is allowed.
+
+Image asset kinds use:
+
+- endpoint: `POST /v1/text_to_image`
+- model: `gen4_image`
+- asset kinds: `portrait`, `hero`, `realm_background`, `game_board_theme`, `game_piece_set`
+
+Video asset kinds use:
+
+- endpoint: `POST /v1/image_to_video`
+- model: `gen4_turbo`
+- asset kinds: `idle_video`, `speaking_video`, `calm_video`, `trailer`
+
+Image payloads use the current `promptText` and `ratio` shape and do not include the older video-only fields such as `promptImage` or `duration`. Video payloads are reserved for future image-to-video work and include `promptImage` only when a source asset is provided.
+
+Diagnostics verify image and video provider target mapping and build image execution-spike payloads without calling Runway.
+
 ## One-Test Operator Procedure
 
 For the real A10 test, the operator should paste the Runway key into a secure PowerShell prompt and send it only as an HTTPS request header. The command should not echo the key and should not save it to disk.

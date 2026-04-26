@@ -5,7 +5,12 @@ import {
   canUseRunwayStagingTestBypass,
   canUseRunwayTransientStagingCredentials,
 } from "../src/routes/admin.mjs";
-import { canExecuteRunwayProvider } from "../src/services/runwayProvider.mjs";
+import {
+  buildRunwayApiPayload,
+  canExecuteRunwayProvider,
+  createDryRunJob,
+  resolveRunwayGenerationTarget,
+} from "../src/services/runwayProvider.mjs";
 
 const PORT = Number(process.env.SPIRITCORE_DIAG_PORT || 3115);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -333,6 +338,48 @@ async function main() {
         }) === false,
         detail: "production cannot use Runway auth check",
       },
+      {
+        name: "runway-image-provider-target",
+        pass: (() => {
+          const job = createDryRunJob({
+            targetId: "test-realm",
+            assetKind: "realm_background",
+            promptIntent: "Diagnostic image payload mapping.",
+            styleProfile: "spiritverse_internal_test",
+            safetyLevel: "internal_review",
+          });
+          const target = resolveRunwayGenerationTarget(job, {});
+          const payload = buildRunwayApiPayload(job);
+          return target.endpointPath === "/v1/text_to_image"
+            && target.model === "gen4_image"
+            && payload.model === "gen4_image"
+            && payload.ratio === "1920:1080"
+            && payload.promptImage === undefined
+            && payload.duration === undefined;
+        })(),
+        detail: "image asset maps to text_to_image gen4_image payload",
+      },
+      {
+        name: "runway-video-provider-target",
+        pass: (() => {
+          const job = createDryRunJob({
+            targetId: "test-realm",
+            assetKind: "trailer",
+            promptIntent: "Diagnostic video payload mapping.",
+            styleProfile: "spiritverse_internal_test",
+            safetyLevel: "internal_review",
+            sourceAssets: ["https://example.com/reference.png"],
+          });
+          const target = resolveRunwayGenerationTarget(job, {});
+          const payload = buildRunwayApiPayload(job);
+          return target.endpointPath === "/v1/image_to_video"
+            && target.model === "gen4_turbo"
+            && payload.model === "gen4_turbo"
+            && payload.promptImage === "https://example.com/reference.png"
+            && payload.duration === 8;
+        })(),
+        detail: "video asset maps to image_to_video gen4_turbo payload",
+      },
     ].map((check) => ({
       ...check,
       method: "INTERNAL",
@@ -503,6 +550,26 @@ async function main() {
         && result?.body?.job?.executionGates?.missingGates?.includes("RUNWAY_DRY_RUN_EXECUTE=true is required")
         ? "body transient key fallback reached execution gate without provider call"
         : "unexpected body transient credential result",
+    });
+    await run("runway-execution-spike-image-payload-no-exec", "POST", "/admin/runway/execution-spike", {
+      headers: {
+        "x-runway-transient-execute": "false",
+        "x-runway-transient-provider-execution": "false",
+      },
+      body: {
+        targetId: "test-realm",
+        assetKind: "realm_background",
+        promptIntent: "Diagnostic image execution spike payload without provider execution.",
+        styleProfile: "spiritverse_internal_test",
+        safetyLevel: "internal_review",
+        runwayTransientKey: "mock-runway-key",
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.job?.providerTarget?.endpointPath === "/v1/text_to_image"
+        && result?.body?.job?.apiPayloadPreview?.model === "gen4_image"
+        && result?.body?.job?.apiPayloadPreview?.promptImage === undefined
+        ? "image execution spike payload built without provider call"
+        : "unexpected image execution payload result",
     });
     await run("runway-execution-spike-staging-bypass-malformed", "POST", "/admin/runway/execution-spike", {
       body: {
