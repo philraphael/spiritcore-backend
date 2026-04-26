@@ -174,11 +174,22 @@ function providerPromptText(normalized = {}, promptPackage = {}) {
   const directPrompt = normalizeText(normalized.promptIntent, 1200);
   const isCompactSpiritkinMotionPrompt = directPrompt
     && directPrompt.length <= 1000
-    && directPrompt.includes("Preserve the exact portrait identity")
+    && (
+      directPrompt.includes("Preserve the exact portrait identity")
+      || directPrompt.includes("Preserve exact portrait identity")
+      || directPrompt.includes("Preserve exact identity")
+    )
+    && directPrompt.includes("calm Spiritverse tone")
     && (
       directPrompt.includes("No speaking, no mouth movement")
       || directPrompt.includes("silent subtle speaking presence loop")
       || directPrompt.includes("restrained speaking presence loop")
+      || directPrompt.includes("silent attentive listening loop")
+      || directPrompt.includes("silent reflective thinking loop")
+      || directPrompt.includes("silent gentle emotional gesture loop")
+      || directPrompt.includes("silent warm greeting presence loop")
+      || directPrompt.includes("silent seated or perched presence loop")
+      || directPrompt.includes("silent subtle ambient movement loop")
     );
   if (isCompactSpiritkinMotionPrompt) {
     return directPrompt;

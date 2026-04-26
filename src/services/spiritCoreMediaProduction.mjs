@@ -96,6 +96,12 @@ export const SPIRITKIN_MOTION_GENERATION_MODES = Object.freeze([
   "diagnostic_idle",
   "subtle_speaking",
   "speaking",
+  "attentive_listening",
+  "reflective_thinking",
+  "gentle_gesture",
+  "greeting_entry",
+  "seated_presence",
+  "ambient_walk",
 ]);
 
 export const SPIRITKIN_MOTION_INTENSITIES = Object.freeze(["low", "medium"]);
@@ -630,6 +636,20 @@ function normalizeMotionGenerationControls(input = {}) {
   };
 }
 
+export const SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES = Object.freeze({
+  idle_01: "diagnostic_idle",
+  idle_02: "diagnostic_idle",
+  speaking_01: "subtle_speaking",
+  speaking_02: "subtle_speaking",
+  listen_01: "attentive_listening",
+  think_01: "reflective_thinking",
+  gesture_01: "gentle_gesture",
+  gesture_02: "gentle_gesture",
+  greeting_or_entry_01: "greeting_entry",
+  sit_or_perch_01: "seated_presence",
+  walk_loop_01: "ambient_walk",
+});
+
 function buildMotionGenerationPrompt({ canonicalName, assetType, stateTrigger, promptIntent, styleProfile, controls }) {
   if (controls.generationMode === "diagnostic_idle") {
     return [
@@ -657,6 +677,60 @@ function buildMotionGenerationPrompt({ canonicalName, assetType, stateTrigger, p
       "Add natural but controlled mouth movement, soft blinking, light breathing, and small expressive head motion.",
       "Keep motion stable and premium.",
       "No audio, no subtitles, no text, no logos, no background change, no camera movement, no large gestures, no identity drift.",
+    ].join(" ");
+  }
+
+  if (controls.generationMode === "attentive_listening") {
+    return [
+      `Animate ${canonicalName} in a silent attentive listening loop.`,
+      "Preserve exact portrait identity, colors, eyes, face, silhouette, and calm Spiritverse tone.",
+      "Add soft breathing, natural irregular blinking, tiny attentive head tilt, and focused eye presence as if listening to the user.",
+      "No speaking, no mouth movement, no audio, no text, no camera movement, no background change, no large gestures.",
+    ].join(" ");
+  }
+
+  if (controls.generationMode === "reflective_thinking") {
+    return [
+      `Animate ${canonicalName} in a silent reflective thinking loop.`,
+      "Preserve exact portrait identity, colors, eyes, face, silhouette, and calm Spiritverse tone.",
+      "Add slow breathing, thoughtful eye movement, gentle blink variation, tiny head angle shift, and a calm contemplative expression.",
+      "No speaking, no audio, no text, no logos, no background change, no camera movement, no large gestures.",
+    ].join(" ");
+  }
+
+  if (controls.generationMode === "gentle_gesture") {
+    return [
+      `Animate ${canonicalName} in a silent gentle emotional gesture loop.`,
+      "Preserve exact portrait identity, colors, eyes, face, silhouette, and calm Spiritverse tone.",
+      "Add soft breathing, natural blinking, a small graceful upper-body or head gesture, and subtle emotional warmth.",
+      "No audio, no subtitles, no text, no logos, no background change, no camera movement, no exaggerated motion.",
+    ].join(" ");
+  }
+
+  if (controls.generationMode === "greeting_entry") {
+    return [
+      `Animate ${canonicalName} in a silent warm greeting presence loop.`,
+      "Preserve exact portrait identity, colors, eyes, face, silhouette, and calm Spiritverse tone.",
+      "Add gentle breathing, friendly eye focus, soft blinking, a tiny welcoming head motion, and subtle joyful presence as if greeting the user.",
+      "No audio, no text, no logos, no background change, no camera movement, no large gestures.",
+    ].join(" ");
+  }
+
+  if (controls.generationMode === "seated_presence") {
+    return [
+      `Animate ${canonicalName} in a silent seated or perched presence loop.`,
+      "Preserve exact portrait identity, colors, eyes, face, silhouette, and calm Spiritverse tone.",
+      "Add soft breathing, natural blinking, tiny posture settling, and calm resting presence.",
+      "No speaking, no audio, no text, no logos, no camera movement, no background change, no exaggerated motion.",
+    ].join(" ");
+  }
+
+  if (controls.generationMode === "ambient_walk") {
+    return [
+      `Animate ${canonicalName} in a silent subtle ambient movement loop.`,
+      "Preserve exact identity, colors, eyes, face, silhouette, and calm Spiritverse tone.",
+      "Add gentle lifelike motion suggesting a slow graceful shift through the realm while keeping identity stable and framing readable.",
+      "No audio, no text, no logos, no camera movement, no background change, no exaggerated motion.",
     ].join(" ");
   }
 

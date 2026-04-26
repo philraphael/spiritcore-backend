@@ -132,6 +132,7 @@ Diagnostics verify:
 - missing operator approval is blocked
 - production bypass is denied
 - valid staging preview builds image-to-video payload
+- distinct motion prompt modes are accepted and stay under the provider prompt limit
 - transient execution flags work in mock path
 - generated output remains `review_required`
 - premium member generation remains disabled
@@ -167,7 +168,7 @@ The SpiritCore route, source URL, auth, gates, and review lifecycle worked. The 
 - `durationSec`: `5` or `8`, default `5`
 - `ratio` / `aspectRatio`: default `720:1280`; supported values are `1280:720`, `720:1280`, `1104:832`, `832:1104`, `960:960`, and `1584:672`
 - `motionIntensity`: `low` or `medium`, default `low`
-- `generationMode`: `diagnostic_idle`, `subtle_speaking`, or `speaking`, default `diagnostic_idle`
+- `generationMode`: `diagnostic_idle`, `subtle_speaking`, `speaking`, `attentive_listening`, `reflective_thinking`, `gentle_gesture`, `greeting_entry`, `seated_presence`, or `ambient_walk`, default `diagnostic_idle`
 - `allowMouthMovement`: boolean, default `false`
 
 The recommended next test is Lyra `idle_01`, not `speaking_01`:
@@ -202,6 +203,33 @@ The failure was caused by wrapping the motion prompt with generic Runway prompt-
 The route also preflights `image_to_video` prompt length before provider execution. If a prompt exceeds 1000 characters, SpiritCore returns `PROMPT_TOO_LONG` with `promptTextLength`, `maxPromptTextLength: 1000`, `noProviderCall: true`, and the standard no-promotion/no-manifest/no-ACTIVE-write flags.
 
 The next recommended paid retry is Lyra `speaking_01` with `generationMode: "subtle_speaking"`, `ratio: "720:1280"`, and `durationSec: 5`.
+
+## Distinct Motion Prompt Modes
+
+Lyra's current approved foundation clips are:
+
+- `idle_01`: approved and ingested
+- `speaking_01`: approved and ingested
+- `listen_01`: approved and ingested as a foundation clip
+
+The `listen_01` clip used the generic `diagnostic_idle` prompt. It is acceptable as a calm attentive foundation state, but the motion is slightly slow and not distinct enough for the remaining full motion pack. To avoid creating multiple idle-like clips and wasting paid Runway generations, SpiritCore now supports distinct compact provider prompt modes:
+
+- `attentive_listening` for `listen_01`
+- `reflective_thinking` for `think_01`
+- `gentle_gesture` for `gesture_01` and `gesture_02`
+- `greeting_entry` for `greeting_or_entry_01`
+- `seated_presence` for `sit_or_perch_01`
+- `ambient_walk` for `walk_loop_01`
+
+All of these modes use direct compact provider prompts under Runway's 1000-character `promptText` limit. They bypass the generic Runway prompt package, so style profile, source reference, and safety paragraphs are not duplicated into the provider payload. The provider payload remains constrained to:
+
+- `model`
+- `promptImage`
+- `promptText`
+- `ratio`
+- `duration`
+
+The next recommended paid generation is Lyra `think_01` using `generationMode: "reflective_thinking"`, `ratio: "720:1280"`, and `durationSec: 5`.
 
 ## Provider Request 400 Transparency
 

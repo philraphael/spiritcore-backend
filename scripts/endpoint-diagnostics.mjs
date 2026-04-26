@@ -41,6 +41,7 @@ import {
   PREMIUM_SPIRITKIN_STARTER_PACK_ASSET_KINDS,
   resolveExistingSpiritGateSource,
   resolveExistingSpiritkinSource,
+  SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES,
   SPIRITCORE_AVATAR_PACK_ASSET_TYPES,
   SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP,
   SPIRITKIN_MOTION_PACK_ASSET_TYPES,
@@ -1271,6 +1272,103 @@ async function main() {
           });
         })(),
         detail: "Spiritkin motion provider prompts stay compact without duplicated wrapper text",
+      },
+      {
+        name: "media-spiritkin-distinct-motion-prompt-modes",
+        pass: (() => {
+          const modeExpectations = [
+            {
+              generationMode: "attentive_listening",
+              assetType: "listen_01",
+              assetKind: "listening_video",
+              mustInclude: "silent attentive listening loop",
+              mustNotInclude: "subtle idle presence loop",
+            },
+            {
+              generationMode: "reflective_thinking",
+              assetType: "think_01",
+              assetKind: "idle_video",
+              mustInclude: "silent reflective thinking loop",
+            },
+            {
+              generationMode: "gentle_gesture",
+              assetType: "gesture_01",
+              assetKind: "idle_video",
+              mustInclude: "silent gentle emotional gesture loop",
+            },
+            {
+              generationMode: "greeting_entry",
+              assetType: "greeting_or_entry_01",
+              assetKind: "greeting_video",
+              mustInclude: "silent warm greeting presence loop",
+            },
+            {
+              generationMode: "seated_presence",
+              assetType: "sit_or_perch_01",
+              assetKind: "idle_video",
+              mustInclude: "silent seated or perched presence loop",
+            },
+            {
+              generationMode: "ambient_walk",
+              assetType: "walk_loop_01",
+              assetKind: "idle_video",
+              mustInclude: "silent subtle ambient movement loop",
+            },
+          ];
+          const recommendedModesOk = SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES.listen_01 === "attentive_listening"
+            && SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES.think_01 === "reflective_thinking"
+            && SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES.gesture_01 === "gentle_gesture"
+            && SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES.greeting_or_entry_01 === "greeting_entry"
+            && SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES.sit_or_perch_01 === "seated_presence"
+            && SPIRITKIN_MOTION_RECOMMENDED_GENERATION_MODES.walk_loop_01 === "ambient_walk";
+          return recommendedModesOk && modeExpectations.every((expectation) => {
+            const plan = createSpiritkinMotionStateExecutionPlan({
+              spiritkinId: "lyra",
+              targetId: "lyra-motion-pack-v1",
+              assetType: expectation.assetType,
+              assetKind: expectation.assetKind,
+              sourceAssetRef: "https://example.com/lyra_portrait.png",
+              sourceAssetType: "external_url",
+              promptIntent: "Animate Lyra in a distinct compact motion state.",
+              styleProfile: "premium cinematic Spiritverse companion with a deliberately verbose style profile that should not be duplicated in provider prompt text",
+              safetyLevel: "internal_review",
+              durationSec: 5,
+              ratio: "720:1280",
+              motionIntensity: "low",
+              generationMode: expectation.generationMode,
+              allowMouthMovement: false,
+            });
+            const job = createDryRunJob({
+              spiritkinId: plan.spiritkinId,
+              targetId: plan.targetId,
+              assetKind: plan.assetKind,
+              promptIntent: plan.promptIntent,
+              styleProfile: plan.styleProfile,
+              safetyLevel: plan.safetyLevel,
+              sourceAssetRef: plan.sourceAssetRef,
+              sourceAssets: [plan.sourceAssetRef],
+              sourceAssetType: plan.sourceAssetType,
+              durationSec: plan.generationControls.durationSec,
+              aspectRatio: plan.generationControls.aspectRatio,
+            });
+            const payload = buildRunwayApiPayload(job);
+            const payloadKeys = Object.keys(payload).sort().join(",");
+            return payloadKeys === "duration,model,promptImage,promptText,ratio"
+              && payload.promptText.length <= 1000
+              && payload.promptText.includes(expectation.mustInclude)
+              && (!expectation.mustNotInclude || !payload.promptText.includes(expectation.mustNotInclude))
+              && !payload.promptText.includes("Style profile:")
+              && !payload.promptText.includes("Source assets to preserve:")
+              && !payload.promptText.includes("Safety level:")
+              && payload.ratio === "720:1280"
+              && payload.duration === 5
+              && plan.noPromotionPerformed === true
+              && plan.noManifestUpdatePerformed === true
+              && plan.noActiveWritePerformed === true
+              && plan.premiumMemberGeneration.enabled === false;
+          });
+        })(),
+        detail: "distinct Spiritkin motion prompt modes are compact, accepted, payload-clean, and write-safe",
       },
       {
         name: "media-spiritcore-avatar-pack-plan",
