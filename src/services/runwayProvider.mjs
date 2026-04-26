@@ -219,10 +219,8 @@ function runwayImageRatioForKind(assetKind, requestedRatio) {
 
 function runwayVideoRatioForKind(assetKind, requestedRatio) {
   const requested = normalizeText(requestedRatio, 20);
-  if (requested === "720:1280") return "768:1280";
-  if (requested === "1280:720") return "1280:768";
   if (/^\d+:\d+$/.test(requested)) return requested;
-  return assetKind === "speaking_video" ? "768:1280" : "1280:768";
+  return assetKind === "speaking_video" ? "720:1280" : "1280:720";
 }
 
 function resolveProviderMode(normalized = {}) {

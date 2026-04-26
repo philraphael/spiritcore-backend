@@ -1324,11 +1324,11 @@ export async function adminRoutes(fastify, opts) {
         const mockResponseBody = {
           error: "Validation of body failed",
           issues: [
-            {
-              path: ["ratio"],
-              message: "Invalid enum value. Expected 768:1280 or 1280:768.",
-              code: "invalid_enum_value",
-            },
+              {
+                path: ["ratio"],
+                message: "Invalid option for ratio. Accepted values: 1280:720, 720:1280, 1104:832, 832:1104, 960:960, 1584:672.",
+                code: "invalid_enum_value",
+              },
           ],
           docUrl: "https://docs.dev.runwayml.com/api",
           code: "INVALID_ARGUMENT",

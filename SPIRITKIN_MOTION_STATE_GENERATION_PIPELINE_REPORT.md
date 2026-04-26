@@ -165,7 +165,7 @@ The first Lyra `speaking_01` image-to-video job was accepted by Runway but faile
 The SpiritCore route, source URL, auth, gates, and review lifecycle worked. The failure occurred inside Runway generation. To reduce paid-generation waste, the motion-state execution route now accepts safer controls:
 
 - `durationSec`: `5` or `8`, default `5`
-- `ratio` / `aspectRatio`: default `768:1280`; horizontal override `1280:768`
+- `ratio` / `aspectRatio`: default `720:1280`; supported values are `1280:720`, `720:1280`, `1104:832`, `832:1104`, `960:960`, and `1584:672`
 - `motionIntensity`: `low` or `medium`, default `low`
 - `generationMode`: `diagnostic_idle`, `subtle_speaking`, or `speaking`, default `diagnostic_idle`
 - `allowMouthMovement`: boolean, default `false`
@@ -215,13 +215,16 @@ The payload preview intentionally excludes secrets and internal control fields. 
 
 The next paid retry should happen only after inspecting the sanitized provider 400 body from staging and confirming whether Runway rejected ratio, source image access, prompt shape, or another request field.
 
-After the sanitized response showed Runway body validation with hidden `issues`, the Spiritkin image-to-video ratio handling was corrected for the current `gen4_turbo` `/v1/image_to_video` API shape:
+After the sanitized response showed Runway body validation with hidden `issues`, the actual `gen4_turbo` `/v1/image_to_video` provider response confirmed this accepted ratio list:
 
-- `720:1280` normalizes to `768:1280`
-- `1280:720` normalizes to `1280:768`
-- `832:1104` and `960:960` are no longer accepted for this Spiritkin motion route until confirmed valid for this endpoint/model/version
+- `1280:720`
+- `720:1280`
+- `1104:832`
+- `832:1104`
+- `960:960`
+- `1584:672`
 
-The next Lyra `idle_01` retry should use `ratio: "768:1280"`.
+The previous `768:1280` correction was removed because it is not in the provider-confirmed list for this endpoint/model. The next Lyra `idle_01` retry should use `ratio: "720:1280"`.
 
 ## Confirmations
 

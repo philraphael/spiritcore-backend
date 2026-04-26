@@ -451,7 +451,7 @@ async function main() {
             && payload.promptImage === "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png"
             && typeof payload.promptText === "string"
             && payload.promptText.length > 0
-            && payload.ratio === "768:1280"
+            && payload.ratio === "720:1280"
             && [5, 8].includes(payload.duration)
             && payloadKeys.join(",") === "duration,model,promptImage,promptText,ratio"
             && unsupportedFields.every((field) => payload[field] === undefined);
@@ -485,7 +485,7 @@ async function main() {
                 issues: [
                   {
                     path: ["ratio"],
-                    message: "Invalid enum value. Expected 768:1280 or 1280:768.",
+                    message: "Invalid option for ratio. Accepted values: 1280:720, 720:1280, 1104:832, 832:1104, 960:960, 1584:672.",
                     code: "invalid_enum_value",
                   },
                 ],
@@ -502,7 +502,7 @@ async function main() {
               && error.providerErrorCode === "INVALID_ARGUMENT"
               && error.providerBodyKeys.includes("issues")
               && Array.isArray(error.providerBodyIssues)
-              && error.providerBodyIssues[0]?.message === "Invalid enum value. Expected 768:1280 or 1280:768."
+              && error.providerBodyIssues[0]?.message === "Invalid option for ratio. Accepted values: 1280:720, 720:1280, 1104:832, 832:1104, 960:960, 1584:672."
               && error.providerDocUrl === "https://docs.dev.runwayml.com/api"
               && error.endpointPath === "/v1/image_to_video"
               && error.model === "gen4_turbo"
@@ -939,7 +939,7 @@ async function main() {
         detail: "invalid motion duration is rejected before provider execution",
       },
       {
-        name: "media-spiritkin-motion-ratio-normalization",
+        name: "media-spiritkin-motion-provider-ratios",
         pass: (() => {
           const vertical = createSpiritkinMotionStateExecutionPlan({
             spiritkinId: "lyra",
@@ -965,10 +965,29 @@ async function main() {
             safetyLevel: "internal_review",
             ratio: "1280:720",
           });
-          return vertical.generationControls.aspectRatio === "768:1280"
-            && horizontal.generationControls.aspectRatio === "1280:768";
+          let invalidRejected = false;
+          try {
+            createSpiritkinMotionStateExecutionPlan({
+              spiritkinId: "lyra",
+              targetId: "lyra-motion-pack-v1",
+              assetType: "idle_01",
+              assetKind: "idle_video",
+              sourceAssetRef: "https://example.com/lyra_portrait.png",
+              sourceAssetType: "external_url",
+              promptIntent: "Diagnostic invalid provider ratio.",
+              styleProfile: "premium cinematic Spiritverse companion",
+              safetyLevel: "internal_review",
+              ratio: "768:1280",
+            });
+          } catch (error) {
+            invalidRejected = String(error?.message || "").includes("Invalid Spiritkin motion generation controls")
+              && (error?.detail?.fields || []).some((field) => String(field).includes("ratio must be one of"));
+          }
+          return vertical.generationControls.aspectRatio === "720:1280"
+            && horizontal.generationControls.aspectRatio === "1280:720"
+            && invalidRejected;
         })(),
-        detail: "legacy image-to-video ratios normalize to Gen-4 Turbo API ratios",
+        detail: "provider-supported image-to-video ratios are preserved and 768:1280 is rejected",
       },
       {
         name: "media-spiritkin-diagnostic-idle-prompt-safe",
@@ -1873,8 +1892,8 @@ async function main() {
         && result?.body?.apiPayloadPreview?.model === "gen4_turbo"
         && result?.body?.apiPayloadPreview?.promptImage === lyraSourceUrl
         && result?.body?.apiPayloadPreview?.duration === 5
-        && result?.body?.apiPayloadPreview?.ratio === "768:1280"
-        && result?.body?.generationControls?.aspectRatio === "768:1280"
+        && result?.body?.apiPayloadPreview?.ratio === "720:1280"
+        && result?.body?.generationControls?.aspectRatio === "720:1280"
         && result?.body?.generationControls?.generationMode === "diagnostic_idle"
         && result?.body?.generationControls?.motionIntensity === "low"
         && result?.body?.generationControls?.allowMouthMovement === false
@@ -1928,14 +1947,14 @@ async function main() {
           && result?.body?.providerErrorCode === "INVALID_ARGUMENT"
           && result?.body?.providerBodyKeys?.includes("issues")
           && Array.isArray(result?.body?.providerBodyIssues)
-          && result?.body?.providerBodyIssues[0]?.message === "Invalid enum value. Expected 768:1280 or 1280:768."
+          && result?.body?.providerBodyIssues[0]?.message === "Invalid option for ratio. Accepted values: 1280:720, 720:1280, 1104:832, 832:1104, 960:960, 1584:672."
           && result?.body?.providerDocUrl === "https://docs.dev.runwayml.com/api"
           && result?.body?.endpointPath === "/v1/image_to_video"
           && result?.body?.model === "gen4_turbo"
           && result?.body?.providerMode === "image_to_video"
           && payload.promptImage === lyraSourceUrl
           && payload.duration === 5
-          && payload.ratio === "768:1280"
+          && payload.ratio === "720:1280"
           && payloadKeys === "duration,model,promptImage,promptText,ratio"
           && result?.body?.noPromotionPerformed === true
           && result?.body?.noManifestUpdatePerformed === true
@@ -1975,7 +1994,7 @@ async function main() {
         && result?.body?.transientProviderExecutionRequested === true
         && result?.body?.executionGates?.ok === true
         && result?.body?.generationControls?.durationSec === 5
-        && result?.body?.generationControls?.aspectRatio === "768:1280"
+        && result?.body?.generationControls?.aspectRatio === "720:1280"
         && result?.body?.generationControls?.generationMode === "diagnostic_idle"
         && result?.body?.mediaAssetRecord?.providerJobId === "mock-lyra-idle-01-task"
         && result?.body?.mediaAssetRecord?.lifecycleState === "review_required"
