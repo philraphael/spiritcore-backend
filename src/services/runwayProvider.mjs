@@ -4,11 +4,21 @@ import { ValidationError } from "../errors.mjs";
 export const RUNWAY_SUPPORTED_ASSET_KINDS = Object.freeze([
   "portrait",
   "hero",
+  "full_body",
+  "icon",
+  "presence_indicator",
+  "spiritgate_video",
   "idle_video",
   "speaking_video",
+  "listening_video",
+  "greeting_video",
+  "wake_visual",
   "calm_video",
   "trailer",
+  "trailer_video",
   "realm_background",
+  "room_background",
+  "gateway_background",
   "game_board_theme",
   "game_piece_set",
 ]);
@@ -29,18 +39,40 @@ export const RUNWAY_JOB_LIFECYCLE_STATES = Object.freeze([
 const ASSET_KIND_ALIASES = Object.freeze({
   heroimage: "hero",
   hero_image: "hero",
+  fullbody: "full_body",
+  full_body: "full_body",
+  presence: "presence_indicator",
+  presence_indicator: "presence_indicator",
+  spiritgate: "spiritgate_video",
+  spiritgatevideo: "spiritgate_video",
+  spiritgate_video: "spiritgate_video",
   idle: "idle_video",
   idlevideo: "idle_video",
   idle_video: "idle_video",
   speaking: "speaking_video",
   speakingvideo: "speaking_video",
   speaking_video: "speaking_video",
+  listening: "listening_video",
+  listeningvideo: "listening_video",
+  listening_video: "listening_video",
+  greeting: "greeting_video",
+  greetingvideo: "greeting_video",
+  greeting_video: "greeting_video",
+  wake: "wake_visual",
+  wakevisual: "wake_visual",
+  wake_visual: "wake_visual",
   calm: "calm_video",
   calmvideo: "calm_video",
   calm_video: "calm_video",
   trailervideo: "trailer",
   trailer_video: "trailer",
   intro_trailer: "trailer",
+  room: "room_background",
+  roombackground: "room_background",
+  room_background: "room_background",
+  gateway: "gateway_background",
+  gatewaybackground: "gateway_background",
+  gateway_background: "gateway_background",
   background: "realm_background",
   realm: "realm_background",
   realmbackground: "realm_background",
@@ -56,13 +88,15 @@ const ASSET_KIND_ALIASES = Object.freeze({
   game_piece_set: "game_piece_set",
 });
 
-const VIDEO_KINDS = new Set(["idle_video", "speaking_video", "calm_video", "trailer"]);
-const IMAGE_KINDS = new Set(["portrait", "hero", "realm_background", "game_board_theme", "game_piece_set"]);
+const VIDEO_KINDS = new Set(["spiritgate_video", "idle_video", "speaking_video", "listening_video", "greeting_video", "wake_visual", "calm_video", "trailer"]);
+const IMAGE_KINDS = new Set(["portrait", "hero", "full_body", "icon", "presence_indicator", "realm_background", "room_background", "gateway_background", "game_board_theme", "game_piece_set"]);
 const SAFETY_LEVELS = new Set(["standard", "strict", "internal_review"]);
 const DEFAULT_IMAGE_MODEL = "gen4_image";
 const DEFAULT_VIDEO_MODEL = "gen4_turbo";
+const DEFAULT_VIDEO_TO_VIDEO_MODEL = "gen4_aleph";
 const DEFAULT_IMAGE_GENERATE_PATH = "/v1/text_to_image";
 const DEFAULT_VIDEO_GENERATE_PATH = "/v1/image_to_video";
+const DEFAULT_VIDEO_TO_VIDEO_GENERATE_PATH = "/v1/video_to_video";
 
 function nowIso() {
   return new Date().toISOString();
@@ -131,6 +165,16 @@ function runwayVideoRatioForKind(assetKind, requestedRatio) {
   return assetKind === "speaking_video" ? "720:1280" : "1280:720";
 }
 
+function resolveProviderMode(normalized = {}) {
+  const assetKind = normalizeRunwayAssetKind(normalized.assetKind);
+  if (assetKind === "spiritgate_video") return "video_to_video";
+  if (VIDEO_KINDS.has(assetKind)) {
+    const sourceType = normalizeText(normalized.sourceAssetType || normalized.sourceType, 80).toLowerCase();
+    return sourceType.includes("video") ? "video_to_video" : "image_to_video";
+  }
+  return "text_to_image";
+}
+
 function buildTarget(input = {}, assetKind) {
   const spiritkinId = normalizeText(input.spiritkinId || input.spiritkinName, 120);
   const targetId = normalizeText(input.targetId, 120);
@@ -138,13 +182,24 @@ function buildTarget(input = {}, assetKind) {
   const gameType = normalizeText(input.gameType || targetId, 80);
   const themeId = normalizeText(input.themeId || input.styleProfile || "runway-theme", 80);
 
-  if (assetKind === "realm_background") {
+  if (assetKind === "realm_background" || assetKind === "room_background") {
     return {
       targetType: "realm",
       targetId: realmId,
       requiredLabel: "realmId or targetId",
       activeRoot: `Spiritverse_MASTER_ASSETS/ACTIVE/realms/${slugify(realmId, "realm")}/${assetKind}`,
       publicRoot: `/app/assets/generated/realms/${slugify(realmId, "realm")}/${assetKind}`,
+    };
+  }
+
+  if (assetKind === "spiritgate_video" || assetKind === "gateway_background") {
+    const id = targetId || realmId || "spiritgate";
+    return {
+      targetType: "spiritgate",
+      targetId: id,
+      requiredLabel: "targetId",
+      activeRoot: `Spiritverse_MASTER_ASSETS/ACTIVE/spiritgate/${slugify(id, "spiritgate")}/${assetKind}`,
+      publicRoot: `/app/assets/generated/spiritgate/${slugify(id, "spiritgate")}/${assetKind}`,
     };
   }
 
@@ -215,6 +270,8 @@ export function validateRunwayJobRequest(input = {}) {
   const sourceAssets = Array.isArray(input.sourceAssets)
     ? input.sourceAssets.map((item) => normalizeText(item, 240)).filter(Boolean).slice(0, 16)
     : [];
+  const sourceAssetRef = normalizeText(input.sourceAssetRef || input.videoUri, 1200);
+  const sourceAssetType = normalizeText(input.sourceAssetType || input.sourceType, 80).toLowerCase();
 
   const normalized = {
     targetType: target.targetType,
@@ -231,6 +288,8 @@ export function validateRunwayJobRequest(input = {}) {
     durationSec,
     aspectRatio,
     sourceAssets,
+    sourceAssetRef,
+    sourceAssetType,
     negativePrompt: normalizeText(input.negativePrompt, 500),
     requestedBy: normalizeText(input.requestedBy || "admin_dry_run", 80),
   };
@@ -248,8 +307,12 @@ export function buildRunwayPrompt(input = {}) {
   const targetName = normalizeText(input.spiritkinId || input.targetId || input.realmId || input.gameType, 160);
   const styleProfile = normalizeText(input.styleProfile, 240);
   const promptIntent = normalizeText(input.promptIntent, 1000);
-  const sourceAssets = Array.isArray(input.sourceAssets) && input.sourceAssets.length
-    ? ` Source assets to preserve: ${input.sourceAssets.join(", ")}.`
+  const sourceAssetRefs = [
+    ...(Array.isArray(input.sourceAssets) ? input.sourceAssets : []),
+    input.sourceAssetRef,
+  ].map((item) => normalizeText(item, 600)).filter(Boolean);
+  const sourceAssets = sourceAssetRefs.length
+    ? ` Source assets to preserve: ${sourceAssetRefs.join(", ")}.`
     : " No source assets attached yet; require manual review before identity-sensitive execution.";
   const duration = input.durationSec ? ` Duration target: ${input.durationSec}s.` : "";
   const safety = input.safetyLevel ? ` Safety level: ${input.safetyLevel}.` : "";
@@ -349,16 +412,33 @@ export function resolveRunwayGenerationTarget(job = {}, runwayConfig = {}) {
   const normalized = job.normalizedJobRequest || job;
   const assetKind = normalizeRunwayAssetKind(normalized.assetKind);
   const mediaType = normalized.mediaType || assetMediaType(assetKind);
+  const providerMode = resolveProviderMode(normalized);
   if (mediaType === "image") {
     return {
       mediaType: "image",
+      providerMode: "text_to_image",
       endpointPath: runwayConfig.imageGeneratePath || envValue("RUNWAY_IMAGE_GENERATE_PATH") || DEFAULT_IMAGE_GENERATE_PATH,
       model: runwayConfig.imageModel || envValue("RUNWAY_IMAGE_MODEL") || DEFAULT_IMAGE_MODEL,
     };
   }
 
+  if (providerMode === "video_to_video") {
+    return {
+      mediaType: "video",
+      providerMode: "video_to_video",
+      endpointPath: runwayConfig.videoToVideoGeneratePath || envValue("RUNWAY_VIDEO_TO_VIDEO_GENERATE_PATH") || DEFAULT_VIDEO_TO_VIDEO_GENERATE_PATH,
+      model: runwayConfig.videoToVideoModel || envValue("RUNWAY_VIDEO_TO_VIDEO_MODEL") || DEFAULT_VIDEO_TO_VIDEO_MODEL,
+      fallback: {
+        providerMode: "image_to_video",
+        endpointPath: runwayConfig.videoGeneratePath || runwayConfig.generatePath || envValue("RUNWAY_VIDEO_GENERATE_PATH") || DEFAULT_VIDEO_GENERATE_PATH,
+        model: runwayConfig.videoModel || runwayConfig.model || envValue("RUNWAY_VIDEO_MODEL") || DEFAULT_VIDEO_MODEL,
+      },
+    };
+  }
+
   return {
     mediaType: "video",
+    providerMode: "image_to_video",
     endpointPath: runwayConfig.videoGeneratePath || runwayConfig.generatePath || envValue("RUNWAY_VIDEO_GENERATE_PATH") || DEFAULT_VIDEO_GENERATE_PATH,
     model: runwayConfig.videoModel || runwayConfig.model || envValue("RUNWAY_VIDEO_MODEL") || DEFAULT_VIDEO_MODEL,
   };
@@ -372,6 +452,17 @@ export function buildRunwayApiPayload(job = {}) {
   const normalized = job.normalizedJobRequest || {};
   const promptPackage = job.promptPackage || buildRunwayPrompt(normalized);
   const target = resolveRunwayGenerationTarget(job, job._runwayConfig || {});
+
+  if (target.providerMode === "video_to_video") {
+    const videoUri = normalized.sourceAssetRef || (Array.isArray(normalized.sourceAssets) ? normalized.sourceAssets[0] : "");
+    return {
+      model: job.providerModel || target.model,
+      videoUri: videoUri || undefined,
+      promptText: promptPackage.prompt,
+      ratio: runwayVideoRatioForKind(normalized.assetKind, normalized.aspectRatio),
+      seed: job.seed || undefined,
+    };
+  }
 
   if (target.mediaType === "image") {
     return {

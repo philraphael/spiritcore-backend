@@ -190,6 +190,30 @@ export const PREMIUM_SPIRITKIN_STARTER_PACK_ASSET_KINDS = Object.freeze([
   "wake_visual",
 ]);
 
+export const SOURCE_MEDIA_TYPES = Object.freeze([
+  "uploaded_video",
+  "uploaded_image",
+  "existing_asset",
+  "external_url",
+]);
+
+export const PREMIUM_MEMBER_GENERATION_BOUNDARY = Object.freeze({
+  enabled: false,
+  reason: "Premium member generation remains disabled until creation, moderation, budget, review, storage, and user-status systems are complete.",
+  readinessChecklist: [
+    "user creation form",
+    "safety moderation",
+    "style governance",
+    "generation budget/credit limits",
+    "starter asset pack requirements",
+    "failed generation recovery",
+    "review/approval mode",
+    "storage strategy",
+    "voice/wake/motion completeness",
+    "user-facing status messaging",
+  ],
+});
+
 const GENERATION_TEMPLATES = Object.freeze({
   spiritgate_enhancement: {
     id: "spiritgate_enhancement",
@@ -321,6 +345,60 @@ function extensionForAssetKind(assetKind) {
 
 function versionTagFor(input = {}) {
   return slugify(input.versionTag || input.providerJobId || `media-${Date.now()}`, "media-version");
+}
+
+function normalizeSourceMediaType(value) {
+  const normalized = canonicalize(value);
+  return SOURCE_MEDIA_TYPES.includes(normalized) ? normalized : "";
+}
+
+function providerCompatibilityForSource(sourceType, assetKind = "") {
+  const mediaType = mediaTypeForAssetKind(assetKind);
+  return {
+    runway: {
+      textToImage: sourceType === "uploaded_image" || sourceType === "external_url" || sourceType === "existing_asset",
+      imageToVideo: mediaType === "video" && (sourceType === "uploaded_image" || sourceType === "external_url" || sourceType === "existing_asset"),
+      videoToVideo: mediaType === "video" && (sourceType === "uploaded_video" || sourceType === "external_url" || sourceType === "existing_asset"),
+      recommendedMode: assetKind === "spiritgate_video" ? "video_to_video" : (mediaType === "video" ? "image_to_video" : "text_to_image"),
+      recommendedModel: assetKind === "spiritgate_video" ? "gen4_aleph" : (mediaType === "video" ? "gen4_turbo" : "gen4_image"),
+    },
+  };
+}
+
+export function buildSourceMediaReference(input = {}) {
+  const sourceType = normalizeSourceMediaType(input.sourceType || input.sourceAssetType);
+  const assetKind = normalizeSpiritCoreMediaAssetKind(input.assetKind || "spiritgate_video");
+  const sourceUrl = normalizeText(input.sourceUrl || input.url, 1200);
+  const storagePath = normalizeText(input.storagePath || input.sourceAssetRef || input.sourcePath, 1200);
+  const targetId = normalizeText(input.targetId || "spiritgate", 160);
+  const targetType = normalizeTargetType(input.targetType, assetKind);
+
+  return {
+    sourceAssetId: normalizeText(input.sourceAssetId, 160) || `src_${slugify(targetId)}_${slugify(assetKind)}_${Date.now()}`,
+    targetId,
+    targetType,
+    assetKind,
+    sourceType,
+    sourceUrl: sourceUrl || null,
+    storagePath: storagePath || null,
+    providerCompatibility: providerCompatibilityForSource(sourceType, assetKind),
+    uploadedAt: normalizeText(input.uploadedAt, 80) || nowIso(),
+    notes: normalizeText(input.notes, 1200),
+    approvedForReference: Boolean(input.approvedForReference),
+    usageRestrictions: Array.isArray(input.usageRestrictions)
+      ? input.usageRestrictions.map((item) => normalizeText(item, 240)).filter(Boolean)
+      : ["operator_review_only", "do_not_replace_original", "no_public_promotion_without_approval"],
+  };
+}
+
+export function validateSourceMediaReference(record = {}) {
+  const errors = [];
+  if (!record.sourceAssetId) errors.push("sourceAssetId is required");
+  if (!record.targetId) errors.push("targetId is required");
+  if (!record.assetKind || !SPIRITCORE_MEDIA_ASSET_KINDS.includes(record.assetKind)) errors.push("assetKind must be supported");
+  if (!record.sourceType || !SOURCE_MEDIA_TYPES.includes(record.sourceType)) errors.push("sourceType must be uploaded_video, uploaded_image, existing_asset, or external_url");
+  if (!record.sourceUrl && !record.storagePath) errors.push("sourceUrl or storagePath is required");
+  return { ok: errors.length === 0, errors };
 }
 
 export function buildMediaAssetRecord(input = {}) {
@@ -853,6 +931,106 @@ export function createProductionSequencePlan(input = {}) {
   };
 }
 
+export function createSpiritGateEnhancementExecutionPlan(input = {}) {
+  const targetId = normalizeText(input.targetId || "spiritgate", 160);
+  const sourceAssetRef = normalizeText(input.sourceAssetRef || input.sourcePath || input.sourceUrl || input.storagePath, 1200);
+  const sourceReference = buildSourceMediaReference({
+    sourceAssetId: input.sourceAssetId || "existing-pika-spiritgate-video",
+    targetId,
+    targetType: "spiritgate",
+    assetKind: "spiritgate_video",
+    sourceType: input.sourceAssetType || input.sourceType || "existing_asset",
+    sourceUrl: String(sourceAssetRef).startsWith("http") ? sourceAssetRef : "",
+    storagePath: String(sourceAssetRef).startsWith("http") ? "" : sourceAssetRef,
+    approvedForReference: true,
+    notes: input.notes || "SpiritGate A14 source reference registry entry.",
+  });
+  const sourceValidation = validateSourceMediaReference(sourceReference);
+  if (!sourceValidation.ok) {
+    throw new ValidationError("Invalid SpiritGate source media reference.", sourceValidation.errors);
+  }
+
+  const promptIntent = normalizeText(input.promptIntent || "Enhance the existing SpiritGate entrance video while preserving its original concept.", 1000);
+  const styleProfile = normalizeText(input.styleProfile || "premium cinematic cosmic fantasy, Spiritverse gateway identity", 320);
+  const safetyLevel = normalizeText(input.safetyLevel || "internal_review", 80);
+  const versionTag = input.versionTag || `spiritgate-enhancement-${Date.now()}`;
+  const assetRecord = buildMediaAssetRecord({
+    targetId,
+    targetType: "spiritgate",
+    assetKind: "spiritgate_video",
+    lifecycleState: "review_required",
+    reviewStatus: "pending",
+    promotionStatus: "not_requested",
+    activeStatus: "inactive",
+    provider: "runway",
+    providerJobId: input.providerJobId,
+    sourceAssetRefs: [sourceAssetRef],
+    promptIntent,
+    styleProfile,
+    safetyLevel,
+    versionTag,
+    notes: "Automated SpiritGate enhancement output remains review_required until operator approval.",
+  });
+  const recordValidation = validateMediaAssetRecord(assetRecord);
+  if (!recordValidation.ok) {
+    throw new ValidationError("Invalid SpiritGate enhancement media asset record.", recordValidation.errors);
+  }
+
+  const generationTemplate = buildGenerationTemplate({
+    templateId: "spiritgate_enhancement",
+    targetId,
+    assetKind: "spiritgate_video",
+    spiritkinName: "SpiritGate",
+    spiritkinRole: "Spiritverse threshold",
+    visualIdentity: "recognizable SpiritGate gateway identity from the existing Pika Labs source concept",
+    loreSummary: "The SpiritGate is the memorable entrance threshold into the Spiritverse companion realm.",
+    colorPalette: "luxury black and gold, subtle apple red accents, ivory highlights",
+    emotionalTone: "premium, magical, welcoming, cinematic, emotionally intelligent",
+    styleProfile,
+    safetyLevel,
+    referenceAssets: [sourceAssetRef],
+  });
+
+  return {
+    ok: true,
+    sourceMediaReference: sourceReference,
+    assetRecord,
+    generationTemplate,
+    providerTarget: {
+      provider: "runway",
+      providerMode: "video_to_video",
+      recommendedModel: "gen4_aleph",
+      endpointPath: "/v1/video_to_video",
+      fallback: {
+        providerMode: "image_to_video",
+        recommendedModel: "gen4_turbo",
+        note: "Use only if a reviewed SpiritGate frame is substituted for the source video.",
+      },
+    },
+    commandCenterMetadata: {
+      sourceAssetRequired: true,
+      modelToolRecommendation: "Runway video_to_video with gen4_aleph",
+      operatorApprovalRequired: true,
+      estimatedProviderTarget: "video_to_video",
+      generationStatus: input.providerJobId ? "submitted" : "not_submitted",
+      reviewStatus: "pending",
+      promotionDisabledUntilApproval: true,
+    },
+    premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+    spiritGatePolicy: {
+      sourceConceptMustBePreserved: true,
+      originalReplacementAllowed: false,
+      enhancementOnly: true,
+      noAutoPromotion: true,
+      noManifestUpdate: true,
+      noActiveWrite: true,
+    },
+    noPromotionPerformed: true,
+    noManifestUpdatePerformed: true,
+    noActiveWritePerformed: true,
+  };
+}
+
 export function getMediaCatalogSummary() {
   return {
     ok: true,
@@ -867,6 +1045,8 @@ export function getMediaCatalogSummary() {
       mediaType: mediaTypeForAssetKind(template.assetKind),
     })),
     assistantCapabilityRoadmap: [...SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP],
+    sourceMediaTypes: [...SOURCE_MEDIA_TYPES],
+    premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
     routes: [
       "POST /admin/media/asset-plan",
       "POST /admin/media/requirements-check",
@@ -874,6 +1054,8 @@ export function getMediaCatalogSummary() {
       "POST /admin/media/review-plan",
       "POST /admin/media/promotion-plan",
       "POST /admin/media/production-sequence-plan",
+      "POST /admin/media/source-reference-plan",
+      "POST /admin/media/spiritgate-enhancement-execute",
       "GET /admin/media/catalog-summary",
     ],
     productionSequenceTypes: [...SPIRITCORE_PRODUCTION_SEQUENCE_TYPES],

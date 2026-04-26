@@ -4,6 +4,7 @@ import {
   canUseRunwayStagingAuthCheck,
   canUseRunwayStagingTestBypass,
   canUseRunwayTransientStagingCredentials,
+  canUseSpiritGateEnhancementStagingBypass,
 } from "../src/routes/admin.mjs";
 import {
   buildRunwayApiPayload,
@@ -13,12 +14,15 @@ import {
 } from "../src/services/runwayProvider.mjs";
 import {
   buildGenerationTemplate,
+  buildSourceMediaReference,
   checkMediaRequirements,
   createMediaPromotionPlan,
   createProductionSequencePlan,
+  createSpiritGateEnhancementExecutionPlan,
   createSpiritGateEnhancementPlan,
   getMediaCatalogSummary,
   ORIGINAL_MOTION_PACK_ASSET_KINDS,
+  PREMIUM_MEMBER_GENERATION_BOUNDARY,
   PREMIUM_SPIRITKIN_STARTER_PACK_ASSET_KINDS,
   SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP,
   SPIRITCORE_MEDIA_ASSET_KINDS,
@@ -136,6 +140,7 @@ async function main() {
       RUNWAY_STAGING_TEST_BYPASS: "true",
       RUNWAY_AUTH_CHECK_MOCK: "true",
       RUNWAY_STATUS_CHECK_MOCK: "true",
+      RUNWAY_SPIRITGATE_EXECUTE_MOCK: "true",
       RUNWAY_DRY_RUN_EXECUTE: "false",
       RUNWAY_ALLOW_PROVIDER_EXECUTION: "false",
       RUNWAY_API_KEY: "",
@@ -403,6 +408,58 @@ async function main() {
         detail: "video asset maps to image_to_video gen4_turbo payload",
       },
       {
+        name: "runway-spiritgate-video-to-video-target",
+        pass: (() => {
+          const job = createDryRunJob({
+            targetId: "spiritgate",
+            assetKind: "spiritgate_video",
+            promptIntent: "Diagnostic SpiritGate video-to-video payload mapping.",
+            styleProfile: "spiritverse_internal_test",
+            safetyLevel: "internal_review",
+            sourceAssetRef: "https://example.com/spiritgate.mp4",
+            sourceAssets: ["https://example.com/spiritgate.mp4"],
+            sourceAssetType: "external_url",
+          });
+          const target = resolveRunwayGenerationTarget(job, {});
+          const payload = buildRunwayApiPayload(job);
+          return target.endpointPath === "/v1/video_to_video"
+            && target.providerMode === "video_to_video"
+            && target.model === "gen4_aleph"
+            && payload.model === "gen4_aleph"
+            && payload.videoUri === "https://example.com/spiritgate.mp4"
+            && payload.promptImage === undefined;
+        })(),
+        detail: "SpiritGate video maps to video_to_video gen4_aleph payload",
+      },
+      {
+        name: "spiritgate-enhancement-production-denied",
+        pass: canUseSpiritGateEnhancementStagingBypass({
+          targetId: "spiritgate",
+          sourceAssetRef: "https://example.com/spiritgate.mp4",
+          sourceAssetType: "external_url",
+          safetyLevel: "internal_review",
+          operatorApproval: true,
+        }, {
+          NODE_ENV: "production",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === false,
+        detail: "production cannot use SpiritGate enhancement staging bypass",
+      },
+      {
+        name: "spiritgate-enhancement-valid-staging-bypass",
+        pass: canUseSpiritGateEnhancementStagingBypass({
+          targetId: "spiritgate",
+          sourceAssetRef: "https://example.com/spiritgate.mp4",
+          sourceAssetType: "external_url",
+          safetyLevel: "internal_review",
+          operatorApproval: true,
+        }, {
+          NODE_ENV: "staging",
+          RUNWAY_STAGING_TEST_BYPASS: "true",
+        }) === true,
+        detail: "valid SpiritGate enhancement request can use staging operator bypass",
+      },
+      {
         name: "media-asset-kinds-valid",
         pass: ["portrait", "spiritgate_video", "wake_visual", "trailer_video", "game_piece_set"].every((kind) => SPIRITCORE_MEDIA_ASSET_KINDS.includes(kind)),
         detail: "SpiritCore media asset kinds include production foundation kinds",
@@ -484,6 +541,44 @@ async function main() {
         detail: "SpiritGate enhancement plan preserves existing source asset",
       },
       {
+        name: "media-source-reference-model",
+        pass: (() => {
+          const result = buildSourceMediaReference({
+            sourceAssetId: "existing-pika-spiritgate-video",
+            targetId: "spiritgate",
+            targetType: "spiritgate",
+            assetKind: "spiritgate_video",
+            sourceType: "external_url",
+            sourceUrl: "https://example.com/spiritgate.mp4",
+            approvedForReference: true,
+          });
+          return result.sourceAssetId === "existing-pika-spiritgate-video"
+            && result.providerCompatibility.runway.videoToVideo === true
+            && result.providerCompatibility.runway.recommendedMode === "video_to_video";
+        })(),
+        detail: "source media reference supports video-to-video provider compatibility",
+      },
+      {
+        name: "media-spiritgate-execution-plan-review-required",
+        pass: (() => {
+          const result = createSpiritGateEnhancementExecutionPlan({
+            targetId: "spiritgate",
+            sourceAssetRef: "https://example.com/spiritgate.mp4",
+            sourceAssetType: "external_url",
+            promptIntent: "Diagnostic SpiritGate enhancement execution plan.",
+            styleProfile: "premium cinematic SpiritGate enhancement",
+            safetyLevel: "internal_review",
+          });
+          return result.assetRecord.lifecycleState === "review_required"
+            && result.providerTarget.providerMode === "video_to_video"
+            && result.providerTarget.recommendedModel === "gen4_aleph"
+            && result.noPromotionPerformed === true
+            && result.noManifestUpdatePerformed === true
+            && result.noActiveWritePerformed === true;
+        })(),
+        detail: "SpiritGate execution plan remains review_required and write-safe",
+      },
+      {
         name: "media-assistant-roadmap-documented",
         pass: SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP.some((item) => item.id === "alarms")
           && SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP.some((item) => item.id === "smart_home"),
@@ -491,8 +586,17 @@ async function main() {
       },
       {
         name: "media-catalog-no-runway-generation",
-        pass: getMediaCatalogSummary().noProviderCall === true,
+        pass: getMediaCatalogSummary().noProviderCall === true
+          && getMediaCatalogSummary().routes.includes("POST /admin/media/spiritgate-enhancement-execute")
+          && getMediaCatalogSummary().premiumMemberGeneration.enabled === false,
         detail: "media catalog summary performs no Runway generation",
+      },
+      {
+        name: "premium-member-generation-disabled",
+        pass: PREMIUM_MEMBER_GENERATION_BOUNDARY.enabled === false
+          && PREMIUM_MEMBER_GENERATION_BOUNDARY.readinessChecklist.includes("generation budget/credit limits")
+          && PREMIUM_MEMBER_GENERATION_BOUNDARY.readinessChecklist.includes("review/approval mode"),
+        detail: "premium member generation boundary remains disabled with readiness checklist",
       },
       {
         name: "media-production-sequence-spiritgate-preserves-source",
@@ -967,6 +1071,75 @@ async function main() {
         && result?.body?.productionSequencePlan?.noProviderCall === true
         ? "premium starter pack sequence detects incomplete paid readiness"
         : "unexpected premium starter sequence result",
+    });
+    await run("media-source-reference-plan", "POST", "/admin/media/source-reference-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        sourceAssetId: "existing-pika-spiritgate-video",
+        targetId: "spiritgate",
+        targetType: "spiritgate",
+        assetKind: "spiritgate_video",
+        sourceType: "external_url",
+        sourceUrl: "https://example.com/spiritgate.mp4",
+        approvedForReference: true,
+      },
+      describe: (result) => result?.body?.sourceReference?.providerCompatibility?.runway?.recommendedMode === "video_to_video"
+        && result?.body?.noActiveWritePerformed === true
+        ? "source media reference planned without storage writes"
+        : "unexpected source reference result",
+    });
+    await run("media-spiritgate-enhancement-execute-missing-source", "POST", "/admin/media/spiritgate-enhancement-execute", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        targetId: "spiritgate",
+        sourceAssetType: "external_url",
+        promptIntent: "Diagnostic missing source reference rejection.",
+        styleProfile: "premium cinematic SpiritGate enhancement",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+      },
+      allowStatuses: [400, 422],
+      describe: () => "missing sourceAssetRef rejected",
+    });
+    await run("media-spiritgate-enhancement-execute-missing-approval", "POST", "/admin/media/spiritgate-enhancement-execute", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        targetId: "spiritgate",
+        sourceAssetRef: "https://example.com/spiritgate.mp4",
+        sourceAssetType: "external_url",
+        promptIntent: "Diagnostic missing operator approval rejection.",
+        styleProfile: "premium cinematic SpiritGate enhancement",
+        safetyLevel: "internal_review",
+        operatorApproval: false,
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.executionGates?.missingGates?.includes("operatorApproval=true is required")
+        ? "missing operator approval cannot execute provider"
+        : "unexpected missing approval result",
+    });
+    await run("media-spiritgate-enhancement-execute-valid-preview", "POST", "/admin/media/spiritgate-enhancement-execute", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        targetId: "spiritgate",
+        sourceAssetRef: "https://example.com/spiritgate.mp4",
+        sourceAssetType: "external_url",
+        promptIntent: "Diagnostic SpiritGate source-based video enhancement payload only.",
+        styleProfile: "premium cinematic SpiritGate enhancement",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+      },
+      describe: (result) => result?.body?.externalApiCall === false
+        && result?.body?.providerTarget?.providerMode === "video_to_video"
+        && result?.body?.apiPayloadPreview?.model === "gen4_aleph"
+        && result?.body?.apiPayloadPreview?.videoUri === "https://example.com/spiritgate.mp4"
+        && result?.body?.mediaAssetRecord?.lifecycleState === "review_required"
+        && result?.body?.commandCenterMetadata?.sourceAssetRequired === true
+        && result?.body?.premiumMemberGeneration?.enabled === false
+        && result?.body?.noPromotionPerformed === true
+        && result?.body?.noManifestUpdatePerformed === true
+        && result?.body?.noActiveWritePerformed === true
+        ? "valid staging request builds video-to-video payload without provider call"
+        : "unexpected SpiritGate enhancement execute preview",
     });
 
     const conversation = await run("conversation-bootstrap", "POST", "/v1/conversations", {

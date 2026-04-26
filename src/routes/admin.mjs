@@ -9,22 +9,30 @@ import { config } from "../config.mjs";
 import {
   checkRunwayOrganizationAuth,
   checkRunwayTaskStatus,
+  buildRunwayApiPayload,
+  canExecuteRunwayProvider,
   createDryRunJob,
   createExecutionSpikeJob,
+  resolveRunwayGenerationTarget,
   RUNWAY_SUPPORTED_ASSET_KINDS,
+  submitRunwayJob,
 } from "../services/runwayProvider.mjs";
 import { createPromotionPlan } from "../services/generatedAssetPipeline.mjs";
 import {
   buildGenerationTemplate,
+  buildSourceMediaReference,
   checkMediaRequirements,
   createMediaAssetPlan,
   createMediaPromotionPlan,
   createMediaReviewPlan,
   createProductionSequencePlan,
+  createSpiritGateEnhancementExecutionPlan,
   createSpiritGateEnhancementPlan,
   getMediaCatalogSummary,
+  PREMIUM_MEMBER_GENERATION_BOUNDARY,
   SPIRITCORE_MEDIA_ASSET_KINDS,
   SPIRITCORE_MEDIA_REQUIREMENT_PROFILES,
+  validateSourceMediaReference,
 } from "../services/spiritCoreMediaProduction.mjs";
 
 function isTrueEnv(value) {
@@ -83,6 +91,15 @@ export function canUseRunwayTransientStagingCredentials(body = {}, headers = {},
 
 export function canUseRunwayStagingAuthCheck(env = process.env) {
   return env.NODE_ENV === "staging" && isTrueEnv(env.RUNWAY_STAGING_TEST_BYPASS);
+}
+
+export function canUseSpiritGateEnhancementStagingBypass(body = {}, env = process.env) {
+  return env.NODE_ENV === "staging"
+    && isTrueEnv(env.RUNWAY_STAGING_TEST_BYPASS)
+    && ["spiritgate", "test-spiritgate"].includes(String(body?.targetId || "").trim())
+    && String(body?.safetyLevel || "").trim() === "internal_review"
+    && Boolean(body?.operatorApproval)
+    && Boolean(String(body?.sourceAssetRef || "").trim());
 }
 
 function readRunwayTransientHeaders(body = {}, headers = {}, env = process.env) {
@@ -741,6 +758,46 @@ export async function adminRoutes(fastify, opts) {
     },
   };
 
+  const sourceReferencePlanSchema = {
+    body: {
+      type: "object",
+      required: ["targetId", "assetKind", "sourceType"],
+      properties: {
+        sourceAssetId: { type: "string", nullable: true },
+        targetId: { type: "string", minLength: 1 },
+        targetType: { type: "string", nullable: true },
+        assetKind: { type: "string", minLength: 1 },
+        sourceType: { type: "string", minLength: 1 },
+        sourceAssetType: { type: "string", nullable: true },
+        sourceUrl: { type: "string", nullable: true },
+        storagePath: { type: "string", nullable: true },
+        sourceAssetRef: { type: "string", nullable: true },
+        uploadedAt: { type: "string", nullable: true },
+        notes: { type: "string", nullable: true },
+        approvedForReference: { type: "boolean", nullable: true },
+        usageRestrictions: { type: "array", items: { type: "string" }, nullable: true },
+      },
+    },
+  };
+
+  const spiritGateEnhancementExecuteSchema = {
+    body: {
+      type: "object",
+      required: ["targetId", "sourceAssetRef", "sourceAssetType", "promptIntent", "styleProfile", "safetyLevel", "operatorApproval"],
+      properties: {
+        targetId: { type: "string", minLength: 1 },
+        sourceAssetRef: { type: "string", minLength: 1 },
+        sourceAssetType: { type: "string", minLength: 1 },
+        promptIntent: { type: "string", minLength: 1 },
+        styleProfile: { type: "string", minLength: 1 },
+        safetyLevel: { type: "string", minLength: 1 },
+        runwayTransientKey: { type: "string", minLength: 1, nullable: true },
+        operatorApproval: { type: "boolean" },
+        notes: { type: "string", nullable: true },
+      },
+    },
+  };
+
   function mediaRouteResult(route, builder, req, reply) {
     try {
       return {
@@ -834,6 +891,212 @@ export async function adminRoutes(fastify, opts) {
   }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
     productionSequencePlan: createProductionSequencePlan(req.body),
   }), req, reply));
+
+  fastify.post("/admin/media/source-reference-plan", {
+    preHandler: requireAdminAccess,
+    schema: sourceReferencePlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => {
+    const sourceReference = buildSourceMediaReference(req.body);
+    const validation = validateSourceMediaReference(sourceReference);
+    if (!validation.ok) {
+      const error = new Error("Invalid source media reference.");
+      error.httpCode = 400;
+      error.code = "SOURCE_MEDIA_REFERENCE_INVALID";
+      error.detail = { errors: validation.errors };
+      throw error;
+    }
+    return {
+      sourceReference,
+      sourceRegistryMode: "reference_only",
+      noUploadStorageImplemented: true,
+    };
+  }, req, reply));
+
+  async function requireSpiritGateEnhancementAccess(req, reply) {
+    if (canUseSpiritGateEnhancementStagingBypass(req.body, process.env)) {
+      req.spiritGateStagingBypassUsed = true;
+      req.adminAccess = {
+        allowed: true,
+        bypassed: true,
+        mode: "staging-spiritgate-enhancement-bypass",
+        source: "staging-spiritgate-enhancement-bypass",
+      };
+      return;
+    }
+
+    req.spiritGateStagingBypassUsed = false;
+    return requireAdminAccess(req, reply);
+  }
+
+  fastify.post("/admin/media/spiritgate-enhancement-execute", {
+    preHandler: requireSpiritGateEnhancementAccess,
+    schema: spiritGateEnhancementExecuteSchema,
+  }, async (req, reply) => {
+    const route = req.routeOptions?.url || req.url;
+    const body = req.body || {};
+    if (process.env.NODE_ENV !== "staging") {
+      return reply.code(404).send({
+        ok: false,
+        route,
+        error: "SPIRITGATE_ENHANCEMENT_EXECUTE_UNAVAILABLE",
+        message: "SpiritGate enhancement execution is available only in staging operator mode.",
+        externalApiCall: false,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
+    const gateFailures = [];
+    if (!isTrueEnv(process.env.RUNWAY_STAGING_TEST_BYPASS)) gateFailures.push("RUNWAY_STAGING_TEST_BYPASS=true is required");
+    if (!body.operatorApproval) gateFailures.push("operatorApproval=true is required");
+    if (!["spiritgate", "test-spiritgate"].includes(String(body.targetId || "").trim())) gateFailures.push("targetId must be spiritgate or test-spiritgate");
+    if (body.safetyLevel !== "internal_review") gateFailures.push("safetyLevel must be internal_review");
+    if (!String(body.sourceAssetRef || "").trim()) gateFailures.push("sourceAssetRef is required");
+
+    try {
+      const executionPlan = createSpiritGateEnhancementExecutionPlan({
+        ...body,
+        requestedBy: req.adminAccess?.source || "admin_media_spiritgate_execute",
+      });
+      const runwayApiKey = String(body.runwayTransientKey || config.generator?.video?.runway?.apiKey || process.env.RUNWAY_API_KEY || "").trim();
+      const executionEnv = {
+        ...process.env,
+        RUNWAY_API_KEY: runwayApiKey,
+      };
+      const executionConfig = {
+        ...config,
+        adminAuth: {
+          ...config.adminAuth,
+          mode: "enforce",
+        },
+        generator: {
+          ...config.generator,
+          video: {
+            ...config.generator?.video,
+            runway: {
+              ...config.generator?.video?.runway,
+              apiKey: runwayApiKey,
+              videoToVideoModel: config.generator?.video?.runway?.videoToVideoModel || "gen4_aleph",
+              videoToVideoGeneratePath: config.generator?.video?.runway?.videoToVideoGeneratePath || "/v1/video_to_video",
+            },
+          },
+        },
+      };
+      const providerGates = canExecuteRunwayProvider(executionConfig, executionEnv, req.adminAccess || {});
+      const dryRunJob = createDryRunJob({
+        targetId: body.targetId,
+        assetKind: "spiritgate_video",
+        promptIntent: body.promptIntent,
+        styleProfile: body.styleProfile,
+        safetyLevel: body.safetyLevel,
+        sourceAssetRef: body.sourceAssetRef,
+        sourceAssets: [body.sourceAssetRef],
+        sourceAssetType: body.sourceAssetType,
+        requestedBy: req.adminAccess?.source || "admin_media_spiritgate_execute",
+      });
+      const providerTarget = resolveRunwayGenerationTarget(dryRunJob, executionConfig.generator?.video?.runway || {});
+      const apiPayloadPreview = buildRunwayApiPayload({
+        ...dryRunJob,
+        _runwayConfig: executionConfig.generator?.video?.runway || {},
+      });
+      const allGates = {
+        ok: gateFailures.length === 0 && providerGates.ok,
+        missingGates: [...gateFailures, ...providerGates.missingGates],
+      };
+
+      const baseResponse = {
+        ok: true,
+        route,
+        stagingBypassUsed: Boolean(req.spiritGateStagingBypassUsed),
+        operatorApprovalRequired: true,
+        operatorApprovalReceived: Boolean(body.operatorApproval),
+        sourceConceptMustBePreserved: true,
+        originalReplacementAllowed: false,
+        enhancementOnly: true,
+        externalApiCall: false,
+        executed: false,
+        executionGates: allGates,
+        providerTarget,
+        apiPayloadPreview,
+        mediaAssetRecord: executionPlan.assetRecord,
+        outputLifecycleState: "review_required",
+        commandCenterMetadata: executionPlan.commandCenterMetadata,
+        premiumMemberGeneration: PREMIUM_MEMBER_GENERATION_BOUNDARY,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      };
+
+      if (!allGates.ok) {
+        return baseResponse;
+      }
+
+      if (isTrueEnv(process.env.RUNWAY_SPIRITGATE_EXECUTE_MOCK)) {
+        return {
+          ...baseResponse,
+          externalApiCall: false,
+          executed: false,
+          mock: true,
+          providerResult: {
+            provider: "runway",
+            providerJobId: "mock-spiritgate-video-task",
+            status: "queued",
+            rawStatus: "mock_submitted",
+          },
+          mediaAssetRecord: {
+            ...executionPlan.assetRecord,
+            providerJobId: "mock-spiritgate-video-task",
+            lifecycleState: "review_required",
+            reviewStatus: "pending",
+          },
+        };
+      }
+
+      const providerResult = await submitRunwayJob({
+        ...dryRunJob,
+        lifecycleState: "queued",
+        _runwayConfig: executionConfig.generator?.video?.runway || {},
+      });
+      fastify.log?.warn?.({
+        route,
+        stagingBypassUsed: Boolean(req.spiritGateStagingBypassUsed),
+        targetId: body.targetId,
+        assetKind: "spiritgate_video",
+        safetyLevel: body.safetyLevel,
+        externalApiCall: true,
+      }, "[runway] SpiritGate enhancement execution");
+      return {
+        ...baseResponse,
+        externalApiCall: true,
+        executed: true,
+        providerResult,
+        mediaAssetRecord: {
+          ...executionPlan.assetRecord,
+          providerJobId: providerResult.providerJobId,
+          lifecycleState: "review_required",
+          reviewStatus: "pending",
+        },
+        commandCenterMetadata: {
+          ...executionPlan.commandCenterMetadata,
+          generationStatus: providerResult.status || "queued",
+          reviewStatus: "pending",
+        },
+      };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({
+        ok: false,
+        route,
+        error: err.code ?? "SPIRITGATE_ENHANCEMENT_EXECUTE_ERROR",
+        message: err.message,
+        details: err.detail || {},
+        externalApiCall: false,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+      });
+    }
+  });
 
   fastify.get("/admin/media/catalog-summary", {
     preHandler: requireAdminAccess,
