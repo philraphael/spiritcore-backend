@@ -11,6 +11,16 @@ import {
   createDryRunJob,
   resolveRunwayGenerationTarget,
 } from "../src/services/runwayProvider.mjs";
+import {
+  buildGenerationTemplate,
+  checkMediaRequirements,
+  createMediaPromotionPlan,
+  createSpiritGateEnhancementPlan,
+  getMediaCatalogSummary,
+  SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP,
+  SPIRITCORE_MEDIA_ASSET_KINDS,
+  SPIRITCORE_MEDIA_REQUIREMENT_PROFILES,
+} from "../src/services/spiritCoreMediaProduction.mjs";
 
 const PORT = Number(process.env.SPIRITCORE_DIAG_PORT || 3115);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -389,6 +399,98 @@ async function main() {
         })(),
         detail: "video asset maps to image_to_video gen4_turbo payload",
       },
+      {
+        name: "media-asset-kinds-valid",
+        pass: ["portrait", "spiritgate_video", "wake_visual", "trailer_video", "game_piece_set"].every((kind) => SPIRITCORE_MEDIA_ASSET_KINDS.includes(kind)),
+        detail: "SpiritCore media asset kinds include production foundation kinds",
+      },
+      {
+        name: "media-requirement-profiles-exist",
+        pass: ["original_spiritkin", "premium_spiritkin", "spiritgate_realm", "game_assets", "wake_presence"]
+          .every((profileId) => Boolean(SPIRITCORE_MEDIA_REQUIREMENT_PROFILES[profileId])),
+        detail: "media requirement profiles exist",
+      },
+      {
+        name: "media-original-requirements-check",
+        pass: (() => {
+          const result = checkMediaRequirements({
+            profileId: "original_spiritkin",
+            spiritkinId: "Lyra",
+            assets: [
+              { spiritkinId: "Lyra", assetKind: "portrait", lifecycleState: "active", reviewStatus: "approved", promotionStatus: "promoted", activeStatus: "active" },
+              { spiritkinId: "Lyra", assetKind: "hero", lifecycleState: "review_required", reviewStatus: "pending" },
+            ],
+          });
+          return result.missingRequiredAssets.includes("idle_video")
+            && result.awaitingReviewAssets.includes("hero")
+            && result.activeAssets.includes("portrait")
+            && result.noBehaviorBlock === true;
+        })(),
+        detail: "original Spiritkin can be checked against media requirements",
+      },
+      {
+        name: "media-premium-profile-exists",
+        pass: SPIRITCORE_MEDIA_REQUIREMENT_PROFILES.premium_spiritkin?.requiredAssetKinds?.includes("wake_visual") === true,
+        detail: "premium Spiritkin requirement profile exists",
+      },
+      {
+        name: "media-template-no-provider-call",
+        pass: (() => {
+          const result = buildGenerationTemplate({
+            assetKind: "wake_visual",
+            spiritkinName: "Lyra",
+            spiritkinRole: "Celestial Fawn of the Luminous Veil",
+            visualIdentity: "gentle luminous companion presence",
+            loreSummary: "A warm emotional anchor in the Luminous Veil.",
+            colorPalette: "rose, pearl, soft gold",
+            emotionalTone: "calm, reassuring, magical",
+            referenceAssets: ["/app/assets/concepts/Lyra.png"],
+          });
+          return result.providerCall === false && result.prompt.includes("Lyra") && result.prompt.includes("wake_visual");
+        })(),
+        detail: "template generation produces prompt text without provider calls",
+      },
+      {
+        name: "media-promotion-plan-no-active-write",
+        pass: (() => {
+          const result = createMediaPromotionPlan({
+            spiritkinId: "Lyra",
+            assetKind: "presence_indicator",
+            lifecycleState: "approved",
+            reviewStatus: "approved",
+            promotionStatus: "planned",
+          });
+          return result.operatorApprovalRequired === true
+            && result.noManifestUpdates === true
+            && result.noActiveWrites === true
+            && result.activePath.includes("ACTIVE");
+        })(),
+        detail: "review and promotion plans do not write ACTIVE assets automatically",
+      },
+      {
+        name: "media-spiritgate-enhancement-plan",
+        pass: (() => {
+          const result = createSpiritGateEnhancementPlan({
+            existingSourceAsset: "SpiritGate/PikaLabs/original-spiritgate.mp4",
+            versionTag: "diag-spiritgate-upgrade",
+          });
+          return result.noProviderCall === true
+            && result.spiritGate.originalReplacementAllowed === false
+            && result.spiritGate.existingSourceAsset.includes("PikaLabs");
+        })(),
+        detail: "SpiritGate enhancement plan preserves existing source asset",
+      },
+      {
+        name: "media-assistant-roadmap-documented",
+        pass: SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP.some((item) => item.id === "alarms")
+          && SPIRITCORE_ASSISTANT_CAPABILITY_ROADMAP.some((item) => item.id === "smart_home"),
+        detail: "assistant capability roadmap is documented",
+      },
+      {
+        name: "media-catalog-no-runway-generation",
+        pass: getMediaCatalogSummary().noProviderCall === true,
+        detail: "media catalog summary performs no Runway generation",
+      },
     ].map((check) => ({
       ...check,
       method: "INTERNAL",
@@ -676,6 +778,100 @@ async function main() {
         versionTag: "diag-trailer",
       },
       describe: (result) => result?.body?.promotionPlan?.operatorApprovalRequired === true ? "operator approval required" : "unexpected approval flag",
+    });
+    await run("media-catalog-summary", "GET", "/admin/media/catalog-summary", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      describe: (result) => result?.body?.catalogSummary?.noProviderCall === true
+        && result?.body?.catalogSummary?.assetKinds?.includes("wake_visual")
+        ? "media catalog summary returned without provider call"
+        : "unexpected media catalog summary",
+    });
+    await run("media-requirements-check", "POST", "/admin/media/requirements-check", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        profileId: "premium_spiritkin",
+        spiritkinId: "custom-aura",
+        assets: [
+          { spiritkinId: "custom-aura", assetKind: "portrait", lifecycleState: "draft" },
+        ],
+      },
+      describe: (result) => result?.body?.requirements?.incompletePremiumSpiritkin === true
+        && result?.body?.externalApiCall === false
+        ? "premium requirements checked without blocking behavior"
+        : "unexpected media requirements result",
+    });
+    await run("media-generation-template", "POST", "/admin/media/generation-template", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        assetKind: "listening_video",
+        spiritkinName: "Lyra",
+        spiritkinRole: "Celestial Fawn of the Luminous Veil",
+        visualIdentity: "gentle luminous companion with rose pearl and soft gold motifs",
+        loreSummary: "Lyra is an emotional anchor in the Luminous Veil.",
+        colorPalette: "rose, pearl, soft gold",
+        emotionalTone: "calm, attentive, magical",
+        styleProfile: "premium cinematic Spiritverse companion presence",
+        safetyLevel: "internal_review",
+        referenceAssets: ["/app/assets/concepts/Lyra.png"],
+      },
+      describe: (result) => result?.body?.generationTemplate?.providerCall === false
+        && result?.body?.generationTemplate?.prompt?.includes("Lyra")
+        ? "generation template produced prompt without provider call"
+        : "unexpected media template result",
+    });
+    await run("media-asset-plan", "POST", "/admin/media/asset-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        spiritkinId: "Lyra",
+        assetKind: "presence_indicator",
+        promptIntent: "Create compact living presence indicator states for Lyra.",
+        existingAssets: [
+          { spiritkinId: "Lyra", assetKind: "portrait", lifecycleState: "active", reviewStatus: "approved", promotionStatus: "promoted", activeStatus: "active", publicPath: "/app/assets/concepts/Lyra.png" },
+        ],
+      },
+      describe: (result) => result?.body?.assetPlan?.noProviderCall === true
+        && result?.body?.noActiveWritePerformed === true
+        ? "media asset plan generated without writes"
+        : "unexpected media asset plan",
+    });
+    await run("media-review-plan", "POST", "/admin/media/review-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        spiritkinId: "Lyra",
+        assetKind: "wake_visual",
+        lifecycleState: "review_required",
+        reviewStatus: "pending",
+      },
+      describe: (result) => result?.body?.reviewPlan?.noPromotionPerformed === true
+        && result?.body?.reviewPlan?.requiredChecks?.includes("safety review completed")
+        ? "review plan requires operator checks and performs no promotion"
+        : "unexpected media review plan",
+    });
+    await run("media-promotion-plan", "POST", "/admin/media/promotion-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        spiritkinId: "Lyra",
+        assetKind: "wake_visual",
+        lifecycleState: "approved",
+        reviewStatus: "approved",
+        promotionStatus: "planned",
+        versionTag: "diag-wake-visual",
+      },
+      describe: (result) => result?.body?.promotionPlan?.operatorApprovalRequired === true
+        && result?.body?.promotionPlan?.noActiveWrites === true
+        ? "promotion plan prepared without ACTIVE writes"
+        : "unexpected media promotion plan",
+    });
+    await run("media-spiritgate-enhancement-plan", "POST", "/admin/media/spiritgate-enhancement-plan", {
+      headers: { "x-admin-key": DIAG_ADMIN_KEY },
+      body: {
+        existingSourceAsset: "SpiritGate/PikaLabs/original-spiritgate.mp4",
+        versionTag: "diag-spiritgate-upgrade",
+      },
+      describe: (result) => result?.body?.spiritGateEnhancementPlan?.spiritGate?.originalReplacementAllowed === false
+        && result?.body?.spiritGateEnhancementPlan?.noProviderCall === true
+        ? "SpiritGate enhancement plan preserves original without provider call"
+        : "unexpected SpiritGate enhancement plan",
     });
 
     const conversation = await run("conversation-bootstrap", "POST", "/v1/conversations", {

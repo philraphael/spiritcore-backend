@@ -14,6 +14,17 @@ import {
   RUNWAY_SUPPORTED_ASSET_KINDS,
 } from "../services/runwayProvider.mjs";
 import { createPromotionPlan } from "../services/generatedAssetPipeline.mjs";
+import {
+  buildGenerationTemplate,
+  checkMediaRequirements,
+  createMediaAssetPlan,
+  createMediaPromotionPlan,
+  createMediaReviewPlan,
+  createSpiritGateEnhancementPlan,
+  getMediaCatalogSummary,
+  SPIRITCORE_MEDIA_ASSET_KINDS,
+  SPIRITCORE_MEDIA_REQUIREMENT_PROFILES,
+} from "../services/spiritCoreMediaProduction.mjs";
 
 function isTrueEnv(value) {
   return String(value || "").trim().toLowerCase() === "true";
@@ -629,6 +640,175 @@ export async function adminRoutes(fastify, opts) {
     preHandler: requireRunwayExecutionSpikeAccess,
     schema: runwayExecutionSpikeSchema,
   }, handleRunwayExecutionSpike);
+
+  const mediaAssetPlanSchema = {
+    body: {
+      type: "object",
+      required: ["assetKind"],
+      properties: {
+        assetId: { type: "string", nullable: true },
+        spiritkinId: { type: "string", nullable: true },
+        targetId: { type: "string", nullable: true },
+        targetType: { type: "string", nullable: true },
+        assetKind: { type: "string", minLength: 1 },
+        lifecycleState: { type: "string", nullable: true },
+        reviewStatus: { type: "string", nullable: true },
+        promotionStatus: { type: "string", nullable: true },
+        activeStatus: { type: "string", nullable: true },
+        provider: { type: "string", nullable: true },
+        providerJobId: { type: "string", nullable: true },
+        sourceAssetRefs: { type: "array", items: { type: "string" }, nullable: true },
+        promptIntent: { type: "string", nullable: true },
+        styleProfile: { type: "string", nullable: true },
+        safetyLevel: { type: "string", nullable: true },
+        outputUrls: { type: "array", items: { type: "string" }, nullable: true },
+        publicPath: { type: "string", nullable: true },
+        activePath: { type: "string", nullable: true },
+        reviewPath: { type: "string", nullable: true },
+        metadataPath: { type: "string", nullable: true },
+        versionTag: { type: "string", nullable: true },
+        artifactFileName: { type: "string", nullable: true },
+        existingAssets: { type: "array", items: { type: "object", additionalProperties: true }, nullable: true },
+        assets: { type: "array", items: { type: "object", additionalProperties: true }, nullable: true },
+        referenceAssets: { type: "array", items: { type: "string" }, nullable: true },
+        spiritkinName: { type: "string", nullable: true },
+        spiritkinRole: { type: "string", nullable: true },
+        visualIdentity: { type: "string", nullable: true },
+        loreSummary: { type: "string", nullable: true },
+        colorPalette: { type: "string", nullable: true },
+        emotionalTone: { type: "string", nullable: true },
+        notes: { type: "string", nullable: true },
+      },
+    },
+  };
+
+  const mediaRequirementsCheckSchema = {
+    body: {
+      type: "object",
+      required: ["profileId"],
+      properties: {
+        profileId: { type: "string", minLength: 1 },
+        targetId: { type: "string", nullable: true },
+        spiritkinId: { type: "string", nullable: true },
+        assets: { type: "array", items: { type: "object", additionalProperties: true }, nullable: true },
+      },
+    },
+  };
+
+  const mediaGenerationTemplateSchema = {
+    body: {
+      type: "object",
+      required: ["assetKind"],
+      properties: {
+        templateId: { type: "string", nullable: true },
+        template: { type: "string", nullable: true },
+        assetKind: { type: "string", minLength: 1 },
+        spiritkinName: { type: "string", nullable: true },
+        spiritkinRole: { type: "string", nullable: true },
+        visualIdentity: { type: "string", nullable: true },
+        loreSummary: { type: "string", nullable: true },
+        colorPalette: { type: "string", nullable: true },
+        emotionalTone: { type: "string", nullable: true },
+        styleProfile: { type: "string", nullable: true },
+        safetyLevel: { type: "string", nullable: true },
+        referenceAssets: { type: "array", items: { type: "string" }, nullable: true },
+        negativePrompt: { type: "string", nullable: true },
+      },
+    },
+  };
+
+  function mediaRouteResult(route, builder, req, reply) {
+    try {
+      return {
+        ok: true,
+        route,
+        externalApiCall: false,
+        noProviderCall: true,
+        noPromotionPerformed: true,
+        noManifestUpdatePerformed: true,
+        noActiveWritePerformed: true,
+        ...builder(),
+      };
+    } catch (err) {
+      const code = err.httpCode ?? 500;
+      return reply.code(code).send({
+        ok: false,
+        route,
+        error: err.code ?? "SPIRITCORE_MEDIA_PLAN_ERROR",
+        message: err.message,
+        details: err.detail || {},
+        supportedAssetKinds: SPIRITCORE_MEDIA_ASSET_KINDS,
+        requirementProfiles: Object.keys(SPIRITCORE_MEDIA_REQUIREMENT_PROFILES),
+      });
+    }
+  }
+
+  fastify.post("/admin/media/asset-plan", {
+    preHandler: requireAdminAccess,
+    schema: mediaAssetPlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    assetPlan: createMediaAssetPlan({
+      ...req.body,
+      requestedBy: req.adminAccess?.source || "admin_media_asset_plan",
+    }),
+  }), req, reply));
+
+  fastify.post("/admin/media/requirements-check", {
+    preHandler: requireAdminAccess,
+    schema: mediaRequirementsCheckSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    requirements: checkMediaRequirements(req.body),
+  }), req, reply));
+
+  fastify.post("/admin/media/generation-template", {
+    preHandler: requireAdminAccess,
+    schema: mediaGenerationTemplateSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    generationTemplate: buildGenerationTemplate(req.body),
+  }), req, reply));
+
+  fastify.post("/admin/media/review-plan", {
+    preHandler: requireAdminAccess,
+    schema: mediaAssetPlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    reviewPlan: createMediaReviewPlan(req.body),
+  }), req, reply));
+
+  fastify.post("/admin/media/promotion-plan", {
+    preHandler: requireAdminAccess,
+    schema: mediaAssetPlanSchema,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    promotionPlan: createMediaPromotionPlan(req.body),
+  }), req, reply));
+
+  fastify.post("/admin/media/spiritgate-enhancement-plan", {
+    preHandler: requireAdminAccess,
+    schema: {
+      body: {
+        type: "object",
+        properties: {
+          targetId: { type: "string", nullable: true },
+          assetKind: { type: "string", nullable: true },
+          existingSourceAsset: { type: "string", nullable: true },
+          sourcePath: { type: "string", nullable: true },
+          sourceAssetRefs: { type: "array", items: { type: "string" }, nullable: true },
+          referenceAssets: { type: "array", items: { type: "string" }, nullable: true },
+          promptIntent: { type: "string", nullable: true },
+          styleProfile: { type: "string", nullable: true },
+          safetyLevel: { type: "string", nullable: true },
+          versionTag: { type: "string", nullable: true },
+        },
+      },
+    },
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    spiritGateEnhancementPlan: createSpiritGateEnhancementPlan(req.body),
+  }), req, reply));
+
+  fastify.get("/admin/media/catalog-summary", {
+    preHandler: requireAdminAccess,
+  }, async (req, reply) => mediaRouteResult(req.routeOptions?.url || req.url, () => ({
+    catalogSummary: getMediaCatalogSummary(),
+  }), req, reply));
 
   async function handleGeneratedAssetPromotionPlan(req, reply) {
     try {
