@@ -99,6 +99,11 @@ export const SPIRITKIN_MOTION_GENERATION_MODES = Object.freeze([
 ]);
 
 export const SPIRITKIN_MOTION_INTENSITIES = Object.freeze(["low", "medium"]);
+export const SPIRITKIN_IMAGE_TO_VIDEO_RATIOS = Object.freeze([
+  "720:1280",
+  "832:1104",
+  "960:960",
+]);
 
 export const ORIGINAL_SPIRITKIN_IDS = Object.freeze([
   "lyra",
@@ -605,12 +610,16 @@ function normalizeMotionGenerationControls(input = {}) {
     errors.push(`generationMode must be one of ${SPIRITKIN_MOTION_GENERATION_MODES.join(", ")}`);
   }
   const allowMouthMovement = Boolean(input.allowMouthMovement);
+  const aspectRatio = normalizeText(input.ratio || input.aspectRatio || "720:1280", 20);
+  if (!SPIRITKIN_IMAGE_TO_VIDEO_RATIOS.includes(aspectRatio)) {
+    errors.push(`ratio must be one of ${SPIRITKIN_IMAGE_TO_VIDEO_RATIOS.join(", ")}`);
+  }
   return {
     ok: errors.length === 0,
     errors,
     controls: {
       durationSec,
-      aspectRatio: normalizeText(input.aspectRatio || "720:1280", 20),
+      aspectRatio,
       motionIntensity,
       generationMode,
       allowMouthMovement,

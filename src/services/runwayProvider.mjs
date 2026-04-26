@@ -120,6 +120,37 @@ function normalizeText(value, max = 400) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+function compactPayload(value = {}) {
+  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined && entry !== null && entry !== ""));
+}
+
+function sanitizeProviderBody(parsed = {}) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  const sanitized = {};
+  for (const key of ["error", "message", "code", "failure", "failureCode", "detail", "details", "status"]) {
+    if (parsed[key] === undefined) continue;
+    if (typeof parsed[key] === "string" || typeof parsed[key] === "number" || typeof parsed[key] === "boolean") {
+      sanitized[key] = normalizeText(parsed[key], 1000);
+    } else if (parsed[key] && typeof parsed[key] === "object") {
+      sanitized[key] = sanitizeProviderBody(parsed[key]);
+    }
+  }
+  return sanitized;
+}
+
+function providerErrorMessage(parsed = {}) {
+  const error = parsed?.error;
+  if (typeof error === "string") return normalizeText(error, 1000);
+  if (error?.message) return normalizeText(error.message, 1000);
+  return normalizeText(parsed?.message || parsed?.failure || parsed?.detail || parsed?.details, 1000) || null;
+}
+
+function providerErrorCode(parsed = {}) {
+  const error = parsed?.error;
+  if (error?.code) return normalizeText(error.code, 160);
+  return normalizeText(parsed?.code || parsed?.failureCode, 160) || null;
+}
+
 function slugify(value, fallback = "target") {
   const slug = String(value || "")
     .trim()
@@ -455,17 +486,17 @@ export function buildRunwayApiPayload(job = {}) {
 
   if (target.providerMode === "video_to_video") {
     const videoUri = normalized.sourceAssetRef || (Array.isArray(normalized.sourceAssets) ? normalized.sourceAssets[0] : "");
-    return {
+    return compactPayload({
       model: job.providerModel || target.model,
       videoUri: videoUri || undefined,
       promptText: promptPackage.prompt,
       ratio: runwayVideoRatioForKind(normalized.assetKind, normalized.aspectRatio),
       seed: job.seed || undefined,
-    };
+    });
   }
 
   if (target.mediaType === "image") {
-    return {
+    return compactPayload({
       model: job.providerModel || target.model,
       promptText: promptPackage.prompt,
       ratio: runwayImageRatioForKind(normalized.assetKind, normalized.aspectRatio),
@@ -473,18 +504,18 @@ export function buildRunwayApiPayload(job = {}) {
       referenceImages: Array.isArray(normalized.sourceAssets) && normalized.sourceAssets.length
         ? normalized.sourceAssets.slice(0, 3).map((uri, index) => ({ uri, tag: `ref${index + 1}` }))
         : undefined,
-    };
+    });
   }
 
   const sourceImage = Array.isArray(normalized.sourceAssets) ? normalized.sourceAssets[0] : null;
-  return {
+  return compactPayload({
     model: job.providerModel || target.model,
     promptText: promptPackage.prompt,
     promptImage: sourceImage || undefined,
     ratio: runwayVideoRatioForKind(normalized.assetKind, normalized.aspectRatio),
     duration: normalized.durationSec || 8,
     seed: job.seed || undefined,
-  };
+  });
 }
 
 export function normalizeRunwayResponse(response = {}) {
@@ -515,7 +546,9 @@ export async function submitRunwayJob(job = {}) {
 
   const payload = buildRunwayApiPayload(job);
   const target = resolveRunwayGenerationTarget(job, runway);
-  const response = await fetch(`${baseUrl}${normalizePathPart(target.endpointPath, DEFAULT_VIDEO_GENERATE_PATH)}`, {
+  const endpointPath = normalizePathPart(target.endpointPath, DEFAULT_VIDEO_GENERATE_PATH);
+  const fetchImpl = job.fetchImpl || runway.fetchImpl || fetch;
+  const response = await fetchImpl(`${baseUrl}${endpointPath}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -533,7 +566,32 @@ export async function submitRunwayJob(job = {}) {
     parsed = { message: "Provider returned a non-JSON response." };
   }
   if (!response.ok) {
-    throw new Error(`Runway provider request failed with status ${response.status}.`);
+    const error = new Error(`Runway provider request failed with status ${response.status}.`);
+    error.code = "RUNWAY_PROVIDER_REQUEST_FAILED";
+    error.httpCode = 502;
+    error.providerHttpStatus = response.status;
+    error.providerBody = sanitizeProviderBody(parsed);
+    error.providerBodyKeys = Object.keys(parsed || {}).slice(0, 20);
+    error.providerError = parsed?.error !== undefined ? sanitizeProviderBody({ error: parsed.error }).error : null;
+    error.providerErrorMessage = providerErrorMessage(parsed);
+    error.providerErrorCode = providerErrorCode(parsed);
+    error.endpointPath = endpointPath;
+    error.model = payload.model || target.model;
+    error.providerMode = target.providerMode;
+    error.payloadPreview = payload;
+    error.detail = {
+      providerHttpStatus: error.providerHttpStatus,
+      providerBody: error.providerBody,
+      providerBodyKeys: error.providerBodyKeys,
+      providerError: error.providerError,
+      providerErrorMessage: error.providerErrorMessage,
+      providerErrorCode: error.providerErrorCode,
+      endpointPath: error.endpointPath,
+      model: error.model,
+      providerMode: error.providerMode,
+      payloadPreview: error.payloadPreview,
+    };
+    throw error;
   }
   return normalizeRunwayResponse(parsed);
 }

@@ -14,6 +14,7 @@ import {
   checkRunwayTaskStatus,
   createDryRunJob,
   resolveRunwayGenerationTarget,
+  submitRunwayJob,
 } from "../src/services/runwayProvider.mjs";
 import {
   buildGenerationTemplate,
@@ -422,6 +423,85 @@ async function main() {
             && payload.duration === 8;
         })(),
         detail: "video asset maps to image_to_video gen4_turbo payload",
+      },
+      {
+        name: "runway-image-to-video-payload-compatible",
+        pass: (() => {
+          const job = createDryRunJob({
+            spiritkinId: "lyra",
+            targetId: "lyra-motion-pack-v1",
+            assetKind: "idle_video",
+            promptIntent: "Diagnostic idle payload compatibility.",
+            styleProfile: "spiritverse_internal_test",
+            safetyLevel: "internal_review",
+            sourceAssetRef: "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png",
+            sourceAssets: ["https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png"],
+            sourceAssetType: "external_url",
+            durationSec: 5,
+            aspectRatio: "720:1280",
+          });
+          const target = resolveRunwayGenerationTarget(job, {});
+          const payload = buildRunwayApiPayload(job);
+          const payloadKeys = Object.keys(payload).sort();
+          const unsupportedFields = ["aspectRatio", "motionIntensity", "generationMode", "allowMouthMovement", "sourceAssetRef", "sourceAssetType"];
+          return target.endpointPath === "/v1/image_to_video"
+            && target.providerMode === "image_to_video"
+            && target.model === "gen4_turbo"
+            && payload.model === "gen4_turbo"
+            && payload.promptImage === "https://spiritcore-backend-copy-production.up.railway.app/portraits/lyra_portrait.png"
+            && typeof payload.promptText === "string"
+            && payload.promptText.length > 0
+            && ["720:1280", "832:1104", "960:960", "1280:720", "1584:672", "1104:832"].includes(payload.ratio)
+            && [5, 8].includes(payload.duration)
+            && payloadKeys.join(",") === "duration,model,promptImage,promptText,ratio"
+            && unsupportedFields.every((field) => payload[field] === undefined);
+        })(),
+        detail: "image_to_video payload uses only Runway-supported fields",
+      },
+      {
+        name: "runway-provider-400-error-sanitized",
+        pass: await (async () => {
+          try {
+            const job = createDryRunJob({
+              spiritkinId: "lyra",
+              targetId: "lyra-motion-pack-v1",
+              assetKind: "idle_video",
+              promptIntent: "Diagnostic provider 400 handling.",
+              styleProfile: "spiritverse_internal_test",
+              safetyLevel: "internal_review",
+              sourceAssets: ["https://example.com/lyra.png"],
+              durationSec: 5,
+              aspectRatio: "720:1280",
+            });
+            await submitRunwayJob({
+              ...job,
+              _runwayConfig: {
+                baseUrl: "https://api.dev.runwayml.com",
+                apiKey: "mock-runway-key",
+                videoModel: "gen4_turbo",
+              },
+              fetchImpl: async () => new Response(JSON.stringify({
+                error: "Invalid request",
+                message: "ratio must be one of 720:1280, 832:1104, 960:960",
+                code: "INVALID_ARGUMENT",
+              }), { status: 400, headers: { "content-type": "application/json" } }),
+            });
+            return false;
+          } catch (error) {
+            const serialized = JSON.stringify(error.detail || {});
+            return error.code === "RUNWAY_PROVIDER_REQUEST_FAILED"
+              && error.providerHttpStatus === 400
+              && error.providerErrorMessage === "Invalid request"
+              && error.providerErrorCode === "INVALID_ARGUMENT"
+              && error.providerBodyKeys.includes("message")
+              && error.endpointPath === "/v1/image_to_video"
+              && error.model === "gen4_turbo"
+              && error.providerMode === "image_to_video"
+              && error.payloadPreview?.promptImage === "https://example.com/lyra.png"
+              && !serialized.includes("mock-runway-key");
+          }
+        })(),
+        detail: "mocked provider 400 returns sanitized request failure details without secrets",
       },
       {
         name: "runway-spiritgate-video-to-video-target",
@@ -1766,6 +1846,56 @@ async function main() {
         && result?.body?.noActiveWritePerformed === true
         ? "valid staging diagnostic idle request builds safe image-to-video payload without provider call"
         : "unexpected Spiritkin motion execute preview",
+    });
+    await run("media-spiritkin-motion-state-execute-provider-400-sanitized", "POST", "/admin/media/spiritkin-motion-state-execute", {
+      headers: {
+        "x-admin-key": DIAG_ADMIN_KEY,
+        "x-runway-transient-execute": "true",
+        "x-runway-transient-provider-execution": "true",
+        "x-runway-mock-provider-400": "true",
+      },
+      body: {
+        spiritkinId: "lyra",
+        targetId: "lyra-motion-pack-v1",
+        assetType: "idle_01",
+        assetKind: "idle_video",
+        sourceAssetRef: lyraSourceUrl,
+        sourceAssetType: "external_url",
+        promptIntent: "Animate Lyra in a diagnostic idle loop for provider 400 handling.",
+        styleProfile: "premium cinematic Spiritverse companion, elegant, emotionally alive",
+        safetyLevel: "internal_review",
+        operatorApproval: true,
+        durationSec: 5,
+        ratio: "720:1280",
+        motionIntensity: "low",
+        generationMode: "diagnostic_idle",
+        allowMouthMovement: false,
+        runwayTransientKey: "mock-runway-key",
+      },
+      allowStatuses: [502],
+      describe: (result) => {
+        const serialized = JSON.stringify(result?.body || {});
+        const payload = result?.body?.payloadPreview || {};
+        const payloadKeys = Object.keys(payload).sort().join(",");
+        return result?.body?.externalApiCall === true
+          && result?.body?.providerHttpStatus === 400
+          && result?.body?.providerErrorMessage === "Invalid request"
+          && result?.body?.providerErrorCode === "INVALID_ARGUMENT"
+          && result?.body?.providerBodyKeys?.includes("message")
+          && result?.body?.endpointPath === "/v1/image_to_video"
+          && result?.body?.model === "gen4_turbo"
+          && result?.body?.providerMode === "image_to_video"
+          && payload.promptImage === lyraSourceUrl
+          && payload.duration === 5
+          && payload.ratio === "720:1280"
+          && payloadKeys === "duration,model,promptImage,promptText,ratio"
+          && result?.body?.noPromotionPerformed === true
+          && result?.body?.noManifestUpdatePerformed === true
+          && result?.body?.noActiveWritePerformed === true
+          && !serialized.includes("mock-runway-key")
+          ? "provider 400 returned sanitized Runway error details without writes"
+          : "unexpected provider 400 sanitization result";
+      },
     });
     await run("media-spiritkin-motion-state-execute-transient-flags-mock", "POST", "/admin/media/spiritkin-motion-state-execute", {
       headers: {

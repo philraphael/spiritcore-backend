@@ -165,7 +165,7 @@ The first Lyra `speaking_01` image-to-video job was accepted by Runway but faile
 The SpiritCore route, source URL, auth, gates, and review lifecycle worked. The failure occurred inside Runway generation. To reduce paid-generation waste, the motion-state execution route now accepts safer controls:
 
 - `durationSec`: `5` or `8`, default `5`
-- `aspectRatio`: default `720:1280`
+- `ratio` / `aspectRatio`: default `720:1280`; diagnostic overrides allow `832:1104` and `960:960`
 - `motionIntensity`: `low` or `medium`, default `low`
 - `generationMode`: `diagnostic_idle`, `subtle_speaking`, or `speaking`, default `diagnostic_idle`
 - `allowMouthMovement`: boolean, default `false`
@@ -180,6 +180,36 @@ The recommended next test is Lyra `idle_01`, not `speaking_01`:
 - `allowMouthMovement`: `false`
 
 `diagnostic_idle` prompts only for blinking, breathing, and tiny natural head movement. It explicitly avoids speaking demands and mouth movement. Lyra `speaking_01` should be retried only after the idle diagnostic succeeds.
+
+## Provider Request 400 Transparency
+
+The first safer Lyra `idle_01` diagnostic attempt reached the SpiritCore execution route but failed before Runway created a task:
+
+- route: `POST /admin/media/spiritkin-motion-state-execute`
+- error: `SPIRITKIN_MOTION_STATE_EXECUTE_ERROR`
+- provider message observed by the route: `Runway provider request failed with status 400.`
+- previous response detail gap: `{}` did not expose the sanitized provider body.
+
+Provider request errors now return sanitized diagnostic fields:
+
+- `providerHttpStatus`
+- `providerBodyKeys`
+- `providerErrorMessage`
+- `providerErrorCode`
+- `endpointPath`
+- `model`
+- `providerMode`
+- `payloadPreview`
+
+The payload preview intentionally excludes secrets and internal control fields. For Lyra `idle_01`, the provider payload is constrained to Runway `image_to_video` fields only:
+
+- `model`
+- `promptImage`
+- `promptText`
+- `ratio`
+- `duration`
+
+The next paid retry should happen only after inspecting the sanitized provider 400 body from staging and confirming whether Runway rejected ratio, source image access, prompt shape, or another request field.
 
 ## Confirmations
 

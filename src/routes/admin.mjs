@@ -982,6 +982,7 @@ export async function adminRoutes(fastify, opts) {
         runwayTransientKey: { type: "string", minLength: 1, nullable: true },
         operatorApproval: { type: "boolean" },
         durationSec: { type: "number", nullable: true },
+        ratio: { type: "string", nullable: true },
         aspectRatio: { type: "string", nullable: true },
         motionIntensity: { type: "string", nullable: true },
         generationMode: { type: "string", nullable: true },
@@ -1319,6 +1320,24 @@ export async function adminRoutes(fastify, opts) {
 
       if (!allGates.ok) return baseResponse;
 
+      if (isTrueEnv(process.env.RUNWAY_SPIRITKIN_MOTION_EXECUTE_MOCK) && String(req.headers["x-runway-mock-provider-400"] || "").toLowerCase() === "true") {
+        const mockResponseBody = {
+          error: "Invalid request",
+          message: "ratio must be one of 720:1280, 832:1104, 960:960, 1280:720, 1584:672, 1104:832",
+          code: "INVALID_ARGUMENT",
+        };
+        await submitRunwayJob({
+          ...dryRunJob,
+          lifecycleState: "queued",
+          _runwayConfig: executionConfig.generator?.video?.runway || {},
+          fetchImpl: async () => ({
+            ok: false,
+            status: 400,
+            text: async () => JSON.stringify(mockResponseBody),
+          }),
+        });
+      }
+
       if (isTrueEnv(process.env.RUNWAY_SPIRITKIN_MOTION_EXECUTE_MOCK)) {
         const mockProviderJobId = `mock-${executionPlan.spiritkinId}-${String(executionPlan.assetType || "motion").replace(/_/g, "-")}-task`;
         return {
@@ -1374,13 +1393,25 @@ export async function adminRoutes(fastify, opts) {
       };
     } catch (err) {
       const code = err.httpCode ?? 500;
+      const providerDetails = {
+        providerHttpStatus: err.providerHttpStatus ?? err.detail?.providerHttpStatus ?? null,
+        providerBodyKeys: err.providerBodyKeys ?? err.detail?.providerBodyKeys ?? [],
+        providerErrorMessage: err.providerErrorMessage ?? err.detail?.providerErrorMessage ?? null,
+        providerErrorCode: err.providerErrorCode ?? err.detail?.providerErrorCode ?? null,
+        endpointPath: err.endpointPath ?? err.detail?.endpointPath ?? null,
+        model: err.model ?? err.detail?.model ?? null,
+        providerMode: err.providerMode ?? err.detail?.providerMode ?? null,
+        payloadPreview: err.payloadPreview ?? err.detail?.payloadPreview ?? null,
+      };
+      const hasProviderDetails = Boolean(providerDetails.providerHttpStatus);
       return reply.code(code).send({
         ok: false,
         route,
         error: err.code ?? "SPIRITKIN_MOTION_STATE_EXECUTE_ERROR",
         message: err.message,
         details: err.detail || {},
-        externalApiCall: false,
+        ...(hasProviderDetails ? providerDetails : {}),
+        externalApiCall: hasProviderDetails,
         noPromotionPerformed: true,
         noManifestUpdatePerformed: true,
         noActiveWritePerformed: true,
